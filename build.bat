@@ -48,8 +48,6 @@ set LINKS=!LINKS! -lgdi32
 set LINKS=!LINKS! -lwinmm
 set LINKS=!LINKS! -lwinpthread
 set LINKS=!LINKS! -lws2_32
-:: set LINKS=!LINKS! -lglfw3
-:: set LIBS=!LIBS! -L"platform/windows/GLFW"
 
 :: compile
 echo Building prism...
