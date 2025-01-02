@@ -140,39 +140,6 @@ def handle():
             quality = "\033[33m"
         print("Audit finished - detected " + quality + str(vulnerabilities) + "\033[0m vulnerabilities")
         return True
-        bake_required = False
-        num_tiles = 0
-
-        # get tile stats
-        for root, dirs, files in os.walk("assets/tiles"):
-            for file in files:
-                filepath = os.path.join(root, file)
-                if ".png" in filepath:
-                    num_tiles += 1
-
-        # construct pack
-        pack_str  = "#ifndef PACK_H\n"
-        pack_str += "#define PACK_H\n"
-        pack_str += "\n"
-        pack_str += f"#define TILE_ASSET_COUNT {num_tiles}\n"
-        pack_str += "\n"
-        pack_str += "#endif"
-
-        if os.path.exists("src/assets/pack.h"):
-            with open("src/assets/pack.h", 'r') as f:
-                src = f.read()
-                bake_required = src != pack_str
-        else:
-            bake_required = True
-
-        if bake_required:
-            print("Assets were detected to be out of date... baking assets now")
-            with open("src/assets/pack.h", 'w') as f:
-                f.write(pack_str)
-            print("Assets \033[32msuccessfully\033[0m baked!")
-        else:
-            print("Assets are currently \033[32mup to date\033[0m - no baking needed!")
-        return True
     return False
 
 if (handle() == False):
