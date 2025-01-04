@@ -1,6 +1,7 @@
 #include "ui.h"
 #include "core/log.h"
 #include "data/input.h"
+#include "data/colors.h"
 #include "raylib.h"
 #include "easymemory.h"
 
@@ -53,12 +54,12 @@ void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
             DrawUI((UI*)(ui->right), x + ui->divide, y, w - ui->divide, h);
         }
     } else {
-        DrawRectangle(x, y, w, h, RED);
-        size_t th = 2;
-        DrawLineEx((Vector2){x, y + (th/2)}, (Vector2){x + w, y + (th/2)}, th, GREEN);
-        DrawLineEx((Vector2){x + (th/2), y}, (Vector2){x + (th/2), y + h}, th, GREEN);
-        DrawLineEx((Vector2){x + w - (th/2), y + h}, (Vector2){x + w - (th/2), y}, th, GREEN);
-        DrawLineEx((Vector2){x + w, y + h - (th/2)}, (Vector2){x, y + h - (th/2)}, th, GREEN);
+        DrawRectangle(x, y, w, h, MappedColor(PANEL_BG_COLOR));
+        size_t th = 1;
+        DrawLineEx((Vector2){x, y + (th/2)}, (Vector2){x + w, y + (th/2)}, th, MappedColor(PANEL_DIVIDER_COLOR));
+        DrawLineEx((Vector2){x + (th/2), y}, (Vector2){x + (th/2), y + h}, th, MappedColor(PANEL_DIVIDER_COLOR));
+        DrawLineEx((Vector2){x + w - (th/2), y + h}, (Vector2){x + w - (th/2), y}, th, MappedColor(PANEL_DIVIDER_COLOR));
+        DrawLineEx((Vector2){x + w, y + h - (th/2)}, (Vector2){x, y + h - (th/2)}, th, MappedColor(PANEL_DIVIDER_COLOR));
     }
 }
 

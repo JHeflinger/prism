@@ -1,6 +1,7 @@
 #include "editor.h"
 #include "data/config.h"
 #include "data/input.h"
+#include "data/colors.h"
 #include "core/log.h"
 #include "ui/ui.h"
 #include "raylib.h"
@@ -13,6 +14,7 @@ void InitEditor() {
     SetConfigFlags(FLAG_VSYNC_HINT);
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
     InitializeInput();
+    InitializeColors();
     g_ui = GenerateUI();
 }
 
