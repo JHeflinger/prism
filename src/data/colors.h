@@ -4,11 +4,13 @@
 #include "data/config.h"
 #include "raylib.h"
 
-#define NUMCOLORS 2
+#define NUMCOLORS 4
 
 typedef enum {
     PANEL_BG_COLOR = 0,
     PANEL_DIVIDER_COLOR = 1,
+    PANEL_DIVIDER_HOVER_COLOR = 2,
+    PANEL_DIVIDER_ACTIVE_COLOR = 3,
 } ColorKey;
 
 typedef struct {
