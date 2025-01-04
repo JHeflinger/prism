@@ -1,25 +1,32 @@
 #include "editor.h"
 #include "data/config.h"
+#include "data/input.h"
 #include "core/log.h"
+#include "ui/ui.h"
 #include "raylib.h"
 #include "easymemory.h"
+
+UI* g_ui = NULL;
 
 void InitEditor() {
 	SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_VSYNC_HINT);
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
+    InitializeInput();
+    g_ui = GenerateUI();
 }
 
 void UpdateEditor() {
-
+    UpdateUI(g_ui);
 }
 
 void DrawEditor() {
     ClearBackground(RAYWHITE);
-    DrawText("hello world", 10, 10, 20, DARKGRAY);
+    DrawUI(g_ui, 0, 0, GetScreenWidth(), GetScreenHeight());
 }
 
 void CleanEditor() {
+    DestroyUI(g_ui);
     CloseWindow();
 }
 
