@@ -2,6 +2,7 @@
 #include "core/log.h"
 #include "data/input.h"
 #include "data/colors.h"
+#include "ui/panels/devpanel.h"
 #include "raylib.h"
 #include "easymemory.h"
 
@@ -10,6 +11,7 @@ BOOL g_divider_active = FALSE;
 
 UI* GenerateUI() {
     UI* ui = EZALLOC(1, sizeof(UI));
+    ConfigureDevPanel(&(ui->panel));
     return ui;
 }
 
@@ -54,8 +56,7 @@ void UpdateUI(UI* ui) {
             GetMousePosition(), 
             (Rectangle){ui->x, ui->y, ui->w, ui->h}) &&
         !ui->left &&
-        !ui->right
-        ) {
+        !ui->right) {
         ui->vertical = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
         UI* left = GenerateUI();
         UI* right = GenerateUI();
