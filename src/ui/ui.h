@@ -4,8 +4,10 @@
 #include "data/config.h"
 #include "raylib.h"
 #include <stddef.h>
+#include <stdarg.h>
 
 #define MAX_NAME_LEN 256
+#define MAX_LINE_WIDTH 2048
 
 typedef void (*PanelFunction)(void);
 
@@ -40,5 +42,7 @@ void PreRenderUI(UI* ui);
 void DestroyUI(UI* ui);
 
 void DestroyPanel(Panel* panel);
+
+void UIDrawText(const char* text, ...);
 
 #endif

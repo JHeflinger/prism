@@ -1,0 +1,10 @@
+design philosophy:
+    - blender but make it i3
+    - why?
+        - because I hate using trackpad
+
+ui todos:
+    - focused panel
+    - tabbed panels
+    - closeable panels
+    - move panels with keybinds

@@ -2,6 +2,7 @@
 #include "data/config.h"
 #include "data/input.h"
 #include "data/colors.h"
+#include "data/assets.h"
 #include "core/log.h"
 #include "ui/ui.h"
 #include "raylib.h"
@@ -15,6 +16,7 @@ void InitEditor() {
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
     InitializeInput();
     InitializeColors();
+    InitializeAssets();
     g_ui = GenerateUI();
 }
 
@@ -33,6 +35,7 @@ void DrawEditor() {
 
 void CleanEditor() {
     DestroyUI(g_ui);
+    DestroyAssets();
     CloseWindow();
 }
 

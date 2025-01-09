@@ -2,12 +2,15 @@
 #include "core/log.h"
 #include "data/input.h"
 #include "data/colors.h"
+#include "data/assets.h"
 #include "ui/panels/devpanel.h"
 #include "easymemory.h"
 #include <string.h>
 
 UI* g_divider_instance = NULL;
 BOOL g_divider_active = FALSE;
+Vector2 g_ui_cursor = { 0 };
+char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
 
 UI* GenerateUI() {
     UI* ui = EZALLOC(1, sizeof(UI));
@@ -139,6 +142,7 @@ void PreRenderUI(UI* ui) {
         PreRenderUI((UI*)(ui->left));
         PreRenderUI((UI*)(ui->right));
     } else if (IsRenderTextureValid(ui->panel.texture) && ui->panel.draw) {
+        g_ui_cursor = (Vector2){ 10, 10 };
         BeginTextureMode(ui->panel.texture);
         ClearBackground((Color){0, 0, 0, 0});
         ui->panel.draw();
@@ -155,4 +159,12 @@ void DestroyUI(UI* ui) {
 
 void DestroyPanel(Panel* panel) {
     if (IsRenderTextureValid(panel->texture)) UnloadRenderTexture(panel->texture);
+}
+
+void UIDrawText(const char* text, ...) {
+    va_list args;
+    va_start(args, text);
+    vsnprintf(g_ui_text_buffer, MAX_LINE_WIDTH - 1, text, args);
+    DrawTextEx(FontAsset(), g_ui_text_buffer, g_ui_cursor, 20, 0, WHITE);
+    g_ui_cursor.y += 20.0f;
 }

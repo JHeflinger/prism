@@ -1,8 +1,18 @@
 #include "devpanel.h"
+#include "easymemory.h"
 
 void DrawDevPanel() {
-    DrawRectangle(10, 50, 200, 200, RED);
-    DrawText("whattup", 20, 60, 18, WHITE);
+    UIDrawText("FPS: %d", (int)(1.0f / GetFrameTime()));
+    UIDrawText("Frametime: %d ms", (int)(1000.0f * GetFrameTime()));
+    if (EZALLOCATED() > 1000000000) {
+        UIDrawText("Memory Usage: %.3f GB (%d bytes)", ((float)EZALLOCATED()) / 1000000000, (int)EZALLOCATED());
+    } else if (EZALLOCATED() > 1000000) {
+        UIDrawText("Memory Usage: %.3f MB (%d bytes)", ((float)EZALLOCATED()) / 1000000, (int)EZALLOCATED());
+    } else if (EZALLOCATED() > 1000) {
+        UIDrawText("Memory Usage: %.3f KB (%d bytes)", ((float)EZALLOCATED()) / 1000, (int)EZALLOCATED());
+    } else {
+        UIDrawText("Memory Usage: %d bytes", (int)EZALLOCATED());
+    }
 }
 
 void ConfigureDevPanel(Panel* panel) {
