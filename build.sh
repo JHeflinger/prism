@@ -41,6 +41,9 @@ LIBS="$LIBS -Lvendor/raylib/lib"
 INCLUDES="$INCLUDES -Ivendor/EasyObjects/include"
 SOURCES="$SOURCES vendor/EasyObjects/include/easymemory.c"
 
+# add cglm vendor
+INCLUDES="$INCLUDES -Ivendor/cglm/include"
+
 # compile
 echo "Building prism..."
 startTime=$(date +%s%N)

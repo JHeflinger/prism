@@ -49,6 +49,9 @@ set LINKS=!LINKS! -lwinmm
 set LINKS=!LINKS! -lwinpthread
 set LINKS=!LINKS! -lws2_32
 
+:: add cglm vendor
+set INCLUDES=!INCLUDES! -I"vendor/cglm/include"
+
 :: compile
 echo Building prism...
 set "startTime=%time: =0%"

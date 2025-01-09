@@ -3,6 +3,6 @@
 
 int main() {
     RunEditor();
-    LOG_INFO("See you, Space Cowboy")
+    LOG_INFO("See you, Space Cowboy");
     return 0;
 }
