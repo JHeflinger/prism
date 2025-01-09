@@ -22,6 +22,10 @@ void UpdateEditor() {
     UpdateUI(g_ui);
 }
 
+void PreRenderEditor() {
+    PreRenderUI(g_ui);
+}
+
 void DrawEditor() {
     ClearBackground(RAYWHITE);
     DrawUI(g_ui, 0, 0, GetScreenWidth(), GetScreenHeight());
@@ -46,6 +50,9 @@ void RunEditor() {
 
         // update editor
         UpdateEditor();
+
+        // prerender steps
+        PreRenderEditor();
 
         // draw editor
         BeginDrawing();

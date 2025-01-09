@@ -3,8 +3,8 @@
 #include "data/input.h"
 #include "data/colors.h"
 #include "ui/panels/devpanel.h"
-#include "raylib.h"
 #include "easymemory.h"
+#include <string.h>
 
 UI* g_divider_instance = NULL;
 BOOL g_divider_active = FALSE;
@@ -13,6 +13,11 @@ UI* GenerateUI() {
     UI* ui = EZALLOC(1, sizeof(UI));
     ConfigureDevPanel(&(ui->panel));
     return ui;
+}
+
+void SetupPanel(Panel* panel, const char* name) {
+    strcpy(panel->name, name);
+    panel->texture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
 }
 
 void UpdateUI(UI* ui) {   
@@ -118,6 +123,8 @@ void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
         }
     } else {
         DrawRectangle(x, y, w, h, MappedColor(PANEL_BG_COLOR));
+        if (IsRenderTextureValid(ui->panel.texture))
+            DrawTexturePro(ui->panel.texture.texture, (Rectangle){ 0, 0, w, -1*((int)h) }, (Rectangle){ x, y, w, h }, (Vector2){ 0, 0 }, 0.0f, (Color){ 255, 255, 255, 255 });
         size_t th = 1;
         if (y != 0) DrawLineEx((Vector2){x, y + (th/2)}, (Vector2){x + w, y + (th/2)}, th, MappedColor(PANEL_DIVIDER_COLOR));
         if (x != 0) DrawLineEx((Vector2){x + (th/2), y}, (Vector2){x + (th/2), y + h}, th, MappedColor(PANEL_DIVIDER_COLOR));
@@ -126,8 +133,26 @@ void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     }
 }
 
+void PreRenderUI(UI* ui) {
+    LOG_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
+    if (ui->left && ui->right) {
+        PreRenderUI((UI*)(ui->left));
+        PreRenderUI((UI*)(ui->right));
+    } else if (IsRenderTextureValid(ui->panel.texture) && ui->panel.draw) {
+        BeginTextureMode(ui->panel.texture);
+        ClearBackground((Color){0, 0, 0, 0});
+        ui->panel.draw();
+        EndTextureMode();
+    }
+}
+
 void DestroyUI(UI* ui) {
     if (ui->left) DestroyUI((UI*)ui->left);
     if (ui->right) DestroyUI((UI*)ui->right);
+    if (!ui->left && !ui->right) DestroyPanel(&(ui->panel));
     EZFREE(ui);
+}
+
+void DestroyPanel(Panel* panel) {
+    if (IsRenderTextureValid(panel->texture)) UnloadRenderTexture(panel->texture);
 }
