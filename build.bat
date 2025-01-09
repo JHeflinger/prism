@@ -40,7 +40,15 @@ set LIBS=!LIBS! -L"vendor/raylib/lib"
 set INCLUDES=!INCLUDES! -I"vendor/EasyObjects/include"
 set SOURCES=!SOURCES! "vendor/EasyObjects/include/easymemory.c"
 
+:: add vulkan vendor
+set INCLUDES=!INCLUDES! -I"platform/windows/vulkan/include"
+set LIBS=!LIBS! -L"platform/windows/vulkan/libs"
+set LINKS=!LINKS! -lvulkan-1
+
 :: add glfw vendor
+set INCLUDES=!INCLUDES! -I"platform/windows/GLFW/include"
+set LIBS=!LIBS! -L"platform/windows/GLFW"
+set LINKS=!LINKS! -lglfw3
 set LINKS=!LINKS! -lshell32
 set LINKS=!LINKS! -luser32
 set LINKS=!LINKS! -lopengl32

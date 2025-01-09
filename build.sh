@@ -37,6 +37,10 @@ LINKS="$LINKS -lGL"
 LINKS="$LINKS -lGLU"
 LIBS="$LIBS -Lvendor/raylib/lib"
 
+# add glfw and vulkan
+LINKS="$LINKS -lglfw"
+LINKS="$LINKS -lvulkan"
+
 # add EasyObjects vendor
 INCLUDES="$INCLUDES -Ivendor/EasyObjects/include"
 SOURCES="$SOURCES vendor/EasyObjects/include/easymemory.c"
