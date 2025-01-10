@@ -5,8 +5,11 @@
 #include "data/assets.h"
 #include "core/log.h"
 #include "ui/ui.h"
-#include "raylib.h"
-#include "easymemory.h"
+#include "ui/panels/diagnostics.h"
+#include "ui/panels/viewport.h"
+#include "renderer/renderer.h"
+#include <raylib.h>
+#include <easymemory.h>
 
 UI* g_ui = NULL;
 
@@ -17,7 +20,13 @@ void InitEditor() {
     InitializeInput();
     InitializeColors();
     InitializeAssets();
+    InitializeRenderer();
     g_ui = GenerateUI();
+    g_ui->left = GenerateUI();
+    g_ui->right = GenerateUI();
+    ConfigureDiagnosticsPanel(&(((UI*)(g_ui->right))->panel));
+    ConfigureViewportPanel(&(((UI*)(g_ui->left))->panel));
+    g_ui->divide = (3 * GetScreenWidth())/4;
 }
 
 void UpdateEditor() {
@@ -36,6 +45,7 @@ void DrawEditor() {
 void CleanEditor() {
     DestroyUI(g_ui);
     DestroyAssets();
+    DestroyRenderer();
     CloseWindow();
 }
 

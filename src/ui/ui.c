@@ -3,8 +3,7 @@
 #include "data/input.h"
 #include "data/colors.h"
 #include "data/assets.h"
-#include "ui/panels/devpanel.h"
-#include "easymemory.h"
+#include <easymemory.h>
 #include <string.h>
 
 UI* g_divider_instance = NULL;
@@ -14,7 +13,6 @@ char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
 
 UI* GenerateUI() {
     UI* ui = EZALLOC(1, sizeof(UI));
-    ConfigureDevPanel(&(ui->panel));
     return ui;
 }
 

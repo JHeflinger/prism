@@ -2,7 +2,7 @@
 #define INPUT_H
 
 #include "data/config.h"
-#include "raylib.h"
+#include <raylib.h>
 
 #define NUMKEYS 1
 

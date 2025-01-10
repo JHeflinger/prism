@@ -2,7 +2,7 @@
 #define COLORS_H
 
 #include "data/config.h"
-#include "raylib.h"
+#include <raylib.h>
 
 #define NUMCOLORS 4
 

@@ -2,7 +2,7 @@
 #define UI_H
 
 #include "data/config.h"
-#include "raylib.h"
+#include <raylib.h>
 #include <stddef.h>
 #include <stdarg.h>
 

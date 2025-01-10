@@ -1,5 +1,5 @@
-#include "devpanel.h"
-#include "easymemory.h"
+#include "diagnostics.h"
+#include <easymemory.h>
 
 void DrawDevPanel() {
     UIDrawText("FPS: %d", (int)(1.0f / GetFrameTime()));
@@ -15,7 +15,7 @@ void DrawDevPanel() {
     }
 }
 
-void ConfigureDevPanel(Panel* panel) {
-    SetupPanel(panel, "Developer Settings");
+void ConfigureDiagnosticsPanel(Panel* panel) {
+    SetupPanel(panel, "Diagnostics");
     panel->draw = DrawDevPanel;
 }
