@@ -1,6 +1,5 @@
 #include "renderer.h"
 #include "core/log.h"
-#include "data/config.h"
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
 #include <string.h>
@@ -22,18 +21,18 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
     void* pUserData) {
     LOG_ASSERT(pUserData == NULL, "User data has not been set up to be handled");
     if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        LOG_WARN("%s[VULKAN]%s [%s] %s",
+        LOG_WARN("%s[VULKAN] [%s]%s %s",
             LOG_YELLOW,
-            LOG_RESET,
             (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ? "GENERAL" :
                 (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ? "VALIDATION" : "PERFORMANCE")),
+            LOG_RESET,
             pCallbackData->pMessage);
     } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        LOG_FATAL("%s[VULKAN]%s [%s] %s",
+        LOG_FATAL("%s[VULKAN] [%s]%s %s",
             LOG_RED,
-            LOG_RESET,
             (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ? "GENERAL" :
                 (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ? "VALIDATION" : "PERFORMANCE")),
+            LOG_RESET,
             pCallbackData->pMessage);
     }
 
@@ -53,6 +52,9 @@ void InitializeVulkanData() {
     if (ENABLE_VK_VALIDATION_LAYERS) {
         ARRLIST_StaticString_add(&(g_renderer.vulkan.required_extensions), VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
+
+    // default gpu to null
+    g_renderer.vulkan.gpu = VK_NULL_HANDLE;
 }
 
 BOOL CheckValidationLayerSupport() {
@@ -99,9 +101,17 @@ void CreateVulkanInstance() {
     createInfo.pApplicationInfo = &appInfo;
     createInfo.enabledExtensionCount = (uint32_t)(g_renderer.vulkan.required_extensions.size);
     createInfo.ppEnabledExtensionNames = g_renderer.vulkan.required_extensions.data;
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = { 0 };
     if (ENABLE_VK_VALIDATION_LAYERS) {
         createInfo.enabledLayerCount = g_renderer.vulkan.validation_layers.size;
         createInfo.ppEnabledLayerNames = g_renderer.vulkan.validation_layers.data;
+
+        // set up additional debug callback for the creation of the instance
+        debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        debugCreateInfo.pfnUserCallback = VulkanDebugCallback;
+        createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
     } else {
         createInfo.enabledLayerCount = 0;
     }
@@ -111,7 +121,72 @@ void CreateVulkanInstance() {
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create vulkan instance");
 }
 
+void SetupVulkanMessenger() {
+    if (!ENABLE_VK_VALIDATION_LAYERS) return;
+    VkDebugUtilsMessengerCreateInfoEXT createInfo = { 0 };
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback = VulkanDebugCallback;
+    createInfo.pUserData = NULL;
+    PFN_vkCreateDebugUtilsMessengerEXT messenger_extension = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(g_renderer.vulkan.instance, "vkCreateDebugUtilsMessengerEXT");
+    LOG_ASSERT(messenger_extension != NULL, "Failed to set up debug messenger");
+    messenger_extension(g_renderer.vulkan.instance, &createInfo, NULL, &(g_renderer.vulkan.messenger));
+}
+
+VulkanFamilyGroup FindQueueFamilies(VkPhysicalDevice gpu) {
+    VulkanFamilyGroup group = { 0 };
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, NULL);
+    VkQueueFamilyProperties* queueFamilies = EZALLOC(queueFamilyCount, sizeof(VkQueueFamilyProperties));
+    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies);
+    for (uint32_t i = 0; i < queueFamilyCount; i++) {
+        if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            group.graphicsFamily = (Schrodingnum){ i, TRUE };
+            break;
+        }
+    }
+    EZFREE(queueFamilies);
+    return group;
+}
+
+void PickGPU() {
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(g_renderer.vulkan.instance, &deviceCount, NULL);
+    LOG_ASSERT(deviceCount != 0, "No devices with vulkan support were found");
+    VkPhysicalDevice* devices = EZALLOC(deviceCount, sizeof(VkPhysicalDevice));
+    vkEnumeratePhysicalDevices(g_renderer.vulkan.instance, &deviceCount, devices);
+    uint32_t score = 0;
+    uint32_t ind = 0;
+    for (uint32_t i = 0; i < deviceCount; i++) {
+        uint32_t curr_score = 0;
+        VkPhysicalDeviceProperties deviceProperties;
+        VkPhysicalDeviceFeatures deviceFeatures;
+        VulkanFamilyGroup families = FindQueueFamilies(devices[i]);
+        if (!families.graphicsFamily.exists) continue;
+        vkGetPhysicalDeviceProperties(devices[i], &deviceProperties);
+        vkGetPhysicalDeviceFeatures(devices[i], &deviceFeatures);
+        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) curr_score += 1000;
+        curr_score += deviceProperties.limits.maxImageDimension2D;
+        if (!deviceFeatures.geometryShader) curr_score = 0;
+        if (curr_score > score) {
+            score = curr_score;
+            ind = i;
+        }
+    }
+    LOG_ASSERT(score != 0, "A suitable GPU could not be found");
+    g_renderer.vulkan.gpu = devices[ind];
+    EZFREE(devices);
+}
+
 void DestroyVulkan() {
+    // destroy debug messenger
+    if (ENABLE_VK_VALIDATION_LAYERS) {
+        PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(g_renderer.vulkan.instance, "vkDestroyDebugUtilsMessengerEXT");
+        if (destroy_messenger != NULL)
+            destroy_messenger(g_renderer.vulkan.instance, g_renderer.vulkan.messenger, NULL);
+    }
+
     // destroy vulkan instance
     vkDestroyInstance(g_renderer.vulkan.instance, NULL);
 
@@ -123,6 +198,8 @@ void DestroyVulkan() {
 void InitializeRenderer() {
     InitializeVulkanData();
     CreateVulkanInstance();
+    SetupVulkanMessenger();
+    PickGPU();
 }
 
 void DestroyRenderer() {
