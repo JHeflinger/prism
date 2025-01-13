@@ -15,13 +15,15 @@ typedef struct {
 } Schrodingnum;
 
 typedef struct {
-    Schrodingnum graphicsFamily;
+    Schrodingnum graphics;
 } VulkanFamilyGroup;
 
 typedef struct {
     VkInstance instance;
     VkDebugUtilsMessengerEXT messenger;
     VkPhysicalDevice gpu;
+    VkDevice interface;
+    VkQueue graphics_queue;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
 } VulkanData;

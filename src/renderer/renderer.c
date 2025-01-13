@@ -142,7 +142,7 @@ VulkanFamilyGroup FindQueueFamilies(VkPhysicalDevice gpu) {
     vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies);
     for (uint32_t i = 0; i < queueFamilyCount; i++) {
         if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            group.graphicsFamily = (Schrodingnum){ i, TRUE };
+            group.graphics = (Schrodingnum){ i, TRUE };
             break;
         }
     }
@@ -163,7 +163,7 @@ void PickGPU() {
         VkPhysicalDeviceProperties deviceProperties;
         VkPhysicalDeviceFeatures deviceFeatures;
         VulkanFamilyGroup families = FindQueueFamilies(devices[i]);
-        if (!families.graphicsFamily.exists) continue;
+        if (!families.graphics.exists) continue;
         vkGetPhysicalDeviceProperties(devices[i], &deviceProperties);
         vkGetPhysicalDeviceFeatures(devices[i], &deviceFeatures);
         if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) curr_score += 1000;
@@ -179,7 +179,36 @@ void PickGPU() {
     EZFREE(devices);
 }
 
+void CreateDeviceInterface() {
+    VulkanFamilyGroup families = FindQueueFamilies(g_renderer.vulkan.gpu);
+    VkDeviceQueueCreateInfo queueCreateInfo = { 0 };
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.queueFamilyIndex = families.graphics.value;
+    queueCreateInfo.queueCount = 1;
+    float queuePriority = 1.0f;
+    queueCreateInfo.pQueuePriorities = &queuePriority;
+    VkPhysicalDeviceFeatures deviceFeatures = { 0 };
+    VkDeviceCreateInfo createInfo = { 0 };
+    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pQueueCreateInfos = &queueCreateInfo;
+    createInfo.queueCreateInfoCount = 1;
+    createInfo.pEnabledFeatures = &deviceFeatures;
+    createInfo.enabledExtensionCount = 0;
+    if (ENABLE_VK_VALIDATION_LAYERS) {
+        createInfo.enabledLayerCount = g_renderer.vulkan.validation_layers.size;
+        createInfo.ppEnabledLayerNames = g_renderer.vulkan.validation_layers.data;
+    } else {
+        createInfo.enabledLayerCount = 0;
+    }
+    VkResult result = vkCreateDevice(g_renderer.vulkan.gpu, &createInfo, NULL, &(g_renderer.vulkan.interface));
+    LOG_ASSERT(result == VK_SUCCESS, "failed to create logical device");
+    vkGetDeviceQueue(g_renderer.vulkan.interface, families.graphics.value, 0, &(g_renderer.vulkan.graphics_queue));
+}
+
 void DestroyVulkan() {
+    // destroy vulkan device
+    vkDestroyDevice(g_renderer.vulkan.interface, NULL);
+
     // destroy debug messenger
     if (ENABLE_VK_VALIDATION_LAYERS) {
         PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(g_renderer.vulkan.instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -200,6 +229,7 @@ void InitializeRenderer() {
     CreateVulkanInstance();
     SetupVulkanMessenger();
     PickGPU();
+    CreateDeviceInterface();
 }
 
 void DestroyRenderer() {
