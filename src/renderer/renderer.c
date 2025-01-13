@@ -134,6 +134,10 @@ void SetupVulkanMessenger() {
     messenger_extension(g_renderer.vulkan.instance, &createInfo, NULL, &(g_renderer.vulkan.messenger));
 }
 
+void CreateSurface() {
+	
+}
+
 VulkanFamilyGroup FindQueueFamilies(VkPhysicalDevice gpu) {
     VulkanFamilyGroup group = { 0 };
     uint32_t queueFamilyCount = 0;
@@ -228,6 +232,7 @@ void InitializeRenderer() {
     InitializeVulkanData();
     CreateVulkanInstance();
     SetupVulkanMessenger();
+	CreateSurface();
     PickGPU();
     CreateDeviceInterface();
 }

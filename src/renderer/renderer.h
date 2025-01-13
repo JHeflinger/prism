@@ -23,6 +23,7 @@ typedef struct {
     VkDebugUtilsMessengerEXT messenger;
     VkPhysicalDevice gpu;
     VkDevice interface;
+	VkSurfaceKHR surface;
     VkQueue graphics_queue;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
