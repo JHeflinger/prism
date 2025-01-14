@@ -53,6 +53,9 @@ void InitializeVulkanData() {
         ARRLIST_StaticString_add(&(g_renderer.vulkan.required_extensions), VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
+    // set up device extensions
+    ARRLIST_StaticString_add(&(g_renderer.vulkan.device_extensions), VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
     // default gpu to null
     g_renderer.vulkan.gpu = VK_NULL_HANDLE;
 }
@@ -79,6 +82,28 @@ BOOL CheckValidationLayerSupport() {
         }
     }
     EZFREE(availableLayers);
+    return TRUE;
+}
+
+BOOL CheckGPUExtensionSupport(VkPhysicalDevice device) {
+    uint32_t extensionCount;
+    vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, NULL);
+    VkExtensionProperties* availableExtensions = EZALLOC(extensionCount, sizeof(VkExtensionProperties));
+    vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, availableExtensions);
+    for (size_t i = 0; i < g_renderer.vulkan.device_extensions.size; i++) {
+        BOOL extensionFound = FALSE;
+        for (size_t j = 0; j < extensionCount; j++) {
+            if (strcmp(ARRLIST_StaticString_get(&(g_renderer.vulkan.device_extensions), i), availableExtensions[j].extensionName) == 0) {
+                extensionFound = TRUE;
+                break;
+            }
+        }
+        if (!extensionFound) {
+            EZFREE(availableExtensions);
+            return FALSE;
+        }
+    }
+    EZFREE(availableExtensions);
     return TRUE;
 }
 
@@ -159,11 +184,14 @@ void PickGPU() {
     uint32_t score = 0;
     uint32_t ind = 0;
     for (uint32_t i = 0; i < deviceCount; i++) {
+        // check if device is suitable
+        VulkanFamilyGroup families = FindQueueFamilies(devices[i]);
+        if (!families.graphics.exists) continue;
+        if (!CheckGPUExtensionSupport(devices[i])) continue;
+
         uint32_t curr_score = 0;
         VkPhysicalDeviceProperties deviceProperties;
         VkPhysicalDeviceFeatures deviceFeatures;
-        VulkanFamilyGroup families = FindQueueFamilies(devices[i]);
-        if (!families.graphics.exists) continue;
         vkGetPhysicalDeviceProperties(devices[i], &deviceProperties);
         vkGetPhysicalDeviceFeatures(devices[i], &deviceFeatures);
         if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) curr_score += 1000;
@@ -193,7 +221,8 @@ void CreateDeviceInterface() {
     createInfo.pQueueCreateInfos = &queueCreateInfo;
     createInfo.queueCreateInfoCount = 1;
     createInfo.pEnabledFeatures = &deviceFeatures;
-    createInfo.enabledExtensionCount = 0;
+    createInfo.enabledExtensionCount = g_renderer.vulkan.device_extensions.size;
+    createInfo.ppEnabledExtensionNames  = g_renderer.vulkan.device_extensions.data;
     if (ENABLE_VK_VALIDATION_LAYERS) {
         createInfo.enabledLayerCount = g_renderer.vulkan.validation_layers.size;
         createInfo.ppEnabledLayerNames = g_renderer.vulkan.validation_layers.data;
@@ -205,7 +234,77 @@ void CreateDeviceInterface() {
     vkGetDeviceQueue(g_renderer.vulkan.interface, families.graphics.value, 0, &(g_renderer.vulkan.graphics_queue));
 }
 
+void CreateImage() {
+    VkImageCreateInfo imageInfo = {};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = 800;
+    imageInfo.extent.height = 600;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = VK_FORMAT_B8G8R8A8_SRGB;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VkResult result = vkCreateImage(g_renderer.vulkan.interface, &imageInfo, NULL, &(g_renderer.vulkan.image));
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to create vulkan image");
+
+    /*
+     // Allocate memory for the image
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(device, image, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = 0;
+
+    // Find suitable memory type
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((memRequirements.memoryTypeBits & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
+            allocInfo.memoryTypeIndex = i;
+            break;
+        }
+    }
+
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate image memory!");
+    }
+
+    vkBindImageMemory(device, image, memory, 0);
+
+    // Create image view
+    VkImageViewCreateInfo viewInfo = {};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create image view!");
+    }
+    */
+}
+
 void DestroyVulkan() {
+    // destroy image view
+    vkDestroyImageView(g_renderer.vulkan.interface, g_renderer.vulkan.view, NULL);
+
+    // destroy image
+    vkDestroyImage(g_renderer.vulkan.interface, g_renderer.vulkan.image, NULL);
+
     // destroy vulkan device
     vkDestroyDevice(g_renderer.vulkan.interface, NULL);
 
@@ -220,8 +319,9 @@ void DestroyVulkan() {
     vkDestroyInstance(g_renderer.vulkan.instance, NULL);
 
     // clean required extensions
-    ARRLIST_StaticString_clear(&(g_renderer.vulkan.required_extensions));
     ARRLIST_StaticString_clear(&(g_renderer.vulkan.validation_layers));
+    ARRLIST_StaticString_clear(&(g_renderer.vulkan.required_extensions));
+    ARRLIST_StaticString_clear(&(g_renderer.vulkan.device_extensions));
 }
 
 void InitializeRenderer() {
@@ -230,6 +330,7 @@ void InitializeRenderer() {
     SetupVulkanMessenger();
     PickGPU();
     CreateDeviceInterface();
+    CreateImage();
 }
 
 void DestroyRenderer() {
