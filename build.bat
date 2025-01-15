@@ -9,6 +9,37 @@ if NOT exist "build\" (
     mkdir build
 )
 
+:: create shaders directory if it does not exist
+cd build
+if NOT exist "shaders\" (
+    mkdir shaders
+)
+cd ..
+
+:: compile shaders
+echo "Building shaders..."
+set SHADERS_DIR=shaders
+set "startTime=%time: =0%"
+for /r %SHADERS_DIR% %%f in (*.vert) do (
+    glslc %%f -o "build/shaders/%%~nxf.spv"
+    if %ERRORLEVEL% NEQ 0 (
+        echo Building vertex [31mFailed[0m with error code %ERRORLEVEL%
+        exit /b %ERRORLEVEL%
+    )
+)
+for /r %SHADERS_DIR% %%f in (*.frag) do (
+    glslc %%f -o "build/shaders/%%~nxf.spv"
+    if %ERRORLEVEL% NEQ 0 (
+        echo Building fragment [31mFailed[0m with error code %ERRORLEVEL%
+        exit /b %ERRORLEVEL%
+    )
+)
+set "endTime=%time: =0%"
+set "end=!endTime:%time:~8,1%=%%100)*100+1!"  &  set "start=!startTime:%time:~8,1%=%%100)*100+1!"
+set /A "elap=((((10!end:%time:~2,1%=%%100)*60+1!%%100)-((((10!start:%time:~2,1%=%%100)*60+1!%%100), elap-=(elap>>31)*24*60*60*100"
+set /A "cc=elap%%100+100,elap/=100,ss=elap%%60+100,elap/=60,mm=elap%%60+100,hh=elap/60+100"
+echo [32mFinished[0m building shaders in %hh:~1%%time:~2,1%%mm:~1%%time:~2,1%%ss:~1%%time:~8,1%%cc:~1%
+
 :: initialize vars for building
 set SRC_DIR=src
 set INCLUDES=
