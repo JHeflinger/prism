@@ -1,5 +1,6 @@
 #include "renderer.h"
 #include "core/log.h"
+#include "core/file.h"
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
 #include <string.h>
@@ -292,8 +293,41 @@ void CreateImage() {
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create image view");
 }
 
+VkShaderModule CreateShader(SimpleFile* file) {
+	VkShaderModuleCreateInfo createInfo = { 0 };
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = file->size;
+	createInfo.pCode = (const uint32_t*)(file->data);
+	VkShaderModule shader;
+	VkResult result = vkCreateShaderModule(g_renderer.vulkan.interface, &createInfo, NULL, &shader);
+	LOG_ASSERT(result == VK_SUCCESS, "Failed to create shader module");
+	return shader;
+}
+
 void CreatePipeline() {
-    
+	SimpleFile* vertshadercode = ReadFile("build/shaders/shader.vert.spv");
+	SimpleFile* fragshadercode = ReadFile("build/shaders/shader.frag.spv");
+	VkShaderModule vertshader = CreateShader(vertshadercode);
+	VkShaderModule fragshader = CreateShader(fragshadercode);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo = { 0 };
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertshader;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo = { 0 };
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragshader;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderstages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+	FreeFile(vertshadercode);
+	FreeFile(fragshadercode);
+	vkDestroyShaderModule(g_renderer.vulkan.interface, vertshader, NULL);
+	vkDestroyShaderModule(g_renderer.vulkan.interface, fragshader, NULL);
 }
 
 void DestroyVulkan() {

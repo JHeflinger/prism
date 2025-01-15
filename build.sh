@@ -6,6 +6,38 @@ if [ ! -d "build" ]; then
 	mkdir "build"
 fi
 
+# create shaders directory if it does not exist
+cd build
+if [ ! -d "shaders" ]; then
+	mkdir "shaders"
+fi
+cd ..
+
+# compile shaders
+echo "Building shaders..."
+startTime=$(date +%s%N)
+while IFS= read -r file; do
+	glslc $file -o "build/$file.spv"
+	if [ $? -ne 0 ]; then
+		echo -e "Building vertex \033[31mfailed\033[0m"
+		exit 1
+	fi
+done < <(find "shaders" -type f -name "*.vert")
+while IFS= read -r file; do
+	glslc $file -o "build/$file.spv"
+	if [ $? -ne 0 ]; then
+		echo -e "Build fragment \033[31mfailed\033[0m"
+		exit 1
+	fi
+done < <(find "shaders" -type f -name "*.frag")
+endTime=$(date +%s%N)
+elapsed=$(((endTime - startTime) / 1000000))
+hh=$((elapsed / 3600000))
+mm=$(((elapsed % 3600000) / 60000))
+ss=$(((elapsed % 60000) / 1000))
+cc=$((elapsed % 1000))
+echo -e "\033[32mFinished\033[0m building shaders in ${hh}:${mm}:${ss}.${cc}"
+
 # initialize vars for building
 SRC_DIR="src"
 INCLUDES=""
@@ -62,4 +94,4 @@ hh=$((elapsed / 3600000))
 mm=$(((elapsed % 3600000) / 60000))
 ss=$(((elapsed % 60000) / 1000))
 cc=$((elapsed % 1000))
-echo -e "\033[32mFinished\033[0m building in ${hh}:${mm}:${ss}.${cc}"
+echo -e "\033[32mFinished\033[0m building executable in ${hh}:${mm}:${ss}.${cc}"
