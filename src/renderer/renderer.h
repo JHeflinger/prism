@@ -26,6 +26,7 @@ typedef struct {
     VkImage image;
     VkImageView view;
     VkDeviceMemory memory;
+    VkPipelineLayout pipeline_layout;
     VkQueue graphics_queue;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
