@@ -420,9 +420,41 @@ void CreatePipeline() {
 	vkDestroyShaderModule(g_renderer.vulkan.interface, fragshader, NULL);
 }
 
+void CreateRenderPass() {
+    VkAttachmentDescription colorAttachment = { 0 };
+    colorAttachment.format = VK_FORMAT_B8G8R8A8_SRGB;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; //TODO: change to possibly VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+
+    VkAttachmentReference colorAttachmentRef = { 0 };
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass = { 0 };
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    VkRenderPassCreateInfo renderPassInfo = { 0 };
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+
+    VkResult result = vkCreateRenderPass(g_renderer.vulkan.interface, &renderPassInfo, NULL, &(g_renderer.vulkan.render_pass));
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to create render pass");
+}
+
 void DestroyVulkan() {
     // destroy pipeline
     vkDestroyPipelineLayout(g_renderer.vulkan.interface, g_renderer.vulkan.pipeline_layout, NULL);
+    vkDestroyRenderPass(g_renderer.vulkan.interface, g_renderer.vulkan.render_pass, NULL);
 
     // destroy image memory
     vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.memory, NULL);
@@ -459,6 +491,7 @@ void InitializeRenderer() {
     PickGPU();
     CreateDeviceInterface();
     CreateImage();
+    CreateRenderPass();
     CreatePipeline();
 }
 
