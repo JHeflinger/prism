@@ -13,6 +13,9 @@ Renderer g_renderer;
     #define ENABLE_VK_VALIDATION_LAYERS TRUE
 #endif
 
+#define TEMP_W 800
+#define TEMP_H 600
+
 IMPL_ARRLIST(StaticString);
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
@@ -240,8 +243,8 @@ void CreateImage() {
     VkImageCreateInfo imageInfo = { 0 };
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent.width = 800;
-    imageInfo.extent.height = 600;
+    imageInfo.extent.width = TEMP_W;
+    imageInfo.extent.height = TEMP_H;
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
@@ -255,24 +258,26 @@ void CreateImage() {
     LOG_ASSERT(result == VK_SUCCESS, "Unable to create vulkan image");
 
     // allocate memory for the image
-    VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(g_renderer.vulkan.interface, g_renderer.vulkan.image, &memRequirements);
-    VkMemoryAllocateInfo allocInfo = { 0 };
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = 0;
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(g_renderer.vulkan.gpu, &memProperties);
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((memRequirements.memoryTypeBits & (1 << i)) &&
-            (memProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
-            allocInfo.memoryTypeIndex = i;
+    VkMemoryRequirements imageMemRequirements = { 0 };
+    vkGetImageMemoryRequirements(g_renderer.vulkan.interface, g_renderer.vulkan.image, &imageMemRequirements);
+    VkMemoryAllocateInfo imageAllocInfo = { 0 };
+    imageAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    imageAllocInfo.allocationSize = imageMemRequirements.size;
+    imageAllocInfo.memoryTypeIndex = 0;
+    VkPhysicalDeviceMemoryProperties imageMemProperties = { 0 };
+    vkGetPhysicalDeviceMemoryProperties(g_renderer.vulkan.gpu, &imageMemProperties);
+    for (uint32_t i = 0; i < imageMemProperties.memoryTypeCount; i++) {
+        if ((imageMemRequirements.memoryTypeBits & (1 << i)) &&
+            (imageMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) &&
+            (imageMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
+            imageAllocInfo.memoryTypeIndex = i;
             break;
         }
     }
-    result = vkAllocateMemory(g_renderer.vulkan.interface, &allocInfo, NULL, &g_renderer.vulkan.memory);
+    result = vkAllocateMemory(g_renderer.vulkan.interface, &imageAllocInfo, NULL, &g_renderer.vulkan.image_memory);
     LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate image memory");
-    vkBindImageMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image, g_renderer.vulkan.memory, 0);
+    result = vkBindImageMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image, g_renderer.vulkan.image_memory, 0);
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to bind image memory");
 
     // create image view
     VkImageViewCreateInfo viewInfo = { 0 };
@@ -291,6 +296,37 @@ void CreateImage() {
     viewInfo.subresourceRange.layerCount = 1;
     result = vkCreateImageView(g_renderer.vulkan.interface, &viewInfo, NULL, &(g_renderer.vulkan.view));
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create image view");
+
+    // create buffer
+    VkBufferCreateInfo bufferInfo = { 0 };
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = TEMP_W * TEMP_H * 4; // Assuming VK_FORMAT_B8G8R8A8_SRGB
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    result = vkCreateBuffer(g_renderer.vulkan.interface, &bufferInfo, NULL, &(g_renderer.vulkan.buffer));
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to create staging buffer");
+
+    // allocate memory for buffer
+    VkMemoryRequirements bufferMemRequirements = { 0 };
+    vkGetBufferMemoryRequirements(g_renderer.vulkan.interface, g_renderer.vulkan.buffer, &bufferMemRequirements);
+    VkMemoryAllocateInfo bufferAllocInfo = { 0 };
+    bufferAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    bufferAllocInfo.allocationSize = bufferMemRequirements.size;
+    bufferAllocInfo.memoryTypeIndex = 0;
+    VkPhysicalDeviceMemoryProperties bufferMemProperties = { 0 };
+    vkGetPhysicalDeviceMemoryProperties(g_renderer.vulkan.gpu, &bufferMemProperties);
+    for (uint32_t i = 0; i < bufferMemProperties.memoryTypeCount; i++) {
+        if ((bufferMemRequirements.memoryTypeBits & (1 << i)) &&
+            (bufferMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) &&
+            (bufferMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
+            bufferAllocInfo.memoryTypeIndex = i;
+            break;
+        }
+    }
+    result = vkAllocateMemory(g_renderer.vulkan.interface, &bufferAllocInfo, NULL, &(g_renderer.vulkan.buffer_memory));
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate buffer memory");
+    result = vkBindBufferMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer, g_renderer.vulkan.buffer_memory, 0);
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to bind buffer memory");
 }
 
 VkShaderModule CreateShader(SimpleFile* file) {
@@ -336,15 +372,15 @@ void CreatePipeline() {
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    VkViewport viewport = { 0 };
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = 800;
-    viewport.height = 600;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+    // VkViewport viewport = { 0 };
+    // viewport.x = 0.0f;
+    // viewport.y = 0.0f;
+    // viewport.width = TEMP_W;
+    // viewport.height = TEMP_H;
+    // viewport.minDepth = 0.0f;
+    // viewport.maxDepth = 1.0f;
 
-    VkRect2D scissor = { 0 };
+    // VkRect2D scissor = { 0 };
 
     VkDynamicState dynamicStates[2] = {
         VK_DYNAMIC_STATE_VIEWPORT,
@@ -414,6 +450,27 @@ void CreatePipeline() {
     VkResult result = vkCreatePipelineLayout(g_renderer.vulkan.interface, &pipelineLayoutInfo, NULL, &(g_renderer.vulkan.pipeline_layout));
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create pipeline layout");
 
+    VkGraphicsPipelineCreateInfo pipelineInfo = { 0 };
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderstages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = NULL; // Optional
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = g_renderer.vulkan.pipeline_layout;
+    pipelineInfo.renderPass = g_renderer.vulkan.render_pass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
+    pipelineInfo.basePipelineIndex = -1; // Optional
+
+    result = vkCreateGraphicsPipelines(g_renderer.vulkan.interface, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &(g_renderer.vulkan.pipeline));
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to create pipeline");
+
 	FreeFile(vertshadercode);
 	FreeFile(fragshadercode);
 	vkDestroyShaderModule(g_renderer.vulkan.interface, vertshader, NULL);
@@ -429,7 +486,7 @@ void CreateRenderPass() {
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; //TODO: change to possibly VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
     VkAttachmentReference colorAttachmentRef = { 0 };
     colorAttachmentRef.attachment = 0;
@@ -440,24 +497,168 @@ void CreateRenderPass() {
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
 
+    VkSubpassDependency dependency = { 0 };
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
     VkRenderPassCreateInfo renderPassInfo = { 0 };
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
 
     VkResult result = vkCreateRenderPass(g_renderer.vulkan.interface, &renderPassInfo, NULL, &(g_renderer.vulkan.render_pass));
     LOG_ASSERT(result == VK_SUCCESS, "Unable to create render pass");
 }
 
+void CreateFramebuffer() {
+    VkImageView attachments[] = { g_renderer.vulkan.view };
+    VkFramebufferCreateInfo framebufferInfo = { 0 };
+    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferInfo.renderPass = g_renderer.vulkan.render_pass;
+    framebufferInfo.attachmentCount = 1;
+    framebufferInfo.pAttachments = attachments;
+    framebufferInfo.width = TEMP_W;
+    framebufferInfo.height = TEMP_H;
+    framebufferInfo.layers = 1;
+    VkResult result = vkCreateFramebuffer(g_renderer.vulkan.interface, &framebufferInfo, NULL, &(g_renderer.vulkan.framebuffer));
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to create framebuffer");
+}
+
+void CreateCommandPool() {
+    VulkanFamilyGroup queueFamilyIndices = FindQueueFamilies(g_renderer.vulkan.gpu);
+    VkCommandPoolCreateInfo poolInfo = { 0 };
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphics.value;
+    VkResult result = vkCreateCommandPool(g_renderer.vulkan.interface, &poolInfo, NULL, &(g_renderer.vulkan.command_pool));
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to create command pool!");
+}
+
+void CreateCommandBuffer() {
+    VkCommandBufferAllocateInfo allocInfo = { 0 };
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = g_renderer.vulkan.command_pool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+    VkResult result = vkAllocateCommandBuffers(g_renderer.vulkan.interface, &allocInfo, &(g_renderer.vulkan.command));
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to create command buffer");
+}
+
+void RecordCommand(VkCommandBuffer command) {
+    // Start command
+    VkCommandBufferBeginInfo beginInfo = { 0 };
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // Optional
+    beginInfo.pInheritanceInfo = NULL; // Optional
+    VkResult result = vkBeginCommandBuffer(command, &beginInfo);
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
+
+    // Rendering
+    {
+        VkRenderPassBeginInfo renderPassInfo = { 0 };
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = g_renderer.vulkan.render_pass;
+        renderPassInfo.framebuffer = g_renderer.vulkan.framebuffer;
+        renderPassInfo.renderArea.offset = (VkOffset2D){ 0, 0 };
+        renderPassInfo.renderArea.extent = (VkExtent2D){ TEMP_W, TEMP_H };
+
+        VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+        renderPassInfo.clearValueCount = 1;
+        renderPassInfo.pClearValues = &clearColor;
+
+        vkCmdBeginRenderPass(command, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, g_renderer.vulkan.pipeline);
+
+        VkViewport viewport = { 0 };
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float)TEMP_W;
+        viewport.height = (float)TEMP_H;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(command, 0, 1, &viewport);
+
+        VkRect2D scissor = { 0 };
+        scissor.offset = (VkOffset2D){ 0, 0 };
+        scissor.extent = (VkExtent2D){ TEMP_W, TEMP_H };
+        vkCmdSetScissor(command, 0, 1, &scissor);
+
+        vkCmdDraw(command, 3, 1, 0, 0);
+
+        vkCmdEndRenderPass(command);
+    }
+
+    // Copy image to staging
+    {
+        VkBufferImageCopy region = { 0 };
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0; // Tightly packed
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = (VkOffset3D){ 0, 0, 0 };
+        region.imageExtent = (VkExtent3D){ TEMP_W, TEMP_H, 1 };
+        vkCmdCopyImageToBuffer(g_renderer.vulkan.command, g_renderer.vulkan.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_renderer.vulkan.buffer, 1, &region);
+    }
+
+    // End command
+    result = vkEndCommandBuffer(command);
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to record command buffer!");
+}
+
+void CreateSyncObjects() {
+    VkSemaphoreCreateInfo semaphoreInfo = { 0 };
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    VkFenceCreateInfo fenceInfo = { 0 };
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    //fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    VkResult result = vkCreateSemaphore(g_renderer.vulkan.interface, &semaphoreInfo, NULL, &(g_renderer.vulkan.syncro.image_available));
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to create semaphore");
+    result = vkCreateSemaphore(g_renderer.vulkan.interface, &semaphoreInfo, NULL, &(g_renderer.vulkan.syncro.render_finished));
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to create semaphore");
+    result = vkCreateFence(g_renderer.vulkan.interface, &fenceInfo, NULL, &(g_renderer.vulkan.syncro.in_flight));
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to create fence");
+}
+
 void DestroyVulkan() {
+    // wait for device to finish
+    vkDeviceWaitIdle(g_renderer.vulkan.interface);
+
+    // destroy syncro objects
+    vkDestroySemaphore(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.image_available, NULL);
+    vkDestroySemaphore(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.render_finished, NULL);
+    vkDestroyFence(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.in_flight, NULL);
+
+    // destroy command pool
+    vkDestroyCommandPool(g_renderer.vulkan.interface, g_renderer.vulkan.command_pool, NULL);
+
+    // destroy framebuffer
+    vkDestroyFramebuffer(g_renderer.vulkan.interface, g_renderer.vulkan.framebuffer, NULL);
+
     // destroy pipeline
+    vkDestroyPipeline(g_renderer.vulkan.interface, g_renderer.vulkan.pipeline, NULL);
     vkDestroyPipelineLayout(g_renderer.vulkan.interface, g_renderer.vulkan.pipeline_layout, NULL);
     vkDestroyRenderPass(g_renderer.vulkan.interface, g_renderer.vulkan.render_pass, NULL);
 
+    // destroy buffer memory
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, NULL);
+
+    // destroy buffer
+    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.buffer, NULL);
+
     // destroy image memory
-    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.memory, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image_memory, NULL);
 
     // destroy image view
     vkDestroyImageView(g_renderer.vulkan.interface, g_renderer.vulkan.view, NULL);
@@ -484,7 +685,7 @@ void DestroyVulkan() {
     ARRLIST_StaticString_clear(&(g_renderer.vulkan.device_extensions));
 }
 
-void InitializeRenderer() {
+void InitializeVulkan() {
     InitializeVulkanData();
     CreateVulkanInstance();
     SetupVulkanMessenger();
@@ -493,8 +694,56 @@ void InitializeRenderer() {
     CreateImage();
     CreateRenderPass();
     CreatePipeline();
+    CreateFramebuffer();
+    CreateCommandPool();
+    CreateCommandBuffer();
+    CreateSyncObjects();
+}
+
+void InitializeRenderer() {
+    InitializeVulkan();
+    g_renderer.target = LoadRenderTexture(TEMP_W, TEMP_H);
+    LOG_ASSERT(IsRenderTextureValid(g_renderer.target), "Unable to load target texture");
 }
 
 void DestroyRenderer() {
     DestroyVulkan();
+    UnloadRenderTexture(g_renderer.target);
+}
+
+void Render() {
+    // reset command buffer and record it
+    vkResetCommandBuffer(g_renderer.vulkan.command, 0);
+    RecordCommand(g_renderer.vulkan.command);
+
+    // submit command buffer
+    VkSubmitInfo submitInfo = { 0 };
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    //VkSemaphore waitSemaphores[] = { g_renderer.vulkan.syncro.image_available };
+    //VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.waitSemaphoreCount = 0;//1;
+    //submitInfo.pWaitSemaphores = waitSemaphores;
+    //submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &(g_renderer.vulkan.command);
+    //VkSemaphore signalSemaphores[] = { g_renderer.vulkan.syncro.render_finished };
+    submitInfo.signalSemaphoreCount = 0;//1;
+    //submitInfo.pSignalSemaphores = signalSemaphores;
+    VkResult result = vkQueueSubmit(g_renderer.vulkan.graphics_queue, 1, &submitInfo, g_renderer.vulkan.syncro.in_flight);
+    LOG_ASSERT(result == VK_SUCCESS, "failed to submit draw command buffer!");
+
+    // wait for and reset rendering fence
+    vkWaitForFences(g_renderer.vulkan.interface, 1, &(g_renderer.vulkan.syncro.in_flight), VK_TRUE, UINT64_MAX);
+    vkResetFences(g_renderer.vulkan.interface, 1, &(g_renderer.vulkan.syncro.in_flight));
+
+    // update render target
+    void* data;
+    vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, 0, VK_WHOLE_SIZE, 0, &data);
+    glBindTexture(GL_TEXTURE_2D, g_renderer.target.texture.id);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEMP_W, TEMP_H, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory);
+}
+
+void Draw(float x, float y) {
+    DrawTexture(g_renderer.target.texture, x, y, WHITE);
 }

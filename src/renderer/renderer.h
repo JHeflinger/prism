@@ -4,6 +4,7 @@
 #include "data/config.h"
 #include <vulkan/vulkan.h>
 #include <easyobjects.h>
+#include <raylib.h>
 
 typedef const char* StaticString;
 
@@ -19,16 +20,29 @@ typedef struct {
 } VulkanFamilyGroup;
 
 typedef struct {
+    VkSemaphore image_available;
+    VkSemaphore render_finished;
+    VkFence in_flight;
+} VulkanSyncro;
+
+typedef struct {
     VkInstance instance;
     VkDebugUtilsMessengerEXT messenger;
     VkPhysicalDevice gpu;
     VkDevice interface;
     VkImage image;
     VkImageView view;
-    VkDeviceMemory memory;
+    VkDeviceMemory image_memory;
+    VkDeviceMemory buffer_memory;
     VkRenderPass render_pass;
+    VkPipeline pipeline;
     VkPipelineLayout pipeline_layout;
     VkQueue graphics_queue;
+    VkFramebuffer framebuffer;
+    VkCommandPool command_pool;
+    VkCommandBuffer command;
+    VulkanSyncro syncro;
+    VkBuffer buffer;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
     ARRLIST_StaticString device_extensions;
@@ -36,10 +50,15 @@ typedef struct {
 
 typedef struct {
     VulkanData vulkan;
+    RenderTexture2D target;
 } Renderer;
 
 void InitializeRenderer();
 
 void DestroyRenderer();
+
+void Render();
+
+void Draw(float x, float y);
 
 #endif
