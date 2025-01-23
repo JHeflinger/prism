@@ -618,16 +618,9 @@ void RecordCommand(VkCommandBuffer command) {
 }
 
 void CreateSyncObjects() {
-    VkSemaphoreCreateInfo semaphoreInfo = { 0 };
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     VkFenceCreateInfo fenceInfo = { 0 };
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    //fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    VkResult result = vkCreateSemaphore(g_renderer.vulkan.interface, &semaphoreInfo, NULL, &(g_renderer.vulkan.syncro.image_available));
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create semaphore");
-    result = vkCreateSemaphore(g_renderer.vulkan.interface, &semaphoreInfo, NULL, &(g_renderer.vulkan.syncro.render_finished));
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create semaphore");
-    result = vkCreateFence(g_renderer.vulkan.interface, &fenceInfo, NULL, &(g_renderer.vulkan.syncro.in_flight));
+    VkResult result = vkCreateFence(g_renderer.vulkan.interface, &fenceInfo, NULL, &(g_renderer.vulkan.syncro.in_flight));
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create fence");
 }
 
@@ -636,8 +629,6 @@ void DestroyVulkan() {
     vkDeviceWaitIdle(g_renderer.vulkan.interface);
 
     // destroy syncro objects
-    vkDestroySemaphore(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.image_available, NULL);
-    vkDestroySemaphore(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.render_finished, NULL);
     vkDestroyFence(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.in_flight, NULL);
 
     // destroy command pool
@@ -719,16 +710,10 @@ void Render() {
     // submit command buffer
     VkSubmitInfo submitInfo = { 0 };
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    //VkSemaphore waitSemaphores[] = { g_renderer.vulkan.syncro.image_available };
-    //VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    submitInfo.waitSemaphoreCount = 0;//1;
-    //submitInfo.pWaitSemaphores = waitSemaphores;
-    //submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.waitSemaphoreCount = 0;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &(g_renderer.vulkan.command);
-    //VkSemaphore signalSemaphores[] = { g_renderer.vulkan.syncro.render_finished };
-    submitInfo.signalSemaphoreCount = 0;//1;
-    //submitInfo.pSignalSemaphores = signalSemaphores;
+    submitInfo.signalSemaphoreCount = 0;
     VkResult result = vkQueueSubmit(g_renderer.vulkan.graphics_queue, 1, &submitInfo, g_renderer.vulkan.syncro.in_flight);
     LOG_ASSERT(result == VK_SUCCESS, "failed to submit draw command buffer!");
 

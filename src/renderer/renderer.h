@@ -20,8 +20,6 @@ typedef struct {
 } VulkanFamilyGroup;
 
 typedef struct {
-    VkSemaphore image_available;
-    VkSemaphore render_finished;
     VkFence in_flight;
 } VulkanSyncro;
 
