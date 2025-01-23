@@ -3,7 +3,7 @@
 
 void DrawDevPanel() {
     UIDrawText("FPS: %d", (int)(1.0f / GetFrameTime()));
-    UIDrawText("Frametime: %d ms", (int)(1000.0f * GetFrameTime()));
+    UIDrawText("Frametime: %.6f ms", (1000.0f * GetFrameTime()));
     if (EZALLOCATED() > 1000000000) {
         UIDrawText("Memory Usage: %.3f GB (%d bytes)", ((float)EZALLOCATED()) / 1000000000, (int)EZALLOCATED());
     } else if (EZALLOCATED() > 1000000) {
