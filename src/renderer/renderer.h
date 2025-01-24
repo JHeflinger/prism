@@ -6,7 +6,7 @@
 #include <easyobjects.h>
 #include <raylib.h>
 
-#define CPUSWAP_LENGTH 2
+#define CPUSWAP_LENGTH 1
 
 typedef const char* StaticString;
 
@@ -28,6 +28,7 @@ typedef struct {
 typedef struct {
 	RenderTexture2D targets[CPUSWAP_LENGTH];
 	size_t index;
+    void* reference;
 } CPUSwap;
 
 typedef struct {

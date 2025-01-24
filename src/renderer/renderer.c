@@ -266,14 +266,16 @@ void CreateImage() {
     imageAllocInfo.memoryTypeIndex = 0;
     VkPhysicalDeviceMemoryProperties imageMemProperties = { 0 };
     vkGetPhysicalDeviceMemoryProperties(g_renderer.vulkan.gpu, &imageMemProperties);
+    BOOL found = FALSE;
     for (uint32_t i = 0; i < imageMemProperties.memoryTypeCount; i++) {
         if ((imageMemRequirements.memoryTypeBits & (1 << i)) &&
-            (imageMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) &&
-            (imageMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
+            (imageMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
             imageAllocInfo.memoryTypeIndex = i;
+            found = TRUE;
             break;
         }
     }
+    LOG_ASSERT(found, "Unable to find memory that satisfies requirements");
     result = vkAllocateMemory(g_renderer.vulkan.interface, &imageAllocInfo, NULL, &g_renderer.vulkan.image_memory);
     LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate image memory");
     result = vkBindImageMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image, g_renderer.vulkan.image_memory, 0);
@@ -315,18 +317,24 @@ void CreateImage() {
     bufferAllocInfo.memoryTypeIndex = 0;
     VkPhysicalDeviceMemoryProperties bufferMemProperties = { 0 };
     vkGetPhysicalDeviceMemoryProperties(g_renderer.vulkan.gpu, &bufferMemProperties);
+    found = FALSE;
     for (uint32_t i = 0; i < bufferMemProperties.memoryTypeCount; i++) {
         if ((bufferMemRequirements.memoryTypeBits & (1 << i)) &&
-            (bufferMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) &&
-            (bufferMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
+            (bufferMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) &&
+            (imageMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT)) {
             bufferAllocInfo.memoryTypeIndex = i;
+            found = TRUE;
             break;
         }
     }
+    LOG_ASSERT(found, "Unable to find memory that satisfies requirements");
     result = vkAllocateMemory(g_renderer.vulkan.interface, &bufferAllocInfo, NULL, &(g_renderer.vulkan.buffer_memory));
     LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate buffer memory");
     result = vkBindBufferMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer, g_renderer.vulkan.buffer_memory, 0);
     LOG_ASSERT(result == VK_SUCCESS, "Unable to bind buffer memory");
+
+    // map memory to buffer
+    vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, 0, VK_WHOLE_SIZE, 0, &(g_renderer.swapchain.reference));
 }
 
 VkShaderModule CreateShader(SimpleFile* file) {
@@ -625,6 +633,9 @@ void CreateSyncObjects() {
 }
 
 void DestroyVulkan() {
+    // unmap mapped memory
+    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory);
+
     // wait for device to finish
     vkDeviceWaitIdle(g_renderer.vulkan.interface);
 
@@ -725,13 +736,11 @@ void Render() {
     vkResetFences(g_renderer.vulkan.interface, 1, &(g_renderer.vulkan.syncro.in_flight));
 
     // update render target
-    char data[4*TEMP_W*TEMP_H] = { 0 };
-    //vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, 0, VK_WHOLE_SIZE, 0, &data);
 	g_renderer.swapchain.index++;
 	if (g_renderer.swapchain.index > CPUSWAP_LENGTH) g_renderer.swapchain.index = 0;
     glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.targets[g_renderer.swapchain.index].texture.id);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEMP_W, TEMP_H, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    //vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEMP_W, TEMP_H, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Draw(float x, float y) {
