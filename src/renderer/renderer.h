@@ -2,6 +2,7 @@
 #define RENDERER_H
 
 #include "data/config.h"
+#include "data/profile.h"
 #include <vulkan/vulkan.h>
 #include <easyobjects.h>
 #include <raylib.h>
@@ -55,6 +56,11 @@ typedef struct {
 } VulkanData;
 
 typedef struct {
+    Profiler profile;
+} RendererStats;
+
+typedef struct {
+    RendererStats stats;
     VulkanData vulkan;
     CPUSwap swapchain;
 } Renderer;
@@ -66,5 +72,7 @@ void DestroyRenderer();
 void Render();
 
 void Draw(float x, float y);
+
+float RenderTime();
 
 #endif

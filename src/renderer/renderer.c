@@ -708,6 +708,7 @@ void InitializeRenderer() {
 		g_renderer.swapchain.targets[i] = LoadRenderTexture(TEMP_W, TEMP_H);
 		LOG_ASSERT(IsRenderTextureValid(g_renderer.swapchain.targets[i]), "Unable to load target texture");
 	}
+    ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 100);
 }
 
 void DestroyRenderer() {
@@ -717,6 +718,9 @@ void DestroyRenderer() {
 }
 
 void Render() {
+    // profile for stats
+    BeginProfile(&(g_renderer.stats.profile));
+
     // reset command buffer and record it
     vkResetCommandBuffer(g_renderer.vulkan.command, 0);
     RecordCommand(g_renderer.vulkan.command);
@@ -741,10 +745,17 @@ void Render() {
     glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.targets[g_renderer.swapchain.index].texture.id);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEMP_W, TEMP_H, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    // end profiling
+    EndProfile(&(g_renderer.stats.profile));
 }
 
 void Draw(float x, float y) {
 	size_t index = g_renderer.swapchain.index + 1;
 	if (index >= CPUSWAP_LENGTH) index = 0;
     DrawTexture(g_renderer.swapchain.targets[index].texture, x, y, WHITE);
+}
+
+float RenderTime() {
+    return ProfileResult(&(g_renderer.stats.profile));
 }
