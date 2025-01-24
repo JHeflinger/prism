@@ -17,7 +17,7 @@ if NOT exist "shaders\" (
 cd ..
 
 :: compile shaders
-echo "Building shaders..."
+echo Building shaders...
 set SHADERS_DIR=shaders
 set "startTime=%time: =0%"
 for /r %SHADERS_DIR% %%f in (*.vert) do (
