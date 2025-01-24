@@ -550,13 +550,13 @@ void CreateCommandPool() {
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create command pool!");
 }
 
-void CreateCommandBuffer() {
+void CreateCommandBuffers() {
     VkCommandBufferAllocateInfo allocInfo = { 0 };
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = g_renderer.vulkan.command_pool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
-    VkResult result = vkAllocateCommandBuffers(g_renderer.vulkan.interface, &allocInfo, &(g_renderer.vulkan.command));
+    allocInfo.commandBufferCount = CPUSWAP_LENGTH;
+    VkResult result = vkAllocateCommandBuffers(g_renderer.vulkan.interface, &allocInfo, g_renderer.vulkan.commands);
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create command buffer");
 }
 
@@ -617,7 +617,7 @@ void RecordCommand(VkCommandBuffer command) {
         region.imageSubresource.layerCount = 1;
         region.imageOffset = (VkOffset3D){ 0, 0, 0 };
         region.imageExtent = (VkExtent3D){ TEMP_W, TEMP_H, 1 };
-        vkCmdCopyImageToBuffer(g_renderer.vulkan.command, g_renderer.vulkan.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_renderer.vulkan.buffer, 1, &region);
+        vkCmdCopyImageToBuffer(command, g_renderer.vulkan.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_renderer.vulkan.buffer, 1, &region);
     }
 
     // End command
@@ -626,10 +626,13 @@ void RecordCommand(VkCommandBuffer command) {
 }
 
 void CreateSyncObjects() {
-    VkFenceCreateInfo fenceInfo = { 0 };
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    VkResult result = vkCreateFence(g_renderer.vulkan.interface, &fenceInfo, NULL, &(g_renderer.vulkan.syncro.in_flight));
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create fence");
+    for (int i = 0; i < CPUSWAP_LENGTH; i++) {
+        VkFenceCreateInfo fenceInfo = { 0 };
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        if (i != 0) fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        VkResult result = vkCreateFence(g_renderer.vulkan.interface, &fenceInfo, NULL, &(g_renderer.vulkan.syncro.fences[i]));
+        LOG_ASSERT(result == VK_SUCCESS, "Failed to create fence");
+    }
 }
 
 void DestroyVulkan() {
@@ -640,7 +643,8 @@ void DestroyVulkan() {
     vkDeviceWaitIdle(g_renderer.vulkan.interface);
 
     // destroy syncro objects
-    vkDestroyFence(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.in_flight, NULL);
+    for (int i = 0; i < CPUSWAP_LENGTH; i++)
+        vkDestroyFence(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.fences[i], NULL);
 
     // destroy command pool
     vkDestroyCommandPool(g_renderer.vulkan.interface, g_renderer.vulkan.command_pool, NULL);
@@ -698,7 +702,7 @@ void InitializeVulkan() {
     CreatePipeline();
     CreateFramebuffer();
     CreateCommandPool();
-    CreateCommandBuffer();
+    CreateCommandBuffers();
     CreateSyncObjects();
 }
 
@@ -722,26 +726,25 @@ void Render() {
     BeginProfile(&(g_renderer.stats.profile));
 
     // reset command buffer and record it
-    vkResetCommandBuffer(g_renderer.vulkan.command, 0);
-    RecordCommand(g_renderer.vulkan.command);
+    vkResetCommandBuffer(g_renderer.vulkan.commands[g_renderer.swapchain.index], 0);
+    RecordCommand(g_renderer.vulkan.commands[g_renderer.swapchain.index]);
 
     // submit command buffer
     VkSubmitInfo submitInfo = { 0 };
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.waitSemaphoreCount = 0;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &(g_renderer.vulkan.command);
+    submitInfo.pCommandBuffers = &(g_renderer.vulkan.commands[g_renderer.swapchain.index]);
     submitInfo.signalSemaphoreCount = 0;
-    VkResult result = vkQueueSubmit(g_renderer.vulkan.graphics_queue, 1, &submitInfo, g_renderer.vulkan.syncro.in_flight);
+    VkResult result = vkQueueSubmit(g_renderer.vulkan.graphics_queue, 1, &submitInfo, g_renderer.vulkan.syncro.fences[g_renderer.swapchain.index]);
     LOG_ASSERT(result == VK_SUCCESS, "failed to submit draw command buffer!");
 
     // wait for and reset rendering fence
-    vkWaitForFences(g_renderer.vulkan.interface, 1, &(g_renderer.vulkan.syncro.in_flight), VK_TRUE, UINT64_MAX);
-    vkResetFences(g_renderer.vulkan.interface, 1, &(g_renderer.vulkan.syncro.in_flight));
+	g_renderer.swapchain.index = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
+    vkWaitForFences(g_renderer.vulkan.interface, 1, &(g_renderer.vulkan.syncro.fences[g_renderer.swapchain.index]), VK_TRUE, UINT64_MAX);
+    vkResetFences(g_renderer.vulkan.interface, 1, &(g_renderer.vulkan.syncro.fences[g_renderer.swapchain.index]));
 
     // update render target
-	g_renderer.swapchain.index++;
-	if (g_renderer.swapchain.index > CPUSWAP_LENGTH) g_renderer.swapchain.index = 0;
     glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.targets[g_renderer.swapchain.index].texture.id);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEMP_W, TEMP_H, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -751,8 +754,7 @@ void Render() {
 }
 
 void Draw(float x, float y) {
-	size_t index = g_renderer.swapchain.index + 1;
-	if (index >= CPUSWAP_LENGTH) index = 0;
+	size_t index = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
     DrawTexture(g_renderer.swapchain.targets[index].texture, x, y, WHITE);
 }
 

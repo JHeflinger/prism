@@ -7,7 +7,7 @@
 #include <easyobjects.h>
 #include <raylib.h>
 
-#define CPUSWAP_LENGTH 1
+#define CPUSWAP_LENGTH 2
 
 typedef const char* StaticString;
 
@@ -23,7 +23,7 @@ typedef struct {
 } VulkanFamilyGroup;
 
 typedef struct {
-    VkFence in_flight;
+    VkFence fences[CPUSWAP_LENGTH];
 } VulkanSyncro;
 
 typedef struct {
@@ -47,7 +47,7 @@ typedef struct {
     VkQueue graphics_queue;
     VkFramebuffer framebuffer;
     VkCommandPool command_pool;
-    VkCommandBuffer command;
+    VkCommandBuffer commands[CPUSWAP_LENGTH];
     VulkanSyncro syncro;
     VkBuffer buffer;
     ARRLIST_StaticString validation_layers;
