@@ -15,7 +15,7 @@ UI* g_ui = NULL;
 
 void InitEditor() {
 	SetTraceLogLevel(LOG_WARNING);
-    SetConfigFlags(FLAG_VSYNC_HINT);
+    //SetConfigFlags(FLAG_VSYNC_HINT);
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
     InitializeInput();
     InitializeColors();

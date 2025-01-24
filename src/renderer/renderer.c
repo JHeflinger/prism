@@ -693,13 +693,16 @@ void InitializeVulkan() {
 
 void InitializeRenderer() {
     InitializeVulkan();
-    g_renderer.target = LoadRenderTexture(TEMP_W, TEMP_H);
-    LOG_ASSERT(IsRenderTextureValid(g_renderer.target), "Unable to load target texture");
+	for (int i = 0; i < CPUSWAP_LENGTH; i++) {
+		g_renderer.swapchain.targets[i] = LoadRenderTexture(TEMP_W, TEMP_H);
+		LOG_ASSERT(IsRenderTextureValid(g_renderer.swapchain.targets[i]), "Unable to load target texture");
+	}
 }
 
 void DestroyRenderer() {
     DestroyVulkan();
-    UnloadRenderTexture(g_renderer.target);
+	for (int i = 0; i < CPUSWAP_LENGTH; i++)
+		UnloadRenderTexture(g_renderer.swapchain.targets[i]);
 }
 
 void Render() {
@@ -724,11 +727,15 @@ void Render() {
     // update render target
     void* data;
     vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, 0, VK_WHOLE_SIZE, 0, &data);
-    glBindTexture(GL_TEXTURE_2D, g_renderer.target.texture.id);
+	g_renderer.swapchain.index++;
+	if (g_renderer.swapchain.index > CPUSWAP_LENGTH) g_renderer.swapchain.index = 0;
+    glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.targets[g_renderer.swapchain.index].texture.id);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEMP_W, TEMP_H, GL_RGBA, GL_UNSIGNED_BYTE, data);
     vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory);
 }
 
 void Draw(float x, float y) {
-    DrawTexture(g_renderer.target.texture, x, y, WHITE);
+	size_t index = g_renderer.swapchain.index + 1;
+	if (index >= CPUSWAP_LENGTH) index = 0;
+    DrawTexture(g_renderer.swapchain.targets[index].texture, x, y, WHITE);
 }

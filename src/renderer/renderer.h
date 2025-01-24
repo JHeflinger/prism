@@ -6,6 +6,8 @@
 #include <easyobjects.h>
 #include <raylib.h>
 
+#define CPUSWAP_LENGTH 2
+
 typedef const char* StaticString;
 
 DECLARE_ARRLIST(StaticString);
@@ -22,6 +24,11 @@ typedef struct {
 typedef struct {
     VkFence in_flight;
 } VulkanSyncro;
+
+typedef struct {
+	RenderTexture2D targets[CPUSWAP_LENGTH];
+	size_t index;
+} CPUSwap;
 
 typedef struct {
     VkInstance instance;
@@ -48,7 +55,7 @@ typedef struct {
 
 typedef struct {
     VulkanData vulkan;
-    RenderTexture2D target;
+    CPUSwap swapchain;
 } Renderer;
 
 void InitializeRenderer();
