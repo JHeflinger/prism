@@ -725,13 +725,13 @@ void Render() {
     vkResetFences(g_renderer.vulkan.interface, 1, &(g_renderer.vulkan.syncro.in_flight));
 
     // update render target
-    void* data;
-    vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, 0, VK_WHOLE_SIZE, 0, &data);
+    char data[4*TEMP_W*TEMP_H] = { 0 };
+    //vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, 0, VK_WHOLE_SIZE, 0, &data);
 	g_renderer.swapchain.index++;
 	if (g_renderer.swapchain.index > CPUSWAP_LENGTH) g_renderer.swapchain.index = 0;
     glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.targets[g_renderer.swapchain.index].texture.id);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEMP_W, TEMP_H, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory);
+    //vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory);
 }
 
 void Draw(float x, float y) {
