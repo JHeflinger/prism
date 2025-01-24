@@ -13,9 +13,6 @@ Renderer g_renderer;
     #define ENABLE_VK_VALIDATION_LAYERS TRUE
 #endif
 
-#define TEMP_W 800
-#define TEMP_H 600
-
 IMPL_ARRLIST(StaticString);
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
@@ -243,8 +240,8 @@ void CreateImage() {
     VkImageCreateInfo imageInfo = { 0 };
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent.width = TEMP_W;
-    imageInfo.extent.height = TEMP_H;
+    imageInfo.extent.width = g_renderer.dimensions.x;
+    imageInfo.extent.height = g_renderer.dimensions.y;
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
@@ -302,7 +299,7 @@ void CreateImage() {
     // create buffer
     VkBufferCreateInfo bufferInfo = { 0 };
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = TEMP_W * TEMP_H * 4; // Assuming VK_FORMAT_B8G8R8A8_SRGB
+    bufferInfo.size = g_renderer.dimensions.x * g_renderer.dimensions.y * 4; // Assuming VK_FORMAT_B8G8R8A8_SRGB
     bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     result = vkCreateBuffer(g_renderer.vulkan.interface, &bufferInfo, NULL, &(g_renderer.vulkan.buffer));
@@ -379,16 +376,6 @@ void CreatePipeline() {
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-    // VkViewport viewport = { 0 };
-    // viewport.x = 0.0f;
-    // viewport.y = 0.0f;
-    // viewport.width = TEMP_W;
-    // viewport.height = TEMP_H;
-    // viewport.minDepth = 0.0f;
-    // viewport.maxDepth = 1.0f;
-
-    // VkRect2D scissor = { 0 };
 
     VkDynamicState dynamicStates[2] = {
         VK_DYNAMIC_STATE_VIEWPORT,
@@ -533,8 +520,8 @@ void CreateFramebuffer() {
     framebufferInfo.renderPass = g_renderer.vulkan.render_pass;
     framebufferInfo.attachmentCount = 1;
     framebufferInfo.pAttachments = attachments;
-    framebufferInfo.width = TEMP_W;
-    framebufferInfo.height = TEMP_H;
+    framebufferInfo.width = g_renderer.dimensions.x;
+    framebufferInfo.height = g_renderer.dimensions.y;
     framebufferInfo.layers = 1;
     VkResult result = vkCreateFramebuffer(g_renderer.vulkan.interface, &framebufferInfo, NULL, &(g_renderer.vulkan.framebuffer));
     LOG_ASSERT(result == VK_SUCCESS, "Unable to create framebuffer");
@@ -576,7 +563,7 @@ void RecordCommand(VkCommandBuffer command) {
         renderPassInfo.renderPass = g_renderer.vulkan.render_pass;
         renderPassInfo.framebuffer = g_renderer.vulkan.framebuffer;
         renderPassInfo.renderArea.offset = (VkOffset2D){ 0, 0 };
-        renderPassInfo.renderArea.extent = (VkExtent2D){ TEMP_W, TEMP_H };
+        renderPassInfo.renderArea.extent = (VkExtent2D){ g_renderer.dimensions.x, g_renderer.dimensions.y };
 
         VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
         renderPassInfo.clearValueCount = 1;
@@ -589,15 +576,15 @@ void RecordCommand(VkCommandBuffer command) {
         VkViewport viewport = { 0 };
         viewport.x = 0.0f;
         viewport.y = 0.0f;
-        viewport.width = (float)TEMP_W;
-        viewport.height = (float)TEMP_H;
+        viewport.width = g_renderer.dimensions.x;
+        viewport.height = g_renderer.dimensions.y;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(command, 0, 1, &viewport);
 
         VkRect2D scissor = { 0 };
         scissor.offset = (VkOffset2D){ 0, 0 };
-        scissor.extent = (VkExtent2D){ TEMP_W, TEMP_H };
+        scissor.extent = (VkExtent2D){ g_renderer.dimensions.x, g_renderer.dimensions.y };
         vkCmdSetScissor(command, 0, 1, &scissor);
 
         vkCmdDraw(command, 3, 1, 0, 0);
@@ -616,7 +603,7 @@ void RecordCommand(VkCommandBuffer command) {
         region.imageSubresource.baseArrayLayer = 0;
         region.imageSubresource.layerCount = 1;
         region.imageOffset = (VkOffset3D){ 0, 0, 0 };
-        region.imageExtent = (VkExtent3D){ TEMP_W, TEMP_H, 1 };
+        region.imageExtent = (VkExtent3D){ g_renderer.dimensions.x, g_renderer.dimensions.y, 1 };
         vkCmdCopyImageToBuffer(command, g_renderer.vulkan.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_renderer.vulkan.buffer, 1, &region);
     }
 
@@ -635,27 +622,12 @@ void CreateSyncObjects() {
     }
 }
 
-void DestroyVulkan() {
+void CleanSwapchain() {
     // unmap mapped memory
     vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory);
 
-    // wait for device to finish
-    vkDeviceWaitIdle(g_renderer.vulkan.interface);
-
-    // destroy syncro objects
-    for (int i = 0; i < CPUSWAP_LENGTH; i++)
-        vkDestroyFence(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.fences[i], NULL);
-
-    // destroy command pool
-    vkDestroyCommandPool(g_renderer.vulkan.interface, g_renderer.vulkan.command_pool, NULL);
-
     // destroy framebuffer
     vkDestroyFramebuffer(g_renderer.vulkan.interface, g_renderer.vulkan.framebuffer, NULL);
-
-    // destroy pipeline
-    vkDestroyPipeline(g_renderer.vulkan.interface, g_renderer.vulkan.pipeline, NULL);
-    vkDestroyPipelineLayout(g_renderer.vulkan.interface, g_renderer.vulkan.pipeline_layout, NULL);
-    vkDestroyRenderPass(g_renderer.vulkan.interface, g_renderer.vulkan.render_pass, NULL);
 
     // destroy buffer memory
     vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, NULL);
@@ -671,6 +643,34 @@ void DestroyVulkan() {
 
     // destroy image
     vkDestroyImage(g_renderer.vulkan.interface, g_renderer.vulkan.image, NULL);
+}
+
+void RecreateSwapchain() {
+    vkDeviceWaitIdle(g_renderer.vulkan.interface);
+    g_renderer.dimensions = (Vector2){ GetScreenWidth(), GetScreenHeight() };
+    CleanSwapchain();
+    CreateImage();
+    CreateFramebuffer();
+}
+
+void DestroyVulkan() {
+    // wait for device to finish
+    vkDeviceWaitIdle(g_renderer.vulkan.interface);
+
+    // clean swapchain
+    CleanSwapchain();
+
+    // destroy syncro objects
+    for (int i = 0; i < CPUSWAP_LENGTH; i++)
+        vkDestroyFence(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.fences[i], NULL);
+
+    // destroy command pool
+    vkDestroyCommandPool(g_renderer.vulkan.interface, g_renderer.vulkan.command_pool, NULL);
+
+    // destroy pipeline
+    vkDestroyPipeline(g_renderer.vulkan.interface, g_renderer.vulkan.pipeline, NULL);
+    vkDestroyPipelineLayout(g_renderer.vulkan.interface, g_renderer.vulkan.pipeline_layout, NULL);
+    vkDestroyRenderPass(g_renderer.vulkan.interface, g_renderer.vulkan.render_pass, NULL);
 
     // destroy vulkan device
     vkDestroyDevice(g_renderer.vulkan.interface, NULL);
@@ -707,9 +707,10 @@ void InitializeVulkan() {
 }
 
 void InitializeRenderer() {
+    g_renderer.dimensions = (Vector2){ GetScreenWidth(), GetScreenHeight() };
     InitializeVulkan();
 	for (int i = 0; i < CPUSWAP_LENGTH; i++) {
-		g_renderer.swapchain.targets[i] = LoadRenderTexture(TEMP_W, TEMP_H);
+		g_renderer.swapchain.targets[i] = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
 		LOG_ASSERT(IsRenderTextureValid(g_renderer.swapchain.targets[i]), "Unable to load target texture");
 	}
     ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 100);
@@ -724,6 +725,9 @@ void DestroyRenderer() {
 void Render() {
     // profile for stats
     BeginProfile(&(g_renderer.stats.profile));
+
+    // check for window changes
+    if (g_renderer.dimensions.x != GetScreenWidth() || g_renderer.dimensions.y != GetScreenHeight()) RecreateSwapchain();
 
     // reset command buffer and record it
     vkResetCommandBuffer(g_renderer.vulkan.commands[g_renderer.swapchain.index], 0);
@@ -746,16 +750,25 @@ void Render() {
 
     // update render target
     glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.targets[g_renderer.swapchain.index].texture.id);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEMP_W, TEMP_H, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_renderer.dimensions.x, g_renderer.dimensions.y, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     // end profiling
     EndProfile(&(g_renderer.stats.profile));
 }
 
-void Draw(float x, float y) {
+void Draw(float x, float y, float w, float h) {
 	size_t index = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
-    DrawTexture(g_renderer.swapchain.targets[index].texture, x, y, WHITE);
+    DrawTexturePro(
+        g_renderer.swapchain.targets[index].texture,
+        (Rectangle){
+            0, 0, 
+            g_renderer.swapchain.targets[index].texture.width,
+            g_renderer.swapchain.targets[index].texture.height },
+        (Rectangle){ x, y, w, h},
+        (Vector2){ 0, 0 },
+        0.0f,
+        WHITE);
 }
 
 float RenderTime() {

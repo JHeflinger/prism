@@ -1,10 +1,9 @@
 #include "viewport.h"
 #include "renderer/renderer.h"
 
-void DrawViewportPanel() {
-    DrawRectangle(100, 100, 100, 100, RED);
+void DrawViewportPanel(float width, float height) {
     Render();
-    Draw(100, 100);
+    Draw(0, 0, width, height);
 }
 
 void ConfigureViewportPanel(Panel* panel) {

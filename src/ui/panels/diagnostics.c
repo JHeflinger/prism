@@ -4,7 +4,7 @@
 
 BOOL g_vsync_enabled = TRUE;
 
-void DrawDevPanel() {
+void DrawDevPanel(float width, float height) {
     UIDrawText("FPS: %d", (int)(1.0f / GetFrameTime()));
     UIDrawText("Frame time: %.6f ms", (1000.0f * GetFrameTime()));
     UIDrawText("Render time: %.6f ms", (float)RenderTime());

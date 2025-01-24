@@ -8,3 +8,4 @@ ui todos:
     - tabbed panels
     - closeable panels
     - move panels with keybinds
+    - accomodate screen resize

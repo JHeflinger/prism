@@ -143,7 +143,7 @@ void PreRenderUI(UI* ui) {
         g_ui_cursor = (Vector2){ 10, 10 };
         BeginTextureMode(ui->panel.texture);
         ClearBackground((Color){0, 0, 0, 0});
-        ui->panel.draw();
+        ui->panel.draw(ui->w, ui->h);
         EndTextureMode();
     }
 }

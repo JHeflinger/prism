@@ -94,7 +94,7 @@ set INCLUDES=!INCLUDES! -I"vendor/cglm/include"
 :: compile
 echo Building prism...
 set "startTime=%time: =0%"
-gcc -Wall -Wextra%SOURCES%%INCLUDES%%LIBS%%LINKS% -o build/prism.exe %PROD%
+gcc -Wall -Wextra -Wno-unused-parameter%SOURCES%%INCLUDES%%LIBS%%LINKS% -o build/prism.exe %PROD%
 if %ERRORLEVEL% NEQ 0 (
     echo Build [31mFailed[0m with error code %ERRORLEVEL%
     exit /b %ERRORLEVEL%

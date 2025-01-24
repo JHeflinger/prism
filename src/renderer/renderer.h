@@ -63,6 +63,7 @@ typedef struct {
     RendererStats stats;
     VulkanData vulkan;
     CPUSwap swapchain;
+    Vector2 dimensions;
 } Renderer;
 
 void InitializeRenderer();
@@ -71,7 +72,7 @@ void DestroyRenderer();
 
 void Render();
 
-void Draw(float x, float y);
+void Draw(float x, float y, float w, float h);
 
 float RenderTime();
 

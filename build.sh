@@ -83,7 +83,7 @@ INCLUDES="$INCLUDES -Ivendor/cglm/include"
 # compile
 echo "Building prism..."
 startTime=$(date +%s%N)
-gcc -Wall -Wextra$SOURCES$INCLUDES$LIBS$LINKS -o build/prism $PROD
+gcc -Wall -Wextra -Wno-unused-parameter$SOURCES$INCLUDES$LIBS$LINKS -o build/prism $PROD
 if [ $? -ne 0 ]; then
 	echo -e "Build \033[31mFailed\033[0m"
 	exit 1

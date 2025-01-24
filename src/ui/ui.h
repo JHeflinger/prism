@@ -9,7 +9,7 @@
 #define MAX_NAME_LEN 256
 #define MAX_LINE_WIDTH 2048
 
-typedef void (*PanelFunction)(void);
+typedef void (*PanelFunction)(float width, float height);
 
 typedef struct {
     char name[MAX_NAME_LEN];
