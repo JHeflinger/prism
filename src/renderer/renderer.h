@@ -48,7 +48,8 @@ typedef struct {
     VkImage image;
     VkImageView view;
     VkDeviceMemory image_memory;
-    VkDeviceMemory buffer_memory;
+    VkDeviceMemory staging_memory;
+    VkDeviceMemory vertex_memory;
     VkRenderPass render_pass;
     VkPipeline pipeline;
     VkPipelineLayout pipeline_layout;
@@ -57,7 +58,8 @@ typedef struct {
     VkCommandPool command_pool;
     VkCommandBuffer commands[CPUSWAP_LENGTH];
     VulkanSyncro syncro;
-    VkBuffer buffer;
+    VkBuffer staging_buffer;
+    VkBuffer vertex_buffer;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
     ARRLIST_StaticString device_extensions;

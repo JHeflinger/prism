@@ -13,6 +13,8 @@ Renderer g_renderer;
     #define ENABLE_VK_VALIDATION_LAYERS TRUE
 #endif
 
+#define IMAGE_FORMAT VK_FORMAT_R8G8B8A8_SRGB
+
 IMPL_ARRLIST(StaticString);
 IMPL_ARRLIST(Vertex);
 
@@ -41,7 +43,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
     return VK_FALSE;
 }
 
-static VkVertexInputBindingDescription VertexBindingDescription() {
+VkVertexInputBindingDescription VertexBindingDescription() {
     VkVertexInputBindingDescription bindingDescription = { 0 };
     bindingDescription.binding = 0;
     bindingDescription.stride = sizeof(Vertex);
@@ -49,7 +51,7 @@ static VkVertexInputBindingDescription VertexBindingDescription() {
     return bindingDescription;
 }
 
-static PAIR_VkVertexInputAttributeDescription VertexAttributeDescriptions() {
+PAIR_VkVertexInputAttributeDescription VertexAttributeDescriptions() {
     PAIR_VkVertexInputAttributeDescription attributeDescriptions = { 0 };
     attributeDescriptions.value[0].binding = 0;
     attributeDescriptions.value[0].location = 0;
@@ -60,6 +62,21 @@ static PAIR_VkVertexInputAttributeDescription VertexAttributeDescriptions() {
     attributeDescriptions.value[1].format = VK_FORMAT_R32G32B32_SFLOAT;
     attributeDescriptions.value[1].offset = offsetof(Vertex, color);
     return attributeDescriptions;
+}
+
+Schrodingnum FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    Schrodingnum result = { 0 };
+    VkPhysicalDeviceMemoryProperties memProperties = { 0 };
+    vkGetPhysicalDeviceMemoryProperties(g_renderer.vulkan.gpu, &memProperties);
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            result.value = i;
+            result.exists = TRUE;
+            break;
+        }
+    }
+    return result;
 }
 
 void InitializeVulkanData() {
@@ -272,7 +289,7 @@ void CreateImage() {
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
-    imageInfo.format = VK_FORMAT_B8G8R8A8_SRGB;
+    imageInfo.format = IMAGE_FORMAT;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -287,19 +304,9 @@ void CreateImage() {
     VkMemoryAllocateInfo imageAllocInfo = { 0 };
     imageAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     imageAllocInfo.allocationSize = imageMemRequirements.size;
-    imageAllocInfo.memoryTypeIndex = 0;
-    VkPhysicalDeviceMemoryProperties imageMemProperties = { 0 };
-    vkGetPhysicalDeviceMemoryProperties(g_renderer.vulkan.gpu, &imageMemProperties);
-    BOOL found = FALSE;
-    for (uint32_t i = 0; i < imageMemProperties.memoryTypeCount; i++) {
-        if ((imageMemRequirements.memoryTypeBits & (1 << i)) &&
-            (imageMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
-            imageAllocInfo.memoryTypeIndex = i;
-            found = TRUE;
-            break;
-        }
-    }
-    LOG_ASSERT(found, "Unable to find memory that satisfies requirements");
+    Schrodingnum imageMemoryType = FindMemoryType(imageMemRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    LOG_ASSERT(imageMemoryType.exists, "Unable to find memory that satisfies requirements");
+    imageAllocInfo.memoryTypeIndex = imageMemoryType.value;
     result = vkAllocateMemory(g_renderer.vulkan.interface, &imageAllocInfo, NULL, &g_renderer.vulkan.image_memory);
     LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate image memory");
     result = vkBindImageMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image, g_renderer.vulkan.image_memory, 0);
@@ -310,7 +317,7 @@ void CreateImage() {
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = g_renderer.vulkan.image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = VK_FORMAT_B8G8R8A8_SRGB;
+    viewInfo.format = IMAGE_FORMAT;
     viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -329,36 +336,25 @@ void CreateImage() {
     bufferInfo.size = g_renderer.dimensions.x * g_renderer.dimensions.y * 4; // Assuming VK_FORMAT_B8G8R8A8_SRGB
     bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    result = vkCreateBuffer(g_renderer.vulkan.interface, &bufferInfo, NULL, &(g_renderer.vulkan.buffer));
+    result = vkCreateBuffer(g_renderer.vulkan.interface, &bufferInfo, NULL, &(g_renderer.vulkan.staging_buffer));
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create staging buffer");
 
     // allocate memory for buffer
     VkMemoryRequirements bufferMemRequirements = { 0 };
-    vkGetBufferMemoryRequirements(g_renderer.vulkan.interface, g_renderer.vulkan.buffer, &bufferMemRequirements);
+    vkGetBufferMemoryRequirements(g_renderer.vulkan.interface, g_renderer.vulkan.staging_buffer, &bufferMemRequirements);
     VkMemoryAllocateInfo bufferAllocInfo = { 0 };
     bufferAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     bufferAllocInfo.allocationSize = bufferMemRequirements.size;
-    bufferAllocInfo.memoryTypeIndex = 0;
-    VkPhysicalDeviceMemoryProperties bufferMemProperties = { 0 };
-    vkGetPhysicalDeviceMemoryProperties(g_renderer.vulkan.gpu, &bufferMemProperties);
-    found = FALSE;
-    for (uint32_t i = 0; i < bufferMemProperties.memoryTypeCount; i++) {
-        if ((bufferMemRequirements.memoryTypeBits & (1 << i)) &&
-            (bufferMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) &&
-            (imageMemProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT)) {
-            bufferAllocInfo.memoryTypeIndex = i;
-            found = TRUE;
-            break;
-        }
-    }
-    LOG_ASSERT(found, "Unable to find memory that satisfies requirements");
-    result = vkAllocateMemory(g_renderer.vulkan.interface, &bufferAllocInfo, NULL, &(g_renderer.vulkan.buffer_memory));
+    Schrodingnum bufferMemoryType = FindMemoryType(bufferMemRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
+    LOG_ASSERT(bufferMemoryType.exists, "Unable to find memory that satisfies requirements");
+    bufferAllocInfo.memoryTypeIndex = bufferMemoryType.value;
+    result = vkAllocateMemory(g_renderer.vulkan.interface, &bufferAllocInfo, NULL, &(g_renderer.vulkan.staging_memory));
     LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate buffer memory");
-    result = vkBindBufferMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer, g_renderer.vulkan.buffer_memory, 0);
+    result = vkBindBufferMemory(g_renderer.vulkan.interface, g_renderer.vulkan.staging_buffer, g_renderer.vulkan.staging_memory, 0);
     LOG_ASSERT(result == VK_SUCCESS, "Unable to bind buffer memory");
 
     // map memory to buffer
-    vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, 0, VK_WHOLE_SIZE, 0, &(g_renderer.swapchain.reference));
+    vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.staging_memory, 0, VK_WHOLE_SIZE, 0, &(g_renderer.swapchain.reference));
 }
 
 VkShaderModule CreateShader(SimpleFile* file) {
@@ -504,7 +500,7 @@ void CreatePipeline() {
 
 void CreateRenderPass() {
     VkAttachmentDescription colorAttachment = { 0 };
-    colorAttachment.format = VK_FORMAT_B8G8R8A8_SRGB;
+    colorAttachment.format = IMAGE_FORMAT;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -617,7 +613,11 @@ void RecordCommand(VkCommandBuffer command) {
         scissor.extent = (VkExtent2D){ g_renderer.dimensions.x, g_renderer.dimensions.y };
         vkCmdSetScissor(command, 0, 1, &scissor);
 
-        vkCmdDraw(command, 3, 1, 0, 0);
+        VkBuffer vertexBuffers[] = { g_renderer.vulkan.vertex_buffer };
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(command, 0, 1, vertexBuffers, offsets);
+
+        vkCmdDraw(command, (uint32_t)g_renderer.vertices.size, 1, 0, 0);
 
         vkCmdEndRenderPass(command);
     }
@@ -634,7 +634,7 @@ void RecordCommand(VkCommandBuffer command) {
         region.imageSubresource.layerCount = 1;
         region.imageOffset = (VkOffset3D){ 0, 0, 0 };
         region.imageExtent = (VkExtent3D){ g_renderer.dimensions.x, g_renderer.dimensions.y, 1 };
-        vkCmdCopyImageToBuffer(command, g_renderer.vulkan.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_renderer.vulkan.buffer, 1, &region);
+        vkCmdCopyImageToBuffer(command, g_renderer.vulkan.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_renderer.vulkan.staging_buffer, 1, &region);
     }
 
     // End command
@@ -654,16 +654,16 @@ void CreateSyncObjects() {
 
 void CleanSwapchain() {
     // unmap mapped memory
-    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory);
+    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.staging_memory);
 
     // destroy framebuffer
     vkDestroyFramebuffer(g_renderer.vulkan.interface, g_renderer.vulkan.framebuffer, NULL);
 
     // destroy buffer memory
-    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.buffer_memory, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.staging_memory, NULL);
 
     // destroy buffer
-    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.buffer, NULL);
+    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.staging_buffer, NULL);
 
     // destroy image memory
     vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image_memory, NULL);
@@ -683,12 +683,46 @@ void RecreateSwapchain() {
     CreateFramebuffer();
 }
 
+void CreateVertexBuffer() {
+    VkBufferCreateInfo bufferInfo = { 0 };
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = sizeof(Vertex) * g_renderer.vertices.size;
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VkResult result = vkCreateBuffer(g_renderer.vulkan.interface, &bufferInfo, NULL, &(g_renderer.vulkan.vertex_buffer));
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to create vertex buffer");
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_buffer, &memRequirements);
+    VkMemoryAllocateInfo allocInfo = { 0 };
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    Schrodingnum vertexMemoryType = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    LOG_ASSERT(vertexMemoryType.exists, "Unable to find memory for vertex buffer");
+    allocInfo.memoryTypeIndex = vertexMemoryType.value;
+    result = vkAllocateMemory(g_renderer.vulkan.interface, &allocInfo, NULL, &(g_renderer.vulkan.vertex_memory));
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate memory for vertex buffer");
+
+    vkBindBufferMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_buffer, g_renderer.vulkan.vertex_memory, 0);
+
+    void* data;
+    vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_memory, 0, bufferInfo.size, 0, &data);
+    memcpy(data, g_renderer.vertices.data, (size_t)bufferInfo.size);
+    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_memory);
+}
+
 void DestroyVulkan() {
     // wait for device to finish
     vkDeviceWaitIdle(g_renderer.vulkan.interface);
 
     // clean swapchain
     CleanSwapchain();
+
+    // destroy vertex buffer
+    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_buffer, NULL);
+
+    // free vertex memory
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_memory, NULL);
 
     // destroy syncro objects
     for (int i = 0; i < CPUSWAP_LENGTH; i++)
@@ -732,6 +766,7 @@ void InitializeVulkan() {
     CreatePipeline();
     CreateFramebuffer();
     CreateCommandPool();
+    CreateVertexBuffer();
     CreateCommandBuffers();
     CreateSyncObjects();
 }
