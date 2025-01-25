@@ -6,12 +6,11 @@
 #include <vulkan/vulkan.h>
 #include <easyobjects.h>
 #include <raylib.h>
+#include <cglm/cglm.h>
 
 #define CPUSWAP_LENGTH 2
 
 typedef const char* StaticString;
-
-DECLARE_ARRLIST(StaticString);
 
 typedef struct {
     uint32_t value;
@@ -31,6 +30,15 @@ typedef struct {
 	size_t index;
     void* reference;
 } CPUSwap;
+
+typedef struct {
+    vec2 position;
+    vec3 color;
+} Vertex;
+
+DECLARE_ARRLIST(StaticString);
+DECLARE_ARRLIST(Vertex);
+DECLARE_PAIR(VkVertexInputAttributeDescription);
 
 typedef struct {
     VkInstance instance;
@@ -64,6 +72,7 @@ typedef struct {
     VulkanData vulkan;
     CPUSwap swapchain;
     Vector2 dimensions;
+    ARRLIST_Vertex vertices;
 } Renderer;
 
 void InitializeRenderer();

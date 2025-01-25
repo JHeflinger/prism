@@ -14,6 +14,7 @@ Renderer g_renderer;
 #endif
 
 IMPL_ARRLIST(StaticString);
+IMPL_ARRLIST(Vertex);
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -40,7 +41,33 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
     return VK_FALSE;
 }
 
+static VkVertexInputBindingDescription VertexBindingDescription() {
+    VkVertexInputBindingDescription bindingDescription = { 0 };
+    bindingDescription.binding = 0;
+    bindingDescription.stride = sizeof(Vertex);
+    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    return bindingDescription;
+}
+
+static PAIR_VkVertexInputAttributeDescription VertexAttributeDescriptions() {
+    PAIR_VkVertexInputAttributeDescription attributeDescriptions = { 0 };
+    attributeDescriptions.value[0].binding = 0;
+    attributeDescriptions.value[0].location = 0;
+    attributeDescriptions.value[0].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions.value[0].offset = offsetof(Vertex, position);
+    attributeDescriptions.value[1].binding = 0;
+    attributeDescriptions.value[1].location = 1;
+    attributeDescriptions.value[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions.value[1].offset = offsetof(Vertex, color);
+    return attributeDescriptions;
+}
+
 void InitializeVulkanData() {
+    // set up temp vertex data
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.0f, -0.5f }, { 1.0f, 0.0f, 0.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f } });
+
     // set up validation layers
     ARRLIST_StaticString_add(&(g_renderer.vulkan.validation_layers), "VK_LAYER_KHRONOS_validation");
 
@@ -365,12 +392,15 @@ void CreatePipeline() {
 
 	VkPipelineShaderStageCreateInfo shaderstages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
+    VkVertexInputBindingDescription bindingDescription = VertexBindingDescription();
+    PAIR_VkVertexInputAttributeDescription attributeDescriptions = VertexAttributeDescriptions();
+
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = { 0 };
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = NULL; // Optional
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = NULL; // Optional
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = 2;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.value;
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = { 0 };
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -707,19 +737,32 @@ void InitializeVulkan() {
 }
 
 void InitializeRenderer() {
+    // set up dimensions
     g_renderer.dimensions = (Vector2){ GetScreenWidth(), GetScreenHeight() };
+
+    // initialize vulkan resources
     InitializeVulkan();
+
+    // set up cpu swap
 	for (int i = 0; i < CPUSWAP_LENGTH; i++) {
 		g_renderer.swapchain.targets[i] = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
 		LOG_ASSERT(IsRenderTextureValid(g_renderer.swapchain.targets[i]), "Unable to load target texture");
 	}
+
+    // configure stat profiler
     ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 100);
 }
 
 void DestroyRenderer() {
+    // destroy vulkan resources
     DestroyVulkan();
+
+    // unload cpu swap textures
 	for (int i = 0; i < CPUSWAP_LENGTH; i++)
 		UnloadRenderTexture(g_renderer.swapchain.targets[i]);
+
+    // clean vertex data
+    ARRLIST_Vertex_clear(&(g_renderer.vertices));
 }
 
 void Render() {
