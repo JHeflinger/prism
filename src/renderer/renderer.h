@@ -10,6 +10,10 @@
 
 #define CPUSWAP_LENGTH 2
 
+/* Overall TODO:
+ * - Condense all buffers into one and use offsets to increase cache performance
+*/
+
 typedef const char* StaticString;
 
 typedef struct {
@@ -36,8 +40,12 @@ typedef struct {
     vec3 color;
 } Vertex;
 
+typedef uint16_t Index;
+#define INDEX_VK_TYPE VK_INDEX_TYPE_UINT16
+
 DECLARE_ARRLIST(StaticString);
 DECLARE_ARRLIST(Vertex);
+DECLARE_ARRLIST(Index); // TODO: may need to make this bigger if we run out of indices
 DECLARE_PAIR(VkVertexInputAttributeDescription);
 
 typedef struct {
@@ -50,6 +58,7 @@ typedef struct {
     VkDeviceMemory image_memory;
     VkDeviceMemory cross_memory;
     VkDeviceMemory vertex_memory;
+    VkDeviceMemory index_memory;
     VkRenderPass render_pass;
     VkPipeline pipeline;
     VkPipelineLayout pipeline_layout;
@@ -60,6 +69,7 @@ typedef struct {
     VulkanSyncro syncro;
     VkBuffer cross_buffer;
     VkBuffer vertex_buffer;
+    VkBuffer index_buffer;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
     ARRLIST_StaticString device_extensions;
@@ -75,6 +85,7 @@ typedef struct {
     CPUSwap swapchain;
     Vector2 dimensions;
     ARRLIST_Vertex vertices;
+    ARRLIST_Index indices;
 } Renderer;
 
 void InitializeRenderer();

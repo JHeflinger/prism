@@ -17,6 +17,7 @@ Renderer g_renderer;
 
 IMPL_ARRLIST(StaticString);
 IMPL_ARRLIST(Vertex);
+IMPL_ARRLIST(Index);
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -139,9 +140,18 @@ void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
 
 void InitializeVulkanData() {
     // set up temp vertex data
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.0f, -0.5f }, { 1.0f, 0.0f, 0.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, 0.5f }, { 1.0f, 1.0f, 1.0f } });
+
+    // set up temp index data
+    ARRLIST_Index_add(&(g_renderer.indices), 0);
+    ARRLIST_Index_add(&(g_renderer.indices), 1);
+    ARRLIST_Index_add(&(g_renderer.indices), 2);
+    ARRLIST_Index_add(&(g_renderer.indices), 2);
+    ARRLIST_Index_add(&(g_renderer.indices), 3);
+    ARRLIST_Index_add(&(g_renderer.indices), 0);
 
     // set up validation layers
     ARRLIST_StaticString_add(&(g_renderer.vulkan.validation_layers), "VK_LAYER_KHRONOS_validation");
@@ -660,7 +670,9 @@ void RecordCommand(VkCommandBuffer command) {
         VkDeviceSize offsets[] = { 0 };
         vkCmdBindVertexBuffers(command, 0, 1, vertexBuffers, offsets);
 
-        vkCmdDraw(command, (uint32_t)g_renderer.vertices.size, 1, 0, 0);
+        vkCmdBindIndexBuffer(command, g_renderer.vulkan.index_buffer, 0, INDEX_VK_TYPE);
+
+        vkCmdDrawIndexed(command, (uint32_t)g_renderer.indices.size, 1, 0, 0, 0);
 
         vkCmdEndRenderPass(command);
     }
@@ -756,6 +768,36 @@ void CreateVertexBuffer() {
     vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
 }
 
+void CreateIndexBuffer() {
+    VkDeviceSize size = sizeof(Index) * g_renderer.indices.size;
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    CreateBuffer(
+        size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &stagingBuffer,
+        &stagingBufferMemory);
+
+    void* data;
+    vkMapMemory(g_renderer.vulkan.interface, stagingBufferMemory, 0, size, 0, &data);
+    memcpy(data, g_renderer.indices.data, (size_t)size);
+    vkUnmapMemory(g_renderer.vulkan.interface, stagingBufferMemory);
+
+    CreateBuffer(
+        size,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &(g_renderer.vulkan.index_buffer),
+        &(g_renderer.vulkan.index_memory));
+    
+    CopyBuffer(stagingBuffer, g_renderer.vulkan.index_buffer, size);
+
+    vkDestroyBuffer(g_renderer.vulkan.interface, stagingBuffer, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
+}
+
 void DestroyVulkan() {
     // wait for device to finish
     vkDeviceWaitIdle(g_renderer.vulkan.interface);
@@ -768,6 +810,12 @@ void DestroyVulkan() {
 
     // free vertex memory
     vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_memory, NULL);
+
+    // destroy index buffer
+    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.index_buffer, NULL);
+
+    // free index memory
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.index_memory, NULL);
 
     // destroy syncro objects
     for (int i = 0; i < CPUSWAP_LENGTH; i++)
@@ -812,6 +860,7 @@ void InitializeVulkan() {
     CreateFramebuffer();
     CreateCommandPool();
     CreateVertexBuffer();
+    CreateIndexBuffer();
     CreateCommandBuffers();
     CreateSyncObjects();
 }
@@ -843,6 +892,9 @@ void DestroyRenderer() {
 
     // clean vertex data
     ARRLIST_Vertex_clear(&(g_renderer.vertices));
+
+    // clean index data
+    ARRLIST_Index_clear(&(g_renderer.indices));
 }
 
 void Render() {
