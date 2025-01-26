@@ -79,6 +79,64 @@ Schrodingnum FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertie
     return result;
 }
 
+void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    VkCommandBufferAllocateInfo allocInfo = { 0 };
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = g_renderer.vulkan.command_pool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(g_renderer.vulkan.interface, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo = { 0 };
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    VkBufferCopy copyRegion = { 0 };
+    copyRegion.srcOffset = 0; // Optional
+    copyRegion.dstOffset = 0; // Optional
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo = { 0 };
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(g_renderer.vulkan.graphics_queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(g_renderer.vulkan.graphics_queue);
+
+    vkFreeCommandBuffers(g_renderer.vulkan.interface, g_renderer.vulkan.command_pool, 1, &commandBuffer);
+}
+
+void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer* buffer, VkDeviceMemory* bufferMemory) {
+    VkBufferCreateInfo bufferInfo = { 0 };
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VkResult result = vkCreateBuffer(g_renderer.vulkan.interface, &bufferInfo, NULL, buffer);
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to create buffer");
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(g_renderer.vulkan.interface, *buffer, &memRequirements);
+    VkMemoryAllocateInfo allocInfo = { 0 };
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    Schrodingnum memoryType = FindMemoryType(memRequirements.memoryTypeBits, properties);
+    LOG_ASSERT(memoryType.exists, "Unable to find memory for vertex buffer");
+    allocInfo.memoryTypeIndex = memoryType.value;
+    result = vkAllocateMemory(g_renderer.vulkan.interface, &allocInfo, NULL, bufferMemory);
+    LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate memory for buffer");
+
+    vkBindBufferMemory(g_renderer.vulkan.interface, *buffer, *bufferMemory, 0);
+}
+
 void InitializeVulkanData() {
     // set up temp vertex data
     ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.0f, -0.5f }, { 1.0f, 0.0f, 0.0f } });
@@ -330,31 +388,16 @@ void CreateImage() {
     result = vkCreateImageView(g_renderer.vulkan.interface, &viewInfo, NULL, &(g_renderer.vulkan.view));
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create image view");
 
-    // create buffer
-    VkBufferCreateInfo bufferInfo = { 0 };
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = g_renderer.dimensions.x * g_renderer.dimensions.y * 4; // Assuming VK_FORMAT_B8G8R8A8_SRGB
-    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    result = vkCreateBuffer(g_renderer.vulkan.interface, &bufferInfo, NULL, &(g_renderer.vulkan.staging_buffer));
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create staging buffer");
-
-    // allocate memory for buffer
-    VkMemoryRequirements bufferMemRequirements = { 0 };
-    vkGetBufferMemoryRequirements(g_renderer.vulkan.interface, g_renderer.vulkan.staging_buffer, &bufferMemRequirements);
-    VkMemoryAllocateInfo bufferAllocInfo = { 0 };
-    bufferAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    bufferAllocInfo.allocationSize = bufferMemRequirements.size;
-    Schrodingnum bufferMemoryType = FindMemoryType(bufferMemRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
-    LOG_ASSERT(bufferMemoryType.exists, "Unable to find memory that satisfies requirements");
-    bufferAllocInfo.memoryTypeIndex = bufferMemoryType.value;
-    result = vkAllocateMemory(g_renderer.vulkan.interface, &bufferAllocInfo, NULL, &(g_renderer.vulkan.staging_memory));
-    LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate buffer memory");
-    result = vkBindBufferMemory(g_renderer.vulkan.interface, g_renderer.vulkan.staging_buffer, g_renderer.vulkan.staging_memory, 0);
-    LOG_ASSERT(result == VK_SUCCESS, "Unable to bind buffer memory");
+    // create cross buffer
+    CreateBuffer(
+        g_renderer.dimensions.x * g_renderer.dimensions.y * 4, // Assuming VK_FORMAT_B8G8R8A8_SRGB
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
+        &(g_renderer.vulkan.cross_buffer),
+        &(g_renderer.vulkan.cross_memory));
 
     // map memory to buffer
-    vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.staging_memory, 0, VK_WHOLE_SIZE, 0, &(g_renderer.swapchain.reference));
+    vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.cross_memory, 0, VK_WHOLE_SIZE, 0, &(g_renderer.swapchain.reference));
 }
 
 VkShaderModule CreateShader(SimpleFile* file) {
@@ -634,7 +677,7 @@ void RecordCommand(VkCommandBuffer command) {
         region.imageSubresource.layerCount = 1;
         region.imageOffset = (VkOffset3D){ 0, 0, 0 };
         region.imageExtent = (VkExtent3D){ g_renderer.dimensions.x, g_renderer.dimensions.y, 1 };
-        vkCmdCopyImageToBuffer(command, g_renderer.vulkan.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_renderer.vulkan.staging_buffer, 1, &region);
+        vkCmdCopyImageToBuffer(command, g_renderer.vulkan.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_renderer.vulkan.cross_buffer, 1, &region);
     }
 
     // End command
@@ -654,16 +697,16 @@ void CreateSyncObjects() {
 
 void CleanSwapchain() {
     // unmap mapped memory
-    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.staging_memory);
+    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.cross_memory);
 
     // destroy framebuffer
     vkDestroyFramebuffer(g_renderer.vulkan.interface, g_renderer.vulkan.framebuffer, NULL);
 
     // destroy buffer memory
-    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.staging_memory, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.cross_memory, NULL);
 
     // destroy buffer
-    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.staging_buffer, NULL);
+    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.cross_buffer, NULL);
 
     // destroy image memory
     vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image_memory, NULL);
@@ -684,31 +727,33 @@ void RecreateSwapchain() {
 }
 
 void CreateVertexBuffer() {
-    VkBufferCreateInfo bufferInfo = { 0 };
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(Vertex) * g_renderer.vertices.size;
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VkResult result = vkCreateBuffer(g_renderer.vulkan.interface, &bufferInfo, NULL, &(g_renderer.vulkan.vertex_buffer));
-    LOG_ASSERT(result == VK_SUCCESS, "Unable to create vertex buffer");
+    VkDeviceSize size = sizeof(Vertex) * g_renderer.vertices.size;
 
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_buffer, &memRequirements);
-    VkMemoryAllocateInfo allocInfo = { 0 };
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    Schrodingnum vertexMemoryType = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    LOG_ASSERT(vertexMemoryType.exists, "Unable to find memory for vertex buffer");
-    allocInfo.memoryTypeIndex = vertexMemoryType.value;
-    result = vkAllocateMemory(g_renderer.vulkan.interface, &allocInfo, NULL, &(g_renderer.vulkan.vertex_memory));
-    LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate memory for vertex buffer");
-
-    vkBindBufferMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_buffer, g_renderer.vulkan.vertex_memory, 0);
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    CreateBuffer(
+        size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &stagingBuffer,
+        &stagingBufferMemory);
 
     void* data;
-    vkMapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_memory, 0, bufferInfo.size, 0, &data);
-    memcpy(data, g_renderer.vertices.data, (size_t)bufferInfo.size);
-    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_memory);
+    vkMapMemory(g_renderer.vulkan.interface, stagingBufferMemory, 0, size, 0, &data);
+    memcpy(data, g_renderer.vertices.data, (size_t)size);
+    vkUnmapMemory(g_renderer.vulkan.interface, stagingBufferMemory);
+
+    CreateBuffer(
+        size,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &(g_renderer.vulkan.vertex_buffer),
+        &(g_renderer.vulkan.vertex_memory));
+    
+    CopyBuffer(stagingBuffer, g_renderer.vulkan.vertex_buffer, size);
+
+    vkDestroyBuffer(g_renderer.vulkan.interface, stagingBuffer, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
 }
 
 void DestroyVulkan() {
