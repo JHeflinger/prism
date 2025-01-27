@@ -40,6 +40,12 @@ typedef struct {
     vec3 color;
 } Vertex;
 
+typedef struct {
+	mat4 model;
+	mat4 view;
+	mat4 projection;
+} UniformBufferObject;
+
 typedef uint16_t Index;
 #define INDEX_VK_TYPE VK_INDEX_TYPE_UINT16
 

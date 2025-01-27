@@ -798,6 +798,10 @@ void CreateIndexBuffer() {
     vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
 }
 
+void CreateDescriptorSetLayout() {
+
+}
+
 void DestroyVulkan() {
     // wait for device to finish
     vkDeviceWaitIdle(g_renderer.vulkan.interface);
@@ -856,6 +860,7 @@ void InitializeVulkan() {
     CreateDeviceInterface();
     CreateImage();
     CreateRenderPass();
+	CreateDescriptorSetLayout();
     CreatePipeline();
     CreateFramebuffer();
     CreateCommandPool();
