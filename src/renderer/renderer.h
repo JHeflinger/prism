@@ -38,6 +38,7 @@ typedef struct {
 typedef struct {
     vec2 position;
     vec3 color;
+    vec2 texcoord;
 } Vertex;
 
 typedef struct {
@@ -58,7 +59,7 @@ typedef uint16_t Index;
 DECLARE_ARRLIST(StaticString);
 DECLARE_ARRLIST(Vertex);
 DECLARE_ARRLIST(Index); // TODO: may need to make this bigger if we run out of indices
-DECLARE_PAIR(VkVertexInputAttributeDescription);
+DECLARE_TRIPLET(VkVertexInputAttributeDescription);
 
 typedef struct {
     VkInstance instance;
@@ -67,9 +68,11 @@ typedef struct {
     VkDevice interface;
     VkImage image;
     VkImageView view;
-    VkImage texture_image;
-    VkDeviceMemory texture_image_memory;
     VkDeviceMemory image_memory;
+    VkImage texture_image;
+    VkImageView texture_image_view;
+    VkSampler texture_sampler;
+    VkDeviceMemory texture_image_memory;
     VkDeviceMemory cross_memory;
     VkDeviceMemory vertex_memory;
     VkDeviceMemory index_memory;
