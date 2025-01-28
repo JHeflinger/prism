@@ -46,6 +46,12 @@ typedef struct {
 	mat4 projection;
 } UniformBufferObject;
 
+typedef struct {
+    VkBuffer buffers[CPUSWAP_LENGTH];
+    VkDeviceMemory memory[CPUSWAP_LENGTH];
+    void* mapped[CPUSWAP_LENGTH];
+} UBOArray;
+
 typedef uint16_t Index;
 #define INDEX_VK_TYPE VK_INDEX_TYPE_UINT16
 
@@ -61,12 +67,17 @@ typedef struct {
     VkDevice interface;
     VkImage image;
     VkImageView view;
+    VkImage texture_image;
+    VkDeviceMemory texture_image_memory;
     VkDeviceMemory image_memory;
     VkDeviceMemory cross_memory;
     VkDeviceMemory vertex_memory;
     VkDeviceMemory index_memory;
     VkRenderPass render_pass;
     VkPipeline pipeline;
+    VkDescriptorPool descriptor_pool;
+    VkDescriptorSet descriptor_sets[CPUSWAP_LENGTH];
+    VkDescriptorSetLayout descriptor_set_layout;
     VkPipelineLayout pipeline_layout;
     VkQueue graphics_queue;
     VkFramebuffer framebuffer;
@@ -76,6 +87,7 @@ typedef struct {
     VkBuffer cross_buffer;
     VkBuffer vertex_buffer;
     VkBuffer index_buffer;
+    UBOArray uniform_buffers;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
     ARRLIST_StaticString device_extensions;

@@ -69,6 +69,9 @@ LINKS="$LINKS -lGL"
 LINKS="$LINKS -lGLU"
 LIBS="$LIBS -Lvendor/raylib/lib"
 
+# add stb_image
+INCLUDES="$INCLUDES -Ivendor/stb_image/include"
+
 # add glfw and vulkan
 LINKS="$LINKS -lglfw"
 LINKS="$LINKS -lvulkan"

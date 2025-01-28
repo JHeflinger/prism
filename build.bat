@@ -67,6 +67,9 @@ set INCLUDES=!INCLUDES! -I"vendor/raylib/include"
 set LINKS=!LINKS! -l:win_x64_libraylib.a
 set LIBS=!LIBS! -L"vendor/raylib/lib"
 
+:: add stb_image vendor
+set INCLUDES=!INCLUDES! -I"vendor/stb_image/include"
+
 :: add EasyObjects vendor
 set INCLUDES=!INCLUDES! -I"vendor/EasyObjects/include"
 set SOURCES=!SOURCES! "vendor/EasyObjects/include/easymemory.c"

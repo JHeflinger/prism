@@ -100,7 +100,7 @@ def handle():
                         linecount = 0
                         for line in file:
                             linecount += 1
-                            if "calloc(" in line or "malloc(" in line or "free(" in line:
+                            if "calloc(" in line or "malloc(" in line or ("free(" in line and "_free(" not in line):
                                 print("Detected an unmonitored memory operation in " + filepath + "on line " + str(linecount) + ":\n  " + line[0:-1].strip())
                                 vulnerabilities += 1
 
