@@ -57,7 +57,7 @@ TRIPLET_VkVertexInputAttributeDescription VertexAttributeDescriptions() {
     TRIPLET_VkVertexInputAttributeDescription attributeDescriptions = { 0 };
     attributeDescriptions.value[0].binding = 0;
     attributeDescriptions.value[0].location = 0;
-    attributeDescriptions.value[0].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions.value[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     attributeDescriptions.value[0].offset = offsetof(Vertex, position);
     attributeDescriptions.value[1].binding = 0;
     attributeDescriptions.value[1].location = 1;
@@ -251,10 +251,15 @@ VkImageView CreateImageView(VkImage image, VkFormat format) {
 
 void InitializeVulkanData() {
     // set up temp vertex data
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0, 0.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 0.0, 0.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f }, { 0.0, 1.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, 0.5f }, { 1.0f, 1.0f, 1.0f }, { 1.0, 1.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0, 0.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0, 0.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, 0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0, 1.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, 0.5f, 0.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0, 1.0f } });
+
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0, 0.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 0.0, 0.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, { 0.0, 1.0f } });
+    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, 0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f }, { 1.0, 1.0f } });
 
     // set up temp index data
     ARRLIST_Index_add(&(g_renderer.indices), 0);
@@ -263,6 +268,13 @@ void InitializeVulkanData() {
     ARRLIST_Index_add(&(g_renderer.indices), 2);
     ARRLIST_Index_add(&(g_renderer.indices), 3);
     ARRLIST_Index_add(&(g_renderer.indices), 0);
+
+    ARRLIST_Index_add(&(g_renderer.indices), 4);
+    ARRLIST_Index_add(&(g_renderer.indices), 5);
+    ARRLIST_Index_add(&(g_renderer.indices), 6);
+    ARRLIST_Index_add(&(g_renderer.indices), 6);
+    ARRLIST_Index_add(&(g_renderer.indices), 7);
+    ARRLIST_Index_add(&(g_renderer.indices), 4);
 
     // set up validation layers
     ARRLIST_StaticString_add(&(g_renderer.vulkan.validation_layers), "VK_LAYER_KHRONOS_validation");

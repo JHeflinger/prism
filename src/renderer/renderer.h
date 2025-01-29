@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 #include <easyobjects.h>
 #include <raylib.h>
+#define CGLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <cglm/cglm.h>
 
 #define CPUSWAP_LENGTH 2
@@ -36,7 +37,7 @@ typedef struct {
 } CPUSwap;
 
 typedef struct {
-    vec2 position;
+    vec3 position;
     vec3 color;
     vec2 texcoord;
 } Vertex;
