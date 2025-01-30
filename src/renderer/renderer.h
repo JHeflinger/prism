@@ -73,6 +73,7 @@ typedef struct {
     VkImage depth_image;
     VkImageView depth_image_view;
     VkDeviceMemory depth_image_memory;
+    uint32_t mip_levels;
     VkImage texture_image;
     VkImageView texture_image_view;
     VkSampler texture_sampler;
