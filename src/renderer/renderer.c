@@ -1526,6 +1526,7 @@ void Render() {
 
     // recreate vertex and index buffer if needed
     if (g_renderer.changes.update_indices) {
+        vkDeviceWaitIdle(g_renderer.vulkan.interface); // TODO: make a buffer for every swap so we don't have to wait
         g_renderer.changes.update_indices = FALSE;
         if (g_renderer.changes.max_indices != g_renderer.indices.maxsize) {
             g_renderer.changes.max_indices = g_renderer.indices.maxsize;
@@ -1537,6 +1538,7 @@ void Render() {
         }
     }
     if (g_renderer.changes.update_vertices) {
+        vkDeviceWaitIdle(g_renderer.vulkan.interface); // TODO: make a buffer for every swap so we don't have to wait
         g_renderer.changes.update_vertices = FALSE;
         if (g_renderer.changes.max_vertices != g_renderer.vertices.maxsize) {
             g_renderer.changes.max_vertices = g_renderer.vertices.maxsize;
