@@ -10,6 +10,7 @@
 #include <cglm/cglm.h>
 
 #define CPUSWAP_LENGTH 2
+#define MAX_TEXTURES 32 // update in fragment shader too if changing this
 
 /* Overall TODO:
  * - Condense all buffers into one and use offsets to increase cache performance
@@ -54,12 +55,40 @@ typedef struct {
     void* mapped[CPUSWAP_LENGTH];
 } UBOArray;
 
-typedef uint32_t Index;
+typedef uint64_t TextureID;
+
+typedef struct {
+    const char* filepath;
+    size_t width;
+    size_t height;
+    uint32_t mip_levels;
+    VkImage image;
+    VkImageView view;
+    VkDeviceMemory memory;
+    VkSampler sampler;
+    TextureID id;
+} VulkanTexture;
+
+typedef uint64_t TriangleID;
+
+typedef struct {
+    Vertex vertices[3];
+    TextureID texture;
+} Triangle;
+
+typedef struct {
+    Vector3 position;
+    Vector3 look;
+    Vector3 up;
+} SimpleCamera;
+
+typedef uint32_t Index; // TODO: may need to make this bigger if we run out of indices
 #define INDEX_VK_TYPE VK_INDEX_TYPE_UINT32
 
 DECLARE_ARRLIST(StaticString);
 DECLARE_ARRLIST(Vertex);
-DECLARE_ARRLIST(Index); // TODO: may need to make this bigger if we run out of indices
+DECLARE_ARRLIST(Index);
+DECLARE_ARRLIST(VulkanTexture);
 DECLARE_TRIPLET(VkVertexInputAttributeDescription);
 
 typedef struct {
@@ -76,11 +105,6 @@ typedef struct {
     VkImage color_image;
     VkImageView color_image_view;
     VkDeviceMemory color_image_memory;
-    uint32_t mip_levels;
-    VkImage texture_image;
-    VkImageView texture_image_view;
-    VkSampler texture_sampler;
-    VkDeviceMemory texture_image_memory;
     VkDeviceMemory cross_memory;
     VkDeviceMemory vertex_memory;
     VkDeviceMemory index_memory;
@@ -100,6 +124,7 @@ typedef struct {
     VkBuffer index_buffer;
     UBOArray uniform_buffers;
     VkSampleCountFlagBits msaa_samples;
+    ARRLIST_VulkanTexture textures;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
     ARRLIST_StaticString device_extensions;
@@ -116,11 +141,28 @@ typedef struct {
     Vector2 dimensions;
     ARRLIST_Vertex vertices;
     ARRLIST_Index indices;
+    SimpleCamera camera;
 } Renderer;
 
 void InitializeRenderer();
 
 void DestroyRenderer();
+
+SimpleCamera GetCamera();
+
+void MoveCamera(SimpleCamera camera);
+
+TriangleID SubmitTriangle(Triangle triangle);
+
+void RemoveTriangle(TriangleID id);
+
+void ClearTriangles();
+
+TextureID SubmitTexture(const char* filepath);
+
+void RemoveTexture(TextureID id);
+
+void ClearTextures();
 
 void Render();
 

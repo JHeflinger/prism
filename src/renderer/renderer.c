@@ -7,7 +7,8 @@
 #include <stb_image.h>
 #include <math.h>
 
-Renderer g_renderer;
+Renderer g_renderer = { 0 };
+TextureID g_texture_id = 0;
 
 #ifdef PROD_BUILD
     #define ENABLE_VK_VALIDATION_LAYERS FALSE
@@ -17,14 +18,13 @@ Renderer g_renderer;
 
 #define IMAGE_FORMAT VK_FORMAT_R8G8B8A8_SRGB
 
-#define TEMP_WIDTH 800
-#define TEMP_HEIGHT 600
 #define TEMP_MODEL_PATH "assets/models/room.obj"
 #define TEMP_TEXTURE_PATH "assets/images/room.png"
 
 IMPL_ARRLIST(StaticString);
 IMPL_ARRLIST(Vertex);
 IMPL_ARRLIST(Index);
+IMPL_ARRLIST(VulkanTexture);
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -1031,7 +1031,7 @@ void CreateDescriptorSetLayout() {
 
     VkDescriptorSetLayoutBinding samplerLayoutBinding = { 0 };
     samplerLayoutBinding.binding = 1;
-    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorCount = MAX_TEXTURES;
     samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerLayoutBinding.pImmutableSamplers = NULL;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1066,8 +1066,7 @@ void UpdateUniformBuffers() {
     time += GetFrameTime();
     UniformBufferObject ubo = { 0 };
     glm_mat4_identity(ubo.model);
-    glm_rotate(ubo.model, time * glm_rad(90.0f), (vec3){ 0.0f, 0.0f, 1.0f });
-    glm_lookat((vec3){ 2.0f, 2.0f, 2.0f }, (vec3){ 0.0f, 0.0f, 0.0f }, (vec3){ 0.0f, 0.0f, 1.0f }, ubo.view);
+    glm_lookat((float*)(&g_renderer.camera.position), (float*)(&g_renderer.camera.look), (float*)(&g_renderer.camera.up), ubo.view);
     glm_perspective(glm_rad(45.0f), g_renderer.dimensions.x / g_renderer.dimensions.y, 0.1f, 10.0f, ubo.projection);
     ubo.projection[1][1] *= -1;
     memcpy(g_renderer.vulkan.uniform_buffers.mapped[g_renderer.swapchain.index], &ubo, sizeof(UniformBufferObject));
@@ -1078,7 +1077,7 @@ void CreateDescriptorPool() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = CPUSWAP_LENGTH;
+    poolSizes[1].descriptorCount = CPUSWAP_LENGTH * MAX_TEXTURES;
 
     VkDescriptorPoolCreateInfo poolInfo = { 0 };
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1087,6 +1086,47 @@ void CreateDescriptorPool() {
     poolInfo.maxSets = CPUSWAP_LENGTH;
     VkResult result = vkCreateDescriptorPool(g_renderer.vulkan.interface, &poolInfo, NULL, &(g_renderer.vulkan.descriptor_pool));
     LOG_ASSERT(result == VK_SUCCESS, "failed to create descriptor pool!");
+}
+
+void UpdateDescriptorSets() {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VkDescriptorBufferInfo bufferInfo = { 0 };
+        bufferInfo.buffer = g_renderer.vulkan.uniform_buffers.buffers[i];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(UniformBufferObject);
+
+        VkDescriptorImageInfo imageInfos[MAX_TEXTURES] = { 0 };
+        for (size_t j = 0; j < g_renderer.vulkan.textures.size; j++) {
+            imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfos[j].imageView = g_renderer.vulkan.textures.data[j].view;
+            imageInfos[j].sampler = g_renderer.vulkan.textures.data[j].sampler;
+        }
+        // fill in rest with default texture
+        for (size_t j = g_renderer.vulkan.textures.size; j < MAX_TEXTURES; j++) {
+            imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfos[j].imageView = g_renderer.vulkan.textures.data[0].view;
+            imageInfos[j].sampler = g_renderer.vulkan.textures.data[0].sampler;
+        }
+
+        VkWriteDescriptorSet descriptorWrites[2] = { 0 };
+
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = g_renderer.vulkan.descriptor_sets[i];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = g_renderer.vulkan.descriptor_sets[i];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].descriptorCount = MAX_TEXTURES;
+        descriptorWrites[1].pImageInfo = imageInfos;
+        vkUpdateDescriptorSets(g_renderer.vulkan.interface, 2, descriptorWrites, 0, NULL);
+    }
 }
 
 void CreateDescriptorSets() {
@@ -1099,34 +1139,7 @@ void CreateDescriptorSets() {
     allocInfo.pSetLayouts = layouts;
     VkResult result = vkAllocateDescriptorSets(g_renderer.vulkan.interface, &allocInfo, g_renderer.vulkan.descriptor_sets);
     LOG_ASSERT(result == VK_SUCCESS, "Failed to allocate descriptor sets!");
-    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        VkDescriptorBufferInfo bufferInfo = { 0 };
-        bufferInfo.buffer = g_renderer.vulkan.uniform_buffers.buffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UniformBufferObject);
-
-        VkDescriptorImageInfo imageInfo = { 0 };
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = g_renderer.vulkan.texture_image_view;
-        imageInfo.sampler = g_renderer.vulkan.texture_sampler;
-
-        VkWriteDescriptorSet descriptorWrites[2] = { 0 };
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = g_renderer.vulkan.descriptor_sets[i];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = g_renderer.vulkan.descriptor_sets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
-        vkUpdateDescriptorSets(g_renderer.vulkan.interface, 2, descriptorWrites, 0, NULL);
-    }
+    UpdateDescriptorSets();
 }
 
 void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) {
@@ -1214,71 +1227,6 @@ void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
     EndSingleTimeCommands(commandBuffer);
 }
 
-void CreateTextureImage() {
-    int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(TEMP_TEXTURE_PATH, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    LOG_ASSERT(pixels, "Failed to load texture image");
-    g_renderer.vulkan.mip_levels = (uint32_t)floor(log2(texWidth > texHeight ? texWidth : texHeight)) + 1;
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    CreateBuffer(
-        imageSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &stagingBuffer,
-        &stagingBufferMemory);
-    void* data;
-    vkMapMemory(g_renderer.vulkan.interface, stagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, pixels, (size_t)imageSize);
-    vkUnmapMemory(g_renderer.vulkan.interface, stagingBufferMemory);
-    stbi_image_free(pixels);
-    CreateImage(
-        texWidth,
-        texHeight,
-        g_renderer.vulkan.mip_levels,
-        VK_SAMPLE_COUNT_1_BIT,
-        IMAGE_FORMAT,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &(g_renderer.vulkan.texture_image),
-        &(g_renderer.vulkan.texture_image_memory));
-    TransitionImageLayout(g_renderer.vulkan.texture_image, IMAGE_FORMAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, g_renderer.vulkan.mip_levels);
-    CopyBufferToImage(stagingBuffer, g_renderer.vulkan.texture_image, (uint32_t)texWidth, (uint32_t)texHeight);
-    GenerateMipmaps(g_renderer.vulkan.texture_image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, g_renderer.vulkan.mip_levels);
-    vkDestroyBuffer(g_renderer.vulkan.interface, stagingBuffer, NULL);
-    vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
-}
-
-void CreateTextureImageView() {
-    g_renderer.vulkan.texture_image_view = CreateImageView(g_renderer.vulkan.texture_image, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT, g_renderer.vulkan.mip_levels);
-}
-
-void CreateTextureSampler() {
-    VkPhysicalDeviceProperties properties = { 0 };
-    vkGetPhysicalDeviceProperties(g_renderer.vulkan.gpu, &properties);
-    VkSamplerCreateInfo samplerInfo = { 0 };
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = (float)g_renderer.vulkan.mip_levels;
-    VkResult result = vkCreateSampler(g_renderer.vulkan.interface, &samplerInfo, NULL, &(g_renderer.vulkan.texture_sampler));
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create texture sampler");
-}
-
 void DestroyVulkan() {
     // wait for device to finish
     vkDeviceWaitIdle(g_renderer.vulkan.interface);
@@ -1286,11 +1234,8 @@ void DestroyVulkan() {
     // clean swapchain
     CleanSwapchain();
 
-    // destroy texture
-    vkDestroyImage(g_renderer.vulkan.interface, g_renderer.vulkan.texture_image, NULL);
-    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.texture_image_memory, NULL);
-    vkDestroySampler(g_renderer.vulkan.interface, g_renderer.vulkan.texture_sampler, NULL);
-    vkDestroyImageView(g_renderer.vulkan.interface, g_renderer.vulkan.texture_image_view, NULL);
+    // destroy textures
+    ClearTextures();
 
     // destroy uniform buffers
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
@@ -1362,12 +1307,10 @@ void InitializeVulkan() {
     CreateColorResources();
     CreateDepthResources();
     CreateFramebuffers();
-    CreateTextureImage();
-    CreateTextureImageView();
-    CreateTextureSampler();
     CreateVertexBuffer();
     CreateIndexBuffer();
     CreateUniformBuffers();
+    SubmitTexture("assets/images/default.png"); // default texture
     CreateDescriptorPool();
     CreateDescriptorSets();
     CreateCommandBuffers();
@@ -1375,6 +1318,11 @@ void InitializeVulkan() {
 }
 
 void InitializeRenderer() {
+    // initialize camera
+    g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };
+    g_renderer.camera.look = (Vector3){ 0.0f, 0.0f, 0.0f };
+    g_renderer.camera.up = (Vector3){ 0.0f, 0.0f, 1.0f };
+
     // set up dimensions
     g_renderer.dimensions = (Vector2){ GetScreenWidth(), GetScreenHeight() };
 
@@ -1404,6 +1352,140 @@ void DestroyRenderer() {
 
     // clean index data
     ARRLIST_Index_clear(&(g_renderer.indices));
+}
+
+SimpleCamera GetCamera() {
+    return g_renderer.camera;
+}
+
+void MoveCamera(SimpleCamera camera) {
+    g_renderer.camera = camera;
+}
+
+TriangleID SubmitTriangle(Triangle triangle) {
+    return 0;
+}
+
+void RemoveTriangle(TriangleID id) {
+
+}
+
+void ClearTriangles() {
+
+}
+
+TextureID SubmitTexture(const char* filepath) {
+    LOG_ASSERT(g_renderer.vulkan.textures.size < MAX_TEXTURES, "No more room for more textures");
+    VulkanTexture texture = { 0 };
+
+    // Create texture image
+    {
+        int texWidth, texHeight, texChannels;
+        stbi_uc* pixels = stbi_load(filepath, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        LOG_ASSERT(pixels, "Failed to load texture image");
+        texture.filepath = filepath;
+        texture.width = texWidth;
+        texture.height = texHeight;
+        texture.mip_levels = (uint32_t)floor(log2(texWidth > texHeight ? texWidth : texHeight)) + 1;
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        CreateBuffer(
+            imageSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &stagingBuffer,
+            &stagingBufferMemory);
+        void* data;
+        vkMapMemory(g_renderer.vulkan.interface, stagingBufferMemory, 0, imageSize, 0, &data);
+        memcpy(data, pixels, (size_t)imageSize);
+        vkUnmapMemory(g_renderer.vulkan.interface, stagingBufferMemory);
+        stbi_image_free(pixels);
+        CreateImage(
+            texWidth,
+            texHeight,
+            texture.mip_levels,
+            VK_SAMPLE_COUNT_1_BIT,
+            IMAGE_FORMAT,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &(texture.image),
+            &(texture.memory));
+        TransitionImageLayout(texture.image, IMAGE_FORMAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.mip_levels);
+        CopyBufferToImage(stagingBuffer, texture.image, (uint32_t)texWidth, (uint32_t)texHeight);
+        GenerateMipmaps(texture.image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, texture.mip_levels);
+        vkDestroyBuffer(g_renderer.vulkan.interface, stagingBuffer, NULL);
+        vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
+    }
+
+    // Create texture view
+    {
+        texture.view = CreateImageView(
+            texture.image, 
+            IMAGE_FORMAT, 
+            VK_IMAGE_ASPECT_COLOR_BIT, 
+            texture.mip_levels);
+    }
+
+    // Create texture sampler
+    {
+        VkPhysicalDeviceProperties properties = { 0 };
+        vkGetPhysicalDeviceProperties(g_renderer.vulkan.gpu, &properties);
+        VkSamplerCreateInfo samplerInfo = { 0 };
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_TRUE;
+        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = (float)texture.mip_levels;
+        VkResult result = vkCreateSampler(g_renderer.vulkan.interface, &samplerInfo, NULL, &(texture.sampler));
+        LOG_ASSERT(result == VK_SUCCESS, "Failed to create texture sampler");
+    }
+
+    texture.id = g_texture_id;
+    g_texture_id++;
+    ARRLIST_VulkanTexture_add(&(g_renderer.vulkan.textures), texture);
+
+    if (g_renderer.vulkan.textures.size > 1) UpdateDescriptorSets();
+
+    return texture.id;
+}
+
+void RemoveTexture(TextureID id) {
+    for (size_t i = 0; i < g_renderer.vulkan.textures.size; i++) {
+        VulkanTexture texture = ARRLIST_VulkanTexture_get(&(g_renderer.vulkan.textures), i);
+        if (texture.id == id) {
+            vkDestroyImage(g_renderer.vulkan.interface, texture.image, NULL);
+            vkFreeMemory(g_renderer.vulkan.interface, texture.memory, NULL);
+            vkDestroySampler(g_renderer.vulkan.interface, texture.sampler, NULL);
+            vkDestroyImageView(g_renderer.vulkan.interface, texture.view, NULL);
+            ARRLIST_VulkanTexture_remove(&(g_renderer.vulkan.textures), i);
+            return;
+        }
+    }
+    LOG_FATAL("Texture could not be removed because it does not exist");
+}
+
+void ClearTextures() {
+    for (size_t i = 0; i < g_renderer.vulkan.textures.size; i++) {
+        VulkanTexture texture = ARRLIST_VulkanTexture_get(&(g_renderer.vulkan.textures), i);
+        vkDestroyImage(g_renderer.vulkan.interface, texture.image, NULL);
+        vkFreeMemory(g_renderer.vulkan.interface, texture.memory, NULL);
+        vkDestroySampler(g_renderer.vulkan.interface, texture.sampler, NULL);
+        vkDestroyImageView(g_renderer.vulkan.interface, texture.view, NULL);
+    }
+    ARRLIST_VulkanTexture_clear(&(g_renderer.vulkan.textures));
 }
 
 void Render() {
