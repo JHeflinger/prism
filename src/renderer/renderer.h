@@ -54,8 +54,8 @@ typedef struct {
     void* mapped[CPUSWAP_LENGTH];
 } UBOArray;
 
-typedef uint16_t Index;
-#define INDEX_VK_TYPE VK_INDEX_TYPE_UINT16
+typedef uint32_t Index;
+#define INDEX_VK_TYPE VK_INDEX_TYPE_UINT32
 
 DECLARE_ARRLIST(StaticString);
 DECLARE_ARRLIST(Vertex);
@@ -70,6 +70,9 @@ typedef struct {
     VkImage image;
     VkImageView view;
     VkDeviceMemory image_memory;
+    VkImage depth_image;
+    VkImageView depth_image_view;
+    VkDeviceMemory depth_image_memory;
     VkImage texture_image;
     VkImageView texture_image_view;
     VkSampler texture_sampler;

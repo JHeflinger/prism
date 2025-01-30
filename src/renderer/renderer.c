@@ -16,6 +16,11 @@ Renderer g_renderer;
 
 #define IMAGE_FORMAT VK_FORMAT_R8G8B8A8_SRGB
 
+#define TEMP_WIDTH 800
+#define TEMP_HEIGHT 600
+#define TEMP_MODEL_PATH "assets/models/room.obj"
+#define TEMP_TEXTURE_PATH "assets/images/room.png"
+
 IMPL_ARRLIST(StaticString);
 IMPL_ARRLIST(Vertex);
 IMPL_ARRLIST(Index);
@@ -98,6 +103,33 @@ VkCommandBuffer BeginSingleTimeCommands() {
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(commandBuffer, &beginInfo);
     return commandBuffer;
+}
+
+BOOL HasStencilComponent(VkFormat format) {
+    return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
+VkFormat FindSupportedFormat(VkFormat* candidates, size_t num_candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+    for (size_t i = 0; i < num_candidates; i++) {
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(g_renderer.vulkan.gpu, candidates[i], &props);
+        if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
+            return candidates[i];
+        } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+            return candidates[i];
+        }
+    }
+    LOG_FATAL("Failed to find supported format!");
+}
+
+VkFormat FindDepthFormat() {
+    VkFormat formats[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
+    return FindSupportedFormat(
+        formats,
+        3,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+    );
 }
 
 void EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
@@ -230,13 +262,13 @@ void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling
     vkBindImageMemory(g_renderer.vulkan.interface, *image, *imageMemory, 0);
 }
 
-VkImageView CreateImageView(VkImage image, VkFormat format) {
+VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
     VkImageViewCreateInfo viewInfo = { 0 };
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
     viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -249,33 +281,30 @@ VkImageView CreateImageView(VkImage image, VkFormat format) {
     return imageView;
 }
 
+void LoadTempModel() {
+    Model model = LoadModel(TEMP_MODEL_PATH);
+    LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
+    Mesh mesh = model.meshes[0];
+    for (int i = 0; i < mesh.vertexCount; i++) {
+        Vertex vertex = {
+            {
+                mesh.vertices[i * 3 + 0],
+                mesh.vertices[i * 3 + 1],
+                mesh.vertices[i * 3 + 2]
+            },
+            { 1.0f, 1.0f, 1.0f },
+            {
+                mesh.texcoords[i * 2 + 0],
+                mesh.texcoords[i * 2 + 1]
+            }
+        };
+        ARRLIST_Vertex_add(&(g_renderer.vertices), vertex);
+        ARRLIST_Index_add(&(g_renderer.indices), (Index)i); //TODO: implement hashmap in EasyObjects to help reduce duplicate triangles
+    }
+    UnloadModel(model);
+}
+
 void InitializeVulkanData() {
-    // set up temp vertex data
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0, 0.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0, 0.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, 0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0, 1.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, 0.5f, 0.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0, 1.0f } });
-
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0, 0.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 0.0, 0.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, { 0.0, 1.0f } });
-    ARRLIST_Vertex_add(&(g_renderer.vertices), (Vertex){ { -0.5f, 0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f }, { 1.0, 1.0f } });
-
-    // set up temp index data
-    ARRLIST_Index_add(&(g_renderer.indices), 0);
-    ARRLIST_Index_add(&(g_renderer.indices), 1);
-    ARRLIST_Index_add(&(g_renderer.indices), 2);
-    ARRLIST_Index_add(&(g_renderer.indices), 2);
-    ARRLIST_Index_add(&(g_renderer.indices), 3);
-    ARRLIST_Index_add(&(g_renderer.indices), 0);
-
-    ARRLIST_Index_add(&(g_renderer.indices), 4);
-    ARRLIST_Index_add(&(g_renderer.indices), 5);
-    ARRLIST_Index_add(&(g_renderer.indices), 6);
-    ARRLIST_Index_add(&(g_renderer.indices), 6);
-    ARRLIST_Index_add(&(g_renderer.indices), 7);
-    ARRLIST_Index_add(&(g_renderer.indices), 4);
-
     // set up validation layers
     ARRLIST_StaticString_add(&(g_renderer.vulkan.validation_layers), "VK_LAYER_KHRONOS_validation");
 
@@ -485,7 +514,7 @@ void CreateDestinationImage() {
         &(g_renderer.vulkan.image_memory));
 
     // create image view
-    g_renderer.vulkan.view = CreateImageView(g_renderer.vulkan.image, IMAGE_FORMAT);
+    g_renderer.vulkan.view = CreateImageView(g_renderer.vulkan.image, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     // create cross buffer
     CreateBuffer(
@@ -613,6 +642,18 @@ void CreatePipeline() {
     VkResult result = vkCreatePipelineLayout(g_renderer.vulkan.interface, &pipelineLayoutInfo, NULL, &(g_renderer.vulkan.pipeline_layout));
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create pipeline layout");
 
+    VkPipelineDepthStencilStateCreateInfo depthStencil = { 0 };
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f; // Optional
+    depthStencil.maxDepthBounds = 1.0f; // Optional
+    depthStencil.stencilTestEnable = VK_FALSE;
+    //depthStencil.front = { 0 }; // Optional
+    //depthStencil.back = { 0 }; // Optional
+
     VkGraphicsPipelineCreateInfo pipelineInfo = { 0 };
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
@@ -622,7 +663,7 @@ void CreatePipeline() {
     pipelineInfo.pViewportState = &viewportState;
     pipelineInfo.pRasterizationState = &rasterizer;
     pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = NULL; // Optional
+    pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = g_renderer.vulkan.pipeline_layout;
@@ -655,23 +696,39 @@ void CreateRenderPass() {
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription depthAttachment = { 0 };
+    depthAttachment.format = FindDepthFormat();
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef = { 0 };
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpass = { 0 };
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
     VkSubpassDependency dependency = { 0 };
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
+    VkAttachmentDescription attachments[] = { colorAttachment, depthAttachment };
     VkRenderPassCreateInfo renderPassInfo = { 0 };
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.attachmentCount = 2;
+    renderPassInfo.pAttachments = attachments;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
     renderPassInfo.dependencyCount = 1;
@@ -681,12 +738,12 @@ void CreateRenderPass() {
     LOG_ASSERT(result == VK_SUCCESS, "Unable to create render pass");
 }
 
-void CreateFramebuffer() {
-    VkImageView attachments[] = { g_renderer.vulkan.view };
+void CreateFramebuffers() {
+    VkImageView attachments[] = { g_renderer.vulkan.view, g_renderer.vulkan.depth_image_view };
     VkFramebufferCreateInfo framebufferInfo = { 0 };
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebufferInfo.renderPass = g_renderer.vulkan.render_pass;
-    framebufferInfo.attachmentCount = 1;
+    framebufferInfo.attachmentCount = 2;
     framebufferInfo.pAttachments = attachments;
     framebufferInfo.width = g_renderer.dimensions.x;
     framebufferInfo.height = g_renderer.dimensions.y;
@@ -733,9 +790,11 @@ void RecordCommand(VkCommandBuffer command) {
         renderPassInfo.renderArea.offset = (VkOffset2D){ 0, 0 };
         renderPassInfo.renderArea.extent = (VkExtent2D){ g_renderer.dimensions.x, g_renderer.dimensions.y };
 
-        VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearColor;
+        VkClearValue clearValues[2] = { 0 };
+        clearValues[0].color = (VkClearColorValue){{ 0.0f, 0.0f, 0.0f, 1.0f }};
+        clearValues[1].depthStencil = (VkClearDepthStencilValue){ 1.0f, 0 };
+        renderPassInfo.clearValueCount = 2;
+        renderPassInfo.pClearValues = clearValues;
 
         vkCmdBeginRenderPass(command, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -798,27 +857,38 @@ void CreateSyncObjects() {
     }
 }
 
+void CreateDepthResources() {
+    VkFormat depthFormat = FindDepthFormat();
+    CreateImage(
+        g_renderer.dimensions.x,
+        g_renderer.dimensions.y,
+        depthFormat,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(g_renderer.vulkan.depth_image), 
+        &(g_renderer.vulkan.depth_image_memory));
+    g_renderer.vulkan.depth_image_view = CreateImageView(g_renderer.vulkan.depth_image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+}
+
 void CleanSwapchain() {
-    // unmap mapped memory
-    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.cross_memory);
+    // destroy depth buffer
+    vkDestroyImageView(g_renderer.vulkan.interface, g_renderer.vulkan.depth_image_view, NULL);
+    vkDestroyImage(g_renderer.vulkan.interface, g_renderer.vulkan.depth_image, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.depth_image_memory, NULL);
 
     // destroy framebuffer
     vkDestroyFramebuffer(g_renderer.vulkan.interface, g_renderer.vulkan.framebuffer, NULL);
 
-    // destroy buffer memory
+    // unmap and destroy cross buffer
+    vkUnmapMemory(g_renderer.vulkan.interface, g_renderer.vulkan.cross_memory);
     vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.cross_memory, NULL);
-
-    // destroy buffer
     vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.cross_buffer, NULL);
 
-    // destroy image memory
-    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image_memory, NULL);
-
-    // destroy image view
-    vkDestroyImageView(g_renderer.vulkan.interface, g_renderer.vulkan.view, NULL);
-
     // destroy image
+    vkDestroyImageView(g_renderer.vulkan.interface, g_renderer.vulkan.view, NULL);
     vkDestroyImage(g_renderer.vulkan.interface, g_renderer.vulkan.image, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image_memory, NULL);
 }
 
 void RecreateSwapchain() {
@@ -826,7 +896,8 @@ void RecreateSwapchain() {
     g_renderer.dimensions = (Vector2){ GetScreenWidth(), GetScreenHeight() };
     CleanSwapchain();
     CreateDestinationImage();
-    CreateFramebuffer();
+    CreateDepthResources();
+    CreateFramebuffers();
 }
 
 void CreateVertexBuffer() {
@@ -999,7 +1070,7 @@ void CreateDescriptorSets() {
 
 void CreateTextureImage() {
     int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load("assets/images/texture.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load(TEMP_TEXTURE_PATH, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     LOG_ASSERT(pixels, "Failed to load texture image");
     VkDeviceSize imageSize = texWidth * texHeight * 4;
     VkBuffer stagingBuffer;
@@ -1032,7 +1103,7 @@ void CreateTextureImage() {
 }
 
 void CreateTextureImageView() {
-    g_renderer.vulkan.texture_image_view = CreateImageView(g_renderer.vulkan.texture_image, IMAGE_FORMAT);
+    g_renderer.vulkan.texture_image_view = CreateImageView(g_renderer.vulkan.texture_image, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void CreateTextureSampler() {
@@ -1128,6 +1199,7 @@ void DestroyVulkan() {
 }
 
 void InitializeVulkan() {
+    LoadTempModel();
     InitializeVulkanData();
     CreateVulkanInstance();
     SetupVulkanMessenger();
@@ -1137,8 +1209,9 @@ void InitializeVulkan() {
     CreateRenderPass();
 	CreateDescriptorSetLayout();
     CreatePipeline();
-    CreateFramebuffer();
     CreateCommandPool();
+    CreateDepthResources();
+    CreateFramebuffers();
     CreateTextureImage();
     CreateTextureImageView();
     CreateTextureSampler();

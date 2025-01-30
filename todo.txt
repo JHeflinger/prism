@@ -9,3 +9,15 @@ ui todos:
     - closeable panels
     - move panels with keybinds
     - accomodate screen resize
+
+ideas:
+    - psuedo-frameless:
+        - after getting raytracing working:
+        - trace a random # of rays
+            - if a frame takes greater than a certain time to render, reduce the random # next frame
+            - if a frame takes less, do the opposite
+                - just make sure you do this scaled in accordance to how much faster/slower it is
+
+after tutorial hell:
+    - condense as much as possible
+    - refactor to have raylib-type functionality
