@@ -73,6 +73,9 @@ typedef struct {
     VkImage depth_image;
     VkImageView depth_image_view;
     VkDeviceMemory depth_image_memory;
+    VkImage color_image;
+    VkImageView color_image_view;
+    VkDeviceMemory color_image_memory;
     uint32_t mip_levels;
     VkImage texture_image;
     VkImageView texture_image_view;
@@ -96,6 +99,7 @@ typedef struct {
     VkBuffer vertex_buffer;
     VkBuffer index_buffer;
     UBOArray uniform_buffers;
+    VkSampleCountFlagBits msaa_samples;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
     ARRLIST_StaticString device_extensions;

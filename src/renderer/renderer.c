@@ -230,7 +230,7 @@ void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     vkBindBufferMemory(g_renderer.vulkan.interface, *buffer, *bufferMemory, 0);
 }
 
-void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage* image, VkDeviceMemory* imageMemory) {
+void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage* image, VkDeviceMemory* imageMemory) {
     VkImageCreateInfo imageInfo = { 0 };
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -243,7 +243,7 @@ void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat f
     imageInfo.tiling = tiling;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = usage;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = numSamples;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     VkResult result = vkCreateImage(g_renderer.vulkan.interface, &imageInfo, NULL, image);
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create image!");
@@ -282,6 +282,21 @@ VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags a
     return imageView;
 }
 
+VkSampleCountFlagBits GetMaximumSampleCount() {
+    VkPhysicalDeviceProperties physicalDeviceProperties;
+    vkGetPhysicalDeviceProperties(g_renderer.vulkan.gpu, &physicalDeviceProperties);
+
+    VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+    if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
+    if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
+    if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
+    if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
+    if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
+    if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
+
+    return VK_SAMPLE_COUNT_1_BIT;
+}
+
 void LoadTempModel() {
     Model model = LoadModel(TEMP_MODEL_PATH);
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
@@ -306,6 +321,9 @@ void LoadTempModel() {
 }
 
 void InitializeVulkanData() {
+    // initialize sample count
+    g_renderer.vulkan.msaa_samples = VK_SAMPLE_COUNT_1_BIT;
+
     // set up validation layers
     ARRLIST_StaticString_add(&(g_renderer.vulkan.validation_layers), "VK_LAYER_KHRONOS_validation");
 
@@ -471,6 +489,7 @@ void PickGPU() {
     }
     LOG_ASSERT(score != 0, "A suitable GPU could not be found");
     g_renderer.vulkan.gpu = devices[ind];
+    g_renderer.vulkan.msaa_samples = GetMaximumSampleCount();
     EZFREE(devices);
 }
 
@@ -484,6 +503,7 @@ void CreateDeviceInterface() {
     queueCreateInfo.pQueuePriorities = &queuePriority;
     VkPhysicalDeviceFeatures deviceFeatures = { 0 };
     deviceFeatures.samplerAnisotropy = VK_TRUE;
+    deviceFeatures.sampleRateShading = VK_TRUE;
     VkDeviceCreateInfo createInfo = { 0 };
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.pQueueCreateInfos = &queueCreateInfo;
@@ -508,6 +528,7 @@ void CreateDestinationImage() {
         g_renderer.dimensions.x,
         g_renderer.dimensions.y,
         1,
+        VK_SAMPLE_COUNT_1_BIT,
         IMAGE_FORMAT,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
@@ -606,9 +627,9 @@ void CreatePipeline() {
 
     VkPipelineMultisampleStateCreateInfo multisampling = { 0 };
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampling.minSampleShading = 1.0f; // Optional
+    multisampling.sampleShadingEnable = VK_TRUE;
+    multisampling.rasterizationSamples = g_renderer.vulkan.msaa_samples;
+    multisampling.minSampleShading = 0.2f; // closer to one is smoother anti-aliasing
     multisampling.pSampleMask = NULL; // Optional
     multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
     multisampling.alphaToOneEnable = VK_FALSE; // Optional
@@ -686,13 +707,13 @@ void CreatePipeline() {
 void CreateRenderPass() {
     VkAttachmentDescription colorAttachment = { 0 };
     colorAttachment.format = IMAGE_FORMAT;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.samples = g_renderer.vulkan.msaa_samples;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference colorAttachmentRef = { 0 };
     colorAttachmentRef.attachment = 0;
@@ -700,7 +721,7 @@ void CreateRenderPass() {
 
     VkAttachmentDescription depthAttachment = { 0 };
     depthAttachment.format = FindDepthFormat();
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.samples = g_renderer.vulkan.msaa_samples;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -712,11 +733,26 @@ void CreateRenderPass() {
     depthAttachmentRef.attachment = 1;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription colorAttachmentResolve = { 0 };
+    colorAttachmentResolve.format = IMAGE_FORMAT;
+    colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+    VkAttachmentReference colorAttachmentResolveRef = { 0 };
+    colorAttachmentResolveRef.attachment = 2;
+    colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpass = { 0 };
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
+    subpass.pResolveAttachments = &colorAttachmentResolveRef;
 
     VkSubpassDependency dependency = { 0 };
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -726,10 +762,10 @@ void CreateRenderPass() {
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    VkAttachmentDescription attachments[] = { colorAttachment, depthAttachment };
+    VkAttachmentDescription attachments[] = { colorAttachment, depthAttachment, colorAttachmentResolve };
     VkRenderPassCreateInfo renderPassInfo = { 0 };
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 2;
+    renderPassInfo.attachmentCount = 3;
     renderPassInfo.pAttachments = attachments;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
@@ -741,11 +777,11 @@ void CreateRenderPass() {
 }
 
 void CreateFramebuffers() {
-    VkImageView attachments[] = { g_renderer.vulkan.view, g_renderer.vulkan.depth_image_view };
+    VkImageView attachments[] = { g_renderer.vulkan.color_image_view, g_renderer.vulkan.depth_image_view, g_renderer.vulkan.view };
     VkFramebufferCreateInfo framebufferInfo = { 0 };
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebufferInfo.renderPass = g_renderer.vulkan.render_pass;
-    framebufferInfo.attachmentCount = 2;
+    framebufferInfo.attachmentCount = 3;
     framebufferInfo.pAttachments = attachments;
     framebufferInfo.width = g_renderer.dimensions.x;
     framebufferInfo.height = g_renderer.dimensions.y;
@@ -865,6 +901,7 @@ void CreateDepthResources() {
         g_renderer.dimensions.x,
         g_renderer.dimensions.y,
         1,
+        g_renderer.vulkan.msaa_samples,
         depthFormat,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -872,6 +909,21 @@ void CreateDepthResources() {
         &(g_renderer.vulkan.depth_image), 
         &(g_renderer.vulkan.depth_image_memory));
     g_renderer.vulkan.depth_image_view = CreateImageView(g_renderer.vulkan.depth_image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+}
+
+void CreateColorResources() {
+    CreateImage(
+        g_renderer.dimensions.x,
+        g_renderer.dimensions.y,
+        1,
+        g_renderer.vulkan.msaa_samples,
+        IMAGE_FORMAT,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(g_renderer.vulkan.color_image),
+        &(g_renderer.vulkan.color_image_memory));
+    g_renderer.vulkan.color_image_view = CreateImageView(g_renderer.vulkan.color_image, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 }
 
 void CleanSwapchain() {
@@ -892,6 +944,11 @@ void CleanSwapchain() {
     vkDestroyImageView(g_renderer.vulkan.interface, g_renderer.vulkan.view, NULL);
     vkDestroyImage(g_renderer.vulkan.interface, g_renderer.vulkan.image, NULL);
     vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.image_memory, NULL);
+
+    // destroy color image
+    vkDestroyImageView(g_renderer.vulkan.interface, g_renderer.vulkan.color_image_view, NULL);
+    vkDestroyImage(g_renderer.vulkan.interface, g_renderer.vulkan.color_image, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.color_image_memory, NULL);
 }
 
 void RecreateSwapchain() {
@@ -899,6 +956,7 @@ void RecreateSwapchain() {
     g_renderer.dimensions = (Vector2){ GetScreenWidth(), GetScreenHeight() };
     CleanSwapchain();
     CreateDestinationImage();
+    CreateColorResources();
     CreateDepthResources();
     CreateFramebuffers();
 }
@@ -1179,6 +1237,7 @@ void CreateTextureImage() {
         texWidth,
         texHeight,
         g_renderer.vulkan.mip_levels,
+        VK_SAMPLE_COUNT_1_BIT,
         IMAGE_FORMAT,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -1300,6 +1359,7 @@ void InitializeVulkan() {
 	CreateDescriptorSetLayout();
     CreatePipeline();
     CreateCommandPool();
+    CreateColorResources();
     CreateDepthResources();
     CreateFramebuffers();
     CreateTextureImage();
