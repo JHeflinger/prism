@@ -37,10 +37,13 @@ typedef struct {
     void* reference;
 } CPUSwap;
 
+typedef uint32_t TextureID; // this will need to be increased given
+
 typedef struct {
     vec3 position;
     vec3 color;
     vec2 texcoord;
+    TextureID texid;
 } Vertex;
 
 typedef struct {
@@ -54,8 +57,6 @@ typedef struct {
     VkDeviceMemory memory[CPUSWAP_LENGTH];
     void* mapped[CPUSWAP_LENGTH];
 } UBOArray;
-
-typedef uint64_t TextureID;
 
 typedef struct {
     const char* filepath;
@@ -73,7 +74,6 @@ typedef uint64_t TriangleID;
 
 typedef struct {
     Vertex vertices[3];
-    TextureID texture;
 } Triangle;
 
 typedef struct {
@@ -82,6 +82,13 @@ typedef struct {
     Vector3 up;
 } SimpleCamera;
 
+typedef struct {
+    size_t max_indices;
+    size_t max_vertices;
+    BOOL update_indices;
+    BOOL update_vertices;
+} ChangeSet;
+
 typedef uint32_t Index; // TODO: may need to make this bigger if we run out of indices
 #define INDEX_VK_TYPE VK_INDEX_TYPE_UINT32
 
@@ -89,7 +96,8 @@ DECLARE_ARRLIST(StaticString);
 DECLARE_ARRLIST(Vertex);
 DECLARE_ARRLIST(Index);
 DECLARE_ARRLIST(VulkanTexture);
-DECLARE_TRIPLET(VkVertexInputAttributeDescription);
+DECLARE_ARRLIST(TriangleID);
+DECLARE_QUAD(VkVertexInputAttributeDescription);
 
 typedef struct {
     VkInstance instance;
@@ -125,6 +133,7 @@ typedef struct {
     UBOArray uniform_buffers;
     VkSampleCountFlagBits msaa_samples;
     ARRLIST_VulkanTexture textures;
+    ARRLIST_TriangleID triangle_refs;
     ARRLIST_StaticString validation_layers;
     ARRLIST_StaticString required_extensions;
     ARRLIST_StaticString device_extensions;
@@ -141,6 +150,7 @@ typedef struct {
     Vector2 dimensions;
     ARRLIST_Vertex vertices;
     ARRLIST_Index indices;
+    ChangeSet changes;
     SimpleCamera camera;
 } Renderer;
 

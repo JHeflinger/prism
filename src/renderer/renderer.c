@@ -9,6 +9,7 @@
 
 Renderer g_renderer = { 0 };
 TextureID g_texture_id = 0;
+TriangleID g_triangle_id = 0;
 
 #ifdef PROD_BUILD
     #define ENABLE_VK_VALIDATION_LAYERS FALSE
@@ -18,13 +19,11 @@ TextureID g_texture_id = 0;
 
 #define IMAGE_FORMAT VK_FORMAT_R8G8B8A8_SRGB
 
-#define TEMP_MODEL_PATH "assets/models/room.obj"
-#define TEMP_TEXTURE_PATH "assets/images/room.png"
-
 IMPL_ARRLIST(StaticString);
 IMPL_ARRLIST(Vertex);
 IMPL_ARRLIST(Index);
 IMPL_ARRLIST(VulkanTexture);
+IMPL_ARRLIST(TriangleID);
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -59,8 +58,8 @@ VkVertexInputBindingDescription VertexBindingDescription() {
     return bindingDescription;
 }
 
-TRIPLET_VkVertexInputAttributeDescription VertexAttributeDescriptions() {
-    TRIPLET_VkVertexInputAttributeDescription attributeDescriptions = { 0 };
+QUAD_VkVertexInputAttributeDescription VertexAttributeDescriptions() {
+    QUAD_VkVertexInputAttributeDescription attributeDescriptions = { 0 };
     attributeDescriptions.value[0].binding = 0;
     attributeDescriptions.value[0].location = 0;
     attributeDescriptions.value[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -73,6 +72,10 @@ TRIPLET_VkVertexInputAttributeDescription VertexAttributeDescriptions() {
     attributeDescriptions.value[2].location = 2;
     attributeDescriptions.value[2].format = VK_FORMAT_R32G32_SFLOAT;
     attributeDescriptions.value[2].offset = offsetof(Vertex, texcoord);
+    attributeDescriptions.value[3].binding = 0;
+    attributeDescriptions.value[3].location = 3;
+    attributeDescriptions.value[3].format = VK_FORMAT_R32_UINT;
+    attributeDescriptions.value[3].offset = offsetof(Vertex, texid);
     return attributeDescriptions;
 }
 
@@ -295,29 +298,6 @@ VkSampleCountFlagBits GetMaximumSampleCount() {
     if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
 
     return VK_SAMPLE_COUNT_1_BIT;
-}
-
-void LoadTempModel() {
-    Model model = LoadModel(TEMP_MODEL_PATH);
-    LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
-    Mesh mesh = model.meshes[0];
-    for (int i = 0; i < mesh.vertexCount; i++) {
-        Vertex vertex = {
-            {
-                mesh.vertices[i * 3 + 0],
-                mesh.vertices[i * 3 + 1],
-                mesh.vertices[i * 3 + 2]
-            },
-            { 1.0f, 1.0f, 1.0f },
-            {
-                mesh.texcoords[i * 2 + 0],
-                mesh.texcoords[i * 2 + 1]
-            }
-        };
-        ARRLIST_Vertex_add(&(g_renderer.vertices), vertex);
-        ARRLIST_Index_add(&(g_renderer.indices), (Index)i); //TODO: implement hashmap in EasyObjects to help reduce duplicate triangles
-    }
-    UnloadModel(model);
 }
 
 void InitializeVulkanData() {
@@ -583,13 +563,13 @@ void CreatePipeline() {
 	VkPipelineShaderStageCreateInfo shaderstages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
     VkVertexInputBindingDescription bindingDescription = VertexBindingDescription();
-    TRIPLET_VkVertexInputAttributeDescription attributeDescriptions = VertexAttributeDescriptions();
+    QUAD_VkVertexInputAttributeDescription attributeDescriptions = VertexAttributeDescriptions();
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = { 0 };
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 1;
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-    vertexInputInfo.vertexAttributeDescriptionCount = 3;
+    vertexInputInfo.vertexAttributeDescriptionCount = 4;
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.value;
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = { 0 };
@@ -961,8 +941,11 @@ void RecreateSwapchain() {
     CreateFramebuffers();
 }
 
-void CreateVertexBuffer() {
-    VkDeviceSize size = sizeof(Vertex) * g_renderer.vertices.size;
+void UpdateVertexBuffer() {
+    VkDeviceSize size = sizeof(Vertex) * g_renderer.vertices.maxsize;
+    size_t subsize = sizeof(Vertex) * g_renderer.vertices.size;
+
+    if (size == 0) return;
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -975,8 +958,17 @@ void CreateVertexBuffer() {
 
     void* data;
     vkMapMemory(g_renderer.vulkan.interface, stagingBufferMemory, 0, size, 0, &data);
-    memcpy(data, g_renderer.vertices.data, (size_t)size);
+    memcpy(data, g_renderer.vertices.data, (size_t)subsize);
     vkUnmapMemory(g_renderer.vulkan.interface, stagingBufferMemory);
+    CopyBuffer(stagingBuffer, g_renderer.vulkan.vertex_buffer, size);
+    vkDestroyBuffer(g_renderer.vulkan.interface, stagingBuffer, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
+}
+
+void CreateVertexBuffer() {
+    VkDeviceSize size = sizeof(Vertex) * g_renderer.vertices.maxsize;
+
+    if (size == 0) return;
 
     CreateBuffer(
         size,
@@ -985,15 +977,13 @@ void CreateVertexBuffer() {
         &(g_renderer.vulkan.vertex_buffer),
         &(g_renderer.vulkan.vertex_memory));
     
-    CopyBuffer(stagingBuffer, g_renderer.vulkan.vertex_buffer, size);
-
-    vkDestroyBuffer(g_renderer.vulkan.interface, stagingBuffer, NULL);
-    vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
+    UpdateVertexBuffer();
 }
 
-void CreateIndexBuffer() {
-    VkDeviceSize size = sizeof(Index) * g_renderer.indices.size;
-
+void UpdateIndexBuffer() {
+    VkDeviceSize size = sizeof(Index) * g_renderer.indices.maxsize;
+    size_t subsize = sizeof(Index) * g_renderer.indices.size;
+    
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
     CreateBuffer(
@@ -1005,8 +995,17 @@ void CreateIndexBuffer() {
 
     void* data;
     vkMapMemory(g_renderer.vulkan.interface, stagingBufferMemory, 0, size, 0, &data);
-    memcpy(data, g_renderer.indices.data, (size_t)size);
+    memcpy(data, g_renderer.indices.data, (size_t)subsize);
     vkUnmapMemory(g_renderer.vulkan.interface, stagingBufferMemory);
+    CopyBuffer(stagingBuffer, g_renderer.vulkan.index_buffer, size);
+    vkDestroyBuffer(g_renderer.vulkan.interface, stagingBuffer, NULL);
+    vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
+}
+
+void CreateIndexBuffer() {
+    VkDeviceSize size = sizeof(Index) * g_renderer.indices.maxsize;
+
+    if (size == 0) return;
 
     CreateBuffer(
         size,
@@ -1015,10 +1014,7 @@ void CreateIndexBuffer() {
         &(g_renderer.vulkan.index_buffer),
         &(g_renderer.vulkan.index_memory));
     
-    CopyBuffer(stagingBuffer, g_renderer.vulkan.index_buffer, size);
-
-    vkDestroyBuffer(g_renderer.vulkan.interface, stagingBuffer, NULL);
-    vkFreeMemory(g_renderer.vulkan.interface, stagingBufferMemory, NULL);
+    UpdateIndexBuffer();
 }
 
 void CreateDescriptorSetLayout() {
@@ -1249,18 +1245,6 @@ void DestroyVulkan() {
     // destroy descriptor set layout
     vkDestroyDescriptorSetLayout(g_renderer.vulkan.interface, g_renderer.vulkan.descriptor_set_layout, NULL);
 
-    // destroy vertex buffer
-    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_buffer, NULL);
-
-    // free vertex memory
-    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_memory, NULL);
-
-    // destroy index buffer
-    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.index_buffer, NULL);
-
-    // free index memory
-    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.index_memory, NULL);
-
     // destroy syncro objects
     for (int i = 0; i < CPUSWAP_LENGTH; i++)
         vkDestroyFence(g_renderer.vulkan.interface, g_renderer.vulkan.syncro.fences[i], NULL);
@@ -1272,6 +1256,9 @@ void DestroyVulkan() {
     vkDestroyPipeline(g_renderer.vulkan.interface, g_renderer.vulkan.pipeline, NULL);
     vkDestroyPipelineLayout(g_renderer.vulkan.interface, g_renderer.vulkan.pipeline_layout, NULL);
     vkDestroyRenderPass(g_renderer.vulkan.interface, g_renderer.vulkan.render_pass, NULL);
+
+    // clean geometry
+    ClearTriangles();
 
     // destroy vulkan device
     vkDestroyDevice(g_renderer.vulkan.interface, NULL);
@@ -1293,7 +1280,6 @@ void DestroyVulkan() {
 }
 
 void InitializeVulkan() {
-    LoadTempModel();
     InitializeVulkanData();
     CreateVulkanInstance();
     SetupVulkanMessenger();
@@ -1346,12 +1332,6 @@ void DestroyRenderer() {
     // unload cpu swap textures
 	for (int i = 0; i < CPUSWAP_LENGTH; i++)
 		UnloadRenderTexture(g_renderer.swapchain.targets[i]);
-
-    // clean vertex data
-    ARRLIST_Vertex_clear(&(g_renderer.vertices));
-
-    // clean index data
-    ARRLIST_Index_clear(&(g_renderer.indices));
 }
 
 SimpleCamera GetCamera() {
@@ -1363,15 +1343,64 @@ void MoveCamera(SimpleCamera camera) {
 }
 
 TriangleID SubmitTriangle(Triangle triangle) {
-    return 0;
+    ARRLIST_Index_add(&(g_renderer.indices), g_renderer.vertices.size);
+    ARRLIST_Vertex_add(&(g_renderer.vertices), triangle.vertices[0]);
+    ARRLIST_Index_add(&(g_renderer.indices), g_renderer.vertices.size);
+    ARRLIST_Vertex_add(&(g_renderer.vertices), triangle.vertices[1]);
+    ARRLIST_Index_add(&(g_renderer.indices), g_renderer.vertices.size);
+    ARRLIST_Vertex_add(&(g_renderer.vertices), triangle.vertices[2]);
+    g_renderer.changes.update_indices = TRUE;
+    g_renderer.changes.update_vertices = TRUE;
+    ARRLIST_TriangleID_add(&(g_renderer.vulkan.triangle_refs), g_triangle_id);
+    g_triangle_id++;
+    return g_triangle_id - 1;
 }
 
 void RemoveTriangle(TriangleID id) {
-
+    size_t ind = 0;
+    BOOL found = false;
+    for (size_t i = 0; i < g_renderer.vulkan.triangle_refs.size; i++) {
+        if (g_renderer.vulkan.triangle_refs.data[i] == id) {
+            ind = i;
+            found = TRUE;
+            break;
+        }
+    }
+    if (found) {
+        for (int i = 3; i > 0; i--) {
+            int realind = i - 1;
+            ARRLIST_Index_remove(&(g_renderer.indices), ind + realind);
+            ARRLIST_Vertex_remove(&(g_renderer.vertices), ind + realind);
+        }
+        ARRLIST_TriangleID_remove(&(g_renderer.vulkan.triangle_refs), ind);
+        g_renderer.changes.update_indices = TRUE;
+        g_renderer.changes.update_vertices = TRUE;
+    } else {
+        LOG_FATAL("Unable to remove nonexistant triangle");
+    }
 }
 
 void ClearTriangles() {
+    // clean vertex data
+    ARRLIST_Vertex_clear(&(g_renderer.vertices));
 
+    // clean index data
+    ARRLIST_Index_clear(&(g_renderer.indices));
+
+    // clean triangle ref data
+    ARRLIST_TriangleID_clear(&(g_renderer.vulkan.triangle_refs));
+
+    // destroy vertex buffer
+    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_buffer, NULL);
+
+    // free vertex memory
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_memory, NULL);
+
+    // destroy index buffer
+    vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.index_buffer, NULL);
+
+    // free index memory
+    vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.index_memory, NULL);
 }
 
 TextureID SubmitTexture(const char* filepath) {
@@ -1489,8 +1518,35 @@ void ClearTextures() {
 }
 
 void Render() {
+    // if there's no geometry, don't render
+    if (g_renderer.vertices.size == 0) return;
+
     // profile for stats
     BeginProfile(&(g_renderer.stats.profile));
+
+    // recreate vertex and index buffer if needed
+    if (g_renderer.changes.update_indices) {
+        g_renderer.changes.update_indices = FALSE;
+        if (g_renderer.changes.max_indices != g_renderer.indices.maxsize) {
+            g_renderer.changes.max_indices = g_renderer.indices.maxsize;
+            vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.index_buffer, NULL);
+            vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.index_memory, NULL);
+            CreateIndexBuffer();
+        } else {
+            UpdateIndexBuffer();
+        }
+    }
+    if (g_renderer.changes.update_vertices) {
+        g_renderer.changes.update_vertices = FALSE;
+        if (g_renderer.changes.max_vertices != g_renderer.vertices.maxsize) {
+            g_renderer.changes.max_vertices = g_renderer.vertices.maxsize;
+            vkDestroyBuffer(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_buffer, NULL);
+            vkFreeMemory(g_renderer.vulkan.interface, g_renderer.vulkan.vertex_memory, NULL);
+            CreateVertexBuffer();
+        } else {
+            UpdateVertexBuffer();
+        }
+    }
 
     // check for window changes
     if (g_renderer.dimensions.x != GetScreenWidth() || g_renderer.dimensions.y != GetScreenHeight()) RecreateSwapchain();
