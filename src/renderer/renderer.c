@@ -319,13 +319,6 @@ void InitializeVulkanData() {
 
     // set up device extensions
     ARRLIST_StaticString_add(&(g_renderer.vulkan.device_extensions), VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    ARRLIST_StaticString_add(&(g_renderer.vulkan.device_extensions), VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-    ARRLIST_StaticString_add(&(g_renderer.vulkan.device_extensions), VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-    ARRLIST_StaticString_add(&(g_renderer.vulkan.device_extensions), VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-    ARRLIST_StaticString_add(&(g_renderer.vulkan.device_extensions), VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    ARRLIST_StaticString_add(&(g_renderer.vulkan.device_extensions), VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    ARRLIST_StaticString_add(&(g_renderer.vulkan.device_extensions), VK_KHR_SPIRV_1_4_EXTENSION_NAME);
-    ARRLIST_StaticString_add(&(g_renderer.vulkan.device_extensions), VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
 
     // default gpu to null
     g_renderer.vulkan.gpu = VK_NULL_HANDLE;
@@ -389,7 +382,7 @@ void CreateVulkanInstance() {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_1;
+    appInfo.apiVersion = VK_API_VERSION_1_0;
 
     // create info
     VkInstanceCreateInfo createInfo = { 0 };
