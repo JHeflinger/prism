@@ -30,6 +30,13 @@ while IFS= read -r file; do
 		exit 1
 	fi
 done < <(find "shaders" -type f -name "*.frag")
+while IFS= read -r file; do
+	glslc $file -o "build/$file.spv"
+	if [ $? -ne 0 ]; then
+		echo -e "Build compute \033[31mfailed\033[0m"
+		exit 1
+	fi
+done < <(find "shaders" -type f -name "*.comp")
 endTime=$(date +%s%N)
 elapsed=$(((endTime - startTime) / 1000000))
 hh=$((elapsed / 3600000))

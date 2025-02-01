@@ -34,6 +34,13 @@ for /r %SHADERS_DIR% %%f in (*.frag) do (
         exit /b %ERRORLEVEL%
     )
 )
+for /r %SHADERS_DIR% %%f in (*.comp) do (
+    glslc %%f -o "build/shaders/%%~nxf.spv"
+    if %ERRORLEVEL% NEQ 0 (
+        echo Building compute [31mFailed[0m with error code %ERRORLEVEL%
+        exit /b %ERRORLEVEL%
+    )
+)
 set "endTime=%time: =0%"
 set "end=!endTime:%time:~8,1%=%%100)*100+1!"  &  set "start=!startTime:%time:~8,1%=%%100)*100+1!"
 set /A "elap=((((10!end:%time:~2,1%=%%100)*60+1!%%100)-((((10!start:%time:~2,1%=%%100)*60+1!%%100), elap-=(elap>>31)*24*60*60*100"
