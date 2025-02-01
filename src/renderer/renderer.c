@@ -1,6 +1,9 @@
 #include "renderer.h"
 #include "core/log.h"
 #include "renderer/vulkan/vutils.h"
+#include "renderer/vulkan/vinit.h"
+#include "renderer/vulkan/vupdate.h"
+#include "renderer/vulkan/vclean.h"
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
 #include <string.h>
@@ -34,7 +37,7 @@ void InitializeVulkanData() {
 
 void CreateVulkanInstance() {
     // error check for validation layer support
-    LOG_ASSERT(ENABLE_VK_VALIDATION_LAYERS && VKU_CheckValidationLayerSupport(), "Requested validation layers are not available");
+    LOG_ASSERT(ENABLE_VK_VALIDATION_LAYERS && VUTIL_CheckValidationLayerSupport(), "Requested validation layers are not available");
 
     // create app info (technically optional)
     VkApplicationInfo appInfo = { 0 };
@@ -60,7 +63,7 @@ void CreateVulkanInstance() {
         debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        debugCreateInfo.pfnUserCallback = VKU_VulkanDebugCallback;
+        debugCreateInfo.pfnUserCallback = VUTIL_VulkanDebugCallback;
         createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
     } else {
         createInfo.enabledLayerCount = 0;
@@ -77,7 +80,7 @@ void SetupVulkanMessenger() {
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    createInfo.pfnUserCallback = VKU_VulkanDebugCallback;
+    createInfo.pfnUserCallback = VUTIL_VulkanDebugCallback;
     createInfo.pUserData = NULL;
     PFN_vkCreateDebugUtilsMessengerEXT messenger_extension = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(g_renderer.vulkan.core.general.instance, "vkCreateDebugUtilsMessengerEXT");
     LOG_ASSERT(messenger_extension != NULL, "Failed to set up debug messenger");
@@ -94,9 +97,9 @@ void PickGPU() {
     uint32_t ind = 0;
     for (uint32_t i = 0; i < deviceCount; i++) {
         // check if device is suitable
-        VulkanFamilyGroup families = VKU_FindQueueFamilies(devices[i]);
+        VulkanFamilyGroup families = VUTIL_FindQueueFamilies(devices[i]);
         if (!families.graphics.exists) continue;
-        if (!VKU_CheckGPUExtensionSupport(devices[i])) continue;
+        if (!VUTIL_CheckGPUExtensionSupport(devices[i])) continue;
 
         uint32_t curr_score = 0;
         VkPhysicalDeviceProperties deviceProperties;
@@ -114,12 +117,12 @@ void PickGPU() {
     }
     LOG_ASSERT(score != 0, "A suitable GPU could not be found");
     g_renderer.vulkan.core.general.gpu = devices[ind];
-    g_renderer.vulkan.core.context.samples = VKU_GetMaximumSampleCount();
+    g_renderer.vulkan.core.context.samples = VUTIL_GetMaximumSampleCount();
     EZFREE(devices);
 }
 
 void CreateDeviceInterface() {
-    VulkanFamilyGroup families = VKU_FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
+    VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
     VkDeviceQueueCreateInfo queueCreateInfo = { 0 };
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queueCreateInfo.queueFamilyIndex = families.graphics.value;
@@ -149,7 +152,7 @@ void CreateDeviceInterface() {
 
 void CreateDestinationImage() {
     // create image
-    VKU_CreateImage(
+    VUTIL_CreateImage(
         g_renderer.dimensions.x,
         g_renderer.dimensions.y,
         1,
@@ -162,7 +165,7 @@ void CreateDestinationImage() {
         &(g_renderer.vulkan.core.context.attachments.target));
 
     // create cross buffer
-    VKU_CreateBuffer(
+    VUTIL_CreateBuffer(
         g_renderer.dimensions.x * g_renderer.dimensions.y * 4, // Assuming VK_FORMAT_B8G8R8A8_SRGB
         VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
@@ -176,9 +179,9 @@ void CreatePipeline() {
 	SimpleFile* vertshadercode = ReadFile("build/shaders/shader.vert.spv");
 	SimpleFile* fragshadercode = ReadFile("build/shaders/shader.frag.spv");
     SimpleFile* compshadercode = ReadFile("build/shaders/shader.comp.spv");
-	VkShaderModule vertshader = VKU_CreateShader(vertshadercode);
-	VkShaderModule fragshader = VKU_CreateShader(fragshadercode);
-	VkShaderModule compshader = VKU_CreateShader(compshadercode);
+	VkShaderModule vertshader = VUTIL_CreateShader(vertshadercode);
+	VkShaderModule fragshader = VUTIL_CreateShader(fragshadercode);
+	VkShaderModule compshader = VUTIL_CreateShader(compshadercode);
 
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo = { 0 };
 	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -200,8 +203,8 @@ void CreatePipeline() {
 
 	VkPipelineShaderStageCreateInfo shaderstages[] = { vertShaderStageInfo, fragShaderStageInfo, compShaderStageInfo };
 
-    VkVertexInputBindingDescription bindingDescription = VKU_VertexBindingDescription();
-    QUAD_VkVertexInputAttributeDescription attributeDescriptions = VKU_VertexAttributeDescriptions();
+    VkVertexInputBindingDescription bindingDescription = VUTIL_VertexBindingDescription();
+    QUAD_VkVertexInputAttributeDescription attributeDescriptions = VUTIL_VertexAttributeDescriptions();
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = { 0 };
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -340,7 +343,7 @@ void CreateRenderPass() {
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentDescription depthAttachment = { 0 };
-    depthAttachment.format = VKU_FindDepthFormat();
+    depthAttachment.format = VUTIL_FindDepthFormat();
     depthAttachment.samples = g_renderer.vulkan.core.context.samples;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -411,7 +414,7 @@ void CreateFramebuffers() {
 }
 
 void CreateCommandPool() {
-    VulkanFamilyGroup queueFamilyIndices = VKU_FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
+    VulkanFamilyGroup queueFamilyIndices = VUTIL_FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
     VkCommandPoolCreateInfo poolInfo = { 0 };
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -516,8 +519,8 @@ void CreateSyncObjects() {
 }
 
 void CreateDepthResources() {
-    VkFormat depthFormat = VKU_FindDepthFormat();
-    VKU_CreateImage(
+    VkFormat depthFormat = VUTIL_FindDepthFormat();
+    VUTIL_CreateImage(
         g_renderer.dimensions.x,
         g_renderer.dimensions.y,
         1,
@@ -531,7 +534,7 @@ void CreateDepthResources() {
 }
 
 void CreateColorResources() {
-    VKU_CreateImage(
+    VUTIL_CreateImage(
         g_renderer.dimensions.x,
         g_renderer.dimensions.y,
         1,
@@ -581,7 +584,7 @@ void RecreateSwapchain() {
 
 void UpdateVertexBuffer() {
     if (sizeof(Vertex) * g_renderer.geometry.vertices.maxsize == 0) return;
-    VKU_CopyHostToBuffer(
+    VUTIL_CopyHostToBuffer(
         g_renderer.geometry.vertices.data,
         sizeof(Vertex) * g_renderer.geometry.vertices.size,
         sizeof(Vertex) * g_renderer.geometry.vertices.maxsize,
@@ -593,7 +596,7 @@ void CreateVertexBuffer() {
 
     if (size == 0) return;
 
-    VKU_CreateBuffer(
+    VUTIL_CreateBuffer(
         size,
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -604,7 +607,7 @@ void CreateVertexBuffer() {
 
 void UpdateIndexBuffer() {
     if (sizeof(Index) * g_renderer.geometry.indices.maxsize == 0) return;
-    VKU_CopyHostToBuffer(
+    VUTIL_CopyHostToBuffer(
         g_renderer.geometry.indices.data,
         sizeof(Index) * g_renderer.geometry.indices.size,
         sizeof(Index) * g_renderer.geometry.indices.maxsize,
@@ -616,7 +619,7 @@ void CreateIndexBuffer() {
 
     if (size == 0) return;
 
-    VKU_CreateBuffer(
+    VUTIL_CreateBuffer(
         size,
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -654,7 +657,7 @@ void CreateDescriptorSetLayout() {
 void CreateUniformBuffers() {
     VkDeviceSize size = sizeof(UniformBufferObject);
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        VKU_CreateBuffer(
+        VUTIL_CreateBuffer(
             size,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -745,7 +748,6 @@ void CreateDescriptorSets() {
     allocInfo.pSetLayouts = layouts;
     VkResult result = vkAllocateDescriptorSets(g_renderer.vulkan.core.general.interface, &allocInfo, g_renderer.vulkan.core.context.renderdata.descriptors.sets);
     LOG_ASSERT(result == VK_SUCCESS, "Failed to allocate descriptor sets!");
-    UpdateDescriptorSets();
 }
 
 void DestroyVulkan() {
@@ -805,7 +807,7 @@ void DestroyVulkan() {
 }
 
 void InitializeVulkan() {
-    VKU_SetVulkanUtilsContext(&g_renderer);
+    VUTIL_SetVulkanUtilsContext(&g_renderer);
     InitializeVulkanData();
     CreateVulkanInstance();
     SetupVulkanMessenger();
@@ -822,7 +824,6 @@ void InitializeVulkan() {
     CreateVertexBuffer();
     CreateIndexBuffer();
     CreateUniformBuffers();
-    SubmitTexture("assets/images/default.png"); // default texture
     CreateDescriptorPool();
     CreateDescriptorSets();
     CreateCommandBuffers();
@@ -840,6 +841,9 @@ void InitializeRenderer() {
 
     // initialize vulkan resources
     InitializeVulkan();
+
+    // default texture
+    SubmitTexture("assets/images/default.png");
 
     // set up cpu swap
 	for (int i = 0; i < CPUSWAP_LENGTH; i++) {
@@ -944,7 +948,7 @@ TextureID SubmitTexture(const char* filepath) {
         texture.mip_levels = (uint32_t)floor(log2(texWidth > texHeight ? texWidth : texHeight)) + 1;
         VkDeviceSize imageSize = texWidth * texHeight * 4;
         VulkanDataBuffer stagingBuffer;
-        VKU_CreateBuffer(
+        VUTIL_CreateBuffer(
             imageSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -954,7 +958,7 @@ TextureID SubmitTexture(const char* filepath) {
         memcpy(data, pixels, (size_t)imageSize);
         vkUnmapMemory(g_renderer.vulkan.core.general.interface, stagingBuffer.memory);
         stbi_image_free(pixels);
-        VKU_CreateImage(
+        VUTIL_CreateImage(
             texWidth,
             texHeight,
             texture.mip_levels,
@@ -965,10 +969,10 @@ TextureID SubmitTexture(const char* filepath) {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT, 
             &(texture.image));
-        VKU_TransitionImageLayout(texture.image.image, IMAGE_FORMAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.mip_levels);
-        VKU_CopyBufferToImage(stagingBuffer.buffer, texture.image.image, (uint32_t)texWidth, (uint32_t)texHeight);
-        VKU_GenerateMipmaps(texture.image.image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, texture.mip_levels);
-        VKU_DestroyBuffer(stagingBuffer);
+        VUTIL_TransitionImageLayout(texture.image.image, IMAGE_FORMAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.mip_levels);
+        VUTIL_CopyBufferToImage(stagingBuffer.buffer, texture.image.image, (uint32_t)texWidth, (uint32_t)texHeight);
+        VUTIL_GenerateMipmaps(texture.image.image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, texture.mip_levels);
+        VUTIL_DestroyBuffer(stagingBuffer);
     }
 
     // Create texture sampler

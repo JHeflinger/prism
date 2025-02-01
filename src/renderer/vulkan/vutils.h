@@ -5,70 +5,70 @@
 #include <vulkan/vulkan.h>
 #include "renderer/vulkan/vstructs.h"
 
-void VKU_SetVulkanUtilsContext(Renderer* renderer);
+void VUTIL_SetVulkanUtilsContext(Renderer* renderer);
 
-VKAPI_ATTR VkBool32 VKAPI_CALL VKU_VulkanDebugCallback(
+VKAPI_ATTR VkBool32 VKAPI_CALL VUTIL_VulkanDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData);
 
-BOOL VKU_CheckValidationLayerSupport();
+BOOL VUTIL_CheckValidationLayerSupport();
 
-BOOL VKU_CheckGPUExtensionSupport(VkPhysicalDevice device);
+BOOL VUTIL_CheckGPUExtensionSupport(VkPhysicalDevice device);
 
-VulkanFamilyGroup VKU_FindQueueFamilies(VkPhysicalDevice gpu);
+VulkanFamilyGroup VUTIL_FindQueueFamilies(VkPhysicalDevice gpu);
 
-VkShaderModule VKU_CreateShader(SimpleFile* file);
+VkShaderModule VUTIL_CreateShader(SimpleFile* file);
 
-void VKU_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer);
+void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer);
 
-void VKU_GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+void VUTIL_GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 
-VkVertexInputBindingDescription VKU_VertexBindingDescription();
+VkVertexInputBindingDescription VUTIL_VertexBindingDescription();
 
-QUAD_VkVertexInputAttributeDescription VKU_VertexAttributeDescriptions();
+QUAD_VkVertexInputAttributeDescription VUTIL_VertexAttributeDescriptions();
 
-Schrodingnum VKU_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+Schrodingnum VUTIL_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-VkCommandBuffer VKU_BeginSingleTimeCommands();
+VkCommandBuffer VUTIL_BeginSingleTimeCommands();
 
-BOOL VKU_HasStencilComponent(VkFormat format);
+BOOL VUTIL_HasStencilComponent(VkFormat format);
 
-VkFormat VKU_FindSupportedFormat(
+VkFormat VUTIL_FindSupportedFormat(
     VkFormat* candidates,
     size_t num_candidates,
     VkImageTiling tiling,
     VkFormatFeatureFlags features);
 
-VkFormat VKU_FindDepthFormat();
+VkFormat VUTIL_FindDepthFormat();
 
-void VKU_EndSingleTimeCommands(VkCommandBuffer commandBuffer);
+void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer);
 
-void VKU_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+void VUTIL_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
-void VKU_CopyBufferToImage(
+void VUTIL_CopyBufferToImage(
     VkBuffer buffer,
     VkImage image,
     uint32_t width,
     uint32_t height);
 
-void VKU_TransitionImageLayout(
+void VUTIL_TransitionImageLayout(
     VkImage image,
     VkFormat format,
     VkImageLayout oldLayout,
     VkImageLayout newLayout,
     uint32_t mipLevels);
 
-void VKU_CreateBuffer(
+void VUTIL_CreateBuffer(
     VkDeviceSize size,
     VkBufferUsageFlags usage,
     VkMemoryPropertyFlags properties,
     VulkanDataBuffer* buffer);
 
-void VKU_DestroyBuffer(VulkanDataBuffer buffer);
+void VUTIL_DestroyBuffer(VulkanDataBuffer buffer);
 
-void VKU_CreateImage(
+void VUTIL_CreateImage(
     uint32_t width,
     uint32_t height,
     uint32_t mipLevels,
@@ -80,6 +80,6 @@ void VKU_CreateImage(
     VkImageAspectFlags aspectFlags,
     VulkanImage* image);
 
-VkSampleCountFlagBits VKU_GetMaximumSampleCount();
+VkSampleCountFlagBits VUTIL_GetMaximumSampleCount();
 
 #endif
