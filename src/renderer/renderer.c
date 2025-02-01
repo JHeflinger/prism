@@ -1,7 +1,5 @@
 #include "renderer.h"
 #include "core/log.h"
-#include "core/file.h"
-#include "renderer/vulkan/vstructs.h"
 #include "renderer/vulkan/vutils.h"
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
@@ -13,285 +11,7 @@ Renderer g_renderer = { 0 };
 TextureID g_texture_id = 0;
 TriangleID g_triangle_id = 0;
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT messageType,
-    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-    void* pUserData) {
-    LOG_ASSERT(pUserData == NULL, "User data has not been set up to be handled");
-    if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        LOG_WARN("%s[VULKAN] [%s]%s %s",
-            LOG_YELLOW,
-            (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ? "GENERAL" :
-                (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ? "VALIDATION" : "PERFORMANCE")),
-            LOG_RESET,
-            pCallbackData->pMessage);
-    } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        LOG_FATAL("%s[VULKAN] [%s]%s %s",
-            LOG_RED,
-            (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ? "GENERAL" :
-                (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ? "VALIDATION" : "PERFORMANCE")),
-            LOG_RESET,
-            pCallbackData->pMessage);
-    }
-
-    return VK_FALSE;
-}
-
-VkVertexInputBindingDescription VertexBindingDescription() {
-    VkVertexInputBindingDescription bindingDescription = { 0 };
-    bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(Vertex);
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    return bindingDescription;
-}
-
-QUAD_VkVertexInputAttributeDescription VertexAttributeDescriptions() {
-    QUAD_VkVertexInputAttributeDescription attributeDescriptions = { 0 };
-    attributeDescriptions.value[0].binding = 0;
-    attributeDescriptions.value[0].location = 0;
-    attributeDescriptions.value[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions.value[0].offset = offsetof(Vertex, position);
-    attributeDescriptions.value[1].binding = 0;
-    attributeDescriptions.value[1].location = 1;
-    attributeDescriptions.value[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions.value[1].offset = offsetof(Vertex, color);
-    attributeDescriptions.value[2].binding = 0;
-    attributeDescriptions.value[2].location = 2;
-    attributeDescriptions.value[2].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions.value[2].offset = offsetof(Vertex, texcoord);
-    attributeDescriptions.value[3].binding = 0;
-    attributeDescriptions.value[3].location = 3;
-    attributeDescriptions.value[3].format = VK_FORMAT_R32_UINT;
-    attributeDescriptions.value[3].offset = offsetof(Vertex, texid);
-    return attributeDescriptions;
-}
-
-Schrodingnum FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
-    Schrodingnum result = { 0 };
-    VkPhysicalDeviceMemoryProperties memProperties = { 0 };
-    vkGetPhysicalDeviceMemoryProperties(g_renderer.vulkan.core.general.gpu, &memProperties);
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) &&
-            (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-            result.value = i;
-            result.exists = TRUE;
-            break;
-        }
-    }
-    return result;
-}
-
-VkCommandBuffer BeginSingleTimeCommands() {
-    VkCommandBufferAllocateInfo allocInfo = { 0 };
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = g_renderer.vulkan.core.scheduler.commands.pool;
-    allocInfo.commandBufferCount = 1;
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(g_renderer.vulkan.core.general.interface, &allocInfo, &commandBuffer);
-    VkCommandBufferBeginInfo beginInfo = { 0 };
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-    return commandBuffer;
-}
-
-BOOL HasStencilComponent(VkFormat format) {
-    return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
-}
-
-VkFormat FindSupportedFormat(VkFormat* candidates, size_t num_candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
-    for (size_t i = 0; i < num_candidates; i++) {
-        VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties(g_renderer.vulkan.core.general.gpu, candidates[i], &props);
-        if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
-            return candidates[i];
-        } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
-            return candidates[i];
-        }
-    }
-    LOG_FATAL("Failed to find supported format!");
-}
-
-VkFormat FindDepthFormat() {
-    VkFormat formats[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
-    return FindSupportedFormat(
-        formats,
-        3,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-    );
-}
-
-void EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
-    vkEndCommandBuffer(commandBuffer);
-    VkSubmitInfo submitInfo = { 0 };
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-    vkQueueSubmit(g_renderer.vulkan.core.scheduler.queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(g_renderer.vulkan.core.scheduler.queue);
-    vkFreeCommandBuffers(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.commands.pool, 1, &commandBuffer);
-}
-
-void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-    VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
-    VkBufferCopy copyRegion = { 0 };
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-    EndSingleTimeCommands(commandBuffer);
-}
-
-void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-    VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
-    VkBufferImageCopy region = { 0 };
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = (VkOffset3D){ 0, 0, 0 };
-    region.imageExtent = (VkExtent3D){ width, height, 1 };
-    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-    EndSingleTimeCommands(commandBuffer);
-}
-
-void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
-    VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
-    VkImageMemoryBarrier barrier = { 0 };
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;
-    barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = mipLevels;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    VkPipelineStageFlags sourceStage;
-    VkPipelineStageFlags destinationStage;
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    } else {
-        LOG_ASSERT(FALSE, "Unsupported layout transition!");
-    }
-    vkCmdPipelineBarrier(
-        commandBuffer,
-        sourceStage, destinationStage,
-        0,
-        0, NULL,
-        0, NULL,
-        1, &barrier);
-    EndSingleTimeCommands(commandBuffer);
-}
-
-void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer* buffer, VkDeviceMemory* bufferMemory) {
-    VkBufferCreateInfo bufferInfo = { 0 };
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-    bufferInfo.usage = usage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VkResult result = vkCreateBuffer(g_renderer.vulkan.core.general.interface, &bufferInfo, NULL, buffer);
-    LOG_ASSERT(result == VK_SUCCESS, "Unable to create buffer");
-
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(g_renderer.vulkan.core.general.interface, *buffer, &memRequirements);
-    VkMemoryAllocateInfo allocInfo = { 0 };
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    Schrodingnum memoryType = FindMemoryType(memRequirements.memoryTypeBits, properties);
-    LOG_ASSERT(memoryType.exists, "Unable to find memory for vertex buffer");
-    allocInfo.memoryTypeIndex = memoryType.value;
-    result = vkAllocateMemory(g_renderer.vulkan.core.general.interface, &allocInfo, NULL, bufferMemory);
-    LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate memory for buffer");
-
-    vkBindBufferMemory(g_renderer.vulkan.core.general.interface, *buffer, *bufferMemory, 0);
-}
-
-void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage* image, VkDeviceMemory* imageMemory) {
-    VkImageCreateInfo imageInfo = { 0 };
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent.width = width;
-    imageInfo.extent.height = height;
-    imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = mipLevels;
-    imageInfo.arrayLayers = 1;
-    imageInfo.format = format;
-    imageInfo.tiling = tiling;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageInfo.usage = usage;
-    imageInfo.samples = numSamples;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VkResult result = vkCreateImage(g_renderer.vulkan.core.general.interface, &imageInfo, NULL, image);
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create image!");
-
-    VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(g_renderer.vulkan.core.general.interface, *image, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = { 0 };
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    Schrodingnum memoryType = FindMemoryType(memRequirements.memoryTypeBits, properties);
-    LOG_ASSERT(memoryType.exists, "Unable to find valid memory type");
-    allocInfo.memoryTypeIndex = memoryType.value;
-    result = vkAllocateMemory(g_renderer.vulkan.core.general.interface, &allocInfo, NULL, imageMemory);
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to allocate image memory!");
-
-    vkBindImageMemory(g_renderer.vulkan.core.general.interface, *image, *imageMemory, 0);
-}
-
-VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) {
-    VkImageViewCreateInfo viewInfo = { 0 };
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = aspectFlags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = mipLevels;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
-
-    VkImageView imageView;
-    VkResult result = vkCreateImageView(g_renderer.vulkan.core.general.interface, &viewInfo, NULL, &imageView);
-    LOG_ASSERT(result == VK_SUCCESS, "failed to create texture image view!");
-
-    return imageView;
-}
-
-VkSampleCountFlagBits GetMaximumSampleCount() {
-    VkPhysicalDeviceProperties physicalDeviceProperties;
-    vkGetPhysicalDeviceProperties(g_renderer.vulkan.core.general.gpu, &physicalDeviceProperties);
-
-    VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
-    if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
-    if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
-    if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
-    if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
-    if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
-    if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
-
-    return VK_SAMPLE_COUNT_1_BIT;
-}
-
 void InitializeVulkanData() {
-    // initialize sample count
-    g_renderer.vulkan.core.context.samples = VK_SAMPLE_COUNT_1_BIT;
-
     // set up validation layers
     ARRLIST_StaticString_add(&(g_renderer.vulkan.metadata.validation), "VK_LAYER_KHRONOS_validation");
 
@@ -312,56 +32,9 @@ void InitializeVulkanData() {
     g_renderer.vulkan.core.general.gpu = VK_NULL_HANDLE;
 }
 
-BOOL CheckValidationLayerSupport() {
-    // grab all available layers
-    uint32_t layerCount;
-    vkEnumerateInstanceLayerProperties(&layerCount, NULL);
-    VkLayerProperties* availableLayers = EZALLOC(layerCount, sizeof(VkLayerProperties));
-    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers);
-
-    // check if layers in validation layers exist in the available layers
-    for (size_t i = 0; i < g_renderer.vulkan.metadata.validation.size; i++) {
-        BOOL layerFound = FALSE;
-        for (size_t j = 0; j < layerCount; j++) {
-            if (strcmp(ARRLIST_StaticString_get(&(g_renderer.vulkan.metadata.validation), i), availableLayers[j].layerName) == 0) {
-                layerFound = TRUE;
-                break;
-            }
-        }
-        if (!layerFound) {
-            EZFREE(availableLayers);
-            return FALSE;
-        }
-    }
-    EZFREE(availableLayers);
-    return TRUE;
-}
-
-BOOL CheckGPUExtensionSupport(VkPhysicalDevice device) {
-    uint32_t extensionCount;
-    vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, NULL);
-    VkExtensionProperties* availableExtensions = EZALLOC(extensionCount, sizeof(VkExtensionProperties));
-    vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, availableExtensions);
-    for (size_t i = 0; i < g_renderer.vulkan.metadata.extensions.device.size; i++) {
-        BOOL extensionFound = FALSE;
-        for (size_t j = 0; j < extensionCount; j++) {
-            if (strcmp(ARRLIST_StaticString_get(&(g_renderer.vulkan.metadata.extensions.device), i), availableExtensions[j].extensionName) == 0) {
-                extensionFound = TRUE;
-                break;
-            }
-        }
-        if (!extensionFound) {
-            EZFREE(availableExtensions);
-            return FALSE;
-        }
-    }
-    EZFREE(availableExtensions);
-    return TRUE;
-}
-
 void CreateVulkanInstance() {
     // error check for validation layer support
-    LOG_ASSERT(ENABLE_VK_VALIDATION_LAYERS && CheckValidationLayerSupport(), "Requested validation layers are not available");
+    LOG_ASSERT(ENABLE_VK_VALIDATION_LAYERS && VKU_CheckValidationLayerSupport(), "Requested validation layers are not available");
 
     // create app info (technically optional)
     VkApplicationInfo appInfo = { 0 };
@@ -387,7 +60,7 @@ void CreateVulkanInstance() {
         debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        debugCreateInfo.pfnUserCallback = VulkanDebugCallback;
+        debugCreateInfo.pfnUserCallback = VKU_VulkanDebugCallback;
         createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
     } else {
         createInfo.enabledLayerCount = 0;
@@ -404,27 +77,11 @@ void SetupVulkanMessenger() {
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    createInfo.pfnUserCallback = VulkanDebugCallback;
+    createInfo.pfnUserCallback = VKU_VulkanDebugCallback;
     createInfo.pUserData = NULL;
     PFN_vkCreateDebugUtilsMessengerEXT messenger_extension = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(g_renderer.vulkan.core.general.instance, "vkCreateDebugUtilsMessengerEXT");
     LOG_ASSERT(messenger_extension != NULL, "Failed to set up debug messenger");
     messenger_extension(g_renderer.vulkan.core.general.instance, &createInfo, NULL, &(g_renderer.vulkan.core.general.messenger));
-}
-
-VulkanFamilyGroup FindQueueFamilies(VkPhysicalDevice gpu) {
-    VulkanFamilyGroup group = { 0 };
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, NULL);
-    VkQueueFamilyProperties* queueFamilies = EZALLOC(queueFamilyCount, sizeof(VkQueueFamilyProperties));
-    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies);
-    for (uint32_t i = 0; i < queueFamilyCount; i++) {
-        if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
-            group.graphics = (Schrodingnum){ i, TRUE };
-            break;
-        }
-    }
-    EZFREE(queueFamilies);
-    return group;
 }
 
 void PickGPU() {
@@ -437,9 +94,9 @@ void PickGPU() {
     uint32_t ind = 0;
     for (uint32_t i = 0; i < deviceCount; i++) {
         // check if device is suitable
-        VulkanFamilyGroup families = FindQueueFamilies(devices[i]);
+        VulkanFamilyGroup families = VKU_FindQueueFamilies(devices[i]);
         if (!families.graphics.exists) continue;
-        if (!CheckGPUExtensionSupport(devices[i])) continue;
+        if (!VKU_CheckGPUExtensionSupport(devices[i])) continue;
 
         uint32_t curr_score = 0;
         VkPhysicalDeviceProperties deviceProperties;
@@ -457,12 +114,12 @@ void PickGPU() {
     }
     LOG_ASSERT(score != 0, "A suitable GPU could not be found");
     g_renderer.vulkan.core.general.gpu = devices[ind];
-    g_renderer.vulkan.core.context.samples = GetMaximumSampleCount();
+    g_renderer.vulkan.core.context.samples = VKU_GetMaximumSampleCount();
     EZFREE(devices);
 }
 
 void CreateDeviceInterface() {
-    VulkanFamilyGroup families = FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
+    VulkanFamilyGroup families = VKU_FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
     VkDeviceQueueCreateInfo queueCreateInfo = { 0 };
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queueCreateInfo.queueFamilyIndex = families.graphics.value;
@@ -492,7 +149,7 @@ void CreateDeviceInterface() {
 
 void CreateDestinationImage() {
     // create image
-    CreateImage(
+    VKU_CreateImage(
         g_renderer.dimensions.x,
         g_renderer.dimensions.y,
         1,
@@ -501,42 +158,27 @@ void CreateDestinationImage() {
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &(g_renderer.vulkan.core.context.attachments.target.image),
-        &(g_renderer.vulkan.core.context.attachments.target.memory));
-
-    // create image view
-    g_renderer.vulkan.core.context.attachments.target.view = CreateImageView(g_renderer.vulkan.core.context.attachments.target.image, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        &(g_renderer.vulkan.core.context.attachments.target));
 
     // create cross buffer
-    CreateBuffer(
+    VKU_CreateBuffer(
         g_renderer.dimensions.x * g_renderer.dimensions.y * 4, // Assuming VK_FORMAT_B8G8R8A8_SRGB
         VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-        &(g_renderer.vulkan.core.bridge.buffer),
-        &(g_renderer.vulkan.core.bridge.memory));
+        &(g_renderer.vulkan.core.bridge));
 
     // map memory to buffer
     vkMapMemory(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.bridge.memory, 0, VK_WHOLE_SIZE, 0, &(g_renderer.swapchain.reference));
-}
-
-VkShaderModule CreateShader(SimpleFile* file) {
-	VkShaderModuleCreateInfo createInfo = { 0 };
-	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.codeSize = file->size;
-	createInfo.pCode = (const uint32_t*)(file->data);
-	VkShaderModule shader;
-	VkResult result = vkCreateShaderModule(g_renderer.vulkan.core.general.interface, &createInfo, NULL, &shader);
-	LOG_ASSERT(result == VK_SUCCESS, "Failed to create shader module");
-	return shader;
 }
 
 void CreatePipeline() {
 	SimpleFile* vertshadercode = ReadFile("build/shaders/shader.vert.spv");
 	SimpleFile* fragshadercode = ReadFile("build/shaders/shader.frag.spv");
     SimpleFile* compshadercode = ReadFile("build/shaders/shader.comp.spv");
-	VkShaderModule vertshader = CreateShader(vertshadercode);
-	VkShaderModule fragshader = CreateShader(fragshadercode);
-	VkShaderModule compshader = CreateShader(compshadercode);
+	VkShaderModule vertshader = VKU_CreateShader(vertshadercode);
+	VkShaderModule fragshader = VKU_CreateShader(fragshadercode);
+	VkShaderModule compshader = VKU_CreateShader(compshadercode);
 
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo = { 0 };
 	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -558,8 +200,8 @@ void CreatePipeline() {
 
 	VkPipelineShaderStageCreateInfo shaderstages[] = { vertShaderStageInfo, fragShaderStageInfo, compShaderStageInfo };
 
-    VkVertexInputBindingDescription bindingDescription = VertexBindingDescription();
-    QUAD_VkVertexInputAttributeDescription attributeDescriptions = VertexAttributeDescriptions();
+    VkVertexInputBindingDescription bindingDescription = VKU_VertexBindingDescription();
+    QUAD_VkVertexInputAttributeDescription attributeDescriptions = VKU_VertexAttributeDescriptions();
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = { 0 };
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -655,7 +297,7 @@ void CreatePipeline() {
 
     VkGraphicsPipelineCreateInfo pipelineInfo = { 0 };
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 3;
+    pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderstages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssembly;
@@ -698,7 +340,7 @@ void CreateRenderPass() {
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentDescription depthAttachment = { 0 };
-    depthAttachment.format = FindDepthFormat();
+    depthAttachment.format = VKU_FindDepthFormat();
     depthAttachment.samples = g_renderer.vulkan.core.context.samples;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -769,7 +411,7 @@ void CreateFramebuffers() {
 }
 
 void CreateCommandPool() {
-    VulkanFamilyGroup queueFamilyIndices = FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
+    VulkanFamilyGroup queueFamilyIndices = VKU_FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
     VkCommandPoolCreateInfo poolInfo = { 0 };
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -874,8 +516,8 @@ void CreateSyncObjects() {
 }
 
 void CreateDepthResources() {
-    VkFormat depthFormat = FindDepthFormat();
-    CreateImage(
+    VkFormat depthFormat = VKU_FindDepthFormat();
+    VKU_CreateImage(
         g_renderer.dimensions.x,
         g_renderer.dimensions.y,
         1,
@@ -884,13 +526,12 @@ void CreateDepthResources() {
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &(g_renderer.vulkan.core.context.attachments.depth.image), 
-        &(g_renderer.vulkan.core.context.attachments.depth.memory));
-    g_renderer.vulkan.core.context.attachments.depth.view = CreateImageView(g_renderer.vulkan.core.context.attachments.depth.image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        &(g_renderer.vulkan.core.context.attachments.depth));
 }
 
 void CreateColorResources() {
-    CreateImage(
+    VKU_CreateImage(
         g_renderer.dimensions.x,
         g_renderer.dimensions.y,
         1,
@@ -899,9 +540,8 @@ void CreateColorResources() {
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &(g_renderer.vulkan.core.context.attachments.color.image),
-        &(g_renderer.vulkan.core.context.attachments.color.memory));
-    g_renderer.vulkan.core.context.attachments.color.view = CreateImageView(g_renderer.vulkan.core.context.attachments.color.image, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        &(g_renderer.vulkan.core.context.attachments.color));
 }
 
 void CleanSwapchain() {
@@ -940,27 +580,12 @@ void RecreateSwapchain() {
 }
 
 void UpdateVertexBuffer() {
-    VkDeviceSize size = sizeof(Vertex) * g_renderer.geometry.vertices.maxsize;
-    size_t subsize = sizeof(Vertex) * g_renderer.geometry.vertices.size;
-
-    if (size == 0) return;
-
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    CreateBuffer(
-        size,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &stagingBuffer,
-        &stagingBufferMemory);
-
-    void* data;
-    vkMapMemory(g_renderer.vulkan.core.general.interface, stagingBufferMemory, 0, size, 0, &data);
-    memcpy(data, g_renderer.geometry.vertices.data, (size_t)subsize);
-    vkUnmapMemory(g_renderer.vulkan.core.general.interface, stagingBufferMemory);
-    CopyBuffer(stagingBuffer, g_renderer.vulkan.geometry.vertices.buffer, size);
-    vkDestroyBuffer(g_renderer.vulkan.core.general.interface, stagingBuffer, NULL);
-    vkFreeMemory(g_renderer.vulkan.core.general.interface, stagingBufferMemory, NULL);
+    if (sizeof(Vertex) * g_renderer.geometry.vertices.maxsize == 0) return;
+    VKU_CopyHostToBuffer(
+        g_renderer.geometry.vertices.data,
+        sizeof(Vertex) * g_renderer.geometry.vertices.size,
+        sizeof(Vertex) * g_renderer.geometry.vertices.maxsize,
+        g_renderer.vulkan.geometry.vertices.buffer);
 }
 
 void CreateVertexBuffer() {
@@ -968,36 +593,22 @@ void CreateVertexBuffer() {
 
     if (size == 0) return;
 
-    CreateBuffer(
+    VKU_CreateBuffer(
         size,
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &(g_renderer.vulkan.geometry.vertices.buffer),
-        &(g_renderer.vulkan.geometry.vertices.memory));
+        &(g_renderer.vulkan.geometry.vertices));
     
     UpdateVertexBuffer();
 }
 
 void UpdateIndexBuffer() {
-    VkDeviceSize size = sizeof(Index) * g_renderer.geometry.indices.maxsize;
-    size_t subsize = sizeof(Index) * g_renderer.geometry.indices.size;
-    
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    CreateBuffer(
-        size,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &stagingBuffer,
-        &stagingBufferMemory);
-
-    void* data;
-    vkMapMemory(g_renderer.vulkan.core.general.interface, stagingBufferMemory, 0, size, 0, &data);
-    memcpy(data, g_renderer.geometry.indices.data, (size_t)subsize);
-    vkUnmapMemory(g_renderer.vulkan.core.general.interface, stagingBufferMemory);
-    CopyBuffer(stagingBuffer, g_renderer.vulkan.geometry.indices.buffer, size);
-    vkDestroyBuffer(g_renderer.vulkan.core.general.interface, stagingBuffer, NULL);
-    vkFreeMemory(g_renderer.vulkan.core.general.interface, stagingBufferMemory, NULL);
+    if (sizeof(Index) * g_renderer.geometry.indices.maxsize == 0) return;
+    VKU_CopyHostToBuffer(
+        g_renderer.geometry.indices.data,
+        sizeof(Index) * g_renderer.geometry.indices.size,
+        sizeof(Index) * g_renderer.geometry.indices.maxsize,
+        g_renderer.vulkan.geometry.indices.buffer);
 }
 
 void CreateIndexBuffer() {
@@ -1005,12 +616,11 @@ void CreateIndexBuffer() {
 
     if (size == 0) return;
 
-    CreateBuffer(
+    VKU_CreateBuffer(
         size,
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &(g_renderer.vulkan.geometry.indices.buffer),
-        &(g_renderer.vulkan.geometry.indices.memory));
+        &(g_renderer.vulkan.geometry.indices));
     
     UpdateIndexBuffer();
 }
@@ -1044,14 +654,16 @@ void CreateDescriptorSetLayout() {
 void CreateUniformBuffers() {
     VkDeviceSize size = sizeof(UniformBufferObject);
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        CreateBuffer(
+        VKU_CreateBuffer(
             size,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &(g_renderer.vulkan.core.context.renderdata.ubos.objects[i].buffer),
-            &(g_renderer.vulkan.core.context.renderdata.ubos.objects[i].memory));
+            &(g_renderer.vulkan.core.context.renderdata.ubos.objects[i]));
 
-        vkMapMemory(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.context.renderdata.ubos.objects[i].memory, 0, size, 0, &g_renderer.vulkan.core.context.renderdata.ubos.mapped[i]);
+        vkMapMemory(
+            g_renderer.vulkan.core.general.interface,
+            g_renderer.vulkan.core.context.renderdata.ubos.objects[i].memory,
+            0, size, 0, &g_renderer.vulkan.core.context.renderdata.ubos.mapped[i]);
     }
 }
 
@@ -1092,13 +704,13 @@ void UpdateDescriptorSets() {
         VkDescriptorImageInfo imageInfos[MAX_TEXTURES] = { 0 };
         for (size_t j = 0; j < g_renderer.vulkan.geometry.textures.size; j++) {
             imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfos[j].imageView = g_renderer.vulkan.geometry.textures.data[j].view;
+            imageInfos[j].imageView = g_renderer.vulkan.geometry.textures.data[j].image.view;
             imageInfos[j].sampler = g_renderer.vulkan.geometry.textures.data[j].sampler;
         }
         // fill in rest with default texture
         for (size_t j = g_renderer.vulkan.geometry.textures.size; j < MAX_TEXTURES; j++) {
             imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfos[j].imageView = g_renderer.vulkan.geometry.textures.data[0].view;
+            imageInfos[j].imageView = g_renderer.vulkan.geometry.textures.data[0].image.view;
             imageInfos[j].sampler = g_renderer.vulkan.geometry.textures.data[0].sampler;
         }
 
@@ -1134,91 +746,6 @@ void CreateDescriptorSets() {
     VkResult result = vkAllocateDescriptorSets(g_renderer.vulkan.core.general.interface, &allocInfo, g_renderer.vulkan.core.context.renderdata.descriptors.sets);
     LOG_ASSERT(result == VK_SUCCESS, "Failed to allocate descriptor sets!");
     UpdateDescriptorSets();
-}
-
-void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) {
-    VkFormatProperties formatProperties;
-    vkGetPhysicalDeviceFormatProperties(g_renderer.vulkan.core.general.gpu, imageFormat, &formatProperties);
-    LOG_ASSERT(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT, "Texture format does not support linear filtering!");
-
-    VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
-
-    VkImageMemoryBarrier barrier = { 0 };
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.image = image;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.subresourceRange.levelCount = 1;
-
-    int32_t mipWidth = texWidth;
-    int32_t mipHeight = texHeight;
-
-    for (uint32_t i = 1; i < mipLevels; i++) {
-        barrier.subresourceRange.baseMipLevel = i - 1;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-        vkCmdPipelineBarrier(commandBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-            0, NULL,
-            0, NULL,
-            1, &barrier);
-
-        VkImageBlit blit = { 0 };
-        blit.srcOffsets[0] = (VkOffset3D){ 0, 0, 0 };
-        blit.srcOffsets[1] = (VkOffset3D){ mipWidth, mipHeight, 1 };
-        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.srcSubresource.mipLevel = i - 1;
-        blit.srcSubresource.baseArrayLayer = 0;
-        blit.srcSubresource.layerCount = 1;
-        blit.dstOffsets[0] = (VkOffset3D){ 0, 0, 0 };
-        blit.dstOffsets[1] = (VkOffset3D){ mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
-        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.dstSubresource.mipLevel = i;
-        blit.dstSubresource.baseArrayLayer = 0;
-        blit.dstSubresource.layerCount = 1;
-
-        vkCmdBlitImage(
-            commandBuffer,
-            image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            1, &blit,
-            VK_FILTER_LINEAR);
-
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        vkCmdPipelineBarrier(
-            commandBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-            0, NULL,
-            0, NULL,
-            1, &barrier);
-
-        if (mipWidth > 1) mipWidth /= 2;
-        if (mipHeight > 1) mipHeight /= 2;
-    }
-
-    barrier.subresourceRange.baseMipLevel = mipLevels - 1;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    vkCmdPipelineBarrier(commandBuffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-        0, NULL,
-        0, NULL,
-        1, &barrier);
-
-    EndSingleTimeCommands(commandBuffer);
 }
 
 void DestroyVulkan() {
@@ -1278,6 +805,7 @@ void DestroyVulkan() {
 }
 
 void InitializeVulkan() {
+    VKU_SetVulkanUtilsContext(&g_renderer);
     InitializeVulkanData();
     CreateVulkanInstance();
     SetupVulkanMessenger();
@@ -1415,20 +943,18 @@ TextureID SubmitTexture(const char* filepath) {
         texture.height = texHeight;
         texture.mip_levels = (uint32_t)floor(log2(texWidth > texHeight ? texWidth : texHeight)) + 1;
         VkDeviceSize imageSize = texWidth * texHeight * 4;
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        CreateBuffer(
+        VulkanDataBuffer stagingBuffer;
+        VKU_CreateBuffer(
             imageSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &stagingBuffer,
-            &stagingBufferMemory);
+            &stagingBuffer);
         void* data;
-        vkMapMemory(g_renderer.vulkan.core.general.interface, stagingBufferMemory, 0, imageSize, 0, &data);
+        vkMapMemory(g_renderer.vulkan.core.general.interface, stagingBuffer.memory, 0, imageSize, 0, &data);
         memcpy(data, pixels, (size_t)imageSize);
-        vkUnmapMemory(g_renderer.vulkan.core.general.interface, stagingBufferMemory);
+        vkUnmapMemory(g_renderer.vulkan.core.general.interface, stagingBuffer.memory);
         stbi_image_free(pixels);
-        CreateImage(
+        VKU_CreateImage(
             texWidth,
             texHeight,
             texture.mip_levels,
@@ -1437,22 +963,12 @@ TextureID SubmitTexture(const char* filepath) {
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            &(texture.image),
-            &(texture.memory));
-        TransitionImageLayout(texture.image, IMAGE_FORMAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.mip_levels);
-        CopyBufferToImage(stagingBuffer, texture.image, (uint32_t)texWidth, (uint32_t)texHeight);
-        GenerateMipmaps(texture.image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, texture.mip_levels);
-        vkDestroyBuffer(g_renderer.vulkan.core.general.interface, stagingBuffer, NULL);
-        vkFreeMemory(g_renderer.vulkan.core.general.interface, stagingBufferMemory, NULL);
-    }
-
-    // Create texture view
-    {
-        texture.view = CreateImageView(
-            texture.image, 
-            IMAGE_FORMAT, 
             VK_IMAGE_ASPECT_COLOR_BIT, 
-            texture.mip_levels);
+            &(texture.image));
+        VKU_TransitionImageLayout(texture.image.image, IMAGE_FORMAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.mip_levels);
+        VKU_CopyBufferToImage(stagingBuffer.buffer, texture.image.image, (uint32_t)texWidth, (uint32_t)texHeight);
+        VKU_GenerateMipmaps(texture.image.image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, texture.mip_levels);
+        VKU_DestroyBuffer(stagingBuffer);
     }
 
     // Create texture sampler
@@ -1493,10 +1009,10 @@ void RemoveTexture(TextureID id) {
     for (size_t i = 0; i < g_renderer.vulkan.geometry.textures.size; i++) {
         VulkanTexture texture = ARRLIST_VulkanTexture_get(&(g_renderer.vulkan.geometry.textures), i);
         if (texture.id == id) {
-            vkDestroyImage(g_renderer.vulkan.core.general.interface, texture.image, NULL);
-            vkFreeMemory(g_renderer.vulkan.core.general.interface, texture.memory, NULL);
+            vkDestroyImage(g_renderer.vulkan.core.general.interface, texture.image.image, NULL);
+            vkFreeMemory(g_renderer.vulkan.core.general.interface, texture.image.memory, NULL);
+            vkDestroyImageView(g_renderer.vulkan.core.general.interface, texture.image.view, NULL);
             vkDestroySampler(g_renderer.vulkan.core.general.interface, texture.sampler, NULL);
-            vkDestroyImageView(g_renderer.vulkan.core.general.interface, texture.view, NULL);
             ARRLIST_VulkanTexture_remove(&(g_renderer.vulkan.geometry.textures), i);
             return;
         }
@@ -1507,10 +1023,10 @@ void RemoveTexture(TextureID id) {
 void ClearTextures() {
     for (size_t i = 0; i < g_renderer.vulkan.geometry.textures.size; i++) {
         VulkanTexture texture = ARRLIST_VulkanTexture_get(&(g_renderer.vulkan.geometry.textures), i);
-        vkDestroyImage(g_renderer.vulkan.core.general.interface, texture.image, NULL);
-        vkFreeMemory(g_renderer.vulkan.core.general.interface, texture.memory, NULL);
+        vkDestroyImage(g_renderer.vulkan.core.general.interface, texture.image.image, NULL);
+        vkFreeMemory(g_renderer.vulkan.core.general.interface, texture.image.memory, NULL);
+        vkDestroyImageView(g_renderer.vulkan.core.general.interface, texture.image.view, NULL);
         vkDestroySampler(g_renderer.vulkan.core.general.interface, texture.sampler, NULL);
-        vkDestroyImageView(g_renderer.vulkan.core.general.interface, texture.view, NULL);
     }
     ARRLIST_VulkanTexture_clear(&(g_renderer.vulkan.geometry.textures));
 }

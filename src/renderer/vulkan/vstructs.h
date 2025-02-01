@@ -29,13 +29,17 @@ typedef uint32_t Index; // TODO: may need to make this bigger if we run out of i
 DECLARE_ARRLIST(Index);
 
 typedef struct {
+    VkImage image;
+    VkImageView view;
+    VkDeviceMemory memory;
+} VulkanImage;
+
+typedef struct {
     const char* filepath;
     size_t width;
     size_t height;
     uint32_t mip_levels;
-    VkImage image;
-    VkImageView view;
-    VkDeviceMemory memory;
+    VulkanImage image;
     VkSampler sampler;
     TextureID id;
 } VulkanTexture;
@@ -94,12 +98,6 @@ typedef struct {
     VkPipeline pipeline;
     VkPipelineLayout layout;
 } VulkanPipeline;
-
-typedef struct {
-    VkImage image;
-    VkImageView view;
-    VkDeviceMemory memory;
-} VulkanImage;
 
 typedef struct {
     VkCommandPool pool;
