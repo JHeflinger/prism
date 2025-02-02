@@ -4,9 +4,11 @@
 #include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vclean.h"
 
+#define INVOCATION_GROUP_SIZE 512
+
 Renderer* g_vupdt_renderer_ref = NULL;
 
-void VUPDT_CommandBuffer(VkCommandBuffer command) {
+void VUPDT_RecordRasterCommand(VkCommandBuffer command) {
     // Start command
     VkCommandBufferBeginInfo beginInfo = { 0 };
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -83,6 +85,59 @@ void VUPDT_CommandBuffer(VkCommandBuffer command) {
     }
 }
 
+void VUPDT_RecordRaytraceCommand(VkCommandBuffer command) {
+    VkCommandBufferBeginInfo beginInfo = { 0 };
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    VkResult result = vkBeginCommandBuffer(command, &beginInfo);
+    LOG_ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
+
+    // trace rays
+    {
+        vkCmdBindPipeline(
+            command,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            g_vupdt_renderer_ref->vulkan.core.context.raytracer.pipeline.pipeline);
+
+        vkCmdBindDescriptorSets(
+            command,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            g_vupdt_renderer_ref->vulkan.core.context.raytracer.pipeline.layout,
+            0,
+            1,
+            &(g_vupdt_renderer_ref->vulkan.core.context.raytracer.descriptors.sets[g_vupdt_renderer_ref->swapchain.index]),
+            0,
+            NULL);
+
+        uint32_t imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
+        uint32_t imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
+        vkCmdDispatch(command, (imgw * imgh) / INVOCATION_GROUP_SIZE, 1, 1);
+    }
+
+    // Copy image to staging
+    {
+        VkBufferImageCopy region = { 0 };
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0; // Tightly packed
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = (VkOffset3D){ 0, 0, 0 };
+        region.imageExtent = (VkExtent3D){ g_vupdt_renderer_ref->dimensions.x, g_vupdt_renderer_ref->dimensions.y, 1 };
+        vkCmdCopyImageToBuffer(
+            command,
+            g_vupdt_renderer_ref->vulkan.core.context.raytracer.targets[g_vupdt_renderer_ref->swapchain.index].image,
+            VK_IMAGE_LAYOUT_GENERAL, g_vupdt_renderer_ref->vulkan.core.bridge.buffer, 1, &region);
+    }
+
+    // End command
+    result = vkEndCommandBuffer(command);
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to record command!");
+    }
+}
+
 void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VkDescriptorBufferInfo bufferInfo = { 0 };
@@ -140,7 +195,7 @@ void VUPDT_ComputeDescriptorSets(VulkanDescriptors* descriptors) {
         storageBufferInfo.range = sizeof(RayGenerator) * imgw * imgh;
 
         VkDescriptorImageInfo imageInfo = { 0 };
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: change this so we can write to it
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
         imageInfo.imageView = g_vupdt_renderer_ref->vulkan.core.context.raytracer.targets[i].view;
 
         VkWriteDescriptorSet descriptorWrites[3] = { 0 };
@@ -169,7 +224,7 @@ void VUPDT_ComputeDescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[2].descriptorCount = 1;
         descriptorWrites[2].pImageInfo = &imageInfo;
 
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 2, descriptorWrites, 0, NULL);
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 3, descriptorWrites, 0, NULL);
     }
 }
 

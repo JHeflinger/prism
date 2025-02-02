@@ -232,6 +232,47 @@ BOOL VINIT_ComputeDescriptors(VulkanDescriptors* descriptors) {
     return TRUE;
 }
 
+BOOL VINIT_ComputePipeline(VulkanPipeline* pipeline) {
+    SimpleFile* compshadercode = ReadFile("build/shaders/shader.comp.spv");
+	VkShaderModule compshader = VUTIL_CreateShader(compshadercode);
+
+	VkPipelineShaderStageCreateInfo compShaderStageInfo = { 0 };
+	compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	compShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	compShaderStageInfo.module = compshader;
+	compShaderStageInfo.pName = "main";
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { 0 };
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &(g_vinit_renderer_ref->vulkan.core.context.raytracer.descriptors.layout);
+
+    VkResult result = vkCreatePipelineLayout(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &pipelineLayoutInfo, NULL, &(pipeline->layout));
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create pipeline layout!");
+        return FALSE;
+    }
+
+    VkComputePipelineCreateInfo pipelineInfo = { 0 };
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfo.layout = pipeline->layout;
+    pipelineInfo.stage = compShaderStageInfo;
+
+    result = vkCreateComputePipelines(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &(pipeline->pipeline));
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create pipeline!");
+        return FALSE;
+    }
+
+    FreeFile(compshadercode);
+	vkDestroyShaderModule(g_vinit_renderer_ref->vulkan.core.general.interface, compshader, NULL);
+    return TRUE;
+}
+
 BOOL VINIT_Attachments(VulkanAttachments* attachments) {
     // create target
     VUTIL_CreateImage(
@@ -385,10 +426,8 @@ BOOL VINIT_RenderPass(VkRenderPass* renderpass) {
 BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
     SimpleFile* vertshadercode = ReadFile("build/shaders/shader.vert.spv");
 	SimpleFile* fragshadercode = ReadFile("build/shaders/shader.frag.spv");
-    SimpleFile* compshadercode = ReadFile("build/shaders/shader.comp.spv");
 	VkShaderModule vertshader = VUTIL_CreateShader(vertshadercode);
 	VkShaderModule fragshader = VUTIL_CreateShader(fragshadercode);
-	VkShaderModule compshader = VUTIL_CreateShader(compshadercode);
 
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo = { 0 };
 	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -402,13 +441,7 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
 	fragShaderStageInfo.module = fragshader;
 	fragShaderStageInfo.pName = "main";
 
-	VkPipelineShaderStageCreateInfo compShaderStageInfo = { 0 };
-	compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	compShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	compShaderStageInfo.module = compshader;
-	compShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo shaderstages[] = { vertShaderStageInfo, fragShaderStageInfo, compShaderStageInfo };
+	VkPipelineShaderStageCreateInfo shaderstages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
     VkVertexInputBindingDescription bindingDescription = VUTIL_VertexBindingDescription();
     QUAD_VkVertexInputAttributeDescription attributeDescriptions = VUTIL_VertexAttributeDescriptions();
@@ -538,10 +571,8 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
 
 	FreeFile(vertshadercode);
 	FreeFile(fragshadercode);
-    FreeFile(compshadercode);
 	vkDestroyShaderModule(g_vinit_renderer_ref->vulkan.core.general.interface, vertshader, NULL);
 	vkDestroyShaderModule(g_vinit_renderer_ref->vulkan.core.general.interface, fragshader, NULL);
-	vkDestroyShaderModule(g_vinit_renderer_ref->vulkan.core.general.interface, compshader, NULL);
     return TRUE;
 }
 
@@ -576,8 +607,8 @@ BOOL VINIT_Raytracer(VulkanRaytracer* raytracer) {
     RayGenerator* raygens = EZALLOC(imgw * imgh, sizeof(RayGenerator));
     for (uint32_t x = 0; x < imgw; x++) {
         for (uint32_t y = 0; y < imgh; y++) {
-            raygens[y*imgh + x].x = x;
-            raygens[y*imgh + x].y = y;
+            raygens[y*imgw + x].x = x;
+            raygens[y*imgw + x].y = y;
         }
     }
 
@@ -613,16 +644,25 @@ BOOL VINIT_Raytracer(VulkanRaytracer* raytracer) {
             g_vinit_renderer_ref->dimensions.y,
             1,
             VK_SAMPLE_COUNT_1_BIT,
-            IMAGE_FORMAT,
+            VK_FORMAT_R8G8B8A8_UNORM,
             VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             &(raytracer->targets[i]));
+        VUTIL_TransitionImageLayout(
+            raytracer->targets[i].image,
+            VK_FORMAT_R8G8B8A8_UNORM,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_GENERAL,
+            1);
     }
 
     // initialize descriptors
     VINIT_ComputeDescriptors(&(raytracer->descriptors));
+
+    // initialize pipeline
+    VINIT_ComputePipeline(&(raytracer->pipeline));
 
     return TRUE;
 }

@@ -15,6 +15,9 @@ TextureID g_texture_id = 0;
 TriangleID g_triangle_id = 0;
 
 void InitializeRenderer() {
+    // configure to raytrace
+    g_renderer.raytrace = TRUE;
+
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };
     g_renderer.camera.look = (Vector3){ 0.0f, 0.0f, 0.0f };
@@ -168,7 +171,7 @@ TextureID SubmitTexture(const char* filepath) {
             &(texture.image));
         VUTIL_TransitionImageLayout(texture.image.image, IMAGE_FORMAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.mip_levels);
         VUTIL_CopyBufferToImage(stagingBuffer.buffer, texture.image.image, (uint32_t)texWidth, (uint32_t)texHeight);
-        VUTIL_GenerateMipmaps(texture.image.image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, texture.mip_levels);
+        VUTIL_GenerateMipmaps(texture.image.image, IMAGE_FORMAT, texWidth, texHeight, texture.mip_levels);
         VUTIL_DestroyBuffer(stagingBuffer);
     }
 
@@ -276,7 +279,10 @@ void Render() {
 
     // reset command buffer and record it
     vkResetCommandBuffer(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index], 0);
-    VUPDT_CommandBuffer(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
+    if (g_renderer.raytrace)
+        VUPDT_RecordRaytraceCommand(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
+    else
+        VUPDT_RecordRasterCommand(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
 
     // submit command buffer
     VkSubmitInfo submitInfo = { 0 };

@@ -136,6 +136,7 @@ typedef struct {
     VulkanDataBuffer ssbos[CPUSWAP_LENGTH];
     VulkanImage targets[CPUSWAP_LENGTH];
     VulkanDescriptors descriptors;
+    VulkanPipeline pipeline;
 } VulkanRaytracer;
 
 typedef struct {
@@ -195,6 +196,7 @@ typedef struct {
     Vector2 dimensions;
     Geometry geometry;
     SimpleCamera camera;
+    BOOL raytrace;
 } Renderer;
 
 #endif

@@ -3,7 +3,9 @@
 
 #include "renderer/vulkan/vstructs.h"
 
-void VUPDT_CommandBuffer(VkCommandBuffer command);
+void VUPDT_RecordRasterCommand(VkCommandBuffer command);
+
+void VUPDT_RecordRaytraceCommand(VkCommandBuffer command);
 
 void VUPDT_DescriptorSets(VulkanDescriptors* descriptors);
 

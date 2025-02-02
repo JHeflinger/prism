@@ -16,7 +16,18 @@ void DrawViewportPanel(float width, float height) {
     MoveCamera(camera);
     Render();
     Draw(0, 0, width, height);
-    if (i < mesh.vertexCount / 3) {
+}
+
+void ConfigureViewportPanel(Panel* panel) {
+    SetupPanel(panel, "Viewport");
+    panel->draw = DrawViewportPanel;
+
+    TextureID tid = SubmitTexture("assets/images/room.png");
+
+    Model model = LoadModel("assets/models/room.obj");
+    LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
+    Mesh mesh = model.meshes[0];
+    for (int i = 0; i < mesh.vertexCount / 3; i++) {
         Triangle triangle = { 0 };
         for (int j = 0; j < 3; j++) {
             Vertex vertex = {
@@ -35,18 +46,6 @@ void DrawViewportPanel(float width, float height) {
             triangle.vertices[j] = vertex;
         }
         SubmitTriangle(triangle);
-        i++;
     }
-
-    if (IsKeyPressed(KEY_D)) {
-        tid = SubmitTexture("assets/images/room.png");
-        model = LoadModel("assets/models/room.obj");
-        LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
-        mesh = model.meshes[0];
-    }
-}
-
-void ConfigureViewportPanel(Panel* panel) {
-    SetupPanel(panel, "Viewport");
-    panel->draw = DrawViewportPanel;
+    UnloadModel(model);
 }

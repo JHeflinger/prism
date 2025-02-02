@@ -1,5 +1,29 @@
 #version 450
 
-void main() {
+layout(binding = 0) uniform UniformBufferObject {
+	mat4 model;
+	mat4 view;
+	mat4 projection;
+} ubo;
 
+struct RayGenerator {
+    uint x;
+    uint y;
+};
+
+layout(std140, binding = 1) readonly buffer RayGeneratorSSBOIn {
+   RayGenerator raygenIn[ ];
+};
+
+layout(binding = 2, rgba8) uniform image2D outputImage;
+
+layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+
+void main() 
+{
+    uint index= gl_GlobalInvocationID.x;
+    RayGenerator rgIn = raygenIn[index];
+    ivec2 pixel = ivec2(rgIn.x, rgIn.y);
+    vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
+    imageStore(outputImage, pixel, color);
 }

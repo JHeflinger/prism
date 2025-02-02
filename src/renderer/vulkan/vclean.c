@@ -66,10 +66,12 @@ void VCLEAN_Vulkan(VulkanObject* vulkan) {
     // destroy command pool
     vkDestroyCommandPool(vulkan->core.general.interface, vulkan->core.scheduler.commands.pool, NULL);
 
-    // destroy pipeline
+    // destroy pipelines
     vkDestroyPipeline(vulkan->core.general.interface, vulkan->core.context.pipeline.pipeline, NULL);
     vkDestroyPipelineLayout(vulkan->core.general.interface, vulkan->core.context.pipeline.layout, NULL);
     vkDestroyRenderPass(vulkan->core.general.interface, vulkan->core.context.renderpass, NULL);
+    vkDestroyPipeline(vulkan->core.general.interface, vulkan->core.context.raytracer.pipeline.pipeline, NULL);
+    vkDestroyPipelineLayout(vulkan->core.general.interface, vulkan->core.context.raytracer.pipeline.layout, NULL);
 
     // destroy vulkan device
     vkDestroyDevice(vulkan->core.general.interface, NULL);

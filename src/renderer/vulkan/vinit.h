@@ -16,6 +16,8 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors);
 
 BOOL VINIT_ComputeDescriptors(VulkanDescriptors* descriptors);
 
+BOOL VINIT_ComputePipeline(VulkanPipeline* pipeline);
+
 BOOL VINIT_Attachments(VulkanAttachments* attachments);
 
 BOOL VINIT_Framebuffers(VkFramebuffer* framebuffer);
