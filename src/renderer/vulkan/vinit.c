@@ -66,11 +66,90 @@ BOOL VINIT_Syncro(VulkanSyncro* syncro) {
 }
 
 BOOL VINIT_UniformBuffers(UBOArray* ubos) {
-    return FALSE;
+    VkDeviceSize size = sizeof(UniformBufferObject);
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUTIL_CreateBuffer(
+            size,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &(ubos->objects[i]));
+
+        vkMapMemory(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            ubos->objects[i].memory,
+            0, size, 0, &(ubos->mapped[i]));
+    }
+    return TRUE;
 }
 
 BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
-    return FALSE;
+    // create descriptor set layout
+    VkDescriptorSetLayoutBinding uboLayoutBinding = { 0 };
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = NULL;
+
+    VkDescriptorSetLayoutBinding samplerLayoutBinding = { 0 };
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = MAX_TEXTURES;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = NULL;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding bindings[] = { uboLayoutBinding, samplerLayoutBinding };
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 2;
+    layoutInfo.pBindings = bindings;
+
+    VkResult result = vkCreateDescriptorSetLayout(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &layoutInfo, NULL, &(descriptors->layout));
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create descriptor set layout!");
+        return FALSE;
+    }
+
+    // create descriptor pool
+    VkDescriptorPoolSize poolSizes[2] = { 0 };
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = CPUSWAP_LENGTH * MAX_TEXTURES;
+
+    VkDescriptorPoolCreateInfo poolInfo = { 0 };
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 2;
+    poolInfo.pPoolSizes = poolSizes;
+    poolInfo.maxSets = CPUSWAP_LENGTH;
+    result = vkCreateDescriptorPool(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &poolInfo, NULL, &(descriptors->pool));
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create descriptor pool!");
+        return FALSE;
+    }
+
+    // create descriptor sets
+    VkDescriptorSetLayout layouts[CPUSWAP_LENGTH];
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) layouts[i] = descriptors->layout;
+    VkDescriptorSetAllocateInfo allocInfo = { 0 };
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptors->pool;
+    allocInfo.descriptorSetCount = CPUSWAP_LENGTH;
+    allocInfo.pSetLayouts = layouts;
+    result = vkAllocateDescriptorSets(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &allocInfo, descriptors->sets);
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create descriptor sets!");
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 BOOL VINIT_Attachments(VulkanAttachments* attachments) {
@@ -118,13 +197,32 @@ BOOL VINIT_Attachments(VulkanAttachments* attachments) {
 }
 
 BOOL VINIT_Framebuffers(VkFramebuffer* framebuffer) {
-    return FALSE;
+    VkImageView attachments[] = { 
+        g_vinit_renderer_ref->vulkan.core.context.attachments.color.view,
+        g_vinit_renderer_ref->vulkan.core.context.attachments.depth.view,
+        g_vinit_renderer_ref->vulkan.core.context.attachments.target.view };
+    VkFramebufferCreateInfo framebufferInfo = { 0 };
+    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferInfo.renderPass = g_vinit_renderer_ref->vulkan.core.context.renderpass;
+    framebufferInfo.attachmentCount = 3;
+    framebufferInfo.pAttachments = attachments;
+    framebufferInfo.width = g_vinit_renderer_ref->dimensions.x;
+    framebufferInfo.height = g_vinit_renderer_ref->dimensions.y;
+    framebufferInfo.layers = 1;
+    VkResult result = vkCreateFramebuffer(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &framebufferInfo, NULL, framebuffer);
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create framebuffers");
+        return FALSE;
+    }
+    return TRUE;
 }
 
 BOOL VINIT_RenderData(VulkanRenderData* renderdata) {
 	if (!VINIT_UniformBuffers(&(renderdata->ubos))) return FALSE;
 	if (!VINIT_Descriptors(&(renderdata->descriptors))) return FALSE;
-    return FALSE;
+    return TRUE;
 }
 
 BOOL VINIT_RenderPass(VkRenderPass* renderpass) {
@@ -205,7 +303,166 @@ BOOL VINIT_RenderPass(VkRenderPass* renderpass) {
 }
 
 BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
-    return FALSE;
+    SimpleFile* vertshadercode = ReadFile("build/shaders/shader.vert.spv");
+	SimpleFile* fragshadercode = ReadFile("build/shaders/shader.frag.spv");
+    SimpleFile* compshadercode = ReadFile("build/shaders/shader.comp.spv");
+	VkShaderModule vertshader = VUTIL_CreateShader(vertshadercode);
+	VkShaderModule fragshader = VUTIL_CreateShader(fragshadercode);
+	VkShaderModule compshader = VUTIL_CreateShader(compshadercode);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo = { 0 };
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertshader;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo = { 0 };
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragshader;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo compShaderStageInfo = { 0 };
+	compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	compShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	compShaderStageInfo.module = compshader;
+	compShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderstages[] = { vertShaderStageInfo, fragShaderStageInfo, compShaderStageInfo };
+
+    VkVertexInputBindingDescription bindingDescription = VUTIL_VertexBindingDescription();
+    QUAD_VkVertexInputAttributeDescription attributeDescriptions = VUTIL_VertexAttributeDescriptions();
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo = { 0 };
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = 4;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.value;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = { 0 };
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkDynamicState dynamicStates[2] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState = { 0 };
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
+
+    VkPipelineViewportStateCreateInfo viewportState = { 0 };
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer = { 0 };
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.depthBiasConstantFactor = 0.0f; // Optional
+    rasterizer.depthBiasClamp = 0.0f; // Optional
+    rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+
+    VkPipelineMultisampleStateCreateInfo multisampling = { 0 };
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_TRUE;
+    multisampling.rasterizationSamples = g_vinit_renderer_ref->vulkan.core.context.samples;
+    multisampling.minSampleShading = 0.2f; // closer to one is smoother anti-aliasing
+    multisampling.pSampleMask = NULL; // Optional
+    multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
+    multisampling.alphaToOneEnable = VK_FALSE; // Optional
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = { 0 };
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending = { 0 };
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.blendConstants[0] = 0.0f; // Optional
+    colorBlending.blendConstants[1] = 0.0f; // Optional
+    colorBlending.blendConstants[2] = 0.0f; // Optional
+    colorBlending.blendConstants[3] = 0.0f; // Optional
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { 0 };
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &(g_vinit_renderer_ref->vulkan.core.context.renderdata.descriptors.layout);
+    pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
+    pipelineLayoutInfo.pPushConstantRanges = NULL; // Optional
+
+    VkResult result = vkCreatePipelineLayout(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &pipelineLayoutInfo, NULL, &(pipeline->layout));
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create pipeline layout!");
+        return FALSE;
+    }
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil = { 0 };
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f; // Optional
+    depthStencil.maxDepthBounds = 1.0f; // Optional
+    depthStencil.stencilTestEnable = VK_FALSE;
+    //depthStencil.front = { 0 }; // Optional
+    //depthStencil.back = { 0 }; // Optional
+
+    VkGraphicsPipelineCreateInfo pipelineInfo = { 0 };
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderstages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = pipeline->layout;
+    pipelineInfo.renderPass = g_vinit_renderer_ref->vulkan.core.context.renderpass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
+    pipelineInfo.basePipelineIndex = -1; // Optional
+
+    result = vkCreateGraphicsPipelines(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &(pipeline->pipeline));
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create pipeline!");
+        return FALSE;
+    }
+
+	FreeFile(vertshadercode);
+	FreeFile(fragshadercode);
+    FreeFile(compshadercode);
+	vkDestroyShaderModule(g_vinit_renderer_ref->vulkan.core.general.interface, vertshader, NULL);
+	vkDestroyShaderModule(g_vinit_renderer_ref->vulkan.core.general.interface, fragshader, NULL);
+	vkDestroyShaderModule(g_vinit_renderer_ref->vulkan.core.general.interface, compshader, NULL);
+    return TRUE;
 }
 
 BOOL VINIT_Scheduler(VulkanScheduler* scheduler) {
@@ -237,6 +494,8 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context) {
 	if (!VINIT_Attachments(&(context->attachments))) return FALSE;
 	if (!VINIT_RenderPass(&(context->renderpass))) return FALSE;
 	if (!VINIT_RenderData(&(context->renderdata))) return FALSE;
+	if (!VINIT_Framebuffers(&(context->framebuffer))) return FALSE;
+	if (!VINIT_Pipeline(&(context->pipeline))) return FALSE;
     return TRUE;
 }
 
