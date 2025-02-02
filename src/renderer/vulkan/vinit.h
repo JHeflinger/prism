@@ -14,6 +14,8 @@ BOOL VINIT_UniformBuffers(UBOArray* ubos);
 
 BOOL VINIT_Descriptors(VulkanDescriptors* descriptors);
 
+BOOL VINIT_ComputeDescriptors(VulkanDescriptors* descriptors);
+
 BOOL VINIT_Attachments(VulkanAttachments* attachments);
 
 BOOL VINIT_Framebuffers(VkFramebuffer* framebuffer);
@@ -27,6 +29,8 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline);
 BOOL VINIT_Scheduler(VulkanScheduler* scheduler);
 
 BOOL VINIT_Bridge(VulkanDataBuffer* bridge);
+
+BOOL VINIT_Raytracer(VulkanRaytracer* raytracer);
 
 BOOL VINIT_RenderContext(VulkanRenderContext* context);
 

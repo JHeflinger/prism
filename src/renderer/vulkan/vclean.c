@@ -32,17 +32,32 @@ void VCLEAN_Vulkan(VulkanObject* vulkan) {
     // clean swapchain
     VCLEAN_DimensionDependant(vulkan);
 
+    // destroy raytracing targets
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        vkDestroyImageView(vulkan->core.general.interface, vulkan->core.context.raytracer.targets[i].view, NULL);
+        vkDestroyImage(vulkan->core.general.interface, vulkan->core.context.raytracer.targets[i].image, NULL);
+        vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.raytracer.targets[i].memory, NULL);
+    }
+
+    // destroy raytracing ssbos
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        vkDestroyBuffer(vulkan->core.general.interface, vulkan->core.context.raytracer.ssbos[i].buffer, NULL);
+        vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.raytracer.ssbos[i].memory, NULL);
+    }
+
     // destroy uniform buffers
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         vkDestroyBuffer(vulkan->core.general.interface, vulkan->core.context.renderdata.ubos.objects[i].buffer, NULL);
         vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.renderdata.ubos.objects[i].memory, NULL);
     }
 
-    // destroy descriptor pool
+    // destroy descriptor pools
     vkDestroyDescriptorPool(vulkan->core.general.interface, vulkan->core.context.renderdata.descriptors.pool, NULL);
+    vkDestroyDescriptorPool(vulkan->core.general.interface, vulkan->core.context.raytracer.descriptors.pool, NULL);
 
-    // destroy descriptor set layout
+    // destroy descriptor set layouts
     vkDestroyDescriptorSetLayout(vulkan->core.general.interface, vulkan->core.context.renderdata.descriptors.layout, NULL);
+    vkDestroyDescriptorSetLayout(vulkan->core.general.interface, vulkan->core.context.raytracer.descriptors.layout, NULL);
 
     // destroy syncro objects
     for (int i = 0; i < CPUSWAP_LENGTH; i++)

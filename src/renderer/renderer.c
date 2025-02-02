@@ -239,6 +239,9 @@ void Render() {
     // if there's no geometry, don't render
     if (g_renderer.geometry.vertices.size == 0) return;
 
+    // check for window changes
+    if (g_renderer.dimensions.x != GetScreenWidth() || g_renderer.dimensions.y != GetScreenHeight()) VUPDT_RenderSize(GetScreenWidth(), GetScreenHeight());
+
     // profile for stats
     BeginProfile(&(g_renderer.stats.profile));
 
@@ -267,9 +270,6 @@ void Render() {
 			VUPDT_Vertices(&(g_renderer.vulkan.geometry.vertices));
         }
     }
-
-    // check for window changes
-    if (g_renderer.dimensions.x != GetScreenWidth() || g_renderer.dimensions.y != GetScreenHeight()) VUPDT_RenderSize(GetScreenWidth(), GetScreenHeight());
 
     // update uniform buffers
     VUPDT_UniformBuffers(&(g_renderer.vulkan.core.context.renderdata.ubos));

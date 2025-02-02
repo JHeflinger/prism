@@ -29,6 +29,11 @@ typedef uint32_t Index; // TODO: may need to make this bigger if we run out of i
 DECLARE_ARRLIST(Index);
 
 typedef struct {
+    uint32_t x;
+    uint32_t y;
+} RayGenerator;
+
+typedef struct {
     VkImage image;
     VkImageView view;
     VkDeviceMemory memory;
@@ -128,12 +133,19 @@ typedef struct {
 } VulkanRenderData;
 
 typedef struct {
+    VulkanDataBuffer ssbos[CPUSWAP_LENGTH];
+    VulkanImage targets[CPUSWAP_LENGTH];
+    VulkanDescriptors descriptors;
+} VulkanRaytracer;
+
+typedef struct {
     VulkanPipeline pipeline;
     VkRenderPass renderpass;
     VulkanRenderData renderdata;
     VkFramebuffer framebuffer;
     VkSampleCountFlagBits samples;
     VulkanAttachments attachments;
+    VulkanRaytracer raytracer;
 } VulkanRenderContext;
 
 typedef struct {

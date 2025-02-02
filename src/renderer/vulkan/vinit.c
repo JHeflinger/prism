@@ -152,6 +152,86 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
     return TRUE;
 }
 
+BOOL VINIT_ComputeDescriptors(VulkanDescriptors* descriptors) {
+    // create descriptor set layout
+    VkDescriptorSetLayoutBinding uboLayoutBinding = { 0 };
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    uboLayoutBinding.pImmutableSamplers = NULL;
+
+    VkDescriptorSetLayoutBinding ssboLayoutBinding = { 0 };
+    ssboLayoutBinding.binding = 1;
+    ssboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    ssboLayoutBinding.descriptorCount = 1;
+    ssboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    ssboLayoutBinding.pImmutableSamplers = NULL;
+
+    VkDescriptorSetLayoutBinding imageLayoutBinding = { 0 };
+    imageLayoutBinding.binding = 2;
+    imageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    imageLayoutBinding.descriptorCount = 1;
+    imageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    imageLayoutBinding.pImmutableSamplers = NULL;
+
+    VkDescriptorSetLayoutBinding bindings[] = { uboLayoutBinding, ssboLayoutBinding, imageLayoutBinding };
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 3;
+    layoutInfo.pBindings = bindings;
+
+    VkResult result = vkCreateDescriptorSetLayout(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &layoutInfo, NULL, &(descriptors->layout));
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create descriptor set layout!");
+        return FALSE;
+    }
+
+    // create descriptor pool
+    VkDescriptorPoolSize poolSizes[3] = { 0 };
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[1].descriptorCount = CPUSWAP_LENGTH;
+    poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    poolSizes[2].descriptorCount = CPUSWAP_LENGTH;
+
+    VkDescriptorPoolCreateInfo poolInfo = { 0 };
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 3;
+    poolInfo.pPoolSizes = poolSizes;
+    poolInfo.maxSets = CPUSWAP_LENGTH;
+    result = vkCreateDescriptorPool(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &poolInfo, NULL, &(descriptors->pool));
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create descriptor pool!");
+        return FALSE;
+    }
+
+    // create descriptor sets
+    VkDescriptorSetLayout layouts[CPUSWAP_LENGTH];
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) layouts[i] = descriptors->layout;
+    VkDescriptorSetAllocateInfo allocInfo = { 0 };
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptors->pool;
+    allocInfo.descriptorSetCount = CPUSWAP_LENGTH;
+    allocInfo.pSetLayouts = layouts;
+    result = vkAllocateDescriptorSets(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &allocInfo, descriptors->sets);
+    if (result != VK_SUCCESS) {
+        LOG_FATAL("Failed to create descriptor sets!");
+        return FALSE;
+    }
+
+    VUPDT_ComputeDescriptorSets(descriptors);
+    return TRUE;
+}
+
 BOOL VINIT_Attachments(VulkanAttachments* attachments) {
     // create target
     VUTIL_CreateImage(
@@ -489,6 +569,64 @@ BOOL VINIT_Bridge(VulkanDataBuffer* bridge) {
     return TRUE;
 }
 
+BOOL VINIT_Raytracer(VulkanRaytracer* raytracer) {
+    // initialize ssbos
+    uint32_t imgw = (uint32_t)g_vinit_renderer_ref->dimensions.x;
+    uint32_t imgh = (uint32_t)g_vinit_renderer_ref->dimensions.y;
+    RayGenerator* raygens = EZALLOC(imgw * imgh, sizeof(RayGenerator));
+    for (uint32_t x = 0; x < imgw; x++) {
+        for (uint32_t y = 0; y < imgh; y++) {
+            raygens[y*imgh + x].x = x;
+            raygens[y*imgh + x].y = y;
+        }
+    }
+
+    VkDeviceSize bufferSize = sizeof(RayGenerator) * imgw * imgh;
+    VulkanDataBuffer stagingBuffer;
+    VUTIL_CreateBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &stagingBuffer);
+    void* data;
+    vkMapMemory(g_vinit_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory, 0, bufferSize, 0, &data);
+    memcpy(data, raygens, (size_t)bufferSize);
+    vkUnmapMemory(g_vinit_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory);
+
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUTIL_CreateBuffer(
+            bufferSize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &(raytracer->ssbos[i]));
+        VUTIL_CopyBuffer(stagingBuffer.buffer, raytracer->ssbos[i].buffer, bufferSize);
+    }
+
+    vkDestroyBuffer(g_vinit_renderer_ref->vulkan.core.general.interface, stagingBuffer.buffer, NULL);
+    vkFreeMemory(g_vinit_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory, NULL);
+    EZFREE(raygens);
+
+    // initialize targets
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUTIL_CreateImage(
+            g_vinit_renderer_ref->dimensions.x,
+            g_vinit_renderer_ref->dimensions.y,
+            1,
+            VK_SAMPLE_COUNT_1_BIT,
+            IMAGE_FORMAT,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            &(raytracer->targets[i]));
+    }
+
+    // initialize descriptors
+    VINIT_ComputeDescriptors(&(raytracer->descriptors));
+
+    return TRUE;
+}
+
 BOOL VINIT_RenderContext(VulkanRenderContext* context) {
     context->samples = VUTIL_GetMaximumSampleCount();
 	if (!VINIT_Attachments(&(context->attachments))) return FALSE;
@@ -496,6 +634,7 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context) {
 	if (!VINIT_RenderData(&(context->renderdata))) return FALSE;
 	if (!VINIT_Framebuffers(&(context->framebuffer))) return FALSE;
 	if (!VINIT_Pipeline(&(context->pipeline))) return FALSE;
+	if (!VINIT_Raytracer(&(context->raytracer))) return FALSE;
     return TRUE;
 }
 

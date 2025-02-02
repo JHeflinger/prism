@@ -120,6 +120,55 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = MAX_TEXTURES;
         descriptorWrites[1].pImageInfo = imageInfos;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 2, descriptorWrites, 0, NULL);
+    }
+}
+
+void VUPDT_ComputeDescriptorSets(VulkanDescriptors* descriptors) {
+    uint32_t imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
+    uint32_t imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VkDescriptorBufferInfo bufferInfo = { 0 };
+        bufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ubos.objects[i].buffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(UniformBufferObject);
+
+        VkDescriptorBufferInfo storageBufferInfo = { 0 };
+        storageBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.raytracer.ssbos[i].buffer;
+        storageBufferInfo.offset = 0;
+        storageBufferInfo.range = sizeof(RayGenerator) * imgw * imgh;
+
+        VkDescriptorImageInfo imageInfo = { 0 };
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: change this so we can write to it
+        imageInfo.imageView = g_vupdt_renderer_ref->vulkan.core.context.raytracer.targets[i].view;
+
+        VkWriteDescriptorSet descriptorWrites[3] = { 0 };
+
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = descriptors->sets[i];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = descriptors->sets[i];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pBufferInfo = &storageBufferInfo;
+
+        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = descriptors->sets[i];
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pImageInfo = &imageInfo;
+
         vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 2, descriptorWrites, 0, NULL);
     }
 }
