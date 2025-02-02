@@ -14,8 +14,9 @@
 #define LOG_PURPLE "\033[35m"
 #define LOG_CYAN "\033[36m"
 
+#define LOG_TRACE(...) {printf(__VA_ARGS__); printf("\n");}
 #define LOG_INFO(...)  {printf("%s[INFO]%s  ", LOG_GREEN, LOG_RESET);  printf(__VA_ARGS__); printf("\n");}
-#define LOG_FATAL(...) {printf("%s[FATAL]%s ", LOG_RED, LOG_RESET);    printf(__VA_ARGS__); printf("\n"); exit(1);}
+#define LOG_FATAL(...) {printf("%s[FATAL]%s Critical failure in %s:%d - \"", LOG_RED, LOG_RESET, __FILE__, __LINE__); printf(__VA_ARGS__); printf("\"\n"); exit(1);}
 #define LOG_WARN(...)  {printf("%s[WARN]%s  ", LOG_YELLOW, LOG_RESET); printf(__VA_ARGS__); printf("\n");}
 #define LOG_DEBUG(...) {printf("%s[DEBUG]%s ", LOG_BLUE, LOG_RESET);   printf(__VA_ARGS__); printf("\n");}
 #define LOG_CUSTOM(precursor, ...) {printf("%s[%s]%s  ", LOG_CYAN, precursor, LOG_RESET);   printf(__VA_ARGS__); printf("\n");}
@@ -24,6 +25,7 @@
 
 #else
 
+#define LOG_TRACE(...) ((void) 0)
 #define LOG_INFO(...) ((void) 0)
 #define LOG_FATAL(...) ((void) 0)
 #define LOG_WARN(...) ((void) 0)

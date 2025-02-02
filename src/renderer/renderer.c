@@ -14,167 +14,6 @@ Renderer g_renderer = { 0 };
 TextureID g_texture_id = 0;
 TriangleID g_triangle_id = 0;
 
-void InitializeVulkanData() {
-    // set up validation layers
-    ARRLIST_StaticString_add(&(g_renderer.vulkan.metadata.validation), "VK_LAYER_KHRONOS_validation");
-
-    // set up required extensions
-    uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    for (size_t i = 0; i < glfwExtensionCount; i++)
-        ARRLIST_StaticString_add(&(g_renderer.vulkan.metadata.extensions.required), glfwExtensions[i]);
-    if (ENABLE_VK_VALIDATION_LAYERS) {
-        ARRLIST_StaticString_add(&(g_renderer.vulkan.metadata.extensions.required), VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    }
-
-    // set up device extensions
-    ARRLIST_StaticString_add(&(g_renderer.vulkan.metadata.extensions.device), VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
-    // default gpu to null
-    g_renderer.vulkan.core.general.gpu = VK_NULL_HANDLE;
-}
-
-void CreateVulkanInstance() {
-    // error check for validation layer support
-    LOG_ASSERT(ENABLE_VK_VALIDATION_LAYERS && VUTIL_CheckValidationLayerSupport(), "Requested validation layers are not available");
-
-    // create app info (technically optional)
-    VkApplicationInfo appInfo = { 0 };
-    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Prism Renderer";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.pEngineName = "No Engine";
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
-
-    // create info
-    VkInstanceCreateInfo createInfo = { 0 };
-    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    createInfo.pApplicationInfo = &appInfo;
-    createInfo.enabledExtensionCount = (uint32_t)(g_renderer.vulkan.metadata.extensions.required.size);
-    createInfo.ppEnabledExtensionNames = g_renderer.vulkan.metadata.extensions.required.data;
-    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = { 0 };
-    if (ENABLE_VK_VALIDATION_LAYERS) {
-        createInfo.enabledLayerCount = g_renderer.vulkan.metadata.validation.size;
-        createInfo.ppEnabledLayerNames = g_renderer.vulkan.metadata.validation.data;
-
-        // set up additional debug callback for the creation of the instance
-        debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        debugCreateInfo.pfnUserCallback = VUTIL_VulkanDebugCallback;
-        createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
-    } else {
-        createInfo.enabledLayerCount = 0;
-    }
-
-    // create instance
-    VkResult result = vkCreateInstance(&createInfo, NULL, &(g_renderer.vulkan.core.general.instance));
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create vulkan instance");
-}
-
-void SetupVulkanMessenger() {
-    if (!ENABLE_VK_VALIDATION_LAYERS) return;
-    VkDebugUtilsMessengerCreateInfoEXT createInfo = { 0 };
-    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    createInfo.pfnUserCallback = VUTIL_VulkanDebugCallback;
-    createInfo.pUserData = NULL;
-    PFN_vkCreateDebugUtilsMessengerEXT messenger_extension = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(g_renderer.vulkan.core.general.instance, "vkCreateDebugUtilsMessengerEXT");
-    LOG_ASSERT(messenger_extension != NULL, "Failed to set up debug messenger");
-    messenger_extension(g_renderer.vulkan.core.general.instance, &createInfo, NULL, &(g_renderer.vulkan.core.general.messenger));
-}
-
-void PickGPU() {
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(g_renderer.vulkan.core.general.instance, &deviceCount, NULL);
-    LOG_ASSERT(deviceCount != 0, "No devices with vulkan support were found");
-    VkPhysicalDevice* devices = EZALLOC(deviceCount, sizeof(VkPhysicalDevice));
-    vkEnumeratePhysicalDevices(g_renderer.vulkan.core.general.instance, &deviceCount, devices);
-    uint32_t score = 0;
-    uint32_t ind = 0;
-    for (uint32_t i = 0; i < deviceCount; i++) {
-        // check if device is suitable
-        VulkanFamilyGroup families = VUTIL_FindQueueFamilies(devices[i]);
-        if (!families.graphics.exists) continue;
-        if (!VUTIL_CheckGPUExtensionSupport(devices[i])) continue;
-
-        uint32_t curr_score = 0;
-        VkPhysicalDeviceProperties deviceProperties;
-        VkPhysicalDeviceFeatures deviceFeatures;
-        vkGetPhysicalDeviceProperties(devices[i], &deviceProperties);
-        vkGetPhysicalDeviceFeatures(devices[i], &deviceFeatures);
-        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) curr_score += 1000;
-        curr_score += deviceProperties.limits.maxImageDimension2D;
-        if (!deviceFeatures.geometryShader) curr_score = 0;
-        if (!deviceFeatures.samplerAnisotropy) curr_score = 0;
-        if (curr_score > score) {
-            score = curr_score;
-            ind = i;
-        }
-    }
-    LOG_ASSERT(score != 0, "A suitable GPU could not be found");
-    g_renderer.vulkan.core.general.gpu = devices[ind];
-    g_renderer.vulkan.core.context.samples = VUTIL_GetMaximumSampleCount();
-    EZFREE(devices);
-}
-
-void CreateDeviceInterface() {
-    VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
-    VkDeviceQueueCreateInfo queueCreateInfo = { 0 };
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = families.graphics.value;
-    queueCreateInfo.queueCount = 1;
-    float queuePriority = 1.0f;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
-    VkPhysicalDeviceFeatures deviceFeatures = { 0 };
-    deviceFeatures.samplerAnisotropy = VK_TRUE;
-    deviceFeatures.sampleRateShading = VK_TRUE;
-    VkDeviceCreateInfo createInfo = { 0 };
-    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pQueueCreateInfos = &queueCreateInfo;
-    createInfo.queueCreateInfoCount = 1;
-    createInfo.pEnabledFeatures = &deviceFeatures;
-    createInfo.enabledExtensionCount = g_renderer.vulkan.metadata.extensions.device.size;
-    createInfo.ppEnabledExtensionNames  = g_renderer.vulkan.metadata.extensions.device.data;
-    if (ENABLE_VK_VALIDATION_LAYERS) {
-        createInfo.enabledLayerCount = g_renderer.vulkan.metadata.validation.size;
-        createInfo.ppEnabledLayerNames = g_renderer.vulkan.metadata.validation.data;
-    } else {
-        createInfo.enabledLayerCount = 0;
-    }
-    VkResult result = vkCreateDevice(g_renderer.vulkan.core.general.gpu, &createInfo, NULL, &(g_renderer.vulkan.core.general.interface));
-    LOG_ASSERT(result == VK_SUCCESS, "failed to create logical device");
-    vkGetDeviceQueue(g_renderer.vulkan.core.general.interface, families.graphics.value, 0, &(g_renderer.vulkan.core.scheduler.queue));
-}
-
-void CreateDestinationImage() {
-    // create image
-    VUTIL_CreateImage(
-        g_renderer.dimensions.x,
-        g_renderer.dimensions.y,
-        1,
-        VK_SAMPLE_COUNT_1_BIT,
-        IMAGE_FORMAT,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        &(g_renderer.vulkan.core.context.attachments.target));
-
-    // create cross buffer
-    VUTIL_CreateBuffer(
-        g_renderer.dimensions.x * g_renderer.dimensions.y * 4, // Assuming VK_FORMAT_B8G8R8A8_SRGB
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-        &(g_renderer.vulkan.core.bridge));
-
-    // map memory to buffer
-    vkMapMemory(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.bridge.memory, 0, VK_WHOLE_SIZE, 0, &(g_renderer.swapchain.reference));
-}
-
 void CreatePipeline() {
 	SimpleFile* vertshadercode = ReadFile("build/shaders/shader.vert.spv");
 	SimpleFile* fragshadercode = ReadFile("build/shaders/shader.frag.spv");
@@ -327,78 +166,6 @@ void CreatePipeline() {
 	vkDestroyShaderModule(g_renderer.vulkan.core.general.interface, compshader, NULL);
 }
 
-void CreateRenderPass() {
-    VkAttachmentDescription colorAttachment = { 0 };
-    colorAttachment.format = IMAGE_FORMAT;
-    colorAttachment.samples = g_renderer.vulkan.core.context.samples;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference colorAttachmentRef = { 0 };
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentDescription depthAttachment = { 0 };
-    depthAttachment.format = VUTIL_FindDepthFormat();
-    depthAttachment.samples = g_renderer.vulkan.core.context.samples;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef = { 0 };
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentDescription colorAttachmentResolve = { 0 };
-    colorAttachmentResolve.format = IMAGE_FORMAT;
-    colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-
-    VkAttachmentReference colorAttachmentResolveRef = { 0 };
-    colorAttachmentResolveRef.attachment = 2;
-    colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass = { 0 };
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-    subpass.pResolveAttachments = &colorAttachmentResolveRef;
-
-    VkSubpassDependency dependency = { 0 };
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    VkAttachmentDescription attachments[] = { colorAttachment, depthAttachment, colorAttachmentResolve };
-    VkRenderPassCreateInfo renderPassInfo = { 0 };
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 3;
-    renderPassInfo.pAttachments = attachments;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    VkResult result = vkCreateRenderPass(g_renderer.vulkan.core.general.interface, &renderPassInfo, NULL, &(g_renderer.vulkan.core.context.renderpass));
-    LOG_ASSERT(result == VK_SUCCESS, "Unable to create render pass");
-}
-
 void CreateFramebuffers() {
     VkImageView attachments[] = { g_renderer.vulkan.core.context.attachments.color.view, g_renderer.vulkan.core.context.attachments.depth.view, g_renderer.vulkan.core.context.attachments.target.view };
     VkFramebufferCreateInfo framebufferInfo = { 0 };
@@ -411,26 +178,6 @@ void CreateFramebuffers() {
     framebufferInfo.layers = 1;
     VkResult result = vkCreateFramebuffer(g_renderer.vulkan.core.general.interface, &framebufferInfo, NULL, &(g_renderer.vulkan.core.context.framebuffer));
     LOG_ASSERT(result == VK_SUCCESS, "Unable to create framebuffer");
-}
-
-void CreateCommandPool() {
-    VulkanFamilyGroup queueFamilyIndices = VUTIL_FindQueueFamilies(g_renderer.vulkan.core.general.gpu);
-    VkCommandPoolCreateInfo poolInfo = { 0 };
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    poolInfo.queueFamilyIndex = queueFamilyIndices.graphics.value;
-    VkResult result = vkCreateCommandPool(g_renderer.vulkan.core.general.interface, &poolInfo, NULL, &(g_renderer.vulkan.core.scheduler.commands.pool));
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create command pool!");
-}
-
-void CreateCommandBuffers() {
-    VkCommandBufferAllocateInfo allocInfo = { 0 };
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = g_renderer.vulkan.core.scheduler.commands.pool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = CPUSWAP_LENGTH;
-    VkResult result = vkAllocateCommandBuffers(g_renderer.vulkan.core.general.interface, &allocInfo, g_renderer.vulkan.core.scheduler.commands.commands);
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create command buffer");
 }
 
 void RecordCommand(VkCommandBuffer command) {
@@ -508,45 +255,6 @@ void RecordCommand(VkCommandBuffer command) {
     LOG_ASSERT(result == VK_SUCCESS, "Failed to record command buffer!");
 }
 
-void CreateSyncObjects() {
-    for (int i = 0; i < CPUSWAP_LENGTH; i++) {
-        VkFenceCreateInfo fenceInfo = { 0 };
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        if (i != 0) fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-        VkResult result = vkCreateFence(g_renderer.vulkan.core.general.interface, &fenceInfo, NULL, &(g_renderer.vulkan.core.scheduler.syncro.fences[i]));
-        LOG_ASSERT(result == VK_SUCCESS, "Failed to create fence");
-    }
-}
-
-void CreateDepthResources() {
-    VkFormat depthFormat = VUTIL_FindDepthFormat();
-    VUTIL_CreateImage(
-        g_renderer.dimensions.x,
-        g_renderer.dimensions.y,
-        1,
-        g_renderer.vulkan.core.context.samples,
-        depthFormat,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        VK_IMAGE_ASPECT_DEPTH_BIT,
-        &(g_renderer.vulkan.core.context.attachments.depth));
-}
-
-void CreateColorResources() {
-    VUTIL_CreateImage(
-        g_renderer.dimensions.x,
-        g_renderer.dimensions.y,
-        1,
-        g_renderer.vulkan.core.context.samples,
-        IMAGE_FORMAT,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        &(g_renderer.vulkan.core.context.attachments.color));
-}
-
 void CleanSwapchain() {
     // destroy depth buffer
     vkDestroyImageView(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.context.attachments.depth.view, NULL);
@@ -576,56 +284,8 @@ void RecreateSwapchain() {
     vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
     g_renderer.dimensions = (Vector2){ GetScreenWidth(), GetScreenHeight() };
     CleanSwapchain();
-    CreateDestinationImage();
-    CreateColorResources();
-    CreateDepthResources();
+	VINIT_Attachments(&(g_renderer.vulkan.core.context.attachments));
     CreateFramebuffers();
-}
-
-void UpdateVertexBuffer() {
-    if (sizeof(Vertex) * g_renderer.geometry.vertices.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
-        g_renderer.geometry.vertices.data,
-        sizeof(Vertex) * g_renderer.geometry.vertices.size,
-        sizeof(Vertex) * g_renderer.geometry.vertices.maxsize,
-        g_renderer.vulkan.geometry.vertices.buffer);
-}
-
-void CreateVertexBuffer() {
-    VkDeviceSize size = sizeof(Vertex) * g_renderer.geometry.vertices.maxsize;
-
-    if (size == 0) return;
-
-    VUTIL_CreateBuffer(
-        size,
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &(g_renderer.vulkan.geometry.vertices));
-    
-    UpdateVertexBuffer();
-}
-
-void UpdateIndexBuffer() {
-    if (sizeof(Index) * g_renderer.geometry.indices.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
-        g_renderer.geometry.indices.data,
-        sizeof(Index) * g_renderer.geometry.indices.size,
-        sizeof(Index) * g_renderer.geometry.indices.maxsize,
-        g_renderer.vulkan.geometry.indices.buffer);
-}
-
-void CreateIndexBuffer() {
-    VkDeviceSize size = sizeof(Index) * g_renderer.geometry.indices.maxsize;
-
-    if (size == 0) return;
-
-    VUTIL_CreateBuffer(
-        size,
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &(g_renderer.vulkan.geometry.indices));
-    
-    UpdateIndexBuffer();
 }
 
 void CreateDescriptorSetLayout() {
@@ -807,27 +467,12 @@ void DestroyVulkan() {
 }
 
 void InitializeVulkan() {
-    VUTIL_SetVulkanUtilsContext(&g_renderer);
-    InitializeVulkanData();
-    CreateVulkanInstance();
-    SetupVulkanMessenger();
-    PickGPU();
-    CreateDeviceInterface();
-    CreateDestinationImage();
-    CreateRenderPass();
-	CreateDescriptorSetLayout();
-    CreatePipeline();
-    CreateCommandPool();
-    CreateColorResources();
-    CreateDepthResources();
-    CreateFramebuffers();
-    CreateVertexBuffer();
-    CreateIndexBuffer();
     CreateUniformBuffers();
+	CreateDescriptorSetLayout();
     CreateDescriptorPool();
     CreateDescriptorSets();
-    CreateCommandBuffers();
-    CreateSyncObjects();
+    CreatePipeline();
+    CreateFramebuffers();
 }
 
 void InitializeRenderer() {
@@ -840,7 +485,12 @@ void InitializeRenderer() {
     g_renderer.dimensions = (Vector2){ GetScreenWidth(), GetScreenHeight() };
 
     // initialize vulkan resources
-    InitializeVulkan();
+	VUTIL_SetVulkanUtilsContext(&g_renderer);
+	VINIT_SetVulkanInitContext(&g_renderer);
+	VUPDT_SetVulkanUpdateContext(&g_renderer);
+	BOOL result = VINIT_Vulkan(&(g_renderer.vulkan));
+	LOG_ASSERT(result, "Failed to initialize vulkan");
+	InitializeVulkan();
 
     // default texture
     SubmitTexture("assets/images/default.png");
@@ -1050,9 +700,9 @@ void Render() {
             g_renderer.geometry.changes.max_indices = g_renderer.geometry.indices.maxsize;
             vkDestroyBuffer(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.geometry.indices.buffer, NULL);
             vkFreeMemory(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.geometry.indices.memory, NULL);
-            CreateIndexBuffer();
+			VINIT_Indices(&(g_renderer.vulkan.geometry.indices));
         } else {
-            UpdateIndexBuffer();
+			VUPDT_Indices(&(g_renderer.vulkan.geometry.indices));
         }
     }
     if (g_renderer.geometry.changes.update_vertices) {
@@ -1062,9 +712,9 @@ void Render() {
             g_renderer.geometry.changes.max_vertices = g_renderer.geometry.vertices.maxsize;
             vkDestroyBuffer(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.geometry.vertices.buffer, NULL);
             vkFreeMemory(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.geometry.vertices.memory, NULL);
-            CreateVertexBuffer();
+			VINIT_Vertices(&(g_renderer.vulkan.geometry.vertices));
         } else {
-            UpdateVertexBuffer();
+			VUPDT_Vertices(&(g_renderer.vulkan.geometry.vertices));
         }
     }
 

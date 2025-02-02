@@ -1,10 +1,10 @@
 #include "vutils.h"
 #include "core/log.h"
 
-Renderer* g_renderer_ref = NULL;
+Renderer* g_vutil_renderer_ref = NULL;
 
 void VUTIL_SetVulkanUtilsContext(Renderer* renderer) {
-    g_renderer_ref = renderer;
+    g_vutil_renderer_ref = renderer;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VUTIL_VulkanDebugCallback(
@@ -21,12 +21,13 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VUTIL_VulkanDebugCallback(
             LOG_RESET,
             pCallbackData->pMessage);
     } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        LOG_FATAL("%s[VULKAN] [%s]%s %s",
+        LOG_TRACE("%s[FATAL] [VULKAN] [%s]%s %s",
             LOG_RED,
             (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ? "GENERAL" :
                 (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ? "VALIDATION" : "PERFORMANCE")),
             LOG_RESET,
             pCallbackData->pMessage);
+		exit(1);
     }
 
     return VK_FALSE;
@@ -40,10 +41,10 @@ BOOL VUTIL_CheckValidationLayerSupport() {
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers);
 
     // check if layers in validation layers exist in the available layers
-    for (size_t i = 0; i < g_renderer_ref->vulkan.metadata.validation.size; i++) {
+    for (size_t i = 0; i < g_vutil_renderer_ref->vulkan.metadata.validation.size; i++) {
         BOOL layerFound = FALSE;
         for (size_t j = 0; j < layerCount; j++) {
-            if (strcmp(ARRLIST_StaticString_get(&(g_renderer_ref->vulkan.metadata.validation), i), availableLayers[j].layerName) == 0) {
+            if (strcmp(ARRLIST_StaticString_get(&(g_vutil_renderer_ref->vulkan.metadata.validation), i), availableLayers[j].layerName) == 0) {
                 layerFound = TRUE;
                 break;
             }
@@ -62,10 +63,10 @@ BOOL VUTIL_CheckGPUExtensionSupport(VkPhysicalDevice device) {
     vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, NULL);
     VkExtensionProperties* availableExtensions = EZALLOC(extensionCount, sizeof(VkExtensionProperties));
     vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, availableExtensions);
-    for (size_t i = 0; i < g_renderer_ref->vulkan.metadata.extensions.device.size; i++) {
+    for (size_t i = 0; i < g_vutil_renderer_ref->vulkan.metadata.extensions.device.size; i++) {
         BOOL extensionFound = FALSE;
         for (size_t j = 0; j < extensionCount; j++) {
-            if (strcmp(ARRLIST_StaticString_get(&(g_renderer_ref->vulkan.metadata.extensions.device), i), availableExtensions[j].extensionName) == 0) {
+            if (strcmp(ARRLIST_StaticString_get(&(g_vutil_renderer_ref->vulkan.metadata.extensions.device), i), availableExtensions[j].extensionName) == 0) {
                 extensionFound = TRUE;
                 break;
             }
@@ -101,7 +102,7 @@ VkShaderModule VUTIL_CreateShader(SimpleFile* file) {
 	createInfo.codeSize = file->size;
 	createInfo.pCode = (const uint32_t*)(file->data);
 	VkShaderModule shader;
-	VkResult result = vkCreateShaderModule(g_renderer_ref->vulkan.core.general.interface, &createInfo, NULL, &shader);
+	VkResult result = vkCreateShaderModule(g_vutil_renderer_ref->vulkan.core.general.interface, &createInfo, NULL, &shader);
 	LOG_ASSERT(result == VK_SUCCESS, "Failed to create shader module");
 	return shader;
 }
@@ -114,16 +115,16 @@ void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &stagingBuffer);
     void* data;
-    vkMapMemory(g_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory, 0, buffersize, 0, &data);
+    vkMapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory, 0, buffersize, 0, &data);
     memcpy(data, hostdata, size);
-    vkUnmapMemory(g_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory);
+    vkUnmapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory);
     VUTIL_CopyBuffer(stagingBuffer.buffer, buffer, buffersize);
     VUTIL_DestroyBuffer(stagingBuffer);
 }
 
 void VUTIL_GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) {
     VkFormatProperties formatProperties;
-    vkGetPhysicalDeviceFormatProperties(g_renderer_ref->vulkan.core.general.gpu, imageFormat, &formatProperties);
+    vkGetPhysicalDeviceFormatProperties(g_vutil_renderer_ref->vulkan.core.general.gpu, imageFormat, &formatProperties);
     LOG_ASSERT(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT, "Texture format does not support linear filtering!");
 
     VkCommandBuffer commandBuffer = VUTIL_BeginSingleTimeCommands();
@@ -238,7 +239,7 @@ QUAD_VkVertexInputAttributeDescription VUTIL_VertexAttributeDescriptions() {
 Schrodingnum VUTIL_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     Schrodingnum result = { 0 };
     VkPhysicalDeviceMemoryProperties memProperties = { 0 };
-    vkGetPhysicalDeviceMemoryProperties(g_renderer_ref->vulkan.core.general.gpu, &memProperties);
+    vkGetPhysicalDeviceMemoryProperties(g_vutil_renderer_ref->vulkan.core.general.gpu, &memProperties);
     for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
         if ((typeFilter & (1 << i)) &&
             (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
@@ -254,10 +255,10 @@ VkCommandBuffer VUTIL_BeginSingleTimeCommands() {
     VkCommandBufferAllocateInfo allocInfo = { 0 };
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = g_renderer_ref->vulkan.core.scheduler.commands.pool;
+    allocInfo.commandPool = g_vutil_renderer_ref->vulkan.core.scheduler.commands.pool;
     allocInfo.commandBufferCount = 1;
     VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(g_renderer_ref->vulkan.core.general.interface, &allocInfo, &commandBuffer);
+    vkAllocateCommandBuffers(g_vutil_renderer_ref->vulkan.core.general.interface, &allocInfo, &commandBuffer);
     VkCommandBufferBeginInfo beginInfo = { 0 };
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -276,7 +277,7 @@ VkFormat VUTIL_FindSupportedFormat(
     VkFormatFeatureFlags features) {
     for (size_t i = 0; i < num_candidates; i++) {
         VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties(g_renderer_ref->vulkan.core.general.gpu, candidates[i], &props);
+        vkGetPhysicalDeviceFormatProperties(g_vutil_renderer_ref->vulkan.core.general.gpu, candidates[i], &props);
         if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
             return candidates[i];
         } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
@@ -302,9 +303,9 @@ void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
-    vkQueueSubmit(g_renderer_ref->vulkan.core.scheduler.queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(g_renderer_ref->vulkan.core.scheduler.queue);
-    vkFreeCommandBuffers(g_renderer_ref->vulkan.core.general.interface, g_renderer_ref->vulkan.core.scheduler.commands.pool, 1, &commandBuffer);
+    vkQueueSubmit(g_vutil_renderer_ref->vulkan.core.scheduler.queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(g_vutil_renderer_ref->vulkan.core.scheduler.queue);
+    vkFreeCommandBuffers(g_vutil_renderer_ref->vulkan.core.general.interface, g_vutil_renderer_ref->vulkan.core.scheduler.commands.pool, 1, &commandBuffer);
 }
 
 void VUTIL_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
@@ -389,26 +390,26 @@ void VUTIL_CreateBuffer(
     bufferInfo.size = size;
     bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VkResult result = vkCreateBuffer(g_renderer_ref->vulkan.core.general.interface, &bufferInfo, NULL, &(buffer->buffer));
+    VkResult result = vkCreateBuffer(g_vutil_renderer_ref->vulkan.core.general.interface, &bufferInfo, NULL, &(buffer->buffer));
     LOG_ASSERT(result == VK_SUCCESS, "Unable to create buffer");
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(g_renderer_ref->vulkan.core.general.interface, buffer->buffer, &memRequirements);
+    vkGetBufferMemoryRequirements(g_vutil_renderer_ref->vulkan.core.general.interface, buffer->buffer, &memRequirements);
     VkMemoryAllocateInfo allocInfo = { 0 };
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     Schrodingnum memoryType = VUTIL_FindMemoryType(memRequirements.memoryTypeBits, properties);
     LOG_ASSERT(memoryType.exists, "Unable to find memory for vertex buffer");
     allocInfo.memoryTypeIndex = memoryType.value;
-    result = vkAllocateMemory(g_renderer_ref->vulkan.core.general.interface, &allocInfo, NULL, &(buffer->memory));
+    result = vkAllocateMemory(g_vutil_renderer_ref->vulkan.core.general.interface, &allocInfo, NULL, &(buffer->memory));
     LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate memory for buffer");
 
-    vkBindBufferMemory(g_renderer_ref->vulkan.core.general.interface, buffer->buffer, buffer->memory, 0);
+    vkBindBufferMemory(g_vutil_renderer_ref->vulkan.core.general.interface, buffer->buffer, buffer->memory, 0);
 }
 
 void VUTIL_DestroyBuffer(VulkanDataBuffer buffer) {
-    vkDestroyBuffer(g_renderer_ref->vulkan.core.general.interface, buffer.buffer, NULL);
-    vkFreeMemory(g_renderer_ref->vulkan.core.general.interface, buffer.memory, NULL);
+    vkDestroyBuffer(g_vutil_renderer_ref->vulkan.core.general.interface, buffer.buffer, NULL);
+    vkFreeMemory(g_vutil_renderer_ref->vulkan.core.general.interface, buffer.memory, NULL);
 }
 
 void VUTIL_CreateImage(
@@ -436,11 +437,11 @@ void VUTIL_CreateImage(
     imageInfo.usage = usage;
     imageInfo.samples = numSamples;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VkResult result = vkCreateImage(g_renderer_ref->vulkan.core.general.interface, &imageInfo, NULL, &(image->image));
+    VkResult result = vkCreateImage(g_vutil_renderer_ref->vulkan.core.general.interface, &imageInfo, NULL, &(image->image));
     LOG_ASSERT(result == VK_SUCCESS, "Failed to create image!");
 
     VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(g_renderer_ref->vulkan.core.general.interface, image->image, &memRequirements);
+    vkGetImageMemoryRequirements(g_vutil_renderer_ref->vulkan.core.general.interface, image->image, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo = { 0 };
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -448,10 +449,10 @@ void VUTIL_CreateImage(
     Schrodingnum memoryType = VUTIL_FindMemoryType(memRequirements.memoryTypeBits, properties);
     LOG_ASSERT(memoryType.exists, "Unable to find valid memory type");
     allocInfo.memoryTypeIndex = memoryType.value;
-    result = vkAllocateMemory(g_renderer_ref->vulkan.core.general.interface, &allocInfo, NULL, &(image->memory));
+    result = vkAllocateMemory(g_vutil_renderer_ref->vulkan.core.general.interface, &allocInfo, NULL, &(image->memory));
     LOG_ASSERT(result == VK_SUCCESS, "Failed to allocate image memory!");
 
-    vkBindImageMemory(g_renderer_ref->vulkan.core.general.interface, image->image, image->memory, 0);
+    vkBindImageMemory(g_vutil_renderer_ref->vulkan.core.general.interface, image->image, image->memory, 0);
     
     VkImageViewCreateInfo viewInfo = { 0 };
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -464,13 +465,13 @@ void VUTIL_CreateImage(
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    result = vkCreateImageView(g_renderer_ref->vulkan.core.general.interface, &viewInfo, NULL, &(image->view));
+    result = vkCreateImageView(g_vutil_renderer_ref->vulkan.core.general.interface, &viewInfo, NULL, &(image->view));
     LOG_ASSERT(result == VK_SUCCESS, "failed to create texture image view!");
 }
 
 VkSampleCountFlagBits VUTIL_GetMaximumSampleCount() {
     VkPhysicalDeviceProperties physicalDeviceProperties;
-    vkGetPhysicalDeviceProperties(g_renderer_ref->vulkan.core.general.gpu, &physicalDeviceProperties);
+    vkGetPhysicalDeviceProperties(g_vutil_renderer_ref->vulkan.core.general.gpu, &physicalDeviceProperties);
 
     VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
     if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }

@@ -44,6 +44,6 @@ BOOL VINIT_Core(VulkanCore* core);
 
 BOOL VINIT_Vulkan(VulkanObject* vulkan);
 
-BOOL VINIT_RendererReference(Renderer* renderer);
+void VINIT_SetVulkanInitContext(Renderer* renderer);
 
 #endif
