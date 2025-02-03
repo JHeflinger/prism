@@ -13,6 +13,7 @@ void DrawViewportPanel(float width, float height) {
     SimpleCamera camera = GetCamera();
     camera.position.x = 3.0f * cos(time);
     camera.position.y = 3.0f * sin(time);
+	camera.fov = 90.0f;
     MoveCamera(camera);
     Render();
     Draw(0, 0, width, height);

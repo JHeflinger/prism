@@ -240,6 +240,12 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         g_vupdt_renderer_ref->dimensions.x / g_vupdt_renderer_ref->dimensions.y,
         0.1f, 10.0f, ubo.projection);
     ubo.projection[1][1] *= -1;
+	RV_TO_GV(ubo.position, g_vupdt_renderer_ref->camera.position);
+	RV_TO_GV(ubo.look, g_vupdt_renderer_ref->camera.look);
+	RV_TO_GV(ubo.up, g_vupdt_renderer_ref->camera.up);
+	ubo.fov = g_vupdt_renderer_ref->camera.fov;
+	ubo.width = g_vupdt_renderer_ref->dimensions.x;
+	ubo.height = g_vupdt_renderer_ref->dimensions.y;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
 }
 

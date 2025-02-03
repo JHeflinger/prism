@@ -19,6 +19,8 @@
  * - Condense all buffers into one and use offsets to increase cache performance
 */
 
+#define RV_TO_GV(gv, rv) { gv[0] = rv.x; gv[1] = rv.y; gv[2] = rv.z; }
+
 DECLARE_QUAD(VkVertexInputAttributeDescription);
 
 typedef const char* StaticString;
@@ -73,6 +75,12 @@ typedef struct {
 	mat4 model;
 	mat4 view;
 	mat4 projection;
+	vec3 look;
+	vec3 position;
+	vec3 up;
+	float fov;
+	float width;
+	float height;
 } UniformBufferObject;
 
 typedef struct {

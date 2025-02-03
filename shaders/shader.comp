@@ -4,6 +4,12 @@ layout(binding = 0) uniform UniformBufferObject {
 	mat4 model;
 	mat4 view;
 	mat4 projection;
+	vec3 look;
+	vec3 position;
+	vec3 up;
+	float fov;
+	float width;
+	float height;
 } ubo;
 
 struct RayGenerator {
@@ -21,8 +27,23 @@ layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 
 void main() 
 {
+	// get ray generator
     uint index= gl_GlobalInvocationID.x;
     RayGenerator rgIn = raygenIn[index];
+
+	// create ray
+	float r = ubo.width / 2.0;
+	float b = ubo.height / 2.0;
+	float l = -1.0 * r;
+	float t = -1.0 * b;
+    float u = l + ((r - l) * (float(rgIn.x) + 0.5)) / ubo.width;
+    float v = b + ((t - b) * (float(rgIn.y) + 0.5)) / ubo.height;
+	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
+	//vec3 s = ubo.position;
+    //Vector3 s = camera.PositionVector() + (camera.u() * u) + (camera.v() * v) - (camera.w() * d);
+    //return Ray(camera.PositionVector(), s - camera.PositionVector(), 1.0f);
+
+	// color in pixel
     ivec2 pixel = ivec2(rgIn.x, rgIn.y);
     vec4 color = vec4(rgIn.x / 1600.0, rgIn.y / 900.0, 1.0, 1.0);
     imageStore(outputImage, pixel, color);

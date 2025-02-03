@@ -16,6 +16,7 @@ typedef struct {
     Vector3 position;
     Vector3 look;
     Vector3 up;
+	float fov;
 } SimpleCamera;
 
 typedef struct {
