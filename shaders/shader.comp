@@ -11,7 +11,7 @@ struct RayGenerator {
     uint y;
 };
 
-layout(std140, binding = 1) readonly buffer RayGeneratorSSBOIn {
+layout(binding = 1) readonly buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
 
@@ -24,6 +24,6 @@ void main()
     uint index= gl_GlobalInvocationID.x;
     RayGenerator rgIn = raygenIn[index];
     ivec2 pixel = ivec2(rgIn.x, rgIn.y);
-    vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
+    vec4 color = vec4(rgIn.x / 1600.0, rgIn.y / 900.0, 1.0, 1.0);
     imageStore(outputImage, pixel, color);
 }

@@ -8,6 +8,7 @@
 #include <easymemory.h>
 #include <string.h>
 #include <stb_image.h>
+#include <stb_image_write.h>
 #include <math.h>
 
 Renderer g_renderer = { 0 };
