@@ -241,15 +241,12 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         0.1f, 10.0f, ubo.projection);
     ubo.projection[1][1] *= -1;
 	RV_TO_GV(ubo.position, g_vupdt_renderer_ref->camera.position);
-    Vector3 rl_look = (Vector3){
-        g_vupdt_renderer_ref->camera.look.x - g_vupdt_renderer_ref->camera.position.x,
-        g_vupdt_renderer_ref->camera.look.y - g_vupdt_renderer_ref->camera.position.y,
-        g_vupdt_renderer_ref->camera.look.z - g_vupdt_renderer_ref->camera.position.z};
-	RV_TO_GV(ubo.look, rl_look);
+	RV_TO_GV(ubo.look, g_vupdt_renderer_ref->camera.look);
+    glm_vec3_sub(ubo.look, ubo.position, ubo.look);
 	RV_TO_GV(ubo.up, g_vupdt_renderer_ref->camera.up);
     glm_vec3_normalize(ubo.up);
     glm_vec3_normalize(ubo.look);
-    glm_vec3_scale(ubo.look, -1.0f, ubo.w);
+    glm_vec3_negate_to(ubo.look, ubo.w);
     glm_vec3_crossn(ubo.up, ubo.w, ubo.u);
     glm_vec3_crossn(ubo.w, ubo.u, ubo.v);
 	ubo.camconf[0] = glm_rad(g_vupdt_renderer_ref->camera.fov); // fov
