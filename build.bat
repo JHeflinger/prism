@@ -87,8 +87,8 @@ set LIBS=!LIBS! -L"platform/windows/vulkan/libs"
 set LINKS=!LINKS! -lvulkan-1
 
 :: add glfw vendor
-set INCLUDES=!INCLUDES! -I"platform/windows/GLFW/include"
-set LIBS=!LIBS! -L"platform/windows/GLFW"
+::set INCLUDES=!INCLUDES! -I"platform/windows/GLFW/include"
+::set LIBS=!LIBS! -L"platform/windows/GLFW"
 set LINKS=!LINKS! -lglfw3
 set LINKS=!LINKS! -lshell32
 set LINKS=!LINKS! -luser32

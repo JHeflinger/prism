@@ -1,9 +1,6 @@
 #version 450
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
-	mat4 model;
-	mat4 view;
-	mat4 projection;
 	vec3 look;
 	vec3 position;
 	vec3 up;
@@ -56,14 +53,38 @@ void main()
     float u = l + ((r - l) * (float(rgIn.x) + 0.5)) / width;
     float v = b + ((t - b) * (float(rgIn.y) + 0.5)) / height;
 	float d = (cos(fov / 2.0) / sin(fov / 2.0)) * r;
-    vec3 s = ubo.position + (ubo.u * u) + (ubo.v * v) - (ubo.w * d);
-    vec3 ray_direction = s - ubo.position;
+    vec3 ray_direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+    vec3 ray_position = ubo.position;
 
     // number of triangles
     uint num_triangles = uint(ubo.sizes.x);
 
+    // triangle intersections
+    float distance = -1.0;
+    for (uint i = 0; i < num_triangles; i++) {
+        Triangle tri = triangleIn[i];
+        vec3 tri_normal = normalize(cross(tri.b - tri.a, tri.c - tri.b));
+        float hit_distance = dot(tri.a - ray_position, tri_normal) / dot(ray_direction, tri_normal);
+        if (hit_distance > 0) {
+            vec3 hit_at = ray_position + (ray_direction * hit_distance);
+            if (dot(cross(tri.b - tri.a, hit_at - tri.a), tri_normal) > 0 &&
+                dot(cross(tri.c - tri.b, hit_at - tri.b), tri_normal) > 0 &&
+                dot(cross(tri.a - tri.c, hit_at - tri.c), tri_normal) > 0) {
+                if (distance == -1.0) {
+                    distance = hit_distance;
+                } else if (hit_distance < distance) {
+                    distance = hit_distance;
+                }
+            }
+        }
+    }
+
 	// color in pixel
     ivec2 pixel = ivec2(rgIn.x, rgIn.y);
     vec4 color = vec4(normalize(abs(ray_direction)), 1.0);
+    if (distance > 0) {
+        float tval = 1.0 - (distance / 6.0);
+        color = vec4(tval, tval, tval, 1.0);
+    }
     imageStore(outputImage, pixel, color);
 }

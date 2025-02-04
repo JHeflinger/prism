@@ -1,101 +1,84 @@
 #include "vclean.h"
 
-void VCLEAN_RaytracerTriangles(VulkanObject* vulkan) {
-    vkDestroyBuffer(vulkan->core.general.interface, vulkan->core.context.raytracer.trianglebuffer.buffer, NULL);
-    vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.raytracer.trianglebuffer.memory, NULL);
+Renderer* g_vlcean_renderer_ref = NULL;
+
+void VCLEAN_Triangles(VulkanDataBuffer* triangles) {
+    vkDestroyBuffer(g_vlcean_renderer_ref->vulkan.core.general.interface, triangles->buffer, NULL);
+    vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, triangles->memory, NULL);
 }
 
-void VCLEAN_DimensionDependant(VulkanObject* vulkan) {
-    // destroy depth buffer
-    vkDestroyImageView(vulkan->core.general.interface, vulkan->core.context.attachments.depth.view, NULL);
-    vkDestroyImage(vulkan->core.general.interface, vulkan->core.context.attachments.depth.image, NULL);
-    vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.attachments.depth.memory, NULL);
+void VCLEAN_Geometry(VulkanGeometry* geometry) {
+    VCLEAN_Triangles(&(geometry->triangles));
+}
 
-    // destroy framebuffer
-    vkDestroyFramebuffer(vulkan->core.general.interface, vulkan->core.context.framebuffer, NULL);
+void VCLEAN_Metadata(VulkanMetadata* metadata) {
+    ARRLIST_StaticString_clear(&(metadata->validation));
+    ARRLIST_StaticString_clear(&(metadata->extensions.required));
+    ARRLIST_StaticString_clear(&(metadata->extensions.device));
+}
 
-    // unmap and destroy cross buffer
-    vkUnmapMemory(vulkan->core.general.interface, vulkan->core.bridge.memory);
-    vkFreeMemory(vulkan->core.general.interface, vulkan->core.bridge.memory, NULL);
-    vkDestroyBuffer(vulkan->core.general.interface, vulkan->core.bridge.buffer, NULL);
+void VCLEAN_General(VulkanGeneral* general) {
+    if (ENABLE_VK_VALIDATION_LAYERS) {
+        PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(general->instance, "vkDestroyDebugUtilsMessengerEXT");
+        if (destroy_messenger != NULL)
+            destroy_messenger(general->instance, general->messenger, NULL);
+    }
+    vkDestroyDevice(general->interface, NULL);
+    vkDestroyInstance(general->instance, NULL);
+}
 
-    // destroy image
-    vkDestroyImageView(vulkan->core.general.interface, vulkan->core.context.attachments.target.view, NULL);
-    vkDestroyImage(vulkan->core.general.interface, vulkan->core.context.attachments.target.image, NULL);
-    vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.attachments.target.memory, NULL);
+void VCLEAN_RenderData(VulkanRenderData* renderdata) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        vkDestroyBuffer(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->ssbos[i].buffer, NULL);
+        vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->ssbos[i].memory, NULL);
+    }
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        vkDestroyBuffer(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->ubos.objects[i].buffer, NULL);
+        vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->ubos.objects[i].memory, NULL);
+    }
+    vkDestroyDescriptorPool(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors.pool, NULL);
+    vkDestroyDescriptorSetLayout(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors.layout, NULL);
+}
 
-    // destroy color image
-    vkDestroyImageView(vulkan->core.general.interface, vulkan->core.context.attachments.color.view, NULL);
-    vkDestroyImage(vulkan->core.general.interface, vulkan->core.context.attachments.color.image, NULL);
-    vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.attachments.color.memory, NULL);
+void VCLEAN_RenderContext(VulkanRenderContext* context) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        vkDestroyImageView(g_vlcean_renderer_ref->vulkan.core.general.interface, context->targets[i].view, NULL);
+        vkDestroyImage(g_vlcean_renderer_ref->vulkan.core.general.interface, context->targets[i].image, NULL);
+        vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, context->targets[i].memory, NULL);
+    }
+
+    VCLEAN_RenderData(&(context->renderdata));
+
+    vkDestroyPipeline(g_vlcean_renderer_ref->vulkan.core.general.interface, context->pipeline.pipeline, NULL);
+    vkDestroyPipelineLayout(g_vlcean_renderer_ref->vulkan.core.general.interface, context->pipeline.layout, NULL);
+}
+
+void VCLEAN_Bridge(VulkanDataBuffer* bridge) {
+    vkUnmapMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, bridge->memory);
+    vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, bridge->memory, NULL);
+    vkDestroyBuffer(g_vlcean_renderer_ref->vulkan.core.general.interface, bridge->buffer, NULL);
+}
+
+void VCLEAN_Scheduler(VulkanScheduler* scheduler) {
+    for (int i = 0; i < CPUSWAP_LENGTH; i++)
+        vkDestroyFence(g_vlcean_renderer_ref->vulkan.core.general.interface, scheduler->syncro.fences[i], NULL);
+    vkDestroyCommandPool(g_vlcean_renderer_ref->vulkan.core.general.interface, scheduler->commands.pool, NULL);
+}
+
+void VCLEAN_Core(VulkanCore* core) {
+    VCLEAN_Bridge(&(core->bridge));
+    VCLEAN_Scheduler(&(core->scheduler));
+    VCLEAN_RenderContext(&(core->context));
+    VCLEAN_General(&(core->general));
 }
 
 void VCLEAN_Vulkan(VulkanObject* vulkan) {
-    // wait for device to finish
-    vkDeviceWaitIdle(vulkan->core.general.interface);
+    vkDeviceWaitIdle(g_vlcean_renderer_ref->vulkan.core.general.interface);
+    VCLEAN_Geometry(&(vulkan->geometry));
+    VCLEAN_Metadata(&(vulkan->metadata));
+    VCLEAN_Core(&(vulkan->core));
+}
 
-    // clean swapchain
-    VCLEAN_DimensionDependant(vulkan);
-
-    // clean raytracer triangles
-    VCLEAN_RaytracerTriangles(vulkan);
-
-    // destroy raytracing targets
-    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        vkDestroyImageView(vulkan->core.general.interface, vulkan->core.context.raytracer.targets[i].view, NULL);
-        vkDestroyImage(vulkan->core.general.interface, vulkan->core.context.raytracer.targets[i].image, NULL);
-        vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.raytracer.targets[i].memory, NULL);
-    }
-
-    // destroy raytracing ssbos
-    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        vkDestroyBuffer(vulkan->core.general.interface, vulkan->core.context.raytracer.ssbos[i].buffer, NULL);
-        vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.raytracer.ssbos[i].memory, NULL);
-    }
-
-    // destroy uniform buffers
-    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        vkDestroyBuffer(vulkan->core.general.interface, vulkan->core.context.renderdata.ubos.objects[i].buffer, NULL);
-        vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.renderdata.ubos.objects[i].memory, NULL);
-    }
-
-    // destroy descriptor pools
-    vkDestroyDescriptorPool(vulkan->core.general.interface, vulkan->core.context.renderdata.descriptors.pool, NULL);
-    vkDestroyDescriptorPool(vulkan->core.general.interface, vulkan->core.context.raytracer.descriptors.pool, NULL);
-
-    // destroy descriptor set layouts
-    vkDestroyDescriptorSetLayout(vulkan->core.general.interface, vulkan->core.context.renderdata.descriptors.layout, NULL);
-    vkDestroyDescriptorSetLayout(vulkan->core.general.interface, vulkan->core.context.raytracer.descriptors.layout, NULL);
-
-    // destroy syncro objects
-    for (int i = 0; i < CPUSWAP_LENGTH; i++)
-        vkDestroyFence(vulkan->core.general.interface, vulkan->core.scheduler.syncro.fences[i], NULL);
-
-    // destroy command pool
-    vkDestroyCommandPool(vulkan->core.general.interface, vulkan->core.scheduler.commands.pool, NULL);
-
-    // destroy pipelines
-    vkDestroyPipeline(vulkan->core.general.interface, vulkan->core.context.pipeline.pipeline, NULL);
-    vkDestroyPipelineLayout(vulkan->core.general.interface, vulkan->core.context.pipeline.layout, NULL);
-    vkDestroyRenderPass(vulkan->core.general.interface, vulkan->core.context.renderpass, NULL);
-    vkDestroyPipeline(vulkan->core.general.interface, vulkan->core.context.raytracer.pipeline.pipeline, NULL);
-    vkDestroyPipelineLayout(vulkan->core.general.interface, vulkan->core.context.raytracer.pipeline.layout, NULL);
-
-    // destroy vulkan device
-    vkDestroyDevice(vulkan->core.general.interface, NULL);
-
-    // destroy debug messenger
-    if (ENABLE_VK_VALIDATION_LAYERS) {
-        PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(vulkan->core.general.instance, "vkDestroyDebugUtilsMessengerEXT");
-        if (destroy_messenger != NULL)
-            destroy_messenger(vulkan->core.general.instance, vulkan->core.general.messenger, NULL);
-    }
-
-    // destroy vulkan instance
-    vkDestroyInstance(vulkan->core.general.instance, NULL);
-
-    // clean required extensions
-    ARRLIST_StaticString_clear(&(vulkan->metadata.validation));
-    ARRLIST_StaticString_clear(&(vulkan->metadata.extensions.required));
-    ARRLIST_StaticString_clear(&(vulkan->metadata.extensions.device));
+void VCLEAN_SetVulkanCleanContext(Renderer* renderer) {
+    g_vlcean_renderer_ref = renderer;
 }

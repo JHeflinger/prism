@@ -2,33 +2,12 @@
 #define VSTRUCTS_H
 
 #include "renderer/rstructs.h"
+#include "renderer/vulkan/vconfig.h"
 #include "data/profile.h"
 #include <vulkan/vulkan.h>
 
-#define CPUSWAP_LENGTH 2
-#define IMAGE_FORMAT VK_FORMAT_R8G8B8A8_SRGB
-#define MAX_TEXTURES 32 // update in fragment shader too if changing this
-
-#ifdef PROD_BUILD
-    #define ENABLE_VK_VALIDATION_LAYERS FALSE
-#else
-    #define ENABLE_VK_VALIDATION_LAYERS TRUE
-#endif
-
-/* Overall TODO:
- * - Condense all buffers into one and use offsets to increase cache performance
-*/
-
-#define RV_TO_GV(gv, rv) { gv[0] = rv.x; gv[1] = rv.y; gv[2] = rv.z; }
-
-DECLARE_QUAD(VkVertexInputAttributeDescription);
-
 typedef const char* StaticString;
 DECLARE_ARRLIST(StaticString);
-
-typedef uint32_t Index; // TODO: may need to make this bigger if we run out of indices
-#define INDEX_VK_TYPE VK_INDEX_TYPE_UINT32
-DECLARE_ARRLIST(Index);
 
 typedef struct {
     uint32_t x;
@@ -40,17 +19,6 @@ typedef struct {
     VkImageView view;
     VkDeviceMemory memory;
 } VulkanImage;
-
-typedef struct {
-    const char* filepath;
-    size_t width;
-    size_t height;
-    uint32_t mip_levels;
-    VulkanImage image;
-    VkSampler sampler;
-    TextureID id;
-} VulkanTexture;
-DECLARE_ARRLIST(VulkanTexture);
 
 typedef struct {
     uint32_t value;
@@ -72,17 +40,14 @@ typedef struct {
 } CPUSwap;
 
 typedef struct {
-    alignas(16) mat4 model;       // 64 bytes
-    alignas(16) mat4 view;        // 64 bytes
-    alignas(16) mat4 projection;  // 64 bytes
-    alignas(16) vec3 look;        // 12 bytes  (+4 bytes padding)
-    alignas(16) vec3 position;    // 12 bytes  (+4 bytes padding)
-    alignas(16) vec3 up;          // 12 bytes  (+4 bytes padding)
-    alignas(16) vec3 u;           // 12 bytes  (+4 bytes padding)
-    alignas(16) vec3 v;           // 12 bytes  (+4 bytes padding)
-    alignas(16) vec3 w;           // 12 bytes  (+4 bytes padding)
-    alignas(16) vec3 camconf;     // 12 bytes  (+4 bytes padding)
-    alignas(16) vec3 sizes;       // 12 bytes  (+4 bytes padding)
+    alignas(16) vec3 look;
+    alignas(16) vec3 position;
+    alignas(16) vec3 up;
+    alignas(16) vec3 u;
+    alignas(16) vec3 v;
+    alignas(16) vec3 w;
+    alignas(16) vec3 camconf;
+    alignas(16) vec3 sizes;
 } UniformBufferObject;
 
 typedef struct {
@@ -96,11 +61,7 @@ typedef struct {
 } UBOArray;
 
 typedef struct {
-    size_t max_indices;
-    size_t max_vertices;
     size_t max_triangles;
-    BOOL update_indices;
-    BOOL update_vertices;
     BOOL update_triangles;
 } ChangeSet;
 
@@ -128,12 +89,6 @@ typedef struct {
 } VulkanDescriptors;
 
 typedef struct {
-    VulkanImage target;
-    VulkanImage depth;
-    VulkanImage color;
-} VulkanAttachments;
-
-typedef struct {
     VulkanSyncro syncro;
     VulkanCommands commands;
     VkQueue queue;
@@ -142,25 +97,13 @@ typedef struct {
 typedef struct {
     VulkanDescriptors descriptors;
     UBOArray ubos;
+    VulkanDataBuffer ssbos[CPUSWAP_LENGTH];
 } VulkanRenderData;
 
 typedef struct {
-    VulkanDataBuffer ssbos[CPUSWAP_LENGTH];
-    VulkanImage targets[CPUSWAP_LENGTH];
-    VulkanDescriptors descriptors;
     VulkanPipeline pipeline;
-    ARRLIST_SimpleTriangle triangles;
-    VulkanDataBuffer trianglebuffer;
-} VulkanRaytracer;
-
-typedef struct {
-    VulkanPipeline pipeline;
-    VkRenderPass renderpass;
     VulkanRenderData renderdata;
-    VkFramebuffer framebuffer;
-    VkSampleCountFlagBits samples;
-    VulkanAttachments attachments;
-    VulkanRaytracer raytracer;
+    VulkanImage targets[CPUSWAP_LENGTH];
 } VulkanRenderContext;
 
 typedef struct {
@@ -171,10 +114,7 @@ typedef struct {
 } VulkanCore;
 
 typedef struct {
-    VulkanDataBuffer indices;
-    VulkanDataBuffer vertices;
-    ARRLIST_VulkanTexture textures;
-    ARRLIST_TriangleID triangles;
+    VulkanDataBuffer triangles;
 } VulkanGeometry;
 
 typedef struct {
@@ -198,8 +138,8 @@ typedef struct {
 } RendererStats;
 
 typedef struct {
-    ARRLIST_Vertex vertices;
-    ARRLIST_Index indices;
+    ARRLIST_Triangle triangles;
+    ARRLIST_TriangleID ids;
     ChangeSet changes;
 } Geometry;
 
@@ -210,7 +150,6 @@ typedef struct {
     Vector2 dimensions;
     Geometry geometry;
     SimpleCamera camera;
-    BOOL raytrace;
 } Renderer;
 
 #endif

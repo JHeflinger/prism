@@ -10,8 +10,6 @@
 typedef uint64_t TriangleID;
 DECLARE_ARRLIST(TriangleID);
 
-typedef uint32_t TextureID;
-
 typedef struct {
     Vector3 position;
     Vector3 look;
@@ -20,22 +18,10 @@ typedef struct {
 } SimpleCamera;
 
 typedef struct {
-    vec3 position;
-    vec3 color;
-    vec2 texcoord;
-    TextureID texid;
-} Vertex;
-DECLARE_ARRLIST(Vertex);
-
-typedef struct {
-    Vertex vertices[3];
+    alignas(16) vec3 a;
+    alignas(16) vec3 b;
+    alignas(16) vec3 c;
 } Triangle;
-
-typedef struct {
-    vec3 a;
-    vec3 b;
-    vec3 c;
-} SimpleTriangle;
-DECLARE_ARRLIST(SimpleTriangle);
+DECLARE_ARRLIST(Triangle);
 
 #endif

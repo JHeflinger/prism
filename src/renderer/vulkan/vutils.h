@@ -23,12 +23,6 @@ VkShaderModule VUTIL_CreateShader(SimpleFile* file);
 
 void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer);
 
-void VUTIL_GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
-
-VkVertexInputBindingDescription VUTIL_VertexBindingDescription();
-
-QUAD_VkVertexInputAttributeDescription VUTIL_VertexAttributeDescriptions();
-
 Schrodingnum VUTIL_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 VkCommandBuffer VUTIL_BeginSingleTimeCommands();
@@ -79,7 +73,5 @@ void VUTIL_CreateImage(
     VkMemoryPropertyFlags properties,
     VkImageAspectFlags aspectFlags,
     VulkanImage* image);
-
-VkSampleCountFlagBits VUTIL_GetMaximumSampleCount();
 
 #endif

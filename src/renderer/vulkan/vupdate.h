@@ -3,23 +3,13 @@
 
 #include "renderer/vulkan/vstructs.h"
 
-void VUPDT_RaytracerTriangles(VulkanRaytracer* raytracer);
+void VUPDT_Triangles(VulkanDataBuffer* triangles);
 
-void VUPDT_RecordRasterCommand(VkCommandBuffer command);
-
-void VUPDT_RecordRaytraceCommand(VkCommandBuffer command);
+void VUPDT_RecordCommand(VkCommandBuffer command);
 
 void VUPDT_DescriptorSets(VulkanDescriptors* descriptors);
 
-void VUPDT_ComputeDescriptorSets(VulkanDescriptors* descriptors);
-
 void VUPDT_UniformBuffers(UBOArray* ubos);
-
-void VUPDT_RenderSize(size_t width, size_t height);
-
-void VUPDT_Vertices(VulkanDataBuffer* vertices);
-
-void VUPDT_Indices(VulkanDataBuffer* indices);
 
 void VUPDT_SetVulkanUpdateContext(Renderer* renderer);
 
