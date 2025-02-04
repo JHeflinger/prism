@@ -3,6 +3,8 @@
 
 #include "renderer/vulkan/vstructs.h"
 
+void VUPDT_RaytracerTriangles(VulkanRaytracer* raytracer);
+
 void VUPDT_RecordRasterCommand(VkCommandBuffer command);
 
 void VUPDT_RecordRaytraceCommand(VkCommandBuffer command);

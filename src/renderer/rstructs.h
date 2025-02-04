@@ -31,4 +31,11 @@ typedef struct {
     Vertex vertices[3];
 } Triangle;
 
+typedef struct {
+    vec3 a;
+    vec3 b;
+    vec3 c;
+} SimpleTriangle;
+DECLARE_ARRLIST(SimpleTriangle);
+
 #endif

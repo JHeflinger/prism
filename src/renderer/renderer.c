@@ -79,7 +79,14 @@ TriangleID SubmitTriangle(Triangle triangle) {
     ARRLIST_Vertex_add(&(g_renderer.geometry.vertices), triangle.vertices[2]);
     g_renderer.geometry.changes.update_indices = TRUE;
     g_renderer.geometry.changes.update_vertices = TRUE;
+    g_renderer.geometry.changes.update_triangles = TRUE;
     ARRLIST_TriangleID_add(&(g_renderer.vulkan.geometry.triangles), g_triangle_id);
+    SimpleTriangle stri = { 
+        { triangle.vertices[0].position[0], triangle.vertices[0].position[1], triangle.vertices[0].position[2] },
+        { triangle.vertices[1].position[0], triangle.vertices[1].position[1], triangle.vertices[1].position[2] },
+        { triangle.vertices[2].position[0], triangle.vertices[2].position[1], triangle.vertices[2].position[2] }
+    };
+    ARRLIST_SimpleTriangle_add(&(g_renderer.vulkan.core.context.raytracer.triangles), stri);
     g_triangle_id++;
     return g_triangle_id - 1;
 }
@@ -100,9 +107,11 @@ void RemoveTriangle(TriangleID id) {
             ARRLIST_Index_remove(&(g_renderer.geometry.indices), ind + realind);
             ARRLIST_Vertex_remove(&(g_renderer.geometry.vertices), ind + realind);
         }
+        ARRLIST_SimpleTriangle_remove(&(g_renderer.vulkan.core.context.raytracer.triangles), ind);
         ARRLIST_TriangleID_remove(&(g_renderer.vulkan.geometry.triangles), ind);
         g_renderer.geometry.changes.update_indices = TRUE;
         g_renderer.geometry.changes.update_vertices = TRUE;
+        g_renderer.geometry.changes.update_triangles = TRUE;
     } else {
         LOG_FATAL("Unable to remove nonexistant triangle");
     }
@@ -117,6 +126,9 @@ void ClearTriangles() {
 
     // clean index data
     ARRLIST_Index_clear(&(g_renderer.geometry.indices));
+
+    // clean raytracer triangles
+    ARRLIST_SimpleTriangle_clear(&(g_renderer.vulkan.core.context.raytracer.triangles));
 
     // clean triangle ref data
     ARRLIST_TriangleID_clear(&(g_renderer.vulkan.geometry.triangles));
@@ -272,6 +284,19 @@ void Render() {
 			VINIT_Vertices(&(g_renderer.vulkan.geometry.vertices));
         } else {
 			VUPDT_Vertices(&(g_renderer.vulkan.geometry.vertices));
+        }
+    }
+    if (g_renderer.geometry.changes.update_triangles) {
+        vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
+        g_renderer.geometry.changes.update_triangles = FALSE;
+        if (g_renderer.geometry.changes.max_triangles != g_renderer.vulkan.core.context.raytracer.triangles.maxsize) {
+            g_renderer.geometry.changes.max_triangles = g_renderer.vulkan.core.context.raytracer.triangles.maxsize;
+            VCLEAN_RaytracerTriangles(&(g_renderer.vulkan));
+            VINIT_RaytracerTriangles(&(g_renderer.vulkan.core.context.raytracer));
+            VUPDT_ComputeDescriptorSets(&(g_renderer.vulkan.core.context.raytracer.descriptors));
+        } else {
+            // update triangle buffer
+            VUPDT_RaytracerTriangles(&(g_renderer.vulkan.core.context.raytracer));
         }
     }
 

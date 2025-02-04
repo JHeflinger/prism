@@ -81,7 +81,8 @@ typedef struct {
     alignas(16) vec3 u;           // 12 bytes  (+4 bytes padding)
     alignas(16) vec3 v;           // 12 bytes  (+4 bytes padding)
     alignas(16) vec3 w;           // 12 bytes  (+4 bytes padding)
-    alignas(16) vec3 camconf;           // 12 bytes  (+4 bytes padding)
+    alignas(16) vec3 camconf;     // 12 bytes  (+4 bytes padding)
+    alignas(16) vec3 sizes;       // 12 bytes  (+4 bytes padding)
 } UniformBufferObject;
 
 typedef struct {
@@ -97,8 +98,10 @@ typedef struct {
 typedef struct {
     size_t max_indices;
     size_t max_vertices;
+    size_t max_triangles;
     BOOL update_indices;
     BOOL update_vertices;
+    BOOL update_triangles;
 } ChangeSet;
 
 typedef struct {
@@ -146,6 +149,8 @@ typedef struct {
     VulkanImage targets[CPUSWAP_LENGTH];
     VulkanDescriptors descriptors;
     VulkanPipeline pipeline;
+    ARRLIST_SimpleTriangle triangles;
+    VulkanDataBuffer trianglebuffer;
 } VulkanRaytracer;
 
 typedef struct {

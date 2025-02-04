@@ -6,6 +6,18 @@
 
 Renderer* g_vinit_renderer_ref = NULL;
 
+BOOL VINIT_RaytracerTriangles(VulkanRaytracer* raytracer) {
+    size_t arrsize = sizeof(SimpleTriangle) * g_vinit_renderer_ref->vulkan.core.context.raytracer.triangles.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(raytracer->trianglebuffer));
+    VUPDT_RaytracerTriangles(raytracer);
+    return TRUE;
+}
+
 BOOL VINIT_Queue(VkQueue* queue) {
 	VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vinit_renderer_ref->vulkan.core.general.gpu);
     vkGetDeviceQueue(
@@ -159,27 +171,30 @@ BOOL VINIT_ComputeDescriptors(VulkanDescriptors* descriptors) {
     uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uboLayoutBinding.descriptorCount = 1;
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    uboLayoutBinding.pImmutableSamplers = NULL;
 
     VkDescriptorSetLayoutBinding ssboLayoutBinding = { 0 };
     ssboLayoutBinding.binding = 1;
     ssboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     ssboLayoutBinding.descriptorCount = 1;
     ssboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    ssboLayoutBinding.pImmutableSamplers = NULL;
 
     VkDescriptorSetLayoutBinding imageLayoutBinding = { 0 };
     imageLayoutBinding.binding = 2;
     imageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     imageLayoutBinding.descriptorCount = 1;
     imageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    imageLayoutBinding.pImmutableSamplers = NULL;
 
-    VkDescriptorSetLayoutBinding bindings[] = { uboLayoutBinding, ssboLayoutBinding, imageLayoutBinding };
+    VkDescriptorSetLayoutBinding trianglesLayoutBinding = { 0 };
+    trianglesLayoutBinding.binding = 3;
+    trianglesLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    trianglesLayoutBinding.descriptorCount = 1;
+    trianglesLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutBinding bindings[] = { uboLayoutBinding, ssboLayoutBinding, imageLayoutBinding, trianglesLayoutBinding };
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 3;
+    layoutInfo.bindingCount = 4;
     layoutInfo.pBindings = bindings;
 
     VkResult result = vkCreateDescriptorSetLayout(
@@ -191,17 +206,19 @@ BOOL VINIT_ComputeDescriptors(VulkanDescriptors* descriptors) {
     }
 
     // create descriptor pool
-    VkDescriptorPoolSize poolSizes[3] = { 0 };
+    VkDescriptorPoolSize poolSizes[4] = { 0 };
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[1].descriptorCount = CPUSWAP_LENGTH;
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     poolSizes[2].descriptorCount = CPUSWAP_LENGTH;
+    poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[3].descriptorCount = CPUSWAP_LENGTH;
 
     VkDescriptorPoolCreateInfo poolInfo = { 0 };
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 3;
+    poolInfo.poolSizeCount = 4;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = CPUSWAP_LENGTH;
     result = vkCreateDescriptorPool(
@@ -612,6 +629,9 @@ BOOL VINIT_Raytracer(VulkanRaytracer* raytracer) {
         }
     }
 
+    // initialize triangle buffer
+    VINIT_RaytracerTriangles(raytracer);
+
     VkDeviceSize bufferSize = sizeof(RayGenerator) * imgw * imgh;
     VulkanDataBuffer stagingBuffer;
     VUTIL_CreateBuffer(
@@ -627,7 +647,7 @@ BOOL VINIT_Raytracer(VulkanRaytracer* raytracer) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VUTIL_CreateBuffer(
             bufferSize,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             &(raytracer->ssbos[i]));
         VUTIL_CopyBuffer(stagingBuffer.buffer, raytracer->ssbos[i].buffer, bufferSize);

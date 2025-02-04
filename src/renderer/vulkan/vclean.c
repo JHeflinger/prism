@@ -1,5 +1,10 @@
 #include "vclean.h"
 
+void VCLEAN_RaytracerTriangles(VulkanObject* vulkan) {
+    vkDestroyBuffer(vulkan->core.general.interface, vulkan->core.context.raytracer.trianglebuffer.buffer, NULL);
+    vkFreeMemory(vulkan->core.general.interface, vulkan->core.context.raytracer.trianglebuffer.memory, NULL);
+}
+
 void VCLEAN_DimensionDependant(VulkanObject* vulkan) {
     // destroy depth buffer
     vkDestroyImageView(vulkan->core.general.interface, vulkan->core.context.attachments.depth.view, NULL);
@@ -31,6 +36,9 @@ void VCLEAN_Vulkan(VulkanObject* vulkan) {
 
     // clean swapchain
     VCLEAN_DimensionDependant(vulkan);
+
+    // clean raytracer triangles
+    VCLEAN_RaytracerTriangles(vulkan);
 
     // destroy raytracing targets
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {

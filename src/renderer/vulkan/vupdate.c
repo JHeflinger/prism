@@ -8,6 +8,15 @@
 
 Renderer* g_vupdt_renderer_ref = NULL;
 
+void VUPDT_RaytracerTriangles(VulkanRaytracer* raytracer) {
+    if (sizeof(SimpleTriangle) * raytracer->triangles.maxsize == 0) return;
+    VUTIL_CopyHostToBuffer(
+        raytracer->triangles.data,
+        sizeof(SimpleTriangle) * raytracer->triangles.size,
+        sizeof(SimpleTriangle) * raytracer->triangles.maxsize,
+        raytracer->trianglebuffer.buffer);
+}
+
 void VUPDT_RecordRasterCommand(VkCommandBuffer command) {
     // Start command
     VkCommandBufferBeginInfo beginInfo = { 0 };
@@ -198,7 +207,14 @@ void VUPDT_ComputeDescriptorSets(VulkanDescriptors* descriptors) {
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
         imageInfo.imageView = g_vupdt_renderer_ref->vulkan.core.context.raytracer.targets[i].view;
 
-        VkWriteDescriptorSet descriptorWrites[3] = { 0 };
+        VkDescriptorBufferInfo triangleBufferInfo = { 0 };
+        triangleBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.raytracer.trianglebuffer.buffer;
+        triangleBufferInfo.offset = 0;
+        size_t arrsize = sizeof(SimpleTriangle) * g_vupdt_renderer_ref->vulkan.core.context.raytracer.triangles.size;
+        arrsize = arrsize > 0 ? arrsize : 1;
+        triangleBufferInfo.range = arrsize;
+
+        VkWriteDescriptorSet descriptorWrites[4] = { 0 };
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptors->sets[i];
@@ -224,7 +240,15 @@ void VUPDT_ComputeDescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[2].descriptorCount = 1;
         descriptorWrites[2].pImageInfo = &imageInfo;
 
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 3, descriptorWrites, 0, NULL);
+        descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[3].dstSet = descriptors->sets[i];
+        descriptorWrites[3].dstBinding = 3;
+        descriptorWrites[3].dstArrayElement = 0;
+        descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[3].descriptorCount = 1;
+        descriptorWrites[3].pBufferInfo = &triangleBufferInfo;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 4, descriptorWrites, 0, NULL);
     }
 }
 
@@ -252,6 +276,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 	ubo.camconf[0] = glm_rad(g_vupdt_renderer_ref->camera.fov); // fov
 	ubo.camconf[1] = g_vupdt_renderer_ref->dimensions.x; // width
 	ubo.camconf[2] = g_vupdt_renderer_ref->dimensions.y; // height
+    ubo.sizes[0] = g_vupdt_renderer_ref->vulkan.core.context.raytracer.triangles.size;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
 }
 

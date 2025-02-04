@@ -11,6 +11,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     vec3 v;
     vec3 w;
     vec3 camconf;
+    vec3 sizes;
 } ubo;
 
 layout(location = 0) in vec3 inPosition;
