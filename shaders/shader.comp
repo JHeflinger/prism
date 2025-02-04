@@ -83,7 +83,7 @@ void main()
     ivec2 pixel = ivec2(rgIn.x, rgIn.y);
     vec4 color = vec4(normalize(abs(ray_direction)), 1.0);
     if (distance > 0) {
-        float tval = 1.0 - (distance / 6.0);
+        float tval = 1.0 - (distance / (2.0f * length(ubo.position)));
         color = vec4(tval, tval, tval, 1.0);
     }
     imageStore(outputImage, pixel, color);

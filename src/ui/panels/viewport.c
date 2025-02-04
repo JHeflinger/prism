@@ -8,21 +8,23 @@ int i = 0;
 
 void DrawViewportPanel(float width, float height) {
     static float time = 0.0f;
+    static float radius = 3.0f;
     time += GetFrameTime();
     SimpleCamera camera = GetCamera();
-    camera.position.x = 3.0f * cos(time);
-    camera.position.y = 3.0f * sin(time);
+    camera.position.x = radius * cos(time);
+    camera.position.y = radius * sin(time);
 	camera.fov = 90.0f;
     MoveCamera(camera);
     Render();
     Draw(0, 0, width, height);
+    radius -= GetMouseWheelMove() / 4.0f;
 }
 
 void ConfigureViewportPanel(Panel* panel) {
     SetupPanel(panel, "Viewport");
     panel->draw = DrawViewportPanel;
 
-    Model model = LoadModel("assets/models/room.obj");
+    Model model = LoadModel("assets/models/sphere.obj");
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
     Mesh mesh = model.meshes[0];
     for (int i = 0; i < mesh.vertexCount / 3; i++) {

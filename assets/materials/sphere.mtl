@@ -1,0 +1,29 @@
+# Blender MTL File: 'Blue_sphere.blend'
+# Material Count: 1
+# scale 1.530942
+newmtl Material.001
+Ns 50
+Ka 0.14 0.42 0.64
+Kd 0.14 0.42 0.64
+Ks 1.00 1.00 1.00
+d 1.000000
+illum 2
+
+newmtl light1
+Ka 0.2 0.2 0.2
+Kd 1.0 1.0 1.0
+Ks 1.0 1.0 1.0
+
+
+newmtl light2
+Ka 0.2 0.2 0.2
+Kd 0.5 0.5 0.5
+Ks 0.5 0.5 0.5
+
+
+newmtl light3
+Ka 0.2 0.2 0.2
+Kd 1.0 1.0 1.0
+Ks 1.0 1.0 1.0
+
+
