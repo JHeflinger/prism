@@ -27,25 +27,9 @@ Schrodingnum VUTIL_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags pro
 
 VkCommandBuffer VUTIL_BeginSingleTimeCommands();
 
-BOOL VUTIL_HasStencilComponent(VkFormat format);
-
-VkFormat VUTIL_FindSupportedFormat(
-    VkFormat* candidates,
-    size_t num_candidates,
-    VkImageTiling tiling,
-    VkFormatFeatureFlags features);
-
-VkFormat VUTIL_FindDepthFormat();
-
 void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer);
 
 void VUTIL_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-
-void VUTIL_CopyBufferToImage(
-    VkBuffer buffer,
-    VkImage image,
-    uint32_t width,
-    uint32_t height);
 
 void VUTIL_TransitionImageLayout(
     VkImage image,

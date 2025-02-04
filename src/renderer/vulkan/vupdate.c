@@ -7,12 +7,12 @@
 Renderer* g_vupdt_renderer_ref = NULL;
 
 void VUPDT_Triangles(VulkanDataBuffer* triangles) {
-    if (sizeof(SimpleTriangle) * g_vupdt_renderer_ref->geometry.triangles.maxsize == 0) return;
+    if (sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.triangles.data,
-        sizeof(SimpleTriangle) * g_vupdt_renderer_ref->geometry.triangles.size,
-        sizeof(SimpleTriangle) * g_vupdt_renderer_ref->geometry.triangles.maxsize,
-        triangles.buffer);
+        sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.size,
+        sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.maxsize,
+        triangles->buffer);
 }
 
 void VUPDT_RecordCommand(VkCommandBuffer command) {
@@ -87,9 +87,9 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         imageInfo.imageView = g_vupdt_renderer_ref->vulkan.core.context.targets[i].view;
 
         VkDescriptorBufferInfo triangleBufferInfo = { 0 };
-        triangleBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.geometry.triangles.buffer;
+        triangleBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer;
         triangleBufferInfo.offset = 0;
-        size_t arrsize = sizeof(SimpleTriangle) * g_vupdt_renderer_ref->geometry.triangles.size;
+        size_t arrsize = sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.size;
         arrsize = arrsize > 0 ? arrsize : 1;
         triangleBufferInfo.range = arrsize;
 
@@ -146,7 +146,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 	ubo.camconf[0] = glm_rad(g_vupdt_renderer_ref->camera.fov); // fov
 	ubo.camconf[1] = g_vupdt_renderer_ref->dimensions.x; // width
 	ubo.camconf[2] = g_vupdt_renderer_ref->dimensions.y; // height
-    ubo.sizes[0] = g_vupdt_renderer_ref->vulkan.core.context.raytracer.triangles.size;
+    ubo.sizes[0] = g_vupdt_renderer_ref->geometry.triangles.size;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     #undef RAYVEC_TO_GLMVEC
 }

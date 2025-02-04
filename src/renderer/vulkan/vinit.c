@@ -2,7 +2,7 @@
 #include "core/log.h"
 #include "renderer/vulkan/vutils.h"
 #include "renderer/vulkan/vupdate.h"
-//#include <GLFW/glfw3.h>
+#include <GLFW/glfw3.h>
 
 Renderer* g_vinit_renderer_ref = NULL;
 
@@ -202,6 +202,7 @@ BOOL VINIT_ShaderStorageBuffers(VulkanDataBuffer* ssbo_array) {
     vkDestroyBuffer(g_vinit_renderer_ref->vulkan.core.general.interface, stagingBuffer.buffer, NULL);
     vkFreeMemory(g_vinit_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory, NULL);
     EZFREE(raygens);
+    return TRUE;
 }
 
 BOOL VINIT_RenderData(VulkanRenderData* renderdata) {
@@ -277,14 +278,14 @@ BOOL VINIT_Bridge(VulkanDataBuffer* bridge) {
 }
 
 BOOL VINIT_RenderContext(VulkanRenderContext* context) {
+	if (!VINIT_Targets(context->targets)) return FALSE;
 	if (!VINIT_RenderData(&(context->renderdata))) return FALSE;
 	if (!VINIT_Pipeline(&(context->pipeline))) return FALSE;
-	if (!VINIT_Targets(context->targets)) return FALSE;
     return TRUE;
 }
 
 BOOL VINIT_Triangles(VulkanDataBuffer* triangles) {
-    size_t arrsize = sizeof(SimpleTriangle) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    size_t arrsize = sizeof(Triangle) * g_vinit_renderer_ref->geometry.triangles.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -315,6 +316,7 @@ BOOL VINIT_Targets(VulkanImage* targets_arr) {
             VK_IMAGE_LAYOUT_GENERAL,
             1);
     }
+    return TRUE;
 }
 
 BOOL VINIT_General(VulkanGeneral* general) {
@@ -458,11 +460,11 @@ BOOL VINIT_Metadata(VulkanMetadata* metadata) {
     ARRLIST_StaticString_add(&(metadata->validation), "VK_LAYER_KHRONOS_validation");
 
     // set up required extensions
-    // uint32_t glfwExtensionCount = 0;
-    // const char** glfwExtensions;
-    // glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    // for (size_t i = 0; i < glfwExtensionCount; i++)
-    //     ARRLIST_StaticString_add(&(metadata->extensions.required), glfwExtensions[i]);
+    uint32_t glfwExtensionCount = 0;
+    const char** glfwExtensions;
+    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    for (size_t i = 0; i < glfwExtensionCount; i++)
+        ARRLIST_StaticString_add(&(metadata->extensions.required), glfwExtensions[i]);
     if (ENABLE_VK_VALIDATION_LAYERS) {
         ARRLIST_StaticString_add(&(metadata->extensions.required), VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
@@ -475,6 +477,7 @@ BOOL VINIT_Metadata(VulkanMetadata* metadata) {
 
 BOOL VINIT_Core(VulkanCore* core) {
 	if (!VINIT_General(&(core->general))) return FALSE;
+	if (!VINIT_Geometry(&(core->geometry))) return FALSE;
 	if (!VINIT_Scheduler(&(core->scheduler))) return FALSE;
 	if (!VINIT_Bridge(&(core->bridge))) return FALSE;
 	if (!VINIT_RenderContext(&(core->context))) return FALSE;
@@ -483,7 +486,6 @@ BOOL VINIT_Core(VulkanCore* core) {
 
 BOOL VINIT_Vulkan(VulkanObject* vulkan) {
 	if (!VINIT_Metadata(&(vulkan->metadata))) return FALSE;
-	if (!VINIT_Geometry(&(vulkan->geometry))) return FALSE;
 	if (!VINIT_Core(&(vulkan->core))) return FALSE;
     return TRUE;
 }

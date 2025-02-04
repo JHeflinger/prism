@@ -1,10 +1,10 @@
 #include "vclean.h"
+#include "renderer/vulkan/vutils.h"
 
 Renderer* g_vlcean_renderer_ref = NULL;
 
 void VCLEAN_Triangles(VulkanDataBuffer* triangles) {
-    vkDestroyBuffer(g_vlcean_renderer_ref->vulkan.core.general.interface, triangles->buffer, NULL);
-    vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, triangles->memory, NULL);
+    VUTIL_DestroyBuffer(*triangles);
 }
 
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
@@ -29,12 +29,10 @@ void VCLEAN_General(VulkanGeneral* general) {
 
 void VCLEAN_RenderData(VulkanRenderData* renderdata) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        vkDestroyBuffer(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->ssbos[i].buffer, NULL);
-        vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->ssbos[i].memory, NULL);
+        VUTIL_DestroyBuffer(renderdata->ssbos[i]);
     }
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        vkDestroyBuffer(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->ubos.objects[i].buffer, NULL);
-        vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->ubos.objects[i].memory, NULL);
+        VUTIL_DestroyBuffer(renderdata->ubos.objects[i]);
     }
     vkDestroyDescriptorPool(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors.pool, NULL);
     vkDestroyDescriptorSetLayout(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors.layout, NULL);
@@ -55,8 +53,7 @@ void VCLEAN_RenderContext(VulkanRenderContext* context) {
 
 void VCLEAN_Bridge(VulkanDataBuffer* bridge) {
     vkUnmapMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, bridge->memory);
-    vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, bridge->memory, NULL);
-    vkDestroyBuffer(g_vlcean_renderer_ref->vulkan.core.general.interface, bridge->buffer, NULL);
+    VUTIL_DestroyBuffer(*bridge);
 }
 
 void VCLEAN_Scheduler(VulkanScheduler* scheduler) {
@@ -66,6 +63,7 @@ void VCLEAN_Scheduler(VulkanScheduler* scheduler) {
 }
 
 void VCLEAN_Core(VulkanCore* core) {
+    VCLEAN_Geometry(&(core->geometry));
     VCLEAN_Bridge(&(core->bridge));
     VCLEAN_Scheduler(&(core->scheduler));
     VCLEAN_RenderContext(&(core->context));
@@ -74,7 +72,6 @@ void VCLEAN_Core(VulkanCore* core) {
 
 void VCLEAN_Vulkan(VulkanObject* vulkan) {
     vkDeviceWaitIdle(g_vlcean_renderer_ref->vulkan.core.general.interface);
-    VCLEAN_Geometry(&(vulkan->geometry));
     VCLEAN_Metadata(&(vulkan->metadata));
     VCLEAN_Core(&(vulkan->core));
 }

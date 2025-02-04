@@ -107,15 +107,16 @@ typedef struct {
 } VulkanRenderContext;
 
 typedef struct {
+    VulkanDataBuffer triangles;
+} VulkanGeometry;
+
+typedef struct {
     VulkanGeneral general;
+    VulkanGeometry geometry;
     VulkanRenderContext context;
     VulkanDataBuffer bridge;
     VulkanScheduler scheduler;
 } VulkanCore;
-
-typedef struct {
-    VulkanDataBuffer triangles;
-} VulkanGeometry;
 
 typedef struct {
     ARRLIST_StaticString required;
@@ -130,7 +131,6 @@ typedef struct {
 typedef struct {
     VulkanCore core;
     VulkanMetadata metadata;
-    VulkanGeometry geometry;
 } VulkanObject;
 
 typedef struct {

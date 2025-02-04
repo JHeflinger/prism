@@ -152,37 +152,6 @@ VkCommandBuffer VUTIL_BeginSingleTimeCommands() {
     return commandBuffer;
 }
 
-BOOL VUTIL_HasStencilComponent(VkFormat format) {
-    return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
-}
-
-VkFormat VUTIL_FindSupportedFormat(
-    VkFormat* candidates,
-    size_t num_candidates,
-    VkImageTiling tiling,
-    VkFormatFeatureFlags features) {
-    for (size_t i = 0; i < num_candidates; i++) {
-        VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties(g_vutil_renderer_ref->vulkan.core.general.gpu, candidates[i], &props);
-        if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
-            return candidates[i];
-        } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
-            return candidates[i];
-        }
-    }
-    LOG_FATAL("Failed to find supported format!");
-}
-
-VkFormat VUTIL_FindDepthFormat() {
-    VkFormat formats[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
-    return VUTIL_FindSupportedFormat(
-        formats,
-        3,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-    );
-}
-
 void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkEndCommandBuffer(commandBuffer);
     VkSubmitInfo submitInfo = { 0 };
@@ -199,26 +168,6 @@ void VUTIL_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
     VkBufferCopy copyRegion = { 0 };
     copyRegion.size = size;
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-    VUTIL_EndSingleTimeCommands(commandBuffer);
-}
-
-void VUTIL_CopyBufferToImage(
-    VkBuffer buffer,
-    VkImage image,
-    uint32_t width,
-    uint32_t height) {
-    VkCommandBuffer commandBuffer = VUTIL_BeginSingleTimeCommands();
-    VkBufferImageCopy region = { 0 };
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = (VkOffset3D){ 0, 0, 0 };
-    region.imageExtent = (VkExtent3D){ width, height, 1 };
-    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
     VUTIL_EndSingleTimeCommands(commandBuffer);
 }
 

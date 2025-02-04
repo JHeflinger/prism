@@ -4,10 +4,9 @@
 #include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vclean.h"
-//#include <GLFW/glfw3.h>
+#include <GLFW/glfw3.h>
 #include <easymemory.h>
 #include <string.h>
-#include <math.h>
 
 Renderer g_renderer = { 0 };
 TriangleID g_triangle_id = 0;
@@ -102,11 +101,11 @@ void Render() {
         g_renderer.geometry.changes.update_triangles = FALSE;
         if (g_renderer.geometry.changes.max_triangles != g_renderer.geometry.triangles.maxsize) {
             g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
-            VCLEAN_Triangles(&(g_renderer.vulkan.geometry.triangles));
-            VINIT_Triangles(&(g_renderer.vulkan.geometry.triangles));
+            VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
+            VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             VUPDT_DescriptorSets(&(g_renderer.vulkan.core.context.renderdata.descriptors));
         } else {
-            VUPDT_Triangles(&(g_renderer.vulkan.geometry.triangles));
+            VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             VUPDT_DescriptorSets(&(g_renderer.vulkan.core.context.renderdata.descriptors));
         }
     }
@@ -162,7 +161,7 @@ float RenderTime() {
 }
 
 size_t NumTriangles() {
-    return g_renderer.vulkan.geometry.triangles.size;
+    return g_renderer.geometry.triangles.size;
 }
 
 Vector2 RenderResolution() {
