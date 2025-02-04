@@ -9,7 +9,7 @@ int i = 0;
 
 void DrawViewportPanel(float width, float height) {
     static float time = 0.0f;
-    time += GetFrameTime() / 20.0f;
+    time += GetFrameTime();
     SimpleCamera camera = GetCamera();
     camera.position.x = 3.0f * cos(time);
     camera.position.y = 3.0f * sin(time);

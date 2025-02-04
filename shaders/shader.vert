@@ -1,15 +1,16 @@
 #version 450
 
-layout(binding = 0) uniform UniformBufferObject {
+layout(set = 0, binding = 0) uniform UniformBufferObject {
 	mat4 model;
 	mat4 view;
 	mat4 projection;
 	vec3 look;
 	vec3 position;
 	vec3 up;
-	float fov;
-	float width;
-	float height;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    vec3 camconf;
 } ubo;
 
 layout(location = 0) in vec3 inPosition;

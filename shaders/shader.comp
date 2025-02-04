@@ -1,15 +1,16 @@
 #version 450
 
-layout(binding = 0) uniform UniformBufferObject {
+layout(set = 0, binding = 0) uniform UniformBufferObject {
 	mat4 model;
 	mat4 view;
 	mat4 projection;
 	vec3 look;
 	vec3 position;
 	vec3 up;
-	float fov;
-	float width;
-	float height;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    vec3 camconf;
 } ubo;
 
 struct RayGenerator {
@@ -17,11 +18,11 @@ struct RayGenerator {
     uint y;
 };
 
-layout(binding = 1) readonly buffer RayGeneratorSSBOIn {
+layout(set = 0, binding = 1) readonly buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
 
-layout(binding = 2, rgba8) uniform image2D outputImage;
+layout(set = 0, binding = 2, rgba8) uniform image2D outputImage;
 
 layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 
@@ -31,20 +32,25 @@ void main()
     uint index= gl_GlobalInvocationID.x;
     RayGenerator rgIn = raygenIn[index];
 
+    // camera conf for readability
+    float fov = ubo.camconf.x;
+    float width = ubo.camconf.y;
+    float height = ubo.camconf.z;
+
 	// create ray
-	float r = ubo.width / 2.0;
-	float b = ubo.height / 2.0;
+	float r = width / 2.0;
+	float b = height / 2.0;
 	float l = -1.0 * r;
 	float t = -1.0 * b;
-    float u = l + ((r - l) * (float(rgIn.x) + 0.5)) / ubo.width;
-    float v = b + ((t - b) * (float(rgIn.y) + 0.5)) / ubo.height;
-	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
-	//vec3 s = ubo.position;
-    //Vector3 s = camera.PositionVector() + (camera.u() * u) + (camera.v() * v) - (camera.w() * d);
-    //return Ray(camera.PositionVector(), s - camera.PositionVector(), 1.0f);
+    float u = l + ((r - l) * (float(rgIn.x) + 0.5)) / width;
+    float v = b + ((t - b) * (float(rgIn.y) + 0.5)) / height;
+	float d = (cos(fov / 2.0) / sin(fov / 2.0)) * r;
+    vec3 s = ubo.position + (ubo.u * u) + (ubo.v * v) - (ubo.w * d);
+    vec3 ray_direction = s - ubo.position;
 
 	// color in pixel
     ivec2 pixel = ivec2(rgIn.x, rgIn.y);
-    vec4 color = vec4(rgIn.x / 1600.0, rgIn.y / 900.0, 1.0, 1.0);
+    //vec4 color = vec4(rgIn.x / 1600.0, rgIn.y / 900.0, 1.0, 1.0);
+    vec4 color = vec4(normalize(ray_direction), 1.0);
     imageStore(outputImage, pixel, color);
 }

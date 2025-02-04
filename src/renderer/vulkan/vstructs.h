@@ -72,15 +72,16 @@ typedef struct {
 } CPUSwap;
 
 typedef struct {
-	mat4 model;
-	mat4 view;
-	mat4 projection;
-	vec3 look;
-	vec3 position;
-	vec3 up;
-	float fov;
-	float width;
-	float height;
+    alignas(16) mat4 model;       // 64 bytes
+    alignas(16) mat4 view;        // 64 bytes
+    alignas(16) mat4 projection;  // 64 bytes
+    alignas(16) vec3 look;        // 12 bytes  (+4 bytes padding)
+    alignas(16) vec3 position;    // 12 bytes  (+4 bytes padding)
+    alignas(16) vec3 up;          // 12 bytes  (+4 bytes padding)
+    alignas(16) vec3 u;           // 12 bytes  (+4 bytes padding)
+    alignas(16) vec3 v;           // 12 bytes  (+4 bytes padding)
+    alignas(16) vec3 w;           // 12 bytes  (+4 bytes padding)
+    alignas(16) vec3 camconf;           // 12 bytes  (+4 bytes padding)
 } UniformBufferObject;
 
 typedef struct {
