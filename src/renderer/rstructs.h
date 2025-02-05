@@ -24,4 +24,13 @@ typedef struct {
 } Triangle;
 DECLARE_ARRLIST(Triangle);
 
+typedef struct {
+    alignas(16) vec3 ambient;
+    alignas(16) vec3 diffuse;
+    alignas(16) vec3 specular;
+    alignas(16) vec3 rrr; // reflect, refract, refraction index
+    alignas(16) vec3 tsg; // transparency, shiny, glossy
+} SurfaceMaterial;
+DECLARE_ARRLIST(SurfaceMaterial);
+
 #endif
