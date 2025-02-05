@@ -10,6 +10,11 @@
 
 Renderer g_renderer = { 0 };
 TriangleID g_triangle_id = 0;
+Vector2 g_override_resolution = { 0 };
+
+void OverrideResolution(size_t x, size_t y) {
+	g_override_resolution = (Vector2){ x, y };
+}
 
 void InitializeRenderer() {
     // initialize camera
@@ -18,7 +23,9 @@ void InitializeRenderer() {
     g_renderer.camera.up = (Vector3){ 0.0f, 0.0f, 1.0f };
 
     // set up dimensions
-    g_renderer.dimensions = (Vector2){ GetScreenWidth(), GetScreenHeight() };
+    g_renderer.dimensions = (Vector2){ 
+		g_override_resolution.x == 0 ? GetScreenWidth() : g_override_resolution.x,
+		g_override_resolution.y == 0 ? GetScreenHeight() : g_override_resolution.y };
 
     // initialize vulkan resources
 	VUTIL_SetVulkanUtilsContext(&g_renderer);
@@ -143,13 +150,15 @@ void Render() {
 
 void Draw(float x, float y, float w, float h) {
 	size_t index = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
+	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
+	float psuedo_h = h * (g_renderer.dimensions.y / (float)GetScreenHeight());
     DrawTexturePro(
         g_renderer.swapchain.targets[index].texture,
         (Rectangle){
-            (g_renderer.swapchain.targets[index].texture.width / 2.0f) - (w/2.0f),
-            (g_renderer.swapchain.targets[index].texture.height / 2.0f) - (h/2.0f),
-            w,
-            h },
+            (g_renderer.swapchain.targets[index].texture.width / 2.0f) - (psuedo_w/2.0f),
+            (g_renderer.swapchain.targets[index].texture.height / 2.0f) - (psuedo_h/2.0f),
+            psuedo_w,
+            psuedo_h },
         (Rectangle){ x, y, w, h},
         (Vector2){ 0, 0 },
         0.0f,

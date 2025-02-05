@@ -24,7 +24,7 @@ void ConfigureViewportPanel(Panel* panel) {
     SetupPanel(panel, "Viewport");
     panel->draw = DrawViewportPanel;
 
-    Model model = LoadModel("assets/models/sphere.obj");
+    Model model = LoadModel("assets/models/room.obj");
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
     Mesh mesh = model.meshes[0];
     for (int i = 0; i < mesh.vertexCount / 3; i++) {

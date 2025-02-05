@@ -3,6 +3,8 @@
 
 #include "renderer/rstructs.h"
 
+void OverrideResolution(size_t x, size_t y);
+
 void InitializeRenderer();
 
 void DestroyRenderer();
