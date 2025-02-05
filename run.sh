@@ -2,4 +2,4 @@
 if [ $? -ne 0 ]; then
 	exit 1
 fi
-./build/prism
+./build/prism $1 $2

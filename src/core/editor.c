@@ -12,11 +12,15 @@
 #include <easymemory.h>
 
 UI* g_ui = NULL;
+Vector2 g_override_resolution = { 0 };
 
 void InitEditor() {
 	SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_VSYNC_HINT /*| FLAG_WINDOW_RESIZABLE*/);
-    InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
+    InitWindow(
+		g_override_resolution.x == 0 ? EDITOR_DEFAULT_WIDTH : g_override_resolution.x,
+		g_override_resolution.y == 0 ? EDITOR_DEFAULT_HEIGHT : g_override_resolution.y,
+		"Prism");
     InitializeInput();
     InitializeColors();
     InitializeAssets();
@@ -77,4 +81,8 @@ void RunEditor() {
 
     // Clean memory check
     LOG_ASSERT(memcheck == EZALLOCATED(), "Memory cleanup revealed a leak of %d bytes", (int)(EZALLOCATED() - memcheck));
+}
+
+void SetEditorResolution(size_t x, size_t y) {
+	g_override_resolution = (Vector2){ x, y };
 }
