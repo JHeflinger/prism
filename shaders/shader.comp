@@ -9,6 +9,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     vec3 w;
     vec3 camconf;
     vec3 sizes;
+    vec2 viewport;
 } ubo;
 
 struct RayGenerator {
@@ -40,10 +41,18 @@ void main()
     uint index= gl_GlobalInvocationID.x;
     RayGenerator rgIn = raygenIn[index];
 
-    // camera conf for readability
+    // unpack camera conf for readability
     float fov = ubo.camconf.x;
     float width = ubo.camconf.y;
     float height = ubo.camconf.z;
+
+    // reject any rays outside of the viewport
+    if (ubo.viewport.x != 0 && 
+        (rgIn.x < ceil(((width - ubo.viewport.x) / 2.0)) ||
+        (rgIn.x > ceil(((width + ubo.viewport.x) / 2.0))))) return;
+    if (ubo.viewport.y != 0 && 
+        (rgIn.y < ceil(((height - ubo.viewport.y) / 2.0)) ||
+        (rgIn.y > ceil(((height + ubo.viewport.y) / 2.0))))) return;
 
 	// create ray
 	float r = width / 2.0;

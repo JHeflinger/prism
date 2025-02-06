@@ -38,9 +38,9 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             0,
             NULL);
 
-        uint32_t imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
-        uint32_t imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
-        vkCmdDispatch(command, (imgw * imgh) / INVOCATION_GROUP_SIZE, 1, 1);
+        float imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
+        float imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
+        vkCmdDispatch(command, ceil((imgw * imgh) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
     }
 
     // Copy image to staging
@@ -147,6 +147,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 	ubo.camconf[1] = g_vupdt_renderer_ref->dimensions.x; // width
 	ubo.camconf[2] = g_vupdt_renderer_ref->dimensions.y; // height
     ubo.sizes[0] = g_vupdt_renderer_ref->geometry.triangles.size;
+    ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
+    ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     #undef RAYVEC_TO_GLMVEC
 }

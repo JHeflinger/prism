@@ -14,6 +14,7 @@ void DrawViewportPanel(float width, float height) {
     camera.position.x = radius * cos(time);
     camera.position.y = radius * sin(time);
 	camera.fov = 90.0f;
+    SetViewportSlice(width, height);
     MoveCamera(camera);
     Render();
     Draw(0, 0, width, height);

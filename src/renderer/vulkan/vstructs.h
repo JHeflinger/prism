@@ -48,6 +48,7 @@ typedef struct {
     alignas(16) vec3 w;
     alignas(16) vec3 camconf;
     alignas(16) vec3 sizes;
+    alignas(16) vec2 viewport;
 } UniformBufferObject;
 
 typedef struct {
@@ -150,6 +151,7 @@ typedef struct {
     Vector2 dimensions;
     Geometry geometry;
     SimpleCamera camera;
+    Vector2 viewport;
 } Renderer;
 
 #endif

@@ -12,6 +12,12 @@ Renderer g_renderer = { 0 };
 TriangleID g_triangle_id = 0;
 Vector2 g_override_resolution = { 0 };
 
+void SetViewportSlice(size_t w, size_t h) {
+	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
+	float psuedo_h = h * (g_renderer.dimensions.y / (float)GetScreenHeight());
+    g_renderer.viewport = (Vector2) { ceil(psuedo_w), ceil(psuedo_h) };
+}
+
 void OverrideResolution(size_t x, size_t y) {
 	g_override_resolution = (Vector2){ x, y };
 }

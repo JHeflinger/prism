@@ -3,6 +3,8 @@
 
 #include "renderer/rstructs.h"
 
+void SetViewportSlice(size_t w, size_t h);
+
 void OverrideResolution(size_t x, size_t y);
 
 void InitializeRenderer();
