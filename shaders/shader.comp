@@ -147,27 +147,16 @@ void main()
     }
 
     // visualize point light
-    float light_radius = 0.1;
-    float qeq_a = dot(ray_direction, ray_direction);
-    float qeq_b = dot(ray_direction, ray_position - light_position);
-    float qeq_c = dot(ray_position - light_position, ray_position - light_position) - (light_radius * light_radius);
+    float light_radius = 1.0;
+    vec3 l_t = ray_position + (dot(light_position - ray_position, ray_direction) *  ray_direction);
+    float l_d = length(l_t - light_position);
     vec3 light_color = (ambient_light + diffuse_light + specular_light) / 3.0;
-    int iter_count = 5;
-    for (int i = 0; i < iter_count; i++) {
-        float new_radius = light_radius * (i + 1);
-        float real_qeq_c = qeq_c - (new_radius * new_radius);
-        float qeq_d = (qeq_b * qeq_b) - (qeq_a * real_qeq_c);
-        float qeq_e = dot(ray_direction * -1.0, ray_position - light_position);
-        if (qeq_d >= 0) {
-            float t1 = (qeq_e + sqrt(qeq_d)) / qeq_a;
-            float t2 = (qeq_e - sqrt(qeq_d)) / qeq_a;
-            if (t1 < 0) t1 = t2;
-            if (t2 < 0) t2 = t1;
-            float min_t = t1 < t2 ? t1 : t2;
-            if (min_t < distance || distance <= 0)
-                color = mix(color, light_color, (iter_count - i) * (1.0 / iter_count));
-            break;
-        }
+    if (l_t != ray_position &&
+        (length(l_t - ray_position) < distance ||
+            distance <= 0) && 
+        l_d < light_radius) {
+        float brilliance = 1.0 - (l_d / light_radius);
+        color = mix(color, light_color, pow(brilliance, 5));
     }
 
     imageStore(outputImage, pixel, vec4(color, 1.0));

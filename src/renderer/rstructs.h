@@ -42,6 +42,7 @@ DECLARE_ARRLIST(SurfaceMaterial);
 typedef struct {
     alignas(16) vec3 min;
     alignas(16) vec3 max;
+    alignas(16) uint32_t branches[3]; // [0] is leaf or no, [1] is left tree ind, [2] is right tree ind
 } NodeBVH;
 DECLARE_ARRLIST(NodeBVH);
 

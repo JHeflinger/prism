@@ -36,7 +36,7 @@ void ConfigureViewportPanel(Panel* panel) {
         0,
         0,
         0,
-        5.0f,
+        1.0f,
         0
     };
 
