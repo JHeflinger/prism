@@ -21,6 +21,10 @@ void RemoveTriangle(TriangleID id);
 
 void ClearTriangles();
 
+MaterialID SubmitMaterial(SurfaceMaterial material);
+
+void ClearMaterials();
+
 void Render();
 
 void Draw(float x, float y, float w, float h);

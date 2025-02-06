@@ -5,6 +5,8 @@
 
 void VUPDT_Triangles(VulkanDataBuffer* triangles);
 
+void VUPDT_Materials(VulkanDataBuffer* materials);
+
 void VUPDT_RecordCommand(VkCommandBuffer command);
 
 void VUPDT_DescriptorSets(VulkanDescriptors* descriptors);

@@ -54,6 +54,7 @@ void InitializeRenderer() {
 void DestroyRenderer() {
     // clean geometry
     ClearTriangles();
+    ClearMaterials();
 
     // destroy vulkan resources
     VCLEAN_Vulkan(&(g_renderer.vulkan));
@@ -73,7 +74,7 @@ void MoveCamera(SimpleCamera camera) {
 
 TriangleID SubmitTriangle(Triangle triangle) {
     g_renderer.geometry.changes.update_triangles = TRUE;
-    ARRLIST_TriangleID_add(&(g_renderer.geometry.ids), g_triangle_id);
+    ARRLIST_TriangleID_add(&(g_renderer.geometry.tids), g_triangle_id);
     ARRLIST_Triangle_add(&(g_renderer.geometry.triangles), triangle);
     g_triangle_id++;
     return g_triangle_id - 1;
@@ -82,8 +83,8 @@ TriangleID SubmitTriangle(Triangle triangle) {
 void RemoveTriangle(TriangleID id) {
     size_t ind = 0;
     BOOL found = false;
-    for (size_t i = 0; i < g_renderer.geometry.ids.size; i++) {
-        if (g_renderer.geometry.ids.data[i] == id) {
+    for (size_t i = 0; i < g_renderer.geometry.tids.size; i++) {
+        if (g_renderer.geometry.tids.data[i] == id) {
             ind = i;
             found = TRUE;
             break;
@@ -91,7 +92,7 @@ void RemoveTriangle(TriangleID id) {
     }
     if (found) {
         ARRLIST_Triangle_remove(&(g_renderer.geometry.triangles), ind);
-        ARRLIST_TriangleID_remove(&(g_renderer.geometry.ids), ind);
+        ARRLIST_TriangleID_remove(&(g_renderer.geometry.tids), ind);
         g_renderer.geometry.changes.update_triangles = TRUE;
     } else {
         LOG_FATAL("Unable to remove nonexistant triangle");
@@ -99,16 +100,33 @@ void RemoveTriangle(TriangleID id) {
 }
 
 void ClearTriangles() {
-    vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
-    ARRLIST_TriangleID_clear(&(g_renderer.geometry.ids));
+    ARRLIST_TriangleID_clear(&(g_renderer.geometry.tids));
     ARRLIST_Triangle_clear(&(g_renderer.geometry.triangles));
     g_renderer.geometry.changes.update_triangles = TRUE;
+}
+
+
+MaterialID SubmitMaterial(SurfaceMaterial material) {
+    ARRLIST_SurfaceMaterial_add(&(g_renderer.geometry.materials), material);
+    g_renderer.geometry.changes.update_materials = TRUE;
+    return g_renderer.geometry.materials.size - 1;
+}
+
+void ClearMaterials() {
+    ARRLIST_SurfaceMaterial_clear(&(g_renderer.geometry.materials));
+    g_renderer.geometry.changes.update_materials = TRUE;
 }
 
 void Render() {
     // profile for stats
     BeginProfile(&(g_renderer.stats.profile));
 
+    // detect changes in described data
+    BOOL descriptor_changes = 
+        g_renderer.geometry.changes.update_triangles |
+        g_renderer.geometry.changes.update_materials;
+
+    // update triangles if needed
     if (g_renderer.geometry.changes.update_triangles) {
         vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
         g_renderer.geometry.changes.update_triangles = FALSE;
@@ -116,12 +134,26 @@ void Render() {
             g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
             VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
-            VUPDT_DescriptorSets(&(g_renderer.vulkan.core.context.renderdata.descriptors));
         } else {
             VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
-            VUPDT_DescriptorSets(&(g_renderer.vulkan.core.context.renderdata.descriptors));
         }
     }
+
+    // update materials if needed
+    if (g_renderer.geometry.changes.update_materials) {
+        vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
+        g_renderer.geometry.changes.update_materials = FALSE;
+        if (g_renderer.geometry.changes.max_materials != g_renderer.geometry.materials.maxsize) {
+            g_renderer.geometry.changes.max_materials = g_renderer.geometry.materials.maxsize;
+            VCLEAN_Materials(&(g_renderer.vulkan.core.geometry.materials));
+            VINIT_Materials(&(g_renderer.vulkan.core.geometry.materials));
+        } else {
+            VUPDT_Materials(&(g_renderer.vulkan.core.geometry.materials));
+        }
+    }
+
+    // update descriptor sets if needed
+    if (descriptor_changes) VUPDT_DescriptorSets(&(g_renderer.vulkan.core.context.renderdata.descriptors));
 
     // update uniform buffers
     VUPDT_UniformBuffers(&(g_renderer.vulkan.core.context.renderdata.ubos));

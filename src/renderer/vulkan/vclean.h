@@ -5,6 +5,8 @@
 
 void VCLEAN_Triangles(VulkanDataBuffer* triangles);
 
+void VCLEAN_Materials(VulkanDataBuffer* materials);
+
 void VCLEAN_Geometry(VulkanGeometry* geometry);
 
 void VCLEAN_Metadata(VulkanMetadata* metadata);

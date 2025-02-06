@@ -10,8 +10,8 @@ typedef const char* StaticString;
 DECLARE_ARRLIST(StaticString);
 
 typedef struct {
-    uint32_t x;
-    uint32_t y;
+    alignas(4) uint32_t x;
+    alignas(4) uint32_t y;
 } RayGenerator;
 
 typedef struct {
@@ -46,9 +46,11 @@ typedef struct {
     alignas(16) vec3 u;
     alignas(16) vec3 v;
     alignas(16) vec3 w;
-    alignas(16) vec3 camconf;
-    alignas(16) vec3 sizes;
-    alignas(16) vec2 viewport;
+    alignas(4) float fov;
+    alignas(4) float width;
+    alignas(4) float height;
+    alignas(4) uint32_t triangles;
+    alignas(8) vec2 viewport;
 } UniformBufferObject;
 
 typedef struct {
@@ -64,6 +66,8 @@ typedef struct {
 typedef struct {
     size_t max_triangles;
     BOOL update_triangles;
+    size_t max_materials;
+    BOOL update_materials;
 } ChangeSet;
 
 typedef struct {
@@ -109,6 +113,7 @@ typedef struct {
 
 typedef struct {
     VulkanDataBuffer triangles;
+    VulkanDataBuffer materials;
 } VulkanGeometry;
 
 typedef struct {
@@ -140,7 +145,8 @@ typedef struct {
 
 typedef struct {
     ARRLIST_Triangle triangles;
-    ARRLIST_TriangleID ids;
+    ARRLIST_TriangleID tids;
+    ARRLIST_SurfaceMaterial materials;
     ChangeSet changes;
 } Geometry;
 

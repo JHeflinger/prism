@@ -7,8 +7,13 @@ void VCLEAN_Triangles(VulkanDataBuffer* triangles) {
     VUTIL_DestroyBuffer(*triangles);
 }
 
+void VCLEAN_Materials(VulkanDataBuffer* materials) {
+    VUTIL_DestroyBuffer(*materials);
+}
+
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Triangles(&(geometry->triangles));
+    VCLEAN_Materials(&(geometry->materials));
 }
 
 void VCLEAN_Metadata(VulkanMetadata* metadata) {

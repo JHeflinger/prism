@@ -28,6 +28,8 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context);
 
 BOOL VINIT_Triangles(VulkanDataBuffer* triangles);
 
+BOOL VINIT_Materials(VulkanDataBuffer* materials);
+
 BOOL VINIT_Targets(VulkanImage* targets_arr);
 
 BOOL VINIT_General(VulkanGeneral* general);

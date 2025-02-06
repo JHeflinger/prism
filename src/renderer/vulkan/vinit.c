@@ -108,11 +108,23 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
     trianglesLayoutBinding.descriptorCount = 1;
     trianglesLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding bindings[] = { uboLayoutBinding, ssboLayoutBinding, imageLayoutBinding, trianglesLayoutBinding };
+    VkDescriptorSetLayoutBinding materialsLayoutBinding = { 0 };
+    materialsLayoutBinding.binding = 4;
+    materialsLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    materialsLayoutBinding.descriptorCount = 1;
+    materialsLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutBinding bindings[] = { 
+        uboLayoutBinding,
+        ssboLayoutBinding,
+        imageLayoutBinding,
+        trianglesLayoutBinding,
+        materialsLayoutBinding
+    };
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 4;
+    layoutInfo.bindingCount = 5;
     layoutInfo.pBindings = bindings;
 
     VkResult result = vkCreateDescriptorSetLayout(
@@ -133,10 +145,12 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
     poolSizes[2].descriptorCount = CPUSWAP_LENGTH;
     poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[3].descriptorCount = CPUSWAP_LENGTH;
+    poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[4].descriptorCount = CPUSWAP_LENGTH;
 
     VkDescriptorPoolCreateInfo poolInfo = { 0 };
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 4;
+    poolInfo.poolSizeCount = 5;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = CPUSWAP_LENGTH;
     result = vkCreateDescriptorPool(
@@ -296,6 +310,18 @@ BOOL VINIT_Triangles(VulkanDataBuffer* triangles) {
     return TRUE;
 }
 
+BOOL VINIT_Materials(VulkanDataBuffer* materials) {
+    size_t arrsize = sizeof(SurfaceMaterial) * g_vinit_renderer_ref->geometry.materials.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        materials);
+    VUPDT_Materials(materials);
+    return TRUE;
+}
+
 BOOL VINIT_Targets(VulkanImage* targets_arr) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VUTIL_CreateImage(
@@ -452,6 +478,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
 
 BOOL VINIT_Geometry(VulkanGeometry* geometry) {
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;
+	if (!VINIT_Materials(&(geometry->materials))) return FALSE;
     return TRUE;
 }
 

@@ -28,6 +28,20 @@ void ConfigureViewportPanel(Panel* panel) {
     Model model = LoadModel("assets/models/room.obj");
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
     Mesh mesh = model.meshes[0];
+    SurfaceMaterial material = {
+        { 1.0f, 0, 0 },
+        { 0.1f, 0.6f, 0.3f },
+        { 0.1f, 0.8f, 0.7f },
+        0,
+        0,
+        0,
+        0,
+        5.0f,
+        0
+    };
+
+    MaterialID mid = SubmitMaterial(material);
+
     for (int i = 0; i < mesh.vertexCount / 3; i++) {
         Triangle triangle = {
             {
@@ -44,7 +58,8 @@ void ConfigureViewportPanel(Panel* panel) {
                 mesh.vertices[(i * 3 + 2) * 3 + 0],
                 mesh.vertices[(i * 3 + 2) * 3 + 1],
                 mesh.vertices[(i * 3 + 2) * 3 + 2]
-            }
+            },
+            mid
         };
         SubmitTriangle(triangle);
     }

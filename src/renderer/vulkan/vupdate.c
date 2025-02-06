@@ -15,6 +15,15 @@ void VUPDT_Triangles(VulkanDataBuffer* triangles) {
         triangles->buffer);
 }
 
+void VUPDT_Materials(VulkanDataBuffer* materials) {
+    if (sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.maxsize == 0) return;
+    VUTIL_CopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.materials.data,
+        sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.size,
+        sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.maxsize,
+        materials->buffer);
+}
+
 void VUPDT_RecordCommand(VkCommandBuffer command) {
     VkCommandBufferBeginInfo beginInfo = { 0 };
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -93,7 +102,14 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         arrsize = arrsize > 0 ? arrsize : 1;
         triangleBufferInfo.range = arrsize;
 
-        VkWriteDescriptorSet descriptorWrites[4] = { 0 };
+        VkDescriptorBufferInfo materialsBufferInfo = { 0 };
+        materialsBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.materials.buffer;
+        materialsBufferInfo.offset = 0;
+        arrsize = sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.size;
+        arrsize = arrsize > 0 ? arrsize : 1;
+        materialsBufferInfo.range = arrsize;
+
+        VkWriteDescriptorSet descriptorWrites[5] = { 0 };
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptors->sets[i];
@@ -127,7 +143,15 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[3].descriptorCount = 1;
         descriptorWrites[3].pBufferInfo = &triangleBufferInfo;
 
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 4, descriptorWrites, 0, NULL);
+        descriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[4].dstSet = descriptors->sets[i];
+        descriptorWrites[4].dstBinding = 4;
+        descriptorWrites[4].dstArrayElement = 0;
+        descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[4].descriptorCount = 1;
+        descriptorWrites[4].pBufferInfo = &materialsBufferInfo;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 5, descriptorWrites, 0, NULL);
     }
 }
 
@@ -143,10 +167,10 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     glm_vec3_negate_to(ubo.look, ubo.w);
     glm_vec3_crossn(ubo.up, ubo.w, ubo.u);
     glm_vec3_crossn(ubo.w, ubo.u, ubo.v);
-	ubo.camconf[0] = glm_rad(g_vupdt_renderer_ref->camera.fov); // fov
-	ubo.camconf[1] = g_vupdt_renderer_ref->dimensions.x; // width
-	ubo.camconf[2] = g_vupdt_renderer_ref->dimensions.y; // height
-    ubo.sizes[0] = g_vupdt_renderer_ref->geometry.triangles.size;
+	ubo.fov = glm_rad(g_vupdt_renderer_ref->camera.fov);
+	ubo.width = g_vupdt_renderer_ref->dimensions.x;
+	ubo.height = g_vupdt_renderer_ref->dimensions.y;
+    ubo.triangles = g_vupdt_renderer_ref->geometry.triangles.size;
     ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
     ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));

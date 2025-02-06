@@ -7,8 +7,10 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     vec3 u;
     vec3 v;
     vec3 w;
-    vec3 camconf;
-    vec3 sizes;
+    float fov;
+    float width;
+    float height;
+    uint triangles;
     vec2 viewport;
 } ubo;
 
@@ -21,6 +23,19 @@ struct Triangle {
     vec3 a;
     vec3 b;
     vec3 c;
+    uint material;
+};
+
+struct Material {
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float reflect;
+    float refract;
+    float rindex;
+    float transparency;
+    float shiny;
+    float glossy;
 };
 
 layout(set = 0, binding = 1) readonly buffer RayGeneratorSSBOIn {
@@ -33,44 +48,50 @@ layout(set = 0, binding = 3) readonly buffer TriangleSSBOIn {
     Triangle triangleIn[ ];
 };
 
+layout(set = 0, binding = 4) readonly buffer MaterialSSBOIn {
+    Material materialIn[ ];
+};
+
 layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 
 void main() 
 {
+    // default light
+    vec3 light_position = ubo.position;
+    light_position = vec3(1.0, 1.0, 0.5);
+    vec3 ambient_light = vec3(1.0, 0.0, 0.0);
+    vec3 diffuse_light = vec3(1.0, 1.0, 1.0);
+    vec3 specular_light = vec3(1.0, 1.0, 1.0);
+
 	// get ray generator
     uint index= gl_GlobalInvocationID.x;
     RayGenerator rgIn = raygenIn[index];
 
-    // unpack camera conf for readability
-    float fov = ubo.camconf.x;
-    float width = ubo.camconf.y;
-    float height = ubo.camconf.z;
-
     // reject any rays outside of the viewport
     if (ubo.viewport.x != 0 && 
-        (rgIn.x < ceil(((width - ubo.viewport.x) / 2.0)) ||
-        (rgIn.x > ceil(((width + ubo.viewport.x) / 2.0))))) return;
+        (rgIn.x < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
+        (rgIn.x > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return;
     if (ubo.viewport.y != 0 && 
-        (rgIn.y < ceil(((height - ubo.viewport.y) / 2.0)) ||
-        (rgIn.y > ceil(((height + ubo.viewport.y) / 2.0))))) return;
+        (rgIn.y < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
+        (rgIn.y > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return;
 
 	// create ray
-	float r = width / 2.0;
-	float b = height / 2.0;
+	float r = ubo.width / 2.0;
+	float b = ubo.height / 2.0;
 	float l = -1.0 * r;
 	float t = -1.0 * b;
-    float u = l + ((r - l) * (float(rgIn.x) + 0.5)) / width;
-    float v = b + ((t - b) * (float(rgIn.y) + 0.5)) / height;
-	float d = (cos(fov / 2.0) / sin(fov / 2.0)) * r;
+    float u = l + ((r - l) * (float(rgIn.x) + 0.5)) / ubo.width;
+    float v = b + ((t - b) * (float(rgIn.y) + 0.5)) / ubo.height;
+	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
     vec3 ray_direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
     vec3 ray_position = ubo.position;
 
-    // number of triangles
-    uint num_triangles = uint(ubo.sizes.x);
-
     // triangle intersections
+    bool found_material = false;
+    uint hit_material = 0;
     float distance = -1.0;
-    for (uint i = 0; i < num_triangles; i++) {
+    vec3 hit_normal = vec3(0, 0, 0);
+    for (uint i = 0; i < ubo.triangles; i++) {
         Triangle tri = triangleIn[i];
         vec3 tri_normal = normalize(cross(tri.b - tri.a, tri.c - tri.b));
         float hit_distance = dot(tri.a - ray_position, tri_normal) / dot(ray_direction, tri_normal);
@@ -81,19 +102,73 @@ void main()
                 dot(cross(tri.a - tri.c, hit_at - tri.c), tri_normal) > 0) {
                 if (distance == -1.0) {
                     distance = hit_distance;
+                    hit_material = tri.material;
+                    found_material = true;
+                    hit_normal = tri_normal;
                 } else if (hit_distance < distance) {
                     distance = hit_distance;
+                    hit_material = tri.material;
+                    hit_normal = tri_normal;
                 }
             }
         }
     }
+    vec3 hit_position = ubo.position + (ray_direction * distance);
+
+    // light direction and distance
+    vec3 light_direction = normalize(hit_position - light_position);
+    float light_distance = length(hit_position - light_position);
+    light_direction -= light_direction * 2;
 
 	// color in pixel
     ivec2 pixel = ivec2(rgIn.x, rgIn.y);
-    vec4 color = vec4(normalize(abs(ray_direction)), 1.0);
+    vec3 color = abs(ray_direction);
     if (distance > 0) {
         float tval = 1.0 - (distance / (2.0f * length(ubo.position)));
-        color = vec4(tval, tval, tval, 1.0);
+        color = vec3(tval, tval, tval);
+        if (found_material) {
+            Material material = materialIn[hit_material];
+
+            // ambient light
+            color = material.ambient * ambient_light;
+
+            // diffuse light
+            color += material.diffuse * diffuse_light * dot(light_direction, hit_normal);
+
+            // specular light
+            vec3 reflection = normalize(reflect(light_direction, hit_normal));
+            float specular_const = dot(reflection, ray_direction);
+            if (specular_const >= 0)
+                color += specular_light * material.specular * pow(specular_const, material.shiny);
+
+            // divide to ensure not above 1, 1, 1
+            color /= 3.0;
+        }
     }
-    imageStore(outputImage, pixel, color);
+
+    // visualize point light
+    float light_radius = 0.1;
+    float qeq_a = dot(ray_direction, ray_direction);
+    float qeq_b = dot(ray_direction, ray_position - light_position);
+    float qeq_c = dot(ray_position - light_position, ray_position - light_position) - (light_radius * light_radius);
+    vec3 light_color = (ambient_light + diffuse_light + specular_light) / 3.0;
+    int iter_count = 5;
+    for (int i = 0; i < iter_count; i++) {
+        float new_radius = light_radius * (i + 1);
+        float real_qeq_c = qeq_c - (new_radius * new_radius);
+        float qeq_d = (qeq_b * qeq_b) - (qeq_a * real_qeq_c);
+        float qeq_e = dot(ray_direction * -1.0, ray_position - light_position);
+        if (qeq_d >= 0) {
+            float t1 = (qeq_e + sqrt(qeq_d)) / qeq_a;
+            float t2 = (qeq_e - sqrt(qeq_d)) / qeq_a;
+            if (t1 < 0) t1 = t2;
+            if (t2 < 0) t2 = t1;
+            float min_t = t1 < t2 ? t1 : t2;
+            if (min_t < distance || distance <= 0)
+                color = mix(color, light_color, (iter_count - i) * (1.0 / iter_count));
+            break;
+        }
+    }
+
+    imageStore(outputImage, pixel, vec4(color, 1.0));
 }

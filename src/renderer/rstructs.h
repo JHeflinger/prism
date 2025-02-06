@@ -7,6 +7,7 @@
 #define CGLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <cglm/cglm.h>
 
+typedef uint32_t MaterialID;
 typedef uint64_t TriangleID;
 DECLARE_ARRLIST(TriangleID);
 
@@ -21,6 +22,7 @@ typedef struct {
     alignas(16) vec3 a;
     alignas(16) vec3 b;
     alignas(16) vec3 c;
+    alignas(4) MaterialID material;
 } Triangle;
 DECLARE_ARRLIST(Triangle);
 
@@ -28,9 +30,19 @@ typedef struct {
     alignas(16) vec3 ambient;
     alignas(16) vec3 diffuse;
     alignas(16) vec3 specular;
-    alignas(16) vec3 rrr; // reflect, refract, refraction index
-    alignas(16) vec3 tsg; // transparency, shiny, glossy
+    alignas(4) float reflect;
+    alignas(4) float refract;
+    alignas(4) float rindex;
+    alignas(4) float transparency;
+    alignas(4) float shiny;
+    alignas(4) float glossy;
 } SurfaceMaterial;
 DECLARE_ARRLIST(SurfaceMaterial);
+
+typedef struct {
+    alignas(16) vec3 min;
+    alignas(16) vec3 max;
+} NodeBVH;
+DECLARE_ARRLIST(NodeBVH);
 
 #endif
