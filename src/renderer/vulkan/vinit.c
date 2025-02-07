@@ -114,17 +114,24 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
     materialsLayoutBinding.descriptorCount = 1;
     materialsLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+    VkDescriptorSetLayoutBinding bvhLayoutBinding = { 0 };
+    bvhLayoutBinding.binding = 5;
+    bvhLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bvhLayoutBinding.descriptorCount = 1;
+    bvhLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
     VkDescriptorSetLayoutBinding bindings[] = { 
         uboLayoutBinding,
         ssboLayoutBinding,
         imageLayoutBinding,
         trianglesLayoutBinding,
-        materialsLayoutBinding
+        materialsLayoutBinding,
+        bvhLayoutBinding
     };
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 5;
+    layoutInfo.bindingCount = 6;
     layoutInfo.pBindings = bindings;
 
     VkResult result = vkCreateDescriptorSetLayout(
@@ -136,7 +143,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
     }
 
     // create descriptor pool
-    VkDescriptorPoolSize poolSizes[4] = { 0 };
+    VkDescriptorPoolSize poolSizes[6] = { 0 };
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -147,10 +154,12 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
     poolSizes[3].descriptorCount = CPUSWAP_LENGTH;
     poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[4].descriptorCount = CPUSWAP_LENGTH;
+    poolSizes[5].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[5].descriptorCount = CPUSWAP_LENGTH;
 
     VkDescriptorPoolCreateInfo poolInfo = { 0 };
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 5;
+    poolInfo.poolSizeCount = 6;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = CPUSWAP_LENGTH;
     result = vkCreateDescriptorPool(
@@ -322,6 +331,18 @@ BOOL VINIT_Materials(VulkanDataBuffer* materials) {
     return TRUE;
 }
 
+BOOL VINIT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
+    size_t arrsize = sizeof(NodeBVH) * g_vinit_renderer_ref->geometry.bvh.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        bvh);
+    VUPDT_BoundingVolumeHierarchy(bvh);
+    return TRUE;
+}
+
 BOOL VINIT_Targets(VulkanImage* targets_arr) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VUTIL_CreateImage(
@@ -479,6 +500,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
 BOOL VINIT_Geometry(VulkanGeometry* geometry) {
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;
 	if (!VINIT_Materials(&(geometry->materials))) return FALSE;
+	if (!VINIT_BoundingVolumeHierarchy(&(geometry->bvh))) return FALSE;
     return TRUE;
 }
 

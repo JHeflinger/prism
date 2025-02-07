@@ -1,5 +1,7 @@
 #version 450
 
+// REMEMBER: during aabb intersections first check if it a leaf, if so then do the primitive intersection instead, no need to do 2 intersection operations
+
 layout(set = 0, binding = 0) uniform UniformBufferObject {
 	vec3 look;
 	vec3 position;
@@ -12,6 +14,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     float height;
     uint triangles;
     vec2 viewport;
+    uint bvhsize;
 } ubo;
 
 struct RayGenerator {
@@ -38,6 +41,12 @@ struct Material {
     float glossy;
 };
 
+struct NodeBVH {
+    vec3 min;
+    vec3 max;
+    uint branches[3]; 
+};
+
 layout(set = 0, binding = 1) readonly buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
@@ -52,6 +61,10 @@ layout(set = 0, binding = 4) readonly buffer MaterialSSBOIn {
     Material materialIn[ ];
 };
 
+layout(set = 0, binding = 5) readonly buffer BVHSSBOIn {
+    NodeBVH bvhIn[ ];
+};
+
 layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 
 void main() 
@@ -59,7 +72,7 @@ void main()
     // default light
     vec3 light_position = ubo.position;
     light_position = vec3(1.0, 1.0, 0.5);
-    vec3 ambient_light = vec3(1.0, 0.0, 0.0);
+    vec3 ambient_light = vec3(1.0, 0.5, 0.0);
     vec3 diffuse_light = vec3(1.0, 1.0, 1.0);
     vec3 specular_light = vec3(1.0, 1.0, 1.0);
 
@@ -122,7 +135,7 @@ void main()
 
 	// color in pixel
     ivec2 pixel = ivec2(rgIn.x, rgIn.y);
-    vec3 color = abs(ray_direction);
+    vec3 color = abs(ray_direction) / 8.0;
     if (distance > 0) {
         float tval = 1.0 - (distance / (2.0f * length(ubo.position)));
         color = vec3(tval, tval, tval);

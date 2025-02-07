@@ -6,6 +6,15 @@
 
 Renderer* g_vupdt_renderer_ref = NULL;
 
+void VUPDT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
+    if (sizeof(NodeBVH) * g_vupdt_renderer_ref->geometry.bvh.maxsize == 0) return;
+    VUTIL_CopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.bvh.data,
+        sizeof(NodeBVH) * g_vupdt_renderer_ref->geometry.bvh.size,
+        sizeof(NodeBVH) * g_vupdt_renderer_ref->geometry.bvh.maxsize,
+        bvh->buffer);
+}
+
 void VUPDT_Triangles(VulkanDataBuffer* triangles) {
     if (sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
@@ -109,7 +118,14 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         arrsize = arrsize > 0 ? arrsize : 1;
         materialsBufferInfo.range = arrsize;
 
-        VkWriteDescriptorSet descriptorWrites[5] = { 0 };
+        VkDescriptorBufferInfo bvhBufferInfo = { 0 };
+        bvhBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.bvh.buffer;
+        bvhBufferInfo.offset = 0;
+        arrsize = sizeof(NodeBVH) * g_vupdt_renderer_ref->geometry.bvh.size;
+        arrsize = arrsize > 0 ? arrsize : 1;
+        bvhBufferInfo.range = arrsize;
+
+        VkWriteDescriptorSet descriptorWrites[6] = { 0 };
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptors->sets[i];
@@ -151,7 +167,15 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[4].descriptorCount = 1;
         descriptorWrites[4].pBufferInfo = &materialsBufferInfo;
 
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 5, descriptorWrites, 0, NULL);
+        descriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[5].dstSet = descriptors->sets[i];
+        descriptorWrites[5].dstBinding = 5;
+        descriptorWrites[5].dstArrayElement = 0;
+        descriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[5].descriptorCount = 1;
+        descriptorWrites[5].pBufferInfo = &bvhBufferInfo;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 6, descriptorWrites, 0, NULL);
     }
 }
 
@@ -173,6 +197,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     ubo.triangles = g_vupdt_renderer_ref->geometry.triangles.size;
     ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
     ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
+    ubo.bvhsize = g_vupdt_renderer_ref->geometry.bvh.size;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     #undef RAYVEC_TO_GLMVEC
 }

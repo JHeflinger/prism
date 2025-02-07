@@ -3,6 +3,8 @@
 
 #include "renderer/vulkan/vstructs.h"
 
+void VUPDT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh);
+
 void VUPDT_Triangles(VulkanDataBuffer* triangles);
 
 void VUPDT_Materials(VulkanDataBuffer* materials);

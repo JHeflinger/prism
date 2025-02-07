@@ -51,6 +51,7 @@ typedef struct {
     alignas(4) float height;
     alignas(4) uint32_t triangles;
     alignas(8) vec2 viewport;
+    alignas(4) uint32_t bvhsize;
 } UniformBufferObject;
 
 typedef struct {
@@ -65,6 +66,7 @@ typedef struct {
 
 typedef struct {
     size_t max_triangles;
+    size_t max_bvh;
     BOOL update_triangles;
     size_t max_materials;
     BOOL update_materials;
@@ -114,6 +116,7 @@ typedef struct {
 typedef struct {
     VulkanDataBuffer triangles;
     VulkanDataBuffer materials;
+    VulkanDataBuffer bvh;
 } VulkanGeometry;
 
 typedef struct {
@@ -146,7 +149,9 @@ typedef struct {
 typedef struct {
     ARRLIST_Triangle triangles;
     ARRLIST_TriangleID tids;
+    ARRLIST_TriangleBB tbbs;
     ARRLIST_SurfaceMaterial materials;
+    ARRLIST_NodeBVH bvh;
     ChangeSet changes;
 } Geometry;
 

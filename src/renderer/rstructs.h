@@ -27,6 +27,13 @@ typedef struct {
 DECLARE_ARRLIST(Triangle);
 
 typedef struct {
+    vec3 min;
+    vec3 max;
+    vec3 centroid;
+} TriangleBB;
+DECLARE_ARRLIST(TriangleBB);
+
+typedef struct {
     alignas(16) vec3 ambient;
     alignas(16) vec3 diffuse;
     alignas(16) vec3 specular;
@@ -39,10 +46,18 @@ typedef struct {
 } SurfaceMaterial;
 DECLARE_ARRLIST(SurfaceMaterial);
 
+#define BVH_LEAF 0
+#define BVH_LEFT_ONLY 1
+#define BVH_RIGHT_ONLY 2
+#define BVH_BOTH 3
+
 typedef struct {
     alignas(16) vec3 min;
     alignas(16) vec3 max;
-    alignas(16) uint32_t branches[3]; // [0] is leaf or no, [1] is left tree ind, [2] is right tree ind
+    alignas(16) uint32_t branches[3]; 
+    // branches[0] describes: 0 = leaf, 1 = left tree, 2 = right tree, 3 = both
+    // branches[1] is left tree ind
+    // branches[2] is right tree ind
 } NodeBVH;
 DECLARE_ARRLIST(NodeBVH);
 

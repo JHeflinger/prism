@@ -3,6 +3,8 @@
 
 #include "renderer/rstructs.h"
 
-void RUTIL_BoundingVolumeHierarchy(ARRLIST_NodeBVH* bvh, ARRLIST_Triangle* geometry);
+DECLARE_ARRLIST(size_t);
+
+void RUTIL_BoundingVolumeHierarchy(ARRLIST_NodeBVH* bvh, ARRLIST_TriangleBB* geometry);
 
 #endif

@@ -83,8 +83,4 @@ print("Analyzing project code...")
 statement += analyze_code("src", "CODEBASE") + "\n"
 print("Finished analyzing project code!")
 
-print("Analyzing vendors...")
-statement += analyze_code("vendor", "VENDOR") + "\n"
-print("Finished analyzing vendor code!")
-
 print(statement)

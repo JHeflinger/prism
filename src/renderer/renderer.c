@@ -4,6 +4,7 @@
 #include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vclean.h"
+#include "renderer/rutils.h"
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
 #include <string.h>
@@ -55,6 +56,7 @@ void DestroyRenderer() {
     // clean geometry
     ClearTriangles();
     ClearMaterials();
+    ARRLIST_NodeBVH_clear(&(g_renderer.geometry.bvh));
 
     // destroy vulkan resources
     VCLEAN_Vulkan(&(g_renderer.vulkan));
@@ -74,7 +76,36 @@ void MoveCamera(SimpleCamera camera) {
 
 TriangleID SubmitTriangle(Triangle triangle) {
     g_renderer.geometry.changes.update_triangles = TRUE;
+    TriangleBB bb = {
+        {
+            triangle.a[0] < triangle.b[0] ?
+                (triangle.a[0] < triangle.c[0] ? triangle.a[0] : triangle.c[0]) :
+                (triangle.b[0] < triangle.c[0] ? triangle.b[0] : triangle.c[0]),
+            triangle.a[1] < triangle.b[1] ?
+                (triangle.a[1] < triangle.c[1] ? triangle.a[1] : triangle.c[1]) :
+                (triangle.b[1] < triangle.c[1] ? triangle.b[1] : triangle.c[1]),
+            triangle.a[2] < triangle.b[2] ?
+                (triangle.a[2] < triangle.c[2] ? triangle.a[2] : triangle.c[2]) :
+                (triangle.b[2] < triangle.c[2] ? triangle.b[2] : triangle.c[2])
+        },
+        {
+            triangle.a[0] > triangle.b[0] ?
+                (triangle.a[0] > triangle.c[0] ? triangle.a[0] : triangle.c[0]) :
+                (triangle.b[0] > triangle.c[0] ? triangle.b[0] : triangle.c[0]),
+            triangle.a[1] > triangle.b[1] ?
+                (triangle.a[1] > triangle.c[1] ? triangle.a[1] : triangle.c[1]) :
+                (triangle.b[1] > triangle.c[1] ? triangle.b[1] : triangle.c[1]),
+            triangle.a[2] > triangle.b[2] ?
+                (triangle.a[2] > triangle.c[2] ? triangle.a[2] : triangle.c[2]) :
+                (triangle.b[2] > triangle.c[2] ? triangle.b[2] : triangle.c[2])
+        },
+        { 0, 0, 0 }
+    };
+    bb.centroid[0] = ((bb.max[0] - bb.min[0]) / 2.0f) + bb.min[0];
+    bb.centroid[1] = ((bb.max[1] - bb.min[1]) / 2.0f) + bb.min[1];
+    bb.centroid[2] = ((bb.max[2] - bb.min[2]) / 2.0f) + bb.min[2]; 
     ARRLIST_TriangleID_add(&(g_renderer.geometry.tids), g_triangle_id);
+    ARRLIST_TriangleBB_add(&(g_renderer.geometry.tbbs), bb);
     ARRLIST_Triangle_add(&(g_renderer.geometry.triangles), triangle);
     g_triangle_id++;
     return g_triangle_id - 1;
@@ -93,6 +124,7 @@ void RemoveTriangle(TriangleID id) {
     if (found) {
         ARRLIST_Triangle_remove(&(g_renderer.geometry.triangles), ind);
         ARRLIST_TriangleID_remove(&(g_renderer.geometry.tids), ind);
+        ARRLIST_TriangleBB_remove(&(g_renderer.geometry.tbbs), ind);
         g_renderer.geometry.changes.update_triangles = TRUE;
     } else {
         LOG_FATAL("Unable to remove nonexistant triangle");
@@ -101,6 +133,7 @@ void RemoveTriangle(TriangleID id) {
 
 void ClearTriangles() {
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.tids));
+    ARRLIST_TriangleBB_clear(&(g_renderer.geometry.tbbs));
     ARRLIST_Triangle_clear(&(g_renderer.geometry.triangles));
     g_renderer.geometry.changes.update_triangles = TRUE;
 }
@@ -136,6 +169,15 @@ void Render() {
             VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
         } else {
             VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
+        }
+        // update bvh
+        RUTIL_BoundingVolumeHierarchy(&g_renderer.geometry.bvh, &g_renderer.geometry.tbbs);
+        if (g_renderer.geometry.changes.max_bvh != g_renderer.geometry.bvh.maxsize) {
+            g_renderer.geometry.changes.max_bvh = g_renderer.geometry.bvh.maxsize;
+            VCLEAN_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+            VINIT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+        } else {
+            VUPDT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
         }
     }
 

@@ -3,6 +3,10 @@
 
 Renderer* g_vlcean_renderer_ref = NULL;
 
+void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
+    VUTIL_DestroyBuffer(*bvh);
+}
+
 void VCLEAN_Triangles(VulkanDataBuffer* triangles) {
     VUTIL_DestroyBuffer(*triangles);
 }
@@ -14,6 +18,7 @@ void VCLEAN_Materials(VulkanDataBuffer* materials) {
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Triangles(&(geometry->triangles));
     VCLEAN_Materials(&(geometry->materials));
+    VCLEAN_BoundingVolumeHierarchy(&(geometry->bvh));
 }
 
 void VCLEAN_Metadata(VulkanMetadata* metadata) {
