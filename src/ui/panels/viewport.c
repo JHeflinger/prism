@@ -8,11 +8,19 @@ int i = 0;
 
 void DrawViewportPanel(float width, float height) {
     static float time = 0.0f;
+    static float time2 = 0.0f;
     static float radius = 3.0f;
-    time += GetFrameTime();
     SimpleCamera camera = GetCamera();
+    if (IsKeyDown(KEY_R)) {
+        time += GetFrameTime();
+    }
+    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+        time -= GetMouseDelta().x / 500.0;
+        time2 += GetMouseDelta().y / 250.0;
+    }
     camera.position.x = radius * cos(time);
     camera.position.y = radius * sin(time);
+    camera.position.z = time2;
 	camera.fov = 90.0f;
     SetViewportSlice(width, height);
     MoveCamera(camera);

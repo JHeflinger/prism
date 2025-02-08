@@ -54,10 +54,9 @@ DECLARE_ARRLIST(SurfaceMaterial);
 typedef struct {
     alignas(16) vec3 min;
     alignas(16) vec3 max;
-    //alignas(4) uint32_t branch_config;
-    //alignas(4) uint32_t left;
-    //alignas(4) uint32_t right;
-    alignas(16) uint32_t branches[3]; 
+    alignas(4) uint32_t branch_config;
+    alignas(4) uint32_t left;
+    alignas(4) uint32_t right;
     // branches[0] describes: 0 = leaf, 1 = left tree, 2 = right tree, 3 = both
     // branches[1] is left tree ind
     // branches[2] is right tree ind

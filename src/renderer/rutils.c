@@ -5,10 +5,56 @@
 
 IMPL_ARRLIST(size_t);
 
+void ResizeBVH(ARRLIST_NodeBVH* bvh, size_t index) {
+    if (bvh->data[index].branch_config == BVH_BOTH) {
+        ResizeBVH(bvh, bvh->data[index].left);
+        ResizeBVH(bvh, bvh->data[index].right);
+        glm_vec3_minv(
+            bvh->data[index].min,
+            bvh->data[bvh->data[index].left].min,
+            bvh->data[index].min);
+        glm_vec3_maxv(
+            bvh->data[index].max,
+            bvh->data[bvh->data[index].left].max,
+            bvh->data[index].max);
+        glm_vec3_minv(
+            bvh->data[index].min,
+            bvh->data[bvh->data[index].right].min,
+            bvh->data[index].min);
+        glm_vec3_maxv(
+            bvh->data[index].max,
+            bvh->data[bvh->data[index].right].max,
+            bvh->data[index].max);
+    } else if (bvh->data[index].branch_config == BVH_LEFT_ONLY) {
+        ResizeBVH(bvh, bvh->data[index].left);
+        glm_vec3_minv(
+            bvh->data[index].min,
+            bvh->data[bvh->data[index].left].min,
+            bvh->data[index].min);
+        glm_vec3_maxv(
+            bvh->data[index].max,
+            bvh->data[bvh->data[index].left].max,
+            bvh->data[index].max);
+    } else if (bvh->data[index].branch_config == BVH_RIGHT_ONLY) {
+        ResizeBVH(bvh, bvh->data[index].right);
+        glm_vec3_minv(
+            bvh->data[index].min,
+            bvh->data[bvh->data[index].right].min,
+            bvh->data[index].min);
+        glm_vec3_maxv(
+            bvh->data[index].max,
+            bvh->data[bvh->data[index].right].max,
+            bvh->data[index].max);
+    } else {
+        return;
+    }
+}
+
 void SplitBVH(ARRLIST_NodeBVH* bvh, size_t index, ARRLIST_TriangleBB* geometry, ARRLIST_size_t* children) {
     #define CBVH bvh->data[index]
     #define BVHMIN bvh->data[index].min
     #define BVHMAX bvh->data[index].max
+    #define COPYVEC(v1, v2) { v1[0] = v2[0]; v1[1] = v2[1]; v1[2] = v2[2]; }
 
     // set up split boxes
     float xyz_dist[3] = {
@@ -20,6 +66,7 @@ void SplitBVH(ARRLIST_NodeBVH* bvh, size_t index, ARRLIST_TriangleBB* geometry, 
         (xyz_dist[0] > xyz_dist[2] ? 0 : 2) :
         (xyz_dist[1] > xyz_dist[2] ? 1 : 2);
     if (xyz_dist[dist_ind] < BVH_LIMIT) {
+        size_t stream_index = index;
         for (size_t i = 0; i < children->size; i++) {
             NodeBVH child = {
                 { geometry->data[children->data[i]].min[0],
@@ -28,37 +75,38 @@ void SplitBVH(ARRLIST_NodeBVH* bvh, size_t index, ARRLIST_TriangleBB* geometry, 
                 { geometry->data[children->data[i]].max[0],
                   geometry->data[children->data[i]].max[1],
                   geometry->data[children->data[i]].max[2] },
-                { BVH_LEAF, 0, 0 }
+                BVH_LEAF, children->data[i], 0
             };
             ARRLIST_NodeBVH_add(bvh, child);
-            bvh->data[index].branches[1] = bvh->size - 1;
+            bvh->data[stream_index].left = bvh->size - 1;
 
             if (i + 1 >= children->size) {
-                bvh->data[index].branches[0] = BVH_LEFT_ONLY;
+                bvh->data[stream_index].branch_config = BVH_LEFT_ONLY;
             } else {
-                bvh->data[index].branches[0] = BVH_BOTH;
+                bvh->data[stream_index].branch_config = BVH_BOTH;
                 NodeBVH next = {
                     { BVHMIN[0], BVHMIN[1], BVHMIN[2] },
                     { BVHMAX[0], BVHMAX[1], BVHMAX[2] },
-                    { BVH_LEAF, 0, 0 }
+                    BVH_LEAF, 0, 0
                 };
                 ARRLIST_NodeBVH_add(bvh, next);
-                bvh->data[index].branches[2] = bvh->size - 1;
-                index = bvh->size - 1;
+                bvh->data[stream_index].right = bvh->size - 1;
+                stream_index = bvh->size - 1;
             }
         }
+        ResizeBVH(bvh, index);
         return;
     }
     float mid_dist = xyz_dist[dist_ind] / 2.0f;
     NodeBVH left = {
         { BVHMIN[0], BVHMIN[1], BVHMIN[2] },
         { BVHMAX[0], BVHMAX[1], BVHMAX[2] },
-        { BVH_LEAF, 0, 0 }
+        BVH_LEAF, 0, 0
     };
     NodeBVH right = {
         { BVHMIN[0], BVHMIN[1], BVHMIN[2] },
         { BVHMAX[0], BVHMAX[1], BVHMAX[2] },
-        { BVH_LEAF, 0, 0 }
+        BVH_LEAF, 0, 0
     };
     left.max[dist_ind] -= mid_dist;
     right.min[dist_ind] += mid_dist;
@@ -72,87 +120,77 @@ void SplitBVH(ARRLIST_NodeBVH* bvh, size_t index, ARRLIST_TriangleBB* geometry, 
         else ARRLIST_size_t_add(&right_children, children->data[i]);
     }
     if (left_children.size > 0 && right_children.size > 0) {
-        CBVH.branches[0] = BVH_BOTH;
+        CBVH.branch_config = BVH_BOTH;
     } else if (left_children.size > 0) {
-        CBVH.branches[0] = BVH_LEFT_ONLY;
+        CBVH.branch_config = BVH_LEFT_ONLY;
     } else if (right_children.size > 0) {
-        CBVH.branches[0] = BVH_RIGHT_ONLY;
+        CBVH.branch_config = BVH_RIGHT_ONLY;
     } else {
-        CBVH.branches[0] = BVH_LEAF;
+        LOG_FATAL("This should never happen");
+        CBVH.branch_config = BVH_LEAF;
     }
     if (left_children.size > 1) {
         ARRLIST_NodeBVH_add(bvh, left);
-        CBVH.branches[1] = bvh->size - 1;
-        SplitBVH(bvh, bvh->size - 1, geometry, &left_children);
+        CBVH.left = bvh->size - 1;
+        SplitBVH(bvh, CBVH.left, geometry, &left_children);
     } else if (left_children.size == 1) {
-        left.branches[0] = BVH_LEAF;
-        left.branches[1] = left_children.data[0];
+        left.branch_config = BVH_LEAF;
+        left.left = left_children.data[0];
+        COPYVEC(left.min, geometry->data[left.left].min);
+        COPYVEC(left.max, geometry->data[left.left].max);
         ARRLIST_NodeBVH_add(bvh, left);
-        CBVH.branches[1] = bvh->size - 1;
+        CBVH.left = bvh->size - 1;
     }
     if (right_children.size > 1) {
         ARRLIST_NodeBVH_add(bvh, right);
-        CBVH.branches[2] = bvh->size - 1;
-        SplitBVH(bvh, bvh->size - 1, geometry, &right_children);
+        CBVH.right = bvh->size - 1;
+        SplitBVH(bvh, CBVH.right, geometry, &right_children);
     } else if (right_children.size == 1) {
-        right.branches[0] = BVH_LEAF;
-        right.branches[1] = right_children.data[0];
+        right.branch_config = BVH_LEAF;
+        right.left = right_children.data[0];
+        COPYVEC(right.min, geometry->data[right.left].min);
+        COPYVEC(right.max, geometry->data[right.left].max);
         ARRLIST_NodeBVH_add(bvh, right);
-        CBVH.branches[2] = bvh->size - 1;
+        CBVH.right = bvh->size - 1;
     }
     ARRLIST_size_t_clear(&left_children);
     ARRLIST_size_t_clear(&right_children);
 
     // resize
-    if (bvh->data[index].branches[0] == 3 || bvh->data[index].branches[0] == 1) {
+    if (bvh->data[index].branch_config == BVH_BOTH || bvh->data[index].branch_config == BVH_LEFT_ONLY) {
         glm_vec3_minv(
             bvh->data[index].min,
-            bvh->data[bvh->data[index].branches[1]].min,
+            bvh->data[bvh->data[index].left].min,
             bvh->data[index].min);
         glm_vec3_maxv(
             bvh->data[index].max,
-            bvh->data[bvh->data[index].branches[1]].max,
+            bvh->data[bvh->data[index].left].max,
             bvh->data[index].max);
     }
-    if (bvh->data[index].branches[0] == 3 || bvh->data[index].branches[0] == 2) {
+    if (bvh->data[index].branch_config == BVH_BOTH || bvh->data[index].branch_config == BVH_RIGHT_ONLY) {
         glm_vec3_minv(
             bvh->data[index].min,
-            bvh->data[bvh->data[index].branches[2]].min,
+            bvh->data[bvh->data[index].right].min,
             bvh->data[index].min);
         glm_vec3_maxv(
             bvh->data[index].max,
-            bvh->data[bvh->data[index].branches[2]].max,
+            bvh->data[bvh->data[index].right].max,
             bvh->data[index].max);
     }
+    
     
     #undef CBVH
     #undef BVHMIN
     #undef BVHMAX
+    #undef COPYVEC
 }
 
-void test(ARRLIST_NodeBVH* bvh) {
-    LOG_INFO("%d", (int)bvh->size);
-    uint32_t stack[200];
-    int stack_ptr = 0;
-    stack[stack_ptr++] = 0;
-    while (stack_ptr > 0) {
-        if (stack[stack_ptr - 1] >= bvh->size) { LOG_FATAL("out of bounds!"); }
-        NodeBVH node = bvh->data[stack[--stack_ptr]];
-        if (stack_ptr >= 200 - 1) { LOG_FATAL("out of stack space!"); }
-        if (node.branches[0] == 0) {
-            // triangle intersection check, move on
-        } else if (node.branches[0] == 1) {
-            // traverse left tree
-            stack[stack_ptr++] = node.branches[1];
-        } else if (node.branches[0] == 2) {
-            // traverse right tree
-            stack[stack_ptr++] = node.branches[2];
-        } else {
-            // traverse both tree sides
-            stack[stack_ptr++] = node.branches[1];
-            stack[stack_ptr++] = node.branches[2];
-        }
-    }
+size_t CountBVH(ARRLIST_NodeBVH* bvh, size_t index) {
+    if (bvh->data[index].branch_config == BVH_LEAF) return 1;
+    if (bvh->data[index].branch_config == BVH_LEFT_ONLY) return CountBVH(bvh, bvh->data[index].left);
+    if (bvh->data[index].branch_config == BVH_RIGHT_ONLY) return CountBVH(bvh, bvh->data[index].right);
+    if (bvh->data[index].branch_config == BVH_BOTH) return CountBVH(bvh, bvh->data[index].left) + CountBVH(bvh, bvh->data[index].right);
+    return 0;
 }
 
 void RUTIL_BoundingVolumeHierarchy(ARRLIST_NodeBVH* bvh, ARRLIST_TriangleBB* geometry) {
@@ -163,7 +201,7 @@ void RUTIL_BoundingVolumeHierarchy(ARRLIST_NodeBVH* bvh, ARRLIST_TriangleBB* geo
     NodeBVH root = {
         { FLT_MAX, FLT_MAX, FLT_MAX },
         { -FLT_MAX, -FLT_MAX, -FLT_MAX },
-        { BVH_LEAF, 0, 0 }
+        BVH_LEAF, 0, 0
     };
 
     // resize root
@@ -184,8 +222,4 @@ void RUTIL_BoundingVolumeHierarchy(ARRLIST_NodeBVH* bvh, ARRLIST_TriangleBB* geo
 
     // clean indices
     ARRLIST_size_t_clear(&indices);
-
-    test(bvh);
-    LOG_INFO("tested");
-    //exit(1);
 }
