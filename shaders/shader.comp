@@ -1,6 +1,6 @@
 #version 450
 
-// REMEMBER: during aabb intersections first check if it a leaf, if so then do the primitive intersection instead, no need to do 2 intersection operations
+#define MAX_RECURSIVE_DEPTH 200
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
 	vec3 look;
@@ -76,6 +76,8 @@ float hit_distance = -1.0;
 uint hit_material = 0;
 vec3 hit_normal = vec3(0, 0, 0);
 vec3 hit_position;
+bool stack_failure = false;
+bool out_of_bounds_failure = false;
 
 vec3 light_position = vec3(1.0, 1.0, 0.5);
 vec3 ambient_light = vec3(1.0, 0.5, 0.0);
@@ -105,6 +107,22 @@ void create_ray() {
     ray_position = ubo.position;
 }
 
+bool intersect_triangle(uint triangle_ind, inout vec3 tri_normal, inout float distance, inout uint material) {
+    Triangle tri = triangleIn[triangle_ind];
+    tri_normal = normalize(cross(tri.b - tri.a, tri.c - tri.b));
+    distance = dot(tri.a - ray_position, tri_normal) / dot(ray_direction, tri_normal);
+    if (distance > 0) {
+        vec3 hit_at = ray_position + (ray_direction * distance);
+        if (dot(cross(tri.b - tri.a, hit_at - tri.a), tri_normal) > 0 &&
+            dot(cross(tri.c - tri.b, hit_at - tri.b), tri_normal) > 0 &&
+            dot(cross(tri.a - tri.c, hit_at - tri.c), tri_normal) > 0) {
+            material = tri.material;
+            return true;
+        }
+    }
+    return false;
+}
+
 bool aabb_intersect(uint node_ind) {
     float entrance = 0.0;
     float exit = 3.402823466e+38;
@@ -128,24 +146,41 @@ bool aabb_intersect(uint node_ind) {
     return true;
 }
 
-bool intersect_triangle(uint triangle_ind, inout vec3 tri_normal, inout float distance, inout uint material) {
-    Triangle tri = triangleIn[triangle_ind];
-    tri_normal = normalize(cross(tri.b - tri.a, tri.c - tri.b));
-    distance = dot(tri.a - ray_position, tri_normal) / dot(ray_direction, tri_normal);
-    if (distance > 0) {
-        vec3 hit_at = ray_position + (ray_direction * distance);
-        if (dot(cross(tri.b - tri.a, hit_at - tri.a), tri_normal) > 0 &&
-            dot(cross(tri.c - tri.b, hit_at - tri.b), tri_normal) > 0 &&
-            dot(cross(tri.a - tri.c, hit_at - tri.c), tri_normal) > 0) {
-            material = tri.material;
-            return true;
+bool bvh_intersect(uint node_ind) {
+    // vec3 tri_normal;
+    // float distance;
+    // uint material;
+    uint stack[200];
+    int stack_ptr = 0;
+    stack[stack_ptr++] = 0;
+    while (stack_ptr > 0) {
+        if (stack[stack_ptr - 1] >= ubo.bvhsize) { out_of_bounds_failure = true; break; }
+        NodeBVH node = bvhIn[stack[--stack_ptr]];
+        if (stack_ptr >= 200 - 1) { stack_failure = true; break; }
+        if (node.branches[0] == 0) {
+            // triangle intersection check, move on
+        } else if (node.branches[0] == 1) {
+            // traverse left tree
+            stack[stack_ptr++] = node.branches[1];
+        } else if (node.branches[0] == 2) {
+            // traverse right tree
+            stack[stack_ptr++] = node.branches[2];
+        } else {
+            // traverse both tree sides
+            stack[stack_ptr++] = node.branches[1];
+            stack[stack_ptr++] = node.branches[2];
         }
     }
-    return false;
+    // for (uint i = 0; i < ubo.bvhsize; i++) {
+    //     NodeBVH node = bvhIn[i];
+    //     hit_distance += float(node.branches[0]);
+    //     hit_distance += float(node.branches[1]);
+    //     hit_distance += float(node.branches[2]);
+    // }
+    return hit_distance > 0.0;
 }
 
 void naiive_intersect_ray() {
-    bool found_material = false;
     for (uint i = 0; i < ubo.triangles; i++) {
         vec3 tri_normal;
         float distance;
@@ -154,7 +189,6 @@ void naiive_intersect_ray() {
             if (hit_distance == -1.0) {
                 hit_distance = distance;
                 hit_material = material;
-                found_material = true;
                 hit_normal = tri_normal;
             } else if (distance < hit_distance) {
                 hit_distance = distance;
@@ -169,7 +203,8 @@ void naiive_intersect_ray() {
 }
 
 void accelerated_intersect_ray() {
-    // TODO
+    if (ubo.bvhsize > 0)
+        bvh_intersect(0);
 }
 
 void draw_point_light() {
@@ -221,13 +256,19 @@ void main() {
     create_ray();
 
     // intersect ray
-    naiive_intersect_ray();
+    accelerated_intersect_ray();
 
 	// color in pixel
     shade_color();
 
     // draw point light
     draw_point_light();
+
+    // stack failure
+    if (stack_failure) color = vec3(1.0, 0.0, 0.0);
+
+    // out of bounds failure
+    if (out_of_bounds_failure) color = vec3(0.0, 1.0, 0.0);
 
     // write to image
     imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));

@@ -130,6 +130,31 @@ void SplitBVH(ARRLIST_NodeBVH* bvh, size_t index, ARRLIST_TriangleBB* geometry, 
     #undef BVHMAX
 }
 
+void test(ARRLIST_NodeBVH* bvh) {
+    LOG_INFO("%d", (int)bvh->size);
+    uint32_t stack[200];
+    int stack_ptr = 0;
+    stack[stack_ptr++] = 0;
+    while (stack_ptr > 0) {
+        if (stack[stack_ptr - 1] >= bvh->size) { LOG_FATAL("out of bounds!"); }
+        NodeBVH node = bvh->data[stack[--stack_ptr]];
+        if (stack_ptr >= 200 - 1) { LOG_FATAL("out of stack space!"); }
+        if (node.branches[0] == 0) {
+            // triangle intersection check, move on
+        } else if (node.branches[0] == 1) {
+            // traverse left tree
+            stack[stack_ptr++] = node.branches[1];
+        } else if (node.branches[0] == 2) {
+            // traverse right tree
+            stack[stack_ptr++] = node.branches[2];
+        } else {
+            // traverse both tree sides
+            stack[stack_ptr++] = node.branches[1];
+            stack[stack_ptr++] = node.branches[2];
+        }
+    }
+}
+
 void RUTIL_BoundingVolumeHierarchy(ARRLIST_NodeBVH* bvh, ARRLIST_TriangleBB* geometry) {
     // clear old bvh
     ARRLIST_NodeBVH_clear(bvh);
@@ -159,4 +184,8 @@ void RUTIL_BoundingVolumeHierarchy(ARRLIST_NodeBVH* bvh, ARRLIST_TriangleBB* geo
 
     // clean indices
     ARRLIST_size_t_clear(&indices);
+
+    test(bvh);
+    LOG_INFO("tested");
+    //exit(1);
 }
