@@ -67,28 +67,33 @@ layout(set = 0, binding = 5) readonly buffer BVHSSBOIn {
 
 layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 
-void main() 
-{
-    // default light
-    vec3 light_position = ubo.position;
-    light_position = vec3(1.0, 1.0, 0.5);
-    vec3 ambient_light = vec3(1.0, 0.5, 0.0);
-    vec3 diffuse_light = vec3(1.0, 1.0, 1.0);
-    vec3 specular_light = vec3(1.0, 1.0, 1.0);
+RayGenerator rgIn;
+vec3 ray_direction;
+vec3 ray_position;
+vec3 color;
 
-	// get ray generator
-    uint index= gl_GlobalInvocationID.x;
-    RayGenerator rgIn = raygenIn[index];
+float hit_distance = -1.0;
+uint hit_material = 0;
+vec3 hit_normal = vec3(0, 0, 0);
+vec3 hit_position;
 
-    // reject any rays outside of the viewport
+vec3 light_position = vec3(1.0, 1.0, 0.5);
+vec3 ambient_light = vec3(1.0, 0.5, 0.0);
+vec3 diffuse_light = vec3(1.0, 1.0, 1.0);
+vec3 specular_light = vec3(1.0, 1.0, 1.0);
+float light_distance;
+vec3 light_direction;
+
+void cut_viewport() {
     if (ubo.viewport.x != 0 && 
         (rgIn.x < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
         (rgIn.x > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return;
     if (ubo.viewport.y != 0 && 
         (rgIn.y < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
         (rgIn.y > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return;
+}
 
-	// create ray
+void create_ray() {
 	float r = ubo.width / 2.0;
 	float b = ubo.height / 2.0;
 	float l = -1.0 * r;
@@ -96,81 +101,134 @@ void main()
     float u = l + ((r - l) * (float(rgIn.x) + 0.5)) / ubo.width;
     float v = b + ((t - b) * (float(rgIn.y) + 0.5)) / ubo.height;
 	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
-    vec3 ray_direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
-    vec3 ray_position = ubo.position;
+    ray_direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+    ray_position = ubo.position;
+}
 
-    // triangle intersections
+bool aabb_intersect(uint node_ind) {
+    float entrance = 0.0;
+    float exit = 3.402823466e+38;
+    for (int i = 0; i < 3; i++) {
+        float slab_a = bvhIn[node_ind].min[i];
+        float slab_b = bvhIn[node_ind].max[i];
+        float inv_dir = 1.0 / ray_direction[i];
+        float origin = ray_position[i];
+        float closest = (slab_a - origin) * inv_dir;
+        float farthest = (slab_b - origin) * inv_dir;
+        if (farthest < closest) {
+            float temp = farthest;
+            farthest = closest;
+            closest = temp;
+        }
+        if (farthest < entrance || closest > exit) return false;
+        exit = farthest < exit ? farthest : exit;
+        entrance = closest > entrance ? closest : entrance;
+    }
+    hit_distance = entrance;
+    return true;
+}
+
+bool intersect_triangle(uint triangle_ind, inout vec3 tri_normal, inout float distance, inout uint material) {
+    Triangle tri = triangleIn[triangle_ind];
+    tri_normal = normalize(cross(tri.b - tri.a, tri.c - tri.b));
+    distance = dot(tri.a - ray_position, tri_normal) / dot(ray_direction, tri_normal);
+    if (distance > 0) {
+        vec3 hit_at = ray_position + (ray_direction * distance);
+        if (dot(cross(tri.b - tri.a, hit_at - tri.a), tri_normal) > 0 &&
+            dot(cross(tri.c - tri.b, hit_at - tri.b), tri_normal) > 0 &&
+            dot(cross(tri.a - tri.c, hit_at - tri.c), tri_normal) > 0) {
+            material = tri.material;
+            return true;
+        }
+    }
+    return false;
+}
+
+void naiive_intersect_ray() {
     bool found_material = false;
-    uint hit_material = 0;
-    float distance = -1.0;
-    vec3 hit_normal = vec3(0, 0, 0);
     for (uint i = 0; i < ubo.triangles; i++) {
-        Triangle tri = triangleIn[i];
-        vec3 tri_normal = normalize(cross(tri.b - tri.a, tri.c - tri.b));
-        float hit_distance = dot(tri.a - ray_position, tri_normal) / dot(ray_direction, tri_normal);
-        if (hit_distance > 0) {
-            vec3 hit_at = ray_position + (ray_direction * hit_distance);
-            if (dot(cross(tri.b - tri.a, hit_at - tri.a), tri_normal) > 0 &&
-                dot(cross(tri.c - tri.b, hit_at - tri.b), tri_normal) > 0 &&
-                dot(cross(tri.a - tri.c, hit_at - tri.c), tri_normal) > 0) {
-                if (distance == -1.0) {
-                    distance = hit_distance;
-                    hit_material = tri.material;
-                    found_material = true;
-                    hit_normal = tri_normal;
-                } else if (hit_distance < distance) {
-                    distance = hit_distance;
-                    hit_material = tri.material;
-                    hit_normal = tri_normal;
-                }
+        vec3 tri_normal;
+        float distance;
+        uint material;
+        if (intersect_triangle(i, tri_normal, distance, material)) {
+            if (hit_distance == -1.0) {
+                hit_distance = distance;
+                hit_material = material;
+                found_material = true;
+                hit_normal = tri_normal;
+            } else if (distance < hit_distance) {
+                hit_distance = distance;
+                hit_material = material;
+                hit_normal = tri_normal;
             }
         }
     }
-    vec3 hit_position = ubo.position + (ray_direction * distance);
+    hit_position = ubo.position + (ray_direction * hit_distance);
+    light_direction = normalize(hit_position - light_position) * -1.0;
+    light_distance = length(hit_position - light_position);
+}
 
-    // light direction and distance
-    vec3 light_direction = normalize(hit_position - light_position);
-    float light_distance = length(hit_position - light_position);
-    light_direction -= light_direction * 2;
+void accelerated_intersect_ray() {
+    // TODO
+}
 
-	// color in pixel
-    ivec2 pixel = ivec2(rgIn.x, rgIn.y);
-    vec3 color = abs(ray_direction) / 8.0;
-    if (distance > 0) {
-        float tval = 1.0 - (distance / (2.0f * length(ubo.position)));
-        color = vec3(tval, tval, tval);
-        if (found_material) {
-            Material material = materialIn[hit_material];
-
-            // ambient light
-            color = material.ambient * ambient_light;
-
-            // diffuse light
-            color += material.diffuse * diffuse_light * dot(light_direction, hit_normal);
-
-            // specular light
-            vec3 reflection = normalize(reflect(light_direction, hit_normal));
-            float specular_const = dot(reflection, ray_direction);
-            if (specular_const >= 0)
-                color += specular_light * material.specular * pow(specular_const, material.shiny);
-
-            // divide to ensure not above 1, 1, 1
-            color /= 3.0;
-        }
-    }
-
-    // visualize point light
+void draw_point_light() {
     float light_radius = 1.0;
     vec3 l_t = ray_position + (dot(light_position - ray_position, ray_direction) *  ray_direction);
     float l_d = length(l_t - light_position);
     vec3 light_color = (ambient_light + diffuse_light + specular_light) / 3.0;
     if (l_t != ray_position &&
-        (length(l_t - ray_position) < distance ||
-            distance <= 0) && 
+        (length(l_t - ray_position) < hit_distance ||
+            hit_distance <= 0) && 
         l_d < light_radius) {
         float brilliance = 1.0 - (l_d / light_radius);
         color = mix(color, light_color, pow(brilliance, 5));
     }
+}
 
-    imageStore(outputImage, pixel, vec4(color, 1.0));
+void shade_color() {
+    color = abs(ray_direction) / 8.0;
+    if (hit_distance > 0) {
+        float tval = 1.0 - (hit_distance / (2.0f * length(ubo.position)));
+        color = vec3(tval, tval, tval);
+        Material material = materialIn[hit_material];
+
+        // ambient light
+        color = material.ambient * ambient_light;
+
+        // diffuse light
+        color += material.diffuse * diffuse_light * dot(light_direction, hit_normal);
+
+        // specular light
+        vec3 reflection = normalize(reflect(light_direction, hit_normal));
+        float specular_const = dot(reflection, ray_direction);
+        if (specular_const >= 0)
+            color += specular_light * material.specular * pow(specular_const, material.shiny);
+
+        // divide to ensure not above 1, 1, 1
+        color /= 3.0;
+    }
+}
+
+void main() {
+	// get ray generator
+    rgIn = raygenIn[gl_GlobalInvocationID.x];
+
+    // reject any rays outside of the viewport
+    cut_viewport();
+
+	// create ray
+    create_ray();
+
+    // intersect ray
+    naiive_intersect_ray();
+
+	// color in pixel
+    shade_color();
+
+    // draw point light
+    draw_point_light();
+
+    // write to image
+    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
 }
