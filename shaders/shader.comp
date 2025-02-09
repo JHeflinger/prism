@@ -1,6 +1,8 @@
 #version 450
 
 #define MAX_RECURSIVE_DEPTH 2000
+#define MAX_BOUNCES 1
+#define EPS 0.0001
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
 	vec3 look;
@@ -37,8 +39,8 @@ struct Material {
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
-    float reflect;
-    float refract;
+    float reflection;
+    float refraction;
     float rindex;
     float transparency;
     float shiny;
@@ -247,7 +249,7 @@ bool find_shadows() {
         return true;
     } else {
         accelerated_intersect_ray();
-        is_shadowed = hit_distance > 0.0 && hit_distance < light_distance - 0.0001;
+        is_shadowed = hit_distance > 0.0 && hit_distance < light_distance - EPS;
     }
     
     ray_direction = temp_ray_direction;
@@ -286,7 +288,50 @@ vec3 shade_color() {
     return shadedcolor;
 }
 
-void reflect_color() {
+void reflect_color(int bounces) {
+    vec3 temp_ray_direction = ray_direction;
+    vec3 temp_ray_position = ray_position;
+    float temp_hit_distance = hit_distance;
+    uint temp_hit_material = hit_material;
+    vec3 temp_hit_normal = hit_normal;
+    vec3 temp_hit_position = hit_position;
+    vec3 temp_light_direction = light_direction;
+    float temp_light_distance = light_distance;
+    if (hit_distance >= 0.0) {
+        Material material = materialIn[hit_material];
+        if (material.reflection > 0.0) {
+            vec3 colors[MAX_BOUNCES];
+            float reflectionvals[MAX_BOUNCES];
+            int num_colors = 0;
+            for (int i = 0; i < bounces; i++) {
+                hit_distance = -1.0;
+                ray_direction = reflect(ray_direction, hit_normal);
+                ray_position = hit_position + (ray_direction * EPS);
+                accelerated_intersect_ray();
+                hit_position = ubo.position + (ray_direction * hit_distance);
+                light_direction = normalize(hit_position - light_position) * -1.0;
+                light_distance = length(hit_position - light_position);
+                reflectionvals[num_colors] = material.reflection;
+                colors[num_colors++] = shade_color();
+                if (hit_distance <= 0.0 || materialIn[hit_material].reflection <= 0.0) break;
+                material = materialIn[hit_material];
+            }
+            for (int i = num_colors - 1; i >= 0; i--) {
+                if (i == 0) {
+                    color = mix(color, colors[i], reflectionvals[i]);
+                } else {
+                    colors[i - 1] = mix(colors[i - 1], colors[i], reflectionvals[i]);
+                }
+            }
+        }
+    }
+    light_distance = temp_light_distance;
+    light_direction = temp_light_direction;
+    ray_direction = temp_ray_direction;
+    ray_position = temp_ray_position;
+    hit_distance = temp_hit_distance;
+    hit_material = temp_hit_material;
+    hit_normal = temp_hit_normal;
     // if hit
 
     // get material
@@ -338,7 +383,7 @@ void main() {
     color = shade_color();
 
     // reflect
-    reflect_color();
+    reflect_color(MAX_BOUNCES);
 
     // draw point light
     draw_point_light();
