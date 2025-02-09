@@ -96,10 +96,10 @@ float random(float n) {
 }
 
 void cut_viewport() {
-    if (ubo.viewport.x != 0 && 
+    if (ubo.viewport.x != 0 &&
         (rgIn.x < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
         (rgIn.x > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return;
-    if (ubo.viewport.y != 0 && 
+    if (ubo.viewport.y != 0 &&
         (rgIn.y < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
         (rgIn.y > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return;
 }
@@ -265,7 +265,7 @@ void main() {
 
 	// calculate frame chance
 	float chance = 1.0 - pow(1.0 - ubo.frameless, rgIn.time);
-	if (random(rgIn.x * rgIn.y * ubo.seed) > chance) return;
+	if (random((rgIn.x * rgIn.y) / 123.456789) > chance) return;
 
 	// clear ray history
 	raygenIn[gl_GlobalInvocationID.x].time = 0.0;
@@ -289,7 +289,9 @@ void main() {
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);
 
     // write to image
-	vec4 prev_color = imageLoad(outputImage, ivec2(rgIn.x, rgIn.y));
-    color = mix(color, prev_color.xyz, 0.5);
+	if (ubo.frameless < 1.0) {
+		vec4 prev_color = imageLoad(outputImage, ivec2(rgIn.x, rgIn.y));
+		color = mix(color, prev_color.xyz, 0.5);
+	}
     imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
 }
