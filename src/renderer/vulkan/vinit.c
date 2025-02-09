@@ -198,6 +198,7 @@ BOOL VINIT_ShaderStorageBuffers(VulkanDataBuffer* ssbo_array) {
         for (uint32_t y = 0; y < imgh; y++) {
             raygens[y*imgw + x].x = x;
             raygens[y*imgw + x].y = y;
+			raygens[y*imgw + x].time = 0.0f;
         }
     }
 

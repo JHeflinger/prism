@@ -198,6 +198,9 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
     ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
     ubo.bvhsize = g_vupdt_renderer_ref->geometry.bvh.size;
+	ubo.frametime = GetFrameTime();
+	ubo.frameless = 1.0f;
+	ubo.seed = rand();
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     #undef RAYVEC_TO_GLMVEC
 }

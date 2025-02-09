@@ -12,6 +12,7 @@ DECLARE_ARRLIST(StaticString);
 typedef struct {
     alignas(4) uint32_t x;
     alignas(4) uint32_t y;
+	alignas(4) float time;
 } RayGenerator;
 
 typedef struct {
@@ -52,6 +53,9 @@ typedef struct {
     alignas(4) uint32_t triangles;
     alignas(8) vec2 viewport;
     alignas(4) uint32_t bvhsize;
+	alignas(4) float frametime;
+	alignas(4) float frameless;
+	alignas(4) uint32_t seed;
 } UniformBufferObject;
 
 typedef struct {

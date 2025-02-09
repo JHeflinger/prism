@@ -8,7 +8,7 @@ int i = 0;
 
 void DrawViewportPanel(float width, float height) {
     static float time = 0.0f;
-    static float time2 = 0.0f;
+    static float time2 = 2.0f;
     static float radius = 3.0f;
     SimpleCamera camera = GetCamera();
     if (IsKeyDown(KEY_R)) {
@@ -37,9 +37,9 @@ void ConfigureViewportPanel(Panel* panel) {
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
     Mesh mesh = model.meshes[0];
     SurfaceMaterial material = {
-        { 0.2f, 0, 0 },
-        { 0.1f, 0.6f, 0.3f },
-        { 0.1f, 0.8f, 0.7f },
+        { 0.5f, 0.5f, 0.5f },
+        { 0.6f, 0.6f, 0.6f },
+        { 0.6f, 0.8f, 0.7f },
         0,
         0,
         0,

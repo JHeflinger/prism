@@ -8,6 +8,7 @@
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
 #include <string.h>
+#include <time.h>
 
 Renderer g_renderer = { 0 };
 TriangleID g_triangle_id = 0;
@@ -151,6 +152,9 @@ void ClearMaterials() {
 }
 
 void Render() {
+	// init rand
+	srand(time(NULL));
+
     // profile for stats
     BeginProfile(&(g_renderer.stats.profile));
 
