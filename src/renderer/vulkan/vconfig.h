@@ -5,7 +5,7 @@
 #define IMAGE_FORMAT VK_FORMAT_R8G8B8A8_SRGB
 #define MAX_TEXTURES 32 // update in fragment shader too if changing this
 #define INVOCATION_GROUP_SIZE 512
-#define FRAMELESS_CHANCE 0.9f;
+#define FRAMELESS_CHANCE 1.0f;
 
 #ifdef PROD_BUILD
     #define ENABLE_VK_VALIDATION_LAYERS FALSE

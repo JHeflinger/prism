@@ -213,9 +213,6 @@ void accelerated_intersect_ray() {
                 stack[stack_ptr++] = node.right;
         }
     }
-    hit_position = ubo.position + (ray_direction * hit_distance);
-    light_direction = normalize(hit_position - light_position) * -1.0;
-    light_distance = length(hit_position - light_position);
 }
 
 void draw_point_light() {
@@ -232,28 +229,81 @@ void draw_point_light() {
     }
 }
 
-void shade_color() {
-    color = abs(ray_direction) / 8.0;
+bool find_shadows() {
+    if (hit_distance < 0.0) return false;
+    vec3 temp_ray_direction = ray_direction;
+    vec3 temp_ray_position = ray_position;
+    float temp_hit_distance = hit_distance;
+    uint temp_hit_material = hit_material;
+    vec3 temp_hit_normal = hit_normal;
+    vec3 temp_hit_position = hit_position;
+    hit_distance = -1.0;
+
+    ray_position = light_position;
+    ray_direction = light_direction * -1.0;
+
+    bool is_shadowed = false;
+    if (dot(hit_normal, light_direction) < 0.0) {
+        return true;
+    } else {
+        accelerated_intersect_ray();
+        is_shadowed = hit_distance > 0.0 && hit_distance < light_distance - 0.0001;
+    }
+    
+    ray_direction = temp_ray_direction;
+    ray_position = temp_ray_position;
+    hit_distance = temp_hit_distance;
+    hit_material = temp_hit_material;
+    hit_normal = temp_hit_normal;
+    return is_shadowed;
+}
+
+vec3 shade_color() {
+    vec3 shadedcolor = abs(ray_direction) / 1.0;
     if (hit_distance > 0) {
-        float tval = 1.0 - (hit_distance / (2.0f * length(ubo.position)));
-        color = vec3(tval, tval, tval);
+        // shadows
+        bool is_shadowed = find_shadows();
+
+        // material
         Material material = materialIn[hit_material];
 
         // ambient light
-        color = material.ambient * ambient_light;
+        shadedcolor = material.ambient * ambient_light;
 
         // diffuse light
-        color += material.diffuse * diffuse_light * dot(light_direction, hit_normal);
+        if (!is_shadowed)
+            shadedcolor += material.diffuse * diffuse_light * dot(light_direction, hit_normal);
 
         // specular light
         vec3 reflection = normalize(reflect(light_direction, hit_normal));
         float specular_const = dot(reflection, ray_direction);
-        if (specular_const >= 0)
-            color += specular_light * material.specular * pow(specular_const, material.shiny);
+        if (specular_const >= 0 && !is_shadowed)
+            shadedcolor += specular_light * material.specular * pow(specular_const, material.shiny);
 
         // divide to ensure not above 1, 1, 1
-        color /= 3.0;
+        shadedcolor /= 3.0;
     }
+    return shadedcolor;
+}
+
+void reflect_color() {
+    // if hit
+
+    // get material
+
+    // if material is reflective
+
+    // for # bounces
+        // new ray
+
+        // intersect new ray
+
+        // color new ray
+
+        // add that color to the current color
+
+        // if new ray is reflective continue
+        // otherwise break
 }
 
 void main() {
@@ -279,8 +329,16 @@ void main() {
     // intersect ray
     accelerated_intersect_ray();
 
+    // setup more light data
+    hit_position = ubo.position + (ray_direction * hit_distance);
+    light_direction = normalize(hit_position - light_position) * -1.0;
+    light_distance = length(hit_position - light_position);
+
 	// color in pixel
-    shade_color();
+    color = shade_color();
+
+    // reflect
+    reflect_color();
 
     // draw point light
     draw_point_light();
