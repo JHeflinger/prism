@@ -25,6 +25,9 @@ void OverrideResolution(size_t x, size_t y) {
 }
 
 void InitializeRenderer() {
+    // initialize frameless
+    g_renderer.config.frameless = FRAMELESS_CHANCE;
+
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };
     g_renderer.camera.look = (Vector3){ 0.0f, 0.0f, 0.0f };
@@ -259,4 +262,8 @@ size_t NumTriangles() {
 
 Vector2 RenderResolution() {
     return g_renderer.dimensions;
+}
+
+RendererConfig* RenderConfig() {
+    return &(g_renderer.config);
 }

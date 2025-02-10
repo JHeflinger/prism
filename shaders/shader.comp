@@ -332,23 +332,6 @@ void reflect_color(int bounces) {
     hit_distance = temp_hit_distance;
     hit_material = temp_hit_material;
     hit_normal = temp_hit_normal;
-    // if hit
-
-    // get material
-
-    // if material is reflective
-
-    // for # bounces
-        // new ray
-
-        // intersect new ray
-
-        // color new ray
-
-        // add that color to the current color
-
-        // if new ray is reflective continue
-        // otherwise break
 }
 
 void main() {

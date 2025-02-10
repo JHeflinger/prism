@@ -2,6 +2,8 @@
 #define RSTRUCTS_H
 
 #include "data/config.h"
+#include "data/profile.h"
+#include "renderer/vulkan/vconfig.h"
 #include <easyobjects.h>
 #include <raylib.h>
 #define CGLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -51,6 +53,20 @@ DECLARE_ARRLIST(SurfaceMaterial);
 #define BVH_RIGHT_ONLY 2
 #define BVH_BOTH 3
 
+typedef const char* StaticString;
+DECLARE_ARRLIST(StaticString);
+
+typedef struct {
+    alignas(4) uint32_t x;
+    alignas(4) uint32_t y;
+	alignas(4) float time;
+} RayGenerator;
+
+typedef struct {
+    uint32_t value;
+    BOOL exists;
+} Schrodingnum;
+
 typedef struct {
     alignas(16) vec3 min;
     alignas(16) vec3 max;
@@ -62,5 +78,36 @@ typedef struct {
     // branches[2] is right tree ind
 } NodeBVH;
 DECLARE_ARRLIST(NodeBVH);
+
+typedef struct {
+	RenderTexture2D targets[CPUSWAP_LENGTH];
+	size_t index;
+    void* reference;
+} CPUSwap;
+
+typedef struct {
+    size_t max_triangles;
+    size_t max_bvh;
+    BOOL update_triangles;
+    size_t max_materials;
+    BOOL update_materials;
+} ChangeSet;
+
+typedef struct {
+    Profiler profile;
+} RendererStats;
+
+typedef struct {
+    ARRLIST_Triangle triangles;
+    ARRLIST_TriangleID tids;
+    ARRLIST_TriangleBB tbbs;
+    ARRLIST_SurfaceMaterial materials;
+    ARRLIST_NodeBVH bvh;
+    ChangeSet changes;
+} Geometry;
+
+typedef struct {
+    float frameless;
+} RendererConfig;
 
 #endif

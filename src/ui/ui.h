@@ -45,4 +45,8 @@ void DestroyPanel(Panel* panel);
 
 void UIDrawText(const char* text, ...);
 
+void UIDragFloat(float* value, float min, float max, float speed, size_t w);
+
+void UIMoveCursor(float x, float y);
+
 #endif

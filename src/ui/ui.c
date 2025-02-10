@@ -9,7 +9,10 @@
 UI* g_divider_instance = NULL;
 BOOL g_divider_active = FALSE;
 Vector2 g_ui_cursor = { 0 };
+Vector2 g_ui_position = { 0 };
 char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
+
+#define LINE_HEIGHT 20
 
 UI* GenerateUI() {
     UI* ui = EZALLOC(1, sizeof(UI));
@@ -141,6 +144,7 @@ void PreRenderUI(UI* ui) {
         PreRenderUI((UI*)(ui->right));
     } else if (IsRenderTextureValid(ui->panel.texture) && ui->panel.draw) {
         g_ui_cursor = (Vector2){ 10, 10 };
+        g_ui_position = (Vector2){ ui->x , ui->y };
         BeginTextureMode(ui->panel.texture);
         ClearBackground((Color){0, 0, 0, 0});
         ui->panel.draw(ui->w, ui->h);
@@ -163,6 +167,30 @@ void UIDrawText(const char* text, ...) {
     va_list args;
     va_start(args, text);
     vsnprintf(g_ui_text_buffer, MAX_LINE_WIDTH - 1, text, args);
-    DrawTextEx(FontAsset(), g_ui_text_buffer, g_ui_cursor, 20, 0, WHITE);
-    g_ui_cursor.y += 20.0f;
+    DrawTextEx(FontAsset(), g_ui_text_buffer, g_ui_cursor, LINE_HEIGHT, 0, WHITE);
+    g_ui_cursor.y += LINE_HEIGHT;
+    g_ui_cursor.x = 10;
+}
+
+void UIDragFloat(float* value, float min, float max, float speed, size_t w) {
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+        CheckCollisionPointRec(
+            GetMousePosition(),
+            (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y, w, LINE_HEIGHT})) {
+        *value += GetMouseDelta().x * speed;
+        if (*value < min) *value = min;
+        if (*value > max) *value = max;
+    }
+    char buffer[32] = { 0 };
+    snprintf(buffer, 32, "%.3f", *value);
+    Vector2 text_size = MeasureTextEx(FontAsset(), buffer, LINE_HEIGHT, 0);
+    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y, w, LINE_HEIGHT, MappedColor(UI_DRAG_FLOAT_COLOR));
+    DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, WHITE);
+    g_ui_cursor.y += LINE_HEIGHT;
+    g_ui_cursor.x = 10;
+}
+
+void UIMoveCursor(float x, float y) {
+    g_ui_cursor.x += x;
+    g_ui_cursor.y += y;
 }

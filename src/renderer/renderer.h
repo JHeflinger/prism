@@ -35,4 +35,6 @@ size_t NumTriangles();
 
 Vector2 RenderResolution();
 
+RendererConfig* RenderConfig();
+
 #endif

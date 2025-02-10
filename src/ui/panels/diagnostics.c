@@ -1,8 +1,11 @@
 #include "diagnostics.h"
 #include "renderer/renderer.h"
+#include "data/assets.h"
 #include <easymemory.h>
 
 BOOL g_vsync_enabled = TRUE;
+
+float poop = 0.0f;
 
 void DrawDevPanel(float width, float height) {
     UIDrawText("FPS: %d", (int)(1.0f / GetFrameTime()));
@@ -28,6 +31,12 @@ void DrawDevPanel(float width, float height) {
         else
             ClearWindowState(FLAG_VSYNC_HINT);
     }
+
+    UIMoveCursor(0, 5.0f);
+    UIDrawText("Frameless:");
+    float xdif =  MeasureTextEx(FontAsset(), "Frameless:", 20, 0).x;
+    UIMoveCursor(xdif + 10, -20.0f);
+    UIDragFloat(&(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 30 - xdif);
 }
 
 void ConfigureDiagnosticsPanel(Panel* panel) {

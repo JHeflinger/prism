@@ -2,18 +2,7 @@
 #define VSTRUCTS_H
 
 #include "renderer/rstructs.h"
-#include "renderer/vulkan/vconfig.h"
-#include "data/profile.h"
 #include <vulkan/vulkan.h>
-
-typedef const char* StaticString;
-DECLARE_ARRLIST(StaticString);
-
-typedef struct {
-    alignas(4) uint32_t x;
-    alignas(4) uint32_t y;
-	alignas(4) float time;
-} RayGenerator;
 
 typedef struct {
     VkImage image;
@@ -22,23 +11,12 @@ typedef struct {
 } VulkanImage;
 
 typedef struct {
-    uint32_t value;
-    BOOL exists;
-} Schrodingnum;
-
-typedef struct {
     Schrodingnum graphics;
 } VulkanFamilyGroup;
 
 typedef struct {
     VkFence fences[CPUSWAP_LENGTH];
 } VulkanSyncro;
-
-typedef struct {
-	RenderTexture2D targets[CPUSWAP_LENGTH];
-	size_t index;
-    void* reference;
-} CPUSwap;
 
 typedef struct {
     alignas(16) vec3 look;
@@ -67,14 +45,6 @@ typedef struct {
     VulkanDataBuffer objects[CPUSWAP_LENGTH];
     void* mapped[CPUSWAP_LENGTH];
 } UBOArray;
-
-typedef struct {
-    size_t max_triangles;
-    size_t max_bvh;
-    BOOL update_triangles;
-    size_t max_materials;
-    BOOL update_materials;
-} ChangeSet;
 
 typedef struct {
     VkDebugUtilsMessengerEXT messenger;
@@ -147,19 +117,6 @@ typedef struct {
 } VulkanObject;
 
 typedef struct {
-    Profiler profile;
-} RendererStats;
-
-typedef struct {
-    ARRLIST_Triangle triangles;
-    ARRLIST_TriangleID tids;
-    ARRLIST_TriangleBB tbbs;
-    ARRLIST_SurfaceMaterial materials;
-    ARRLIST_NodeBVH bvh;
-    ChangeSet changes;
-} Geometry;
-
-typedef struct {
     RendererStats stats;
     VulkanObject vulkan;
     CPUSwap swapchain;
@@ -167,6 +124,7 @@ typedef struct {
     Geometry geometry;
     SimpleCamera camera;
     Vector2 viewport;
+    RendererConfig config;
 } Renderer;
 
 #endif

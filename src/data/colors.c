@@ -8,6 +8,7 @@ void InitializeColors() {
     g_color_map.colors[PANEL_DIVIDER_COLOR] = (Color){ 100, 100, 100, 255 };
     g_color_map.colors[PANEL_DIVIDER_HOVER_COLOR] = (Color){ 100, 220, 220, 255 };
     g_color_map.colors[PANEL_DIVIDER_ACTIVE_COLOR] = (Color){ 100, 180, 180, 255 };
+    g_color_map.colors[UI_DRAG_FLOAT_COLOR] = (Color){ 75, 75, 75, 255 };
     g_color_map.initialized = TRUE;
 }
 
