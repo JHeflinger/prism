@@ -37,6 +37,24 @@ void DrawDevPanel(float width, float height) {
     float xdif =  MeasureTextEx(FontAsset(), "Frameless:", 20, 0).x;
     UIMoveCursor(xdif + 10, -20.0f);
     UIDragFloat(&(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 30 - xdif);
+
+	UIMoveCursor(0, 5.0f);
+    UIDrawText("Shadows:");
+    xdif =  MeasureTextEx(FontAsset(), "Shadows:", 20, 0).x;
+    UIMoveCursor(xdif + 10, -20.0f);
+	UICheckbox(&(RenderConfig()->shadows));
+
+	UIMoveCursor(0, 5.0f);
+    UIDrawText("Reflections:");
+    xdif =  MeasureTextEx(FontAsset(), "Reflections:", 20, 0).x;
+    UIMoveCursor(xdif + 10, -20.0f);
+	UICheckbox(&(RenderConfig()->reflections));
+
+	UIMoveCursor(0, 5.0f);
+    UIDrawText("Lighting:");
+    xdif =  MeasureTextEx(FontAsset(), "Lighting:", 20, 0).x;
+    UIMoveCursor(xdif + 10, -20.0f);
+	UICheckbox(&(RenderConfig()->lighting));
 }
 
 void ConfigureDiagnosticsPanel(Panel* panel) {

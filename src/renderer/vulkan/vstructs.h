@@ -34,6 +34,9 @@ typedef struct {
 	alignas(4) float frametime;
 	alignas(4) float frameless;
 	alignas(4) uint32_t seed;
+	alignas(4) uint32_t shadows;
+	alignas(4) uint32_t reflections;
+	alignas(4) uint32_t lighting;
 } UniformBufferObject;
 
 typedef struct {

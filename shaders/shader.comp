@@ -20,6 +20,9 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
 	float frametime;
 	float frameless;
 	uint seed;
+	uint shadows;
+	uint reflections;
+	uint lighting;
 } ubo;
 
 struct RayGenerator {
@@ -232,7 +235,7 @@ void draw_point_light() {
 }
 
 bool find_shadows() {
-    if (hit_distance < 0.0) return false;
+    if (hit_distance < 0.0 || ubo.shadows == 0) return false;
     vec3 temp_ray_direction = ray_direction;
     vec3 temp_ray_position = ray_position;
     float temp_hit_distance = hit_distance;
@@ -261,6 +264,10 @@ bool find_shadows() {
 }
 
 vec3 shade_color() {
+	if (ubo.lighting == 0 && hit_distance > 0) {
+		float tval = 1.0 - (hit_distance / (2.0f * length(ubo.position)));
+        return vec3(tval, tval, tval);
+	}
     vec3 shadedcolor = abs(ray_direction) / 1.0;
     if (hit_distance > 0) {
         // shadows
@@ -289,6 +296,7 @@ vec3 shade_color() {
 }
 
 void reflect_color(int bounces) {
+	if (ubo.reflections == 0) return;
     vec3 temp_ray_direction = ray_direction;
     vec3 temp_ray_position = ray_position;
     float temp_hit_distance = hit_distance;

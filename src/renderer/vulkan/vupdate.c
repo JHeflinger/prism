@@ -201,6 +201,9 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 	ubo.frametime = GetFrameTime();
 	ubo.frameless = g_vupdt_renderer_ref->config.frameless;
 	ubo.seed = rand();
+	ubo.shadows = (uint32_t)g_vupdt_renderer_ref->config.shadows;
+	ubo.reflections = (uint32_t)g_vupdt_renderer_ref->config.reflections;
+	ubo.lighting = (uint32_t)g_vupdt_renderer_ref->config.lighting;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     #undef RAYVEC_TO_GLMVEC
 }

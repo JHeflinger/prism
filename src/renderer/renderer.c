@@ -25,8 +25,11 @@ void OverrideResolution(size_t x, size_t y) {
 }
 
 void InitializeRenderer() {
-    // initialize frameless
+    // initialize config
     g_renderer.config.frameless = FRAMELESS_CHANCE;
+	g_renderer.config.shadows = TRUE;
+	g_renderer.config.reflections = TRUE;
+	g_renderer.config.lighting = TRUE;
 
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };

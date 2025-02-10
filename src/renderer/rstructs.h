@@ -108,6 +108,9 @@ typedef struct {
 
 typedef struct {
     float frameless;
+	BOOL shadows;
+	BOOL reflections;
+	BOOL lighting;
 } RendererConfig;
 
 #endif
