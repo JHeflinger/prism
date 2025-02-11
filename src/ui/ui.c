@@ -176,7 +176,7 @@ void UIDragFloat(float* value, float min, float max, float speed, size_t w) {
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
         CheckCollisionPointRec(
             GetMousePosition(),
-            (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y, w, LINE_HEIGHT})) {
+            (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, w, LINE_HEIGHT - 4})) {
         *value += GetMouseDelta().x * speed;
         if (*value < min) *value = min;
         if (*value > max) *value = max;
@@ -184,7 +184,7 @@ void UIDragFloat(float* value, float min, float max, float speed, size_t w) {
     char buffer[32] = { 0 };
     snprintf(buffer, 32, "%.3f", *value);
     Vector2 text_size = MeasureTextEx(FontAsset(), buffer, LINE_HEIGHT, 0);
-    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y, w, LINE_HEIGHT, MappedColor(UI_DRAG_FLOAT_COLOR));
+    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 2, w, LINE_HEIGHT - 4, MappedColor(UI_DRAG_FLOAT_COLOR));
     DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, WHITE);
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
@@ -225,4 +225,32 @@ void UICheckboxLabeled(const char* label, BOOL* value) {
     float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
     UIMoveCursor(xdif + 5, -LINE_HEIGHT);
 	UICheckbox(value);
+}
+
+void UIDragUInt(uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+        CheckCollisionPointRec(
+            GetMousePosition(),
+            (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, w, LINE_HEIGHT - 4})) {
+        if (GetMouseDelta().x * speed < 0 && GetMouseDelta().x * speed * -1 > *value)
+            *value = 0;
+        else
+            *value += GetMouseDelta().x * speed;
+        if (*value < min) *value = min;
+        if (*value > max) *value = max;
+    }
+    char buffer[32] = { 0 };
+    snprintf(buffer, 32, "%llu", (long long unsigned int)(*value));
+    Vector2 text_size = MeasureTextEx(FontAsset(), buffer, LINE_HEIGHT, 0);
+    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 2, w, LINE_HEIGHT - 4, MappedColor(UI_DRAG_INT_COLOR));
+    DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, WHITE);
+    g_ui_cursor.y += LINE_HEIGHT;
+    g_ui_cursor.x = 10;
+}
+
+void UIDragUIntLabeled(const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
+    UIDrawText(label);
+    float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
+    UIMoveCursor(xdif + 5, -LINE_HEIGHT);
+    UIDragUInt(value, min, max, speed, w - 5 - xdif);
 }

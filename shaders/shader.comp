@@ -2,7 +2,6 @@
 
 #define MAX_RECURSIVE_DEPTH 2000
 #define MAX_BOUNCES 1
-#define MAX_MARCHES 100
 #define EPS 0.0001
 #define SDF_LIMIT 0.0001
 
@@ -31,6 +30,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint sdf;
     uint sdfsize;
     float sdfsmooth;
+    uint maxmarches;
 } ubo;
 
 struct RayGenerator {
@@ -364,7 +364,7 @@ Hit raymarch(Ray ray) {
     hit.distance = -1.0;
     hit.position = ray.position;
     float last_march = -1.0;
-    for (uint i = 0; i < MAX_MARCHES; i++) {
+    for (uint i = 0; i < ubo.maxmarches; i++) {
         float curr_march = sdf(ray.position);
         if (curr_march <= SDF_LIMIT) {
             hit.distance = length(ray.position - hit.position);

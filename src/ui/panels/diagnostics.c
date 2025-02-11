@@ -39,10 +39,11 @@ void DrawDevPanel(float width, float height) {
 	UICheckboxLabeled("Shadows:", &(RenderConfig()->shadows));
 	UICheckboxLabeled("Reflections:", &(RenderConfig()->reflections));
 	UICheckboxLabeled("Lighting:", &(RenderConfig()->lighting));
-    
+
     UIMoveCursor(0, 20.0f);
 	UICheckboxLabeled("SDF:", &(RenderConfig()->sdf));
-    UIDragFloatLabeled("Smooth:", &(RenderConfig()->sdf_smooth), 0.0f, 10000.0f, 0.05f, width - 20);
+    UIDragUIntLabeled("Max Marches:", &(RenderConfig()->maxmarches), 0, 10000000, 1, width - 20);
+    UIDragFloatLabeled("Smooth:", &(RenderConfig()->sdfsmooth), 0.0f, 10000.0f, 0.05f, width - 20);
 }
 
 void ConfigureDiagnosticsPanel(Panel* panel) {

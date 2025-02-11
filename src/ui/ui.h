@@ -4,6 +4,7 @@
 #include "data/config.h"
 #include <raylib.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdarg.h>
 
 #define MAX_NAME_LEN 256
@@ -54,5 +55,9 @@ void UIMoveCursor(float x, float y);
 void UICheckbox(BOOL* value);
 
 void UICheckboxLabeled(const char* label, BOOL* value);
+
+void UIDragUInt(uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w);
+
+void UIDragUIntLabeled(const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w);
 
 #endif

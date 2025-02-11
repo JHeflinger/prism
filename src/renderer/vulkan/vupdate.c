@@ -231,7 +231,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     ubo.raytrace = (uint32_t)g_vupdt_renderer_ref->config.raytrace;
     ubo.sdf = (uint32_t)g_vupdt_renderer_ref->config.sdf;
     ubo.sdfsize = g_vupdt_renderer_ref->geometry.sdfs.size;
-    ubo.sdfsmooth = g_vupdt_renderer_ref->config.sdf_smooth;
+    ubo.sdfsmooth = g_vupdt_renderer_ref->config.sdfsmooth;
+    ubo.maxmarches = g_vupdt_renderer_ref->config.maxmarches;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     #undef RAYVEC_TO_GLMVEC
 }

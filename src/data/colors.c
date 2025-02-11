@@ -11,6 +11,7 @@ void InitializeColors() {
     g_color_map.colors[UI_DRAG_FLOAT_COLOR] = (Color){ 75, 75, 75, 255 };
     g_color_map.colors[UI_CHECKBOX_COLOR] = (Color){ 75, 75, 75, 255 };
 	g_color_map.colors[UI_CHECKMARK_COLOR] = (Color){ 25, 180, 75, 255 };
+    g_color_map.colors[UI_DRAG_INT_COLOR] = (Color){ 75, 75, 75, 255 };
     g_color_map.initialized = TRUE;
 }
 

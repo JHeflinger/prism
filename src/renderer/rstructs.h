@@ -130,7 +130,8 @@ typedef struct {
 	BOOL lighting;
     BOOL raytrace;
     BOOL sdf;
-    float sdf_smooth;
+    float sdfsmooth;
+    uint32_t maxmarches;
 } RendererConfig;
 
 #endif
