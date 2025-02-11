@@ -7,20 +7,22 @@ Mesh mesh;
 int i = 0;
 
 void DrawViewportPanel(float width, float height) {
-    static float time = 0.0f;
-    static float time2 = 2.0f;
     static float radius = 3.0f;
+    static float theta = 0.0f;
+    static float phi = 0.5f;
     SimpleCamera camera = GetCamera();
     if (IsKeyDown(KEY_R)) {
-        time += GetFrameTime();
+        phi += GetFrameTime();
     }
     if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
-        time -= GetMouseDelta().x / 500.0;
-        time2 += GetMouseDelta().y / 250.0;
+        phi -= GetMouseDelta().y / 225.0;
+        theta -= GetMouseDelta().x / 400.0f;
+        if (phi < 0.001f) phi = 0.001f;
+        if (phi > M_PI - 0.001f) phi = M_PI - 0.001f;
     }
-    camera.position.x = radius * cos(time);
-    camera.position.y = radius * sin(time);
-    camera.position.z = time2;
+    camera.position.x = radius * sin(phi) * cos(theta);
+    camera.position.y = radius * sin(phi) * sin(theta);
+    camera.position.z = radius * cos(phi);
 	camera.fov = 90.0f;
     SetViewportSlice(width, height);
     MoveCamera(camera);
