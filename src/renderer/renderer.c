@@ -313,6 +313,10 @@ size_t NumTriangles() {
     return g_renderer.geometry.triangles.size;
 }
 
+size_t NumSDFs() {
+    return g_renderer.geometry.sdfs.size;
+}
+
 Vector2 RenderResolution() {
     return g_renderer.dimensions;
 }

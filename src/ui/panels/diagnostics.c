@@ -13,6 +13,7 @@ void DrawDevPanel(float width, float height) {
     UIDrawText("Render time: %.6f ms", (float)RenderTime());
     UIDrawText("VSYNC: %s", g_vsync_enabled ? "ENABLED" : "DISABLED");
     UIDrawText("Triangles: %d", (int)NumTriangles());
+    UIDrawText("SDF Objects: %d", (int)NumSDFs());
     UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
     if (EZALLOCATED() > 1000000000) {
         UIDrawText("Memory Usage: %.3f GB (%d bytes)", ((float)EZALLOCATED()) / 1000000000, (int)EZALLOCATED());

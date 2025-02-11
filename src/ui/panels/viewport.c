@@ -44,7 +44,7 @@ void ConfigureViewportPanel(Panel* panel) {
         0,
         0,
         0,
-        0.0f,
+        1.0f,
         0
     };
 
@@ -74,5 +74,5 @@ void ConfigureViewportPanel(Panel* panel) {
     UnloadModel(model);
 
     // submit some sdfs
-    SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0}, 3.0f});
+    SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0}, 0.5f});
 }

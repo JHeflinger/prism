@@ -2,7 +2,11 @@
 
 #define MAX_RECURSIVE_DEPTH 2000
 #define MAX_BOUNCES 1
+#define MAX_MARCHES 100
 #define EPS 0.0001
+#define SDF_LIMIT 0.01
+
+#define SDF_SPHERE 0
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
 	vec3 look;
@@ -113,6 +117,7 @@ layout(set = 0, binding = 6) readonly buffer SDFSSBOIn {
 layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 
 bool stack_failure = false;
+bool march_failure = false;
 
 float random(float n) {
 	return fract(sin(n) * 43758.5453123);
@@ -227,13 +232,14 @@ bool is_shadowed(Hit hit, PointLight light) {
     return shadowed;
 }
 
+vec3 dshade(Hit hit) {
+    float dif = clamp( dot(hit.normal,vec3(0.7,0.6,0.4)), 0.0, 1.0 );
+    float amb = 0.5 + 0.5*dot(hit.normal,vec3(0.0,0.8,0.6));
+    return sqrt(vec3(0.2,0.3,0.4)*amb + vec3(0.8,0.7,0.5)*dif);
+}
+
 vec3 shade(Ray ray, Hit hit, PointLight light) {
-	if (ubo.lighting == 0 && hit.distance > 0) {
-        float dif = clamp( dot(hit.normal,vec3(0.7,0.6,0.4)), 0.0, 1.0 );
-        float amb = 0.5 + 0.5*dot(hit.normal,vec3(0.0,0.8,0.6));
-        return sqrt(vec3(0.2,0.3,0.4)*amb + vec3(0.8,0.7,0.5)*dif);
-	}
-    vec3 color;
+    vec3 color = abs(ray.direction) / 1.0;
     if (hit.distance > 0) {
         // shadows
         bool shadowed = is_shadowed(hit, light);
@@ -271,10 +277,6 @@ PointLight default_light(Hit hit) {
     return light;
 }
 
-void raymarch() {
-
-}
-
 void draw_light(Ray ray, Hit hit, PointLight light, inout vec3 color) {
     float light_radius = 1.0;
     vec3 l_t = ray.position + (dot(light.position - ray.position, ray.direction) * ray.direction);
@@ -289,7 +291,6 @@ void draw_light(Ray ray, Hit hit, PointLight light, inout vec3 color) {
 }
 
 void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
-	if (ubo.reflections == 0) return;
     if (hit.distance >= 0.0) {
         Material material = materialIn[hit.material];
         if (material.reflection > 0.0) {
@@ -318,6 +319,59 @@ void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
             }
         }
     }
+}
+
+float sdf_sphere(SDFPrimitive sphere, vec3 position) {
+    return length(position) - sphere.scale;
+}
+
+float sdf(vec3 position) {
+    float distance = 1.0 / 0.0;
+    for (uint i = 0; i < ubo.sdfsize; i++) {
+        SDFPrimitive prim = sdfIn[i];
+        float curr_dist = 0.0;
+        if (prim.type == SDF_SPHERE) {
+            curr_dist = sdf_sphere(prim, position);
+        }
+        distance = min(curr_dist, distance);
+    }
+    return distance;
+}
+
+vec3 sdf_normal(vec3 position) {
+    vec3 v1 = vec3(
+        sdf(position + vec3(EPS, 0.0, 0.0)),
+        sdf(position + vec3(0.0, EPS, 0.0)),
+        sdf(position + vec3(0.0, 0.0, EPS)));
+    vec3 v2 = vec3(
+        sdf(position - vec3(EPS, 0.0, 0.0)),
+        sdf(position - vec3(0.0, EPS, 0.0)),
+        sdf(position - vec3(0.0, 0.0, EPS)));
+    return normalize(v1 - v2);
+}
+
+Hit raymarch(Ray ray) {
+    Hit hit;
+    hit.distance = -1.0;
+    hit.position = ray.position;
+    float last_march = -1.0;
+    for (uint i = 0; i < MAX_MARCHES; i++) {
+        float curr_march = sdf(ray.position);
+        if (curr_march <= SDF_LIMIT) {
+            hit.distance = length(ray.position - hit.position);
+            hit.position = ray.position;
+            hit.normal = sdf_normal(ray.position);
+            return hit;
+        }
+        ray.position += ray.direction * curr_march;
+        if (last_march > 0 && curr_march > last_march) {
+            hit.distance = -1.0;
+            return hit;
+        }
+        last_march = curr_march;
+    }
+    march_failure = true;
+    return hit;
 }
 
 void main() {
@@ -351,16 +405,22 @@ void main() {
         hit = raytrace(ray);
         if (hit.distance > 0.0) {
             light = default_light(hit);
-            color = shade(ray, hit, light);
-            reflect_color(ray, hit, MAX_BOUNCES, color);
+            if (ubo.lighting != 0)
+                color = shade(ray, hit, light);
+            else
+                color = dshade(hit);
+            if (ubo.reflections != 0) reflect_color(ray, hit, MAX_BOUNCES, color);
         }
     } else if (ubo.sdf != 0) {
         // raymarch to get distance
-        raymarch();
+        hit = raymarch(ray);
+        if (hit.distance > 0.0)
+            color = dshade(hit);
     }
     draw_light(ray, hit, light, color);
 
-    // stack failure
+    // failures
+    if (march_failure) color = vec3(0.0, 1.0, 0.0);
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);
 
     // write to image

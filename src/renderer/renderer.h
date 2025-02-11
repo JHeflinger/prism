@@ -39,6 +39,8 @@ float RenderTime();
 
 size_t NumTriangles();
 
+size_t NumSDFs();
+
 Vector2 RenderResolution();
 
 RendererConfig* RenderConfig();
