@@ -24,6 +24,15 @@ void VUPDT_Triangles(VulkanDataBuffer* triangles) {
         triangles->buffer);
 }
 
+void VUPDT_SDFs(VulkanDataBuffer* sdfs) {
+    if (sizeof(SDFPrimitive) * g_vupdt_renderer_ref->geometry.sdfs.maxsize == 0) return;
+    VUTIL_CopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.sdfs.data,
+        sizeof(SDFPrimitive) * g_vupdt_renderer_ref->geometry.sdfs.size,
+        sizeof(SDFPrimitive) * g_vupdt_renderer_ref->geometry.sdfs.maxsize,
+        sdfs->buffer);
+}
+
 void VUPDT_Materials(VulkanDataBuffer* materials) {
     if (sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
@@ -125,7 +134,14 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         arrsize = arrsize > 0 ? arrsize : 1;
         bvhBufferInfo.range = arrsize;
 
-        VkWriteDescriptorSet descriptorWrites[6] = { 0 };
+        VkDescriptorBufferInfo sdfBufferInfo = { 0 };
+        sdfBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.sdfs.buffer;
+        sdfBufferInfo.offset = 0;
+        arrsize = sizeof(SDFPrimitive) * g_vupdt_renderer_ref->geometry.sdfs.size;
+        arrsize = arrsize > 0 ? arrsize : 1;
+        sdfBufferInfo.range = arrsize;
+
+        VkWriteDescriptorSet descriptorWrites[7] = { 0 };
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptors->sets[i];
@@ -175,7 +191,15 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[5].descriptorCount = 1;
         descriptorWrites[5].pBufferInfo = &bvhBufferInfo;
 
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 6, descriptorWrites, 0, NULL);
+        descriptorWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[6].dstSet = descriptors->sets[i];
+        descriptorWrites[6].dstBinding = 6;
+        descriptorWrites[6].dstArrayElement = 0;
+        descriptorWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[6].descriptorCount = 1;
+        descriptorWrites[6].pBufferInfo = &sdfBufferInfo;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 7, descriptorWrites, 0, NULL);
     }
 }
 
@@ -204,6 +228,9 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 	ubo.shadows = (uint32_t)g_vupdt_renderer_ref->config.shadows;
 	ubo.reflections = (uint32_t)g_vupdt_renderer_ref->config.reflections;
 	ubo.lighting = (uint32_t)g_vupdt_renderer_ref->config.lighting;
+    ubo.raytrace = (uint32_t)g_vupdt_renderer_ref->config.raytrace;
+    ubo.sdf = (uint32_t)g_vupdt_renderer_ref->config.sdf;
+    ubo.sdfsize = g_vupdt_renderer_ref->geometry.sdfs.size;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     #undef RAYVEC_TO_GLMVEC
 }

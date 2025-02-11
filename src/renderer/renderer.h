@@ -21,6 +21,12 @@ void RemoveTriangle(TriangleID id);
 
 void ClearTriangles();
 
+SDFID SubmitSDF(SDFPrimitive sdf);
+
+void RemoveSDF(SDFID id);
+
+void ClearSDFs();
+
 MaterialID SubmitMaterial(SurfaceMaterial material);
 
 void ClearMaterials();

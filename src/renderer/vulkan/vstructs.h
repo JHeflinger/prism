@@ -37,6 +37,9 @@ typedef struct {
 	alignas(4) uint32_t shadows;
 	alignas(4) uint32_t reflections;
 	alignas(4) uint32_t lighting;
+	alignas(4) uint32_t raytrace;
+	alignas(4) uint32_t sdf;
+    alignas(4) uint32_t sdfsize;
 } UniformBufferObject;
 
 typedef struct {
@@ -94,6 +97,7 @@ typedef struct {
     VulkanDataBuffer triangles;
     VulkanDataBuffer materials;
     VulkanDataBuffer bvh;
+    VulkanDataBuffer sdfs;
 } VulkanGeometry;
 
 typedef struct {

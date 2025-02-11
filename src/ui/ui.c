@@ -190,6 +190,13 @@ void UIDragFloat(float* value, float min, float max, float speed, size_t w) {
     g_ui_cursor.x = 10;
 }
 
+void UIDragFloatLabeled(const char* label, float* value, float min, float max, float speed, size_t w) {
+    UIDrawText(label);
+    float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
+    UIMoveCursor(xdif + 5, -LINE_HEIGHT);
+    UIDragFloat(value, min, max, speed, w - 5 - xdif);
+}
+
 void UIMoveCursor(float x, float y) {
     g_ui_cursor.x += x;
     g_ui_cursor.y += y;
@@ -211,4 +218,11 @@ void UICheckbox(BOOL* value) {
 	}
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
+}
+
+void UICheckboxLabeled(const char* label, BOOL* value) {
+    UIDrawText(label);
+    float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
+    UIMoveCursor(xdif + 5, -LINE_HEIGHT);
+	UICheckbox(value);
 }

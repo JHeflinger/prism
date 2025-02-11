@@ -12,6 +12,7 @@
 
 Renderer g_renderer = { 0 };
 TriangleID g_triangle_id = 0;
+SDFID g_sdf_id = 0;
 Vector2 g_override_resolution = { 0 };
 
 void SetViewportSlice(size_t w, size_t h) {
@@ -30,6 +31,8 @@ void InitializeRenderer() {
 	g_renderer.config.shadows = TRUE;
 	g_renderer.config.reflections = TRUE;
 	g_renderer.config.lighting = TRUE;
+	g_renderer.config.raytrace = TRUE;
+	g_renderer.config.sdf = FALSE;
 
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };
@@ -63,6 +66,7 @@ void DestroyRenderer() {
     // clean geometry
     ClearTriangles();
     ClearMaterials();
+    ClearSDFs();
     ARRLIST_NodeBVH_clear(&(g_renderer.geometry.bvh));
 
     // destroy vulkan resources
@@ -145,6 +149,38 @@ void ClearTriangles() {
     g_renderer.geometry.changes.update_triangles = TRUE;
 }
 
+SDFID SubmitSDF(SDFPrimitive sdf) {
+    g_renderer.geometry.changes.update_sdfs = TRUE;
+    ARRLIST_SDFID_add(&(g_renderer.geometry.sdfids), g_sdf_id);
+    ARRLIST_SDFPrimitive_add(&(g_renderer.geometry.sdfs), sdf);
+    g_sdf_id++;
+    return g_sdf_id - 1;
+}
+
+void RemoveSDF(SDFID id) {
+    size_t ind = 0;
+    BOOL found = false;
+    for (size_t i = 0; i < g_renderer.geometry.sdfids.size; i++) {
+        if (g_renderer.geometry.sdfids.data[i] == id) {
+            ind = i;
+            found = TRUE;
+            break;
+        }
+    }
+    if (found) {
+        ARRLIST_SDFPrimitive_remove(&(g_renderer.geometry.sdfs), ind);
+        ARRLIST_SDFID_remove(&(g_renderer.geometry.sdfids), ind);
+        g_renderer.geometry.changes.update_sdfs = TRUE;
+    } else {
+        LOG_FATAL("Unable to remove nonexistant sdf");
+    }
+}
+
+void ClearSDFs() {
+    ARRLIST_SDFID_clear(&(g_renderer.geometry.sdfids));
+    ARRLIST_SDFPrimitive_clear(&(g_renderer.geometry.sdfs));
+    g_renderer.geometry.changes.update_sdfs = TRUE;
+}
 
 MaterialID SubmitMaterial(SurfaceMaterial material) {
     ARRLIST_SurfaceMaterial_add(&(g_renderer.geometry.materials), material);
@@ -167,7 +203,8 @@ void Render() {
     // detect changes in described data
     BOOL descriptor_changes = 
         g_renderer.geometry.changes.update_triangles |
-        g_renderer.geometry.changes.update_materials;
+        g_renderer.geometry.changes.update_materials |
+        g_renderer.geometry.changes.update_sdfs;
 
     // update triangles if needed
     if (g_renderer.geometry.changes.update_triangles) {
@@ -188,6 +225,19 @@ void Render() {
             VINIT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
         } else {
             VUPDT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+        }
+    }
+
+    // update sdfs if needed
+    if (g_renderer.geometry.changes.update_sdfs) {
+        vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
+        g_renderer.geometry.changes.update_sdfs = FALSE;
+        if (g_renderer.geometry.changes.max_sdfs != g_renderer.geometry.sdfs.maxsize) {
+            g_renderer.geometry.changes.max_sdfs = g_renderer.geometry.sdfs.maxsize;
+            VCLEAN_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
+            VINIT_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
+        } else {
+            VUPDT_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
         }
     }
 

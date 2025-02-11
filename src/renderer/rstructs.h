@@ -11,7 +11,9 @@
 
 typedef uint32_t MaterialID;
 typedef uint64_t TriangleID;
+typedef uint64_t SDFID;
 DECLARE_ARRLIST(TriangleID);
+DECLARE_ARRLIST(SDFID);
 
 typedef struct {
     Vector3 position;
@@ -27,6 +29,16 @@ typedef struct {
     alignas(4) MaterialID material;
 } Triangle;
 DECLARE_ARRLIST(Triangle);
+
+typedef enum {
+    SDF_SPHERE = 0,
+} SDFType;
+
+typedef struct {
+    alignas(4) uint32_t type;
+    alignas(8) vec2 origin;
+} SDFPrimitive;
+DECLARE_ARRLIST(SDFPrimitive);
 
 typedef struct {
     vec3 min;
@@ -88,9 +100,11 @@ typedef struct {
 typedef struct {
     size_t max_triangles;
     size_t max_bvh;
-    BOOL update_triangles;
     size_t max_materials;
+    size_t max_sdfs;
+    BOOL update_triangles;
     BOOL update_materials;
+    BOOL update_sdfs;
 } ChangeSet;
 
 typedef struct {
@@ -103,6 +117,8 @@ typedef struct {
     ARRLIST_TriangleBB tbbs;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_NodeBVH bvh;
+    ARRLIST_SDFPrimitive sdfs;
+    ARRLIST_SDFID sdfids;
     ChangeSet changes;
 } Geometry;
 
@@ -111,6 +127,8 @@ typedef struct {
 	BOOL shadows;
 	BOOL reflections;
 	BOOL lighting;
+    BOOL raytrace;
+    BOOL sdf;
 } RendererConfig;
 
 #endif

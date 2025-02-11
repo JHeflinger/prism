@@ -37,14 +37,14 @@ void ConfigureViewportPanel(Panel* panel) {
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
     Mesh mesh = model.meshes[0];
     SurfaceMaterial material = {
-        { 0.5f, 0.5f, 0.5f },
-        { 0.6f, 0.6f, 0.6f },
-        { 0.6f, 0.8f, 0.7f },
-        0.1f,
+        { 1.0f, 1.0f, 1.0f },
+        { 1.0f, 1.0f, 1.0f },
+        { 1.0f, 1.0f, 1.0f },
+        0.2f,
         0,
         0,
         0,
-        1.0f,
+        0.0f,
         0
     };
 
@@ -72,4 +72,7 @@ void ConfigureViewportPanel(Panel* panel) {
         SubmitTriangle(triangle);
     }
     UnloadModel(model);
+
+    // submit some sdfs
+    SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0}});
 }
