@@ -26,6 +26,9 @@ void OverrideResolution(size_t x, size_t y) {
 }
 
 void InitializeRenderer() {
+	// init rand
+	srand(time(NULL));
+
     // initialize config
     g_renderer.config.frameless = FRAMELESS_CHANCE;
 	g_renderer.config.shadows = TRUE;
@@ -61,7 +64,7 @@ void InitializeRenderer() {
 	}
 
     // configure stat profiler
-    ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 100);
+    ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 10);
 }
 
 void DestroyRenderer() {
@@ -196,98 +199,104 @@ void ClearMaterials() {
 }
 
 void Render() {
-	// init rand
-	srand(time(NULL));
-
-    // profile for stats
-    BeginProfile(&(g_renderer.stats.profile));
+    static BOOL async_update = TRUE;
 
     // detect changes in described data
-    BOOL descriptor_changes = 
-        g_renderer.geometry.changes.update_triangles |
-        g_renderer.geometry.changes.update_materials |
-        g_renderer.geometry.changes.update_sdfs;
+    if (async_update) {
+        // profile for stats
+        BeginProfile(&(g_renderer.stats.profile));
 
-    // update triangles if needed
-    if (g_renderer.geometry.changes.update_triangles) {
-        vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
-        g_renderer.geometry.changes.update_triangles = FALSE;
-        if (g_renderer.geometry.changes.max_triangles != g_renderer.geometry.triangles.maxsize) {
-            g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
-            VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
-            VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
-        } else {
-            VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
+        BOOL descriptor_changes = 
+            g_renderer.geometry.changes.update_triangles |
+            g_renderer.geometry.changes.update_materials |
+            g_renderer.geometry.changes.update_sdfs;
+
+        // update triangles if needed
+        if (g_renderer.geometry.changes.update_triangles) {
+            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
+            g_renderer.geometry.changes.update_triangles = FALSE;
+            if (g_renderer.geometry.changes.max_triangles != g_renderer.geometry.triangles.maxsize) {
+                g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
+                VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
+                VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
+            } else {
+                VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
+            }
+            // update bvh
+            RUTIL_BoundingVolumeHierarchy(&g_renderer.geometry.bvh, &g_renderer.geometry.tbbs);
+            if (g_renderer.geometry.changes.max_bvh != g_renderer.geometry.bvh.maxsize) {
+                g_renderer.geometry.changes.max_bvh = g_renderer.geometry.bvh.maxsize;
+                VCLEAN_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+                VINIT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+            } else {
+                VUPDT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+            }
         }
-        // update bvh
-        RUTIL_BoundingVolumeHierarchy(&g_renderer.geometry.bvh, &g_renderer.geometry.tbbs);
-        if (g_renderer.geometry.changes.max_bvh != g_renderer.geometry.bvh.maxsize) {
-            g_renderer.geometry.changes.max_bvh = g_renderer.geometry.bvh.maxsize;
-            VCLEAN_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
-            VINIT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
-        } else {
-            VUPDT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+
+        // update sdfs if needed
+        if (g_renderer.geometry.changes.update_sdfs) {
+            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
+            g_renderer.geometry.changes.update_sdfs = FALSE;
+            if (g_renderer.geometry.changes.max_sdfs != g_renderer.geometry.sdfs.maxsize) {
+                g_renderer.geometry.changes.max_sdfs = g_renderer.geometry.sdfs.maxsize;
+                VCLEAN_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
+                VINIT_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
+            } else {
+                VUPDT_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
+            }
         }
+
+        // update materials if needed
+        if (g_renderer.geometry.changes.update_materials) {
+            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
+            g_renderer.geometry.changes.update_materials = FALSE;
+            if (g_renderer.geometry.changes.max_materials != g_renderer.geometry.materials.maxsize) {
+                g_renderer.geometry.changes.max_materials = g_renderer.geometry.materials.maxsize;
+                VCLEAN_Materials(&(g_renderer.vulkan.core.geometry.materials));
+                VINIT_Materials(&(g_renderer.vulkan.core.geometry.materials));
+            } else {
+                VUPDT_Materials(&(g_renderer.vulkan.core.geometry.materials));
+            }
+        }
+
+        // update descriptor sets if needed
+        if (descriptor_changes) VUPDT_DescriptorSets(&(g_renderer.vulkan.core.context.renderdata.descriptors));
+
+        // update uniform buffers
+        VUPDT_UniformBuffers(&(g_renderer.vulkan.core.context.renderdata.ubos));
+
+        // reset command buffer and record it
+        vkResetCommandBuffer(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index], 0);
+        VUPDT_RecordCommand(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
+
+        // submit command buffer
+        VkSubmitInfo submitInfo = { 0 };
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.waitSemaphoreCount = 0;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
+        submitInfo.signalSemaphoreCount = 0;
+        VkResult result = vkQueueSubmit(g_renderer.vulkan.core.scheduler.queue, 1, &submitInfo, g_renderer.vulkan.core.scheduler.syncro.fences[g_renderer.swapchain.index]);
+        LOG_ASSERT(result == VK_SUCCESS, "failed to submit draw command buffer!");
     }
-
-    // update sdfs if needed
-    if (g_renderer.geometry.changes.update_sdfs) {
-        vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
-        g_renderer.geometry.changes.update_sdfs = FALSE;
-        if (g_renderer.geometry.changes.max_sdfs != g_renderer.geometry.sdfs.maxsize) {
-            g_renderer.geometry.changes.max_sdfs = g_renderer.geometry.sdfs.maxsize;
-            VCLEAN_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
-            VINIT_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
-        } else {
-            VUPDT_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
-        }
-    }
-
-    // update materials if needed
-    if (g_renderer.geometry.changes.update_materials) {
-        vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
-        g_renderer.geometry.changes.update_materials = FALSE;
-        if (g_renderer.geometry.changes.max_materials != g_renderer.geometry.materials.maxsize) {
-            g_renderer.geometry.changes.max_materials = g_renderer.geometry.materials.maxsize;
-            VCLEAN_Materials(&(g_renderer.vulkan.core.geometry.materials));
-            VINIT_Materials(&(g_renderer.vulkan.core.geometry.materials));
-        } else {
-            VUPDT_Materials(&(g_renderer.vulkan.core.geometry.materials));
-        }
-    }
-
-    // update descriptor sets if needed
-    if (descriptor_changes) VUPDT_DescriptorSets(&(g_renderer.vulkan.core.context.renderdata.descriptors));
-
-    // update uniform buffers
-    VUPDT_UniformBuffers(&(g_renderer.vulkan.core.context.renderdata.ubos));
-
-    // reset command buffer and record it
-    vkResetCommandBuffer(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index], 0);
-    VUPDT_RecordCommand(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
-
-    // submit command buffer
-    VkSubmitInfo submitInfo = { 0 };
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.waitSemaphoreCount = 0;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
-    submitInfo.signalSemaphoreCount = 0;
-    VkResult result = vkQueueSubmit(g_renderer.vulkan.core.scheduler.queue, 1, &submitInfo, g_renderer.vulkan.core.scheduler.syncro.fences[g_renderer.swapchain.index]);
-    LOG_ASSERT(result == VK_SUCCESS, "failed to submit draw command buffer!");
 
     // wait for and reset rendering fence
-	g_renderer.swapchain.index = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
-    vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[g_renderer.swapchain.index]), VK_TRUE, UINT64_MAX);
-    vkResetFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[g_renderer.swapchain.index]));
+	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
+    if (vkGetFenceStatus(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]) == VK_SUCCESS) {
+        vkResetFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]));
+        g_renderer.swapchain.index = new_ind;
+        async_update = TRUE;
 
-    // update render target
-    glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.targets[g_renderer.swapchain.index].texture.id);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_renderer.dimensions.x, g_renderer.dimensions.y, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    // end profiling
-    EndProfile(&(g_renderer.stats.profile));
+        // update render target
+        glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.targets[g_renderer.swapchain.index].texture.id);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_renderer.dimensions.x, g_renderer.dimensions.y, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        
+        // end profiling
+        EndProfile(&(g_renderer.stats.profile));
+    } else {
+        async_update = FALSE;
+    }
 }
 
 void Draw(float x, float y, float w, float h) {

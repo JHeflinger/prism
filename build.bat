@@ -81,6 +81,9 @@ set INCLUDES=!INCLUDES! -I"vendor/stb_image/include"
 set INCLUDES=!INCLUDES! -I"vendor/EasyObjects/include"
 set SOURCES=!SOURCES! "vendor/EasyObjects/include/easymemory.c"
 
+:: add EasyThreads vendor
+set INCLUDES=!INCLUDES! -I"vendor/EasyThreads/include"
+
 :: add vulkan vendor
 set INCLUDES=!INCLUDES! -I"platform/windows/vulkan/include"
 set LIBS=!LIBS! -L"platform/windows/vulkan/libs"

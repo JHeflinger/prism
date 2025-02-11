@@ -8,13 +8,17 @@ BOOL g_vsync_enabled = TRUE;
 float poop = 0.0f;
 
 void DrawDevPanel(float width, float height) {
-    UIDrawText("FPS: %d", (int)(1.0f / GetFrameTime()));
+    UIDrawText("Application FPS: %d", (int)(1.0f / GetFrameTime()));
     UIDrawText("Frame time: %.6f ms", (1000.0f * GetFrameTime()));
-    UIDrawText("Render time: %.6f ms", (float)RenderTime());
-    UIDrawText("VSYNC: %s", g_vsync_enabled ? "ENABLED" : "DISABLED");
-    UIDrawText("Triangles: %d", (int)NumTriangles());
-    UIDrawText("SDF Objects: %d", (int)NumSDFs());
-    UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
+    BOOL vsync = g_vsync_enabled;
+	UICheckboxLabeled("VSYNC:", &vsync);
+    if (vsync != g_vsync_enabled) {
+        g_vsync_enabled = vsync;
+        if (g_vsync_enabled)
+            SetWindowState(FLAG_VSYNC_HINT);
+        else
+            ClearWindowState(FLAG_VSYNC_HINT);
+    }
     if (EZALLOCATED() > 1000000000) {
         UIDrawText("Memory Usage: %.3f GB (%d bytes)", ((float)EZALLOCATED()) / 1000000000, (int)EZALLOCATED());
     } else if (EZALLOCATED() > 1000000) {
@@ -25,13 +29,12 @@ void DrawDevPanel(float width, float height) {
         UIDrawText("Memory Usage: %d bytes", (int)EZALLOCATED());
     }
 
-    if (IsKeyPressed(KEY_V)) {
-        g_vsync_enabled = !g_vsync_enabled;
-        if (g_vsync_enabled)
-            SetWindowState(FLAG_VSYNC_HINT);
-        else
-            ClearWindowState(FLAG_VSYNC_HINT);
-    }
+    UIMoveCursor(0, 20.0f);
+    UIDrawText("Renderer FPS: %d", (int)(1.0f / ((float)RenderTime() / 1000.0f)));
+    UIDrawText("Render time: %.6f ms", (float)RenderTime());
+    UIDrawText("Triangles: %d", (int)NumTriangles());
+    UIDrawText("SDF Objects: %d", (int)NumSDFs());
+    UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
 
     UIMoveCursor(0, 20.0f);
 	UICheckboxLabeled("Raytrace:", &(RenderConfig()->raytrace));

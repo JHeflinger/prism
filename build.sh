@@ -87,6 +87,9 @@ LINKS="$LINKS -lvulkan"
 INCLUDES="$INCLUDES -Ivendor/EasyObjects/include"
 SOURCES="$SOURCES vendor/EasyObjects/include/easymemory.c"
 
+# add EasyThreads vendor
+INCLUDES="$INCLUDES -Ivendor/EasyThreads/include"
+
 # add cglm vendor
 INCLUDES="$INCLUDES -Ivendor/cglm/include"
 

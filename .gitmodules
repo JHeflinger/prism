@@ -1,3 +1,6 @@
 [submodule "vendor/EasyObjects"]
 	path = vendor/EasyObjects
 	url = https://github.com/JHeflinger/EasyObjects.git
+[submodule "vendor/EasyThreads"]
+	path = vendor/EasyThreads
+	url = https://github.com/JHeflinger/EasyThreads
