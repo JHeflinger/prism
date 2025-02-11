@@ -9,7 +9,7 @@ int i = 0;
 void DrawViewportPanel(float width, float height) {
     static float radius = 3.0f;
     static float theta = 0.0f;
-    static float phi = 0.5f;
+    static float phi = 0.78f;
     SimpleCamera camera = GetCamera();
     if (IsKeyDown(KEY_R)) {
         phi += GetFrameTime();
@@ -76,5 +76,6 @@ void ConfigureViewportPanel(Panel* panel) {
     UnloadModel(model);
 
     // submit some sdfs
-    SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0}, 0.5f});
+    SubmitSDF((SDFPrimitive){SDF_SPHERE, {-0.75, 0.75, -0.75}, 1.0f});
+    SubmitSDF((SDFPrimitive){SDF_SPHERE, {0.75, -0.75, 0.75}, 1.0f});
 }

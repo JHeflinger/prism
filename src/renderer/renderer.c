@@ -31,8 +31,9 @@ void InitializeRenderer() {
 	g_renderer.config.shadows = TRUE;
 	g_renderer.config.reflections = TRUE;
 	g_renderer.config.lighting = TRUE;
-	g_renderer.config.raytrace = TRUE;
-	g_renderer.config.sdf = FALSE;
+	g_renderer.config.raytrace = FALSE;
+	g_renderer.config.sdf = TRUE;
+    g_renderer.config.sdf_smooth = 0.0f;
 
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };

@@ -33,12 +33,16 @@ void DrawDevPanel(float width, float height) {
             ClearWindowState(FLAG_VSYNC_HINT);
     }
 
+    UIMoveCursor(0, 20.0f);
 	UICheckboxLabeled("Raytrace:", &(RenderConfig()->raytrace));
-	UICheckboxLabeled("SDF:", &(RenderConfig()->sdf));
     UIDragFloatLabeled("Frameless:", &(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 20);
 	UICheckboxLabeled("Shadows:", &(RenderConfig()->shadows));
 	UICheckboxLabeled("Reflections:", &(RenderConfig()->reflections));
 	UICheckboxLabeled("Lighting:", &(RenderConfig()->lighting));
+    
+    UIMoveCursor(0, 20.0f);
+	UICheckboxLabeled("SDF:", &(RenderConfig()->sdf));
+    UIDragFloatLabeled("Smooth:", &(RenderConfig()->sdf_smooth), 0.0f, 10000.0f, 0.05f, width - 20);
 }
 
 void ConfigureDiagnosticsPanel(Panel* panel) {

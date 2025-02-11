@@ -4,7 +4,7 @@
 #define MAX_BOUNCES 1
 #define MAX_MARCHES 100
 #define EPS 0.0001
-#define SDF_LIMIT 0.01
+#define SDF_LIMIT 0.0001
 
 #define SDF_SPHERE 0
 
@@ -30,6 +30,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint raytrace;
     uint sdf;
     uint sdfsize;
+    float sdfsmooth;
 } ubo;
 
 struct RayGenerator {
@@ -117,7 +118,6 @@ layout(set = 0, binding = 6) readonly buffer SDFSSBOIn {
 layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 
 bool stack_failure = false;
-bool march_failure = false;
 
 float random(float n) {
 	return fract(sin(n) * 43758.5453123);
@@ -322,7 +322,13 @@ void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
 }
 
 float sdf_sphere(SDFPrimitive sphere, vec3 position) {
-    return length(position) - sphere.scale;
+    return length(sphere.origin - position) - sphere.scale;
+}
+
+float smin(float a, float b, float k) {
+    k *= 1.0;
+    float r = exp2(-a/k) + exp2(-b/k);
+    return -k*log2(r);
 }
 
 float sdf(vec3 position) {
@@ -333,7 +339,10 @@ float sdf(vec3 position) {
         if (prim.type == SDF_SPHERE) {
             curr_dist = sdf_sphere(prim, position);
         }
-        distance = min(curr_dist, distance);
+        if (ubo.sdfsmooth == 0.0)
+            distance = min(curr_dist, distance);
+        else
+            distance = smin(curr_dist, distance, ubo.sdfsmooth);
     }
     return distance;
 }
@@ -364,13 +373,8 @@ Hit raymarch(Ray ray) {
             return hit;
         }
         ray.position += ray.direction * curr_march;
-        if (last_march > 0 && curr_march > last_march) {
-            hit.distance = -1.0;
-            return hit;
-        }
         last_march = curr_march;
     }
-    march_failure = true;
     return hit;
 }
 
@@ -420,7 +424,6 @@ void main() {
     draw_light(ray, hit, light, color);
 
     // failures
-    if (march_failure) color = vec3(0.0, 1.0, 0.0);
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);
 
     // write to image

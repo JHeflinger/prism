@@ -40,6 +40,7 @@ typedef struct {
 	alignas(4) uint32_t raytrace;
 	alignas(4) uint32_t sdf;
     alignas(4) uint32_t sdfsize;
+    alignas(4) float sdfsmooth;
 } UniformBufferObject;
 
 typedef struct {
