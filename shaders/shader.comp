@@ -34,6 +34,18 @@ struct RayGenerator {
 	float time;
 };
 
+struct Ray {
+    vec3 position;
+    vec3 direction;
+};
+
+struct Hit {
+    float distance;
+    uint material;
+    vec3 normal;
+    vec3 position;
+};
+
 struct Triangle {
     vec3 a;
     vec3 b;
@@ -53,12 +65,27 @@ struct Material {
     float glossy;
 };
 
+struct PointLight {
+    vec3 position;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float distance;
+    vec3 direction;
+};
+
 struct NodeBVH {
     vec3 min;
     vec3 max;
     uint config;
     uint left;
     uint right;
+};
+
+struct SDFPrimitive {
+    uint type;
+    vec3 origin;
+    float scale;
 };
 
 layout(set = 0, binding = 1) buffer RayGeneratorSSBOIn {
@@ -79,75 +106,67 @@ layout(set = 0, binding = 5) readonly buffer BVHSSBOIn {
     NodeBVH bvhIn[ ];
 };
 
+layout(set = 0, binding = 6) readonly buffer SDFSSBOIn {
+    SDFPrimitive sdfIn[ ];
+};
+
 layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 
-RayGenerator rgIn;
-vec3 ray_direction;
-vec3 ray_position;
-vec3 color;
-
-float hit_distance = -1.0;
-uint hit_material = 0;
-vec3 hit_normal = vec3(0, 0, 0);
-vec3 hit_position;
 bool stack_failure = false;
-
-vec3 light_position = vec3(1.0, 1.0, 1.5);
-vec3 ambient_light = vec3(1.0, 1.0, 1.0);
-vec3 diffuse_light = vec3(1.0, 1.0, 1.0);
-vec3 specular_light = vec3(1.0, 1.0, 1.0);
-float light_distance;
-vec3 light_direction;
 
 float random(float n) {
 	return fract(sin(n) * 43758.5453123);
 }
 
-void cut_viewport() {
+bool cut_viewport(RayGenerator rg) {
     if (ubo.viewport.x != 0 &&
-        (rgIn.x < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
-        (rgIn.x > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return;
+        (rg.x < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
+        (rg.x > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return true;
     if (ubo.viewport.y != 0 &&
-        (rgIn.y < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
-        (rgIn.y > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return;
+        (rg.y < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
+        (rg.y > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return true;
+    return false;
 }
 
-void create_ray() {
+Ray create_ray(RayGenerator rg) {
 	float r = ubo.width / 2.0;
 	float b = ubo.height / 2.0;
 	float l = -1.0 * r;
 	float t = -1.0 * b;
-    float u = l + ((r - l) * (float(rgIn.x) + 0.5)) / ubo.width;
-    float v = b + ((t - b) * (float(rgIn.y) + 0.5)) / ubo.height;
+    float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
+    float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
 	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
-    ray_direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
-    ray_position = ubo.position;
+    Ray ray;
+    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+    ray.position = ubo.position;
+    return ray;
 }
 
-bool intersect_triangle(uint triangle_ind, inout vec3 tri_normal, inout float distance, inout uint material) {
+bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     Triangle tri = triangleIn[triangle_ind];
-    tri_normal = normalize(cross(tri.b - tri.a, tri.c - tri.b));
-    distance = dot(tri.a - ray_position, tri_normal) / dot(ray_direction, tri_normal);
-    if (distance > 0) {
-        vec3 hit_at = ray_position + (ray_direction * distance);
-        if (dot(cross(tri.b - tri.a, hit_at - tri.a), tri_normal) > 0 &&
-            dot(cross(tri.c - tri.b, hit_at - tri.b), tri_normal) > 0 &&
-            dot(cross(tri.a - tri.c, hit_at - tri.c), tri_normal) > 0) {
-            material = tri.material;
+    hit.normal = normalize(cross(tri.b - tri.a, tri.c - tri.b));
+    hit.distance = dot(tri.a - ray.position, hit.normal) / dot(ray.direction, hit.normal);
+    if (hit.distance > 0) {
+        vec3 hit_at = ray.position + (ray.direction * hit.distance);
+        if (dot(cross(tri.b - tri.a, hit_at - tri.a), hit.normal) > 0 &&
+            dot(cross(tri.c - tri.b, hit_at - tri.b), hit.normal) > 0 &&
+            dot(cross(tri.a - tri.c, hit_at - tri.c), hit.normal) > 0) {
+            hit.material = tri.material;
+            hit.position = ray.position + (ray.direction * hit.distance);
             return true;
         }
     }
     return false;
 }
 
-bool aabb_intersect(uint node_ind) {
+bool aabb_intersect(Ray ray, uint node_ind) {
     float entrance = 0.0;
     float exit = 3.402823466e+38;
     for (int i = 0; i < 3; i++) {
         float slab_a = bvhIn[node_ind].min[i];
         float slab_b = bvhIn[node_ind].max[i];
-        float inv_dir = 1.0 / ray_direction[i];
-        float origin = ray_position[i];
+        float inv_dir = 1.0 / ray.direction[i];
+        float origin = ray.position[i];
         float closest = (slab_a - origin) * inv_dir;
         float farthest = (slab_b - origin) * inv_dir;
         if (farthest < closest) {
@@ -162,34 +181,11 @@ bool aabb_intersect(uint node_ind) {
     return true;
 }
 
-void naiive_intersect_ray() {
-    for (uint i = 0; i < ubo.triangles; i++) {
-        vec3 tri_normal;
-        float distance;
-        uint material;
-        if (intersect_triangle(i, tri_normal, distance, material)) {
-            if (hit_distance == -1.0) {
-                hit_distance = distance;
-                hit_material = material;
-                hit_normal = tri_normal;
-            } else if (distance < hit_distance) {
-                hit_distance = distance;
-                hit_material = material;
-                hit_normal = tri_normal;
-            }
-        }
-    }
-    hit_position = ubo.position + (ray_direction * hit_distance);
-    light_direction = normalize(hit_position - light_position) * -1.0;
-    light_distance = length(hit_position - light_position);
-}
-
-void accelerated_intersect_ray() {
-    if (ubo.bvhsize == 0) return;
-    if (!aabb_intersect(0)) return;
-    vec3 tri_normal;
-    float new_distance;
-    uint material;
+Hit raytrace(Ray ray) {
+    Hit hit;
+    hit.distance = -1.0;
+    if (ubo.bvhsize == 0) return hit;
+    if (!aabb_intersect(ray, 0)) return hit;
     uint stack[MAX_RECURSIVE_DEPTH];
     int stack_ptr = 0;
     stack[stack_ptr++] = 0;
@@ -197,136 +193,121 @@ void accelerated_intersect_ray() {
         NodeBVH node = bvhIn[stack[--stack_ptr]];
         if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
         if (node.config == 0) {
-            if (intersect_triangle(node.left, tri_normal, new_distance, material)) {
-                if (hit_distance == -1.0) {
-                    hit_distance = new_distance;
-                    hit_material = material;
-                    hit_normal = tri_normal;
-                } else if (new_distance < hit_distance) {
-                    hit_distance = new_distance;
-                    hit_material = material;
-                    hit_normal = tri_normal;
+            Hit trihit;
+            if (triangle_intersect(ray, node.left, trihit)) {
+                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
+                    hit = trihit;
                 }
             }
         } else if (node.config == 1) {
-            if (aabb_intersect(node.left))
+            if (aabb_intersect(ray, node.left))
                 stack[stack_ptr++] = node.left;
         } else if (node.config == 2) {
-            if (aabb_intersect(node.right))
+            if (aabb_intersect(ray, node.right))
                 stack[stack_ptr++] = node.right;
         } else {
-            if (aabb_intersect(node.left))
+            if (aabb_intersect(ray, node.left))
                 stack[stack_ptr++] = node.left;
-            if (aabb_intersect(node.right))
+            if (aabb_intersect(ray, node.right))
                 stack[stack_ptr++] = node.right;
         }
     }
+    return hit;
 }
 
-void draw_point_light() {
+bool is_shadowed(Hit hit, PointLight light) {
+    if (hit.distance < 0.0 || ubo.shadows == 0) return false;
+    if (dot(hit.normal, light.direction) < 0.0) return true;
+    bool shadowed = false;
+    Ray ray;
+    ray.position = light.position;
+    ray.direction = light.direction * -1.0;
+    Hit shit = raytrace(ray);
+    shadowed = shit.distance > 0.0 && shit.distance < light.distance - EPS;
+    return shadowed;
+}
+
+vec3 shade(Ray ray, Hit hit, PointLight light) {
+	if (ubo.lighting == 0 && hit.distance > 0) {
+        float dif = clamp( dot(hit.normal,vec3(0.7,0.6,0.4)), 0.0, 1.0 );
+        float amb = 0.5 + 0.5*dot(hit.normal,vec3(0.0,0.8,0.6));
+        return sqrt(vec3(0.2,0.3,0.4)*amb + vec3(0.8,0.7,0.5)*dif);
+	}
+    vec3 color;
+    if (hit.distance > 0) {
+        // shadows
+        bool shadowed = is_shadowed(hit, light);
+
+        // material
+        Material material = materialIn[hit.material];
+
+        // ambient light
+        color = material.ambient * light.ambient;
+
+        // diffuse light
+        if (!shadowed)
+            color += material.diffuse * light.diffuse * dot(light.direction, hit.normal);
+
+        // specular light
+        vec3 reflection = normalize(reflect(light.direction, hit.normal));
+        float specular_const = dot(reflection, ray.direction);
+        if (specular_const >= 0 && !shadowed)
+            color += light.specular * material.specular * pow(specular_const, material.shiny);
+
+        // divide to ensure not above 1, 1, 1
+        color /= 3.0;
+    }
+    return color;
+}
+
+PointLight default_light(Hit hit) {
+    PointLight light;
+    light.position = vec3(1.0, 1.0, 1.5);
+    light.ambient = vec3(1.0, 1.0, 1.0);
+    light.diffuse = vec3(1.0, 1.0, 1.0);
+    light.specular = vec3(1.0, 1.0, 1.0);
+    light.direction = normalize(hit.position - light.position) * -1.0;
+    light.distance = length(hit.position - light.position);
+    return light;
+}
+
+void raymarch() {
+
+}
+
+void draw_light(Ray ray, Hit hit, PointLight light, inout vec3 color) {
     float light_radius = 1.0;
-    vec3 l_t = ray_position + (dot(light_position - ray_position, ray_direction) *  ray_direction);
-    float l_d = length(l_t - light_position);
-    vec3 light_color = (ambient_light + diffuse_light + specular_light) / 3.0;
-    if (l_t != ray_position &&
-        (length(l_t - ray_position) < hit_distance ||
-            hit_distance <= 0) && 
+    vec3 l_t = ray.position + (dot(light.position - ray.position, ray.direction) * ray.direction);
+    float l_d = length(l_t - light.position);
+    vec3 light_color = (light.ambient + light.diffuse + light.specular) / 3.0;
+    if (l_t != ray.position &&
+        (hit.distance <= 0 || length(l_t - ray.position) < hit.distance) && 
         l_d < light_radius) {
         float brilliance = 1.0 - (l_d / light_radius);
         color = mix(color, light_color, pow(brilliance, 5));
     }
 }
 
-bool find_shadows() {
-    if (hit_distance < 0.0 || ubo.shadows == 0) return false;
-    vec3 temp_ray_direction = ray_direction;
-    vec3 temp_ray_position = ray_position;
-    float temp_hit_distance = hit_distance;
-    uint temp_hit_material = hit_material;
-    vec3 temp_hit_normal = hit_normal;
-    vec3 temp_hit_position = hit_position;
-    hit_distance = -1.0;
-
-    ray_position = light_position;
-    ray_direction = light_direction * -1.0;
-
-    bool is_shadowed = false;
-    if (dot(hit_normal, light_direction) < 0.0) {
-        return true;
-    } else {
-        accelerated_intersect_ray();
-        is_shadowed = hit_distance > 0.0 && hit_distance < light_distance - EPS;
-    }
-    
-    ray_direction = temp_ray_direction;
-    ray_position = temp_ray_position;
-    hit_distance = temp_hit_distance;
-    hit_material = temp_hit_material;
-    hit_normal = temp_hit_normal;
-    return is_shadowed;
-}
-
-vec3 shade_color() {
-	if (ubo.lighting == 0 && hit_distance > 0) {
-        float dif = clamp( dot(hit_normal,vec3(0.7,0.6,0.4)), 0.0, 1.0 );
-        float amb = 0.5 + 0.5*dot(hit_normal,vec3(0.0,0.8,0.6));
-        return sqrt(vec3(0.2,0.3,0.4)*amb + vec3(0.8,0.7,0.5)*dif);
-	}
-    vec3 shadedcolor = abs(ray_direction) / 1.0;
-    if (hit_distance > 0) {
-        // shadows
-        bool is_shadowed = find_shadows();
-
-        // material
-        Material material = materialIn[hit_material];
-
-        // ambient light
-        shadedcolor = material.ambient * ambient_light;
-
-        // diffuse light
-        if (!is_shadowed)
-            shadedcolor += material.diffuse * diffuse_light * dot(light_direction, hit_normal);
-
-        // specular light
-        vec3 reflection = normalize(reflect(light_direction, hit_normal));
-        float specular_const = dot(reflection, ray_direction);
-        if (specular_const >= 0 && !is_shadowed)
-            shadedcolor += specular_light * material.specular * pow(specular_const, material.shiny);
-
-        // divide to ensure not above 1, 1, 1
-        shadedcolor /= 3.0;
-    }
-    return shadedcolor;
-}
-
-void reflect_color(int bounces) {
+void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
 	if (ubo.reflections == 0) return;
-    vec3 temp_ray_direction = ray_direction;
-    vec3 temp_ray_position = ray_position;
-    float temp_hit_distance = hit_distance;
-    uint temp_hit_material = hit_material;
-    vec3 temp_hit_normal = hit_normal;
-    vec3 temp_hit_position = hit_position;
-    vec3 temp_light_direction = light_direction;
-    float temp_light_distance = light_distance;
-    if (hit_distance >= 0.0) {
-        Material material = materialIn[hit_material];
+    if (hit.distance >= 0.0) {
+        Material material = materialIn[hit.material];
         if (material.reflection > 0.0) {
             vec3 colors[MAX_BOUNCES];
             float reflectionvals[MAX_BOUNCES];
             int num_colors = 0;
+            Hit rhit = hit;
+            Ray rray = ray;
             for (int i = 0; i < bounces; i++) {
-                hit_distance = -1.0;
-                ray_direction = reflect(ray_direction, hit_normal);
-                ray_position = hit_position + (ray_direction * EPS);
-                accelerated_intersect_ray();
-                hit_position = ubo.position + (ray_direction * hit_distance);
-                light_direction = normalize(hit_position - light_position) * -1.0;
-                light_distance = length(hit_position - light_position);
+                rray.direction = reflect(rray.direction, rhit.normal);
+                rray.position = rhit.position + (rray.direction * EPS);
+                rhit = raytrace(rray);
+                rhit.position = ubo.position + (rray.direction * rhit.distance); // should we keep this in? should this be using ubo.position...
+                PointLight light = default_light(rhit);
                 reflectionvals[num_colors] = material.reflection;
-                colors[num_colors++] = shade_color();
-                if (hit_distance <= 0.0 || materialIn[hit_material].reflection <= 0.0) break;
-                material = materialIn[hit_material];
+                colors[num_colors++] = shade(ray, rhit, light);
+                if (rhit.distance <= 0.0 || materialIn[rhit.material].reflection <= 0.0) break;
+                material = materialIn[rhit.material];
             }
             for (int i = num_colors - 1; i >= 0; i--) {
                 if (i == 0) {
@@ -337,13 +318,6 @@ void reflect_color(int bounces) {
             }
         }
     }
-    light_distance = temp_light_distance;
-    light_direction = temp_light_direction;
-    ray_direction = temp_ray_direction;
-    ray_position = temp_ray_position;
-    hit_distance = temp_hit_distance;
-    hit_material = temp_hit_material;
-    hit_normal = temp_hit_normal;
 }
 
 void main() {
@@ -351,7 +325,7 @@ void main() {
 	raygenIn[gl_GlobalInvocationID.x].time += ubo.frametime;
 
 	// get ray generator
-    rgIn = raygenIn[gl_GlobalInvocationID.x];
+    RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
 
 	// calculate frame chance
 	float chance = 1.0 - pow(1.0 - ubo.frameless, rgIn.time);
@@ -361,31 +335,30 @@ void main() {
 	raygenIn[gl_GlobalInvocationID.x].time = 0.0;
 
 	// reject any rays outside of the viewport
-    cut_viewport();
+    if (cut_viewport(rgIn)) return;
 
 	// create ray
-    create_ray();
+    Ray ray = create_ray(rgIn);
 
+    // colors
+    vec3 color = abs(ray.direction) / 1.0;
+
+    // trace/march
+    Hit hit;
+    hit.distance = -1.0;
+    PointLight light = default_light(hit);
     if (ubo.raytrace != 0) {
-        // intersect ray
-        accelerated_intersect_ray();
-
-        // setup more light data
-        hit_position = ubo.position + (ray_direction * hit_distance);
-        light_direction = normalize(hit_position - light_position) * -1.0;
-        light_distance = length(hit_position - light_position);
-
-        // color in pixel
-        color = shade_color();
-
-        // reflect
-        reflect_color(MAX_BOUNCES);
-    } else {
-        color = abs(ray_direction) / 1.0;
+        hit = raytrace(ray);
+        if (hit.distance > 0.0) {
+            light = default_light(hit);
+            color = shade(ray, hit, light);
+            reflect_color(ray, hit, MAX_BOUNCES, color);
+        }
+    } else if (ubo.sdf != 0) {
+        // raymarch to get distance
+        raymarch();
     }
-
-    // draw point light
-    draw_point_light();
+    draw_light(ray, hit, light, color);
 
     // stack failure
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);

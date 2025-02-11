@@ -36,7 +36,8 @@ typedef enum {
 
 typedef struct {
     alignas(4) uint32_t type;
-    alignas(8) vec2 origin;
+    alignas(16) vec3 origin;
+    alignas(4) float scale;
 } SDFPrimitive;
 DECLARE_ARRLIST(SDFPrimitive);
 
