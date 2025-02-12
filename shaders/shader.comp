@@ -336,13 +336,13 @@ vec4 qsqr(vec4 a) {
 }
 
 float sdf_julia(SDFPrimitive julia, vec3 position) {
-    vec4 c = vec4(0.3, 0.3, 0.3, ubo.time);
+    vec4 c = 0.45*cos( vec4(0.5,3.9,1.4,1.1) + (ubo.time / 4.0)*vec4(1.2,1.7,1.3,2.5) ) - vec4(0.3,0.0,0.0,0.0);
     vec4 z = vec4(position.xyz, 0.0);
     float md2 = 1.0;
     float mz2 = dot(z, z);
     vec3 z_abs = abs(z.xyz);
     vec4 trap = vec4(z_abs.xyz, dot(z, z));
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < 11; i++) {
         md2 *= 4.0 * mz2;
         z = qsqr(z) + c;
         z_abs = abs(z.xyz);
@@ -362,11 +362,15 @@ float sdf_mandelbulb(SDFPrimitive bulb, vec3 position) {
         r = length(z);
         if (r > 2.0)
             break;
-        float theta = acos(z.z / r) * power;
-        float phi = atan(z.y, z.x) * power;
+        float theta = acos(z.z / r);
+        float phi = atan(z.y, z.x);
+        dr = pow(r, power - 1.0) * power * dr + 1.0;
+
         float zr = pow(r, power);
-        dr = pow(r, power - 1) * power * dr + 1;
-        z = zr * vec3(sin(theta) * cos(phi), sin(phi) * sin(theta), 0.0);
+        theta = theta*power;
+        phi = phi*power;
+
+        z = zr * vec3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
         z += position;
     }
 
