@@ -39,10 +39,10 @@ void DrawDevPanel(float width, float height) {
 	UICheckboxLabeled("Time Paused:", &g_time_paused);
     if (!g_time_paused) RenderConfig()->time += GetFrameTime();
     UIDragFloatLabeled("Time:", &(RenderConfig()->time), 0.0f, 999999999.0f, 1.00f, width - 20);
+    UIDragFloatLabeled("Frameless:", &(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 20);
 
     UIMoveCursor(0, 20.0f);
 	UICheckboxLabeled("Raytrace:", &(RenderConfig()->raytrace));
-    UIDragFloatLabeled("Frameless:", &(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 20);
 	UICheckboxLabeled("Shadows:", &(RenderConfig()->shadows));
 	UICheckboxLabeled("Reflections:", &(RenderConfig()->reflections));
 	UICheckboxLabeled("Lighting:", &(RenderConfig()->lighting));

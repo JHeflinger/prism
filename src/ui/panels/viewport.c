@@ -12,7 +12,7 @@ void DrawViewportPanel(float width, float height) {
     static float phi = 0.78f;
     SimpleCamera camera = GetCamera();
     if (IsKeyDown(KEY_R)) {
-        phi += GetFrameTime();
+        theta += GetFrameTime();
     }
     if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
         phi -= GetMouseDelta().y / 225.0;
