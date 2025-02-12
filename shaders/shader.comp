@@ -6,6 +6,8 @@
 #define SDF_LIMIT 0.0001
 
 #define SDF_SPHERE 0
+#define SDF_JULIA 1
+#define SDF_MANDELBULB 2
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
 	vec3 look;
@@ -31,6 +33,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint sdfsize;
     float sdfsmooth;
     uint maxmarches;
+    float time;
 } ubo;
 
 struct RayGenerator {
@@ -232,10 +235,10 @@ bool is_shadowed(Hit hit, PointLight light) {
     return shadowed;
 }
 
-vec3 dshade(Hit hit) {
-    float dif = clamp( dot(hit.normal,vec3(0.7,0.6,0.4)), 0.0, 1.0 );
-    float amb = 0.5 + 0.5*dot(hit.normal,vec3(0.0,0.8,0.6));
-    return sqrt(vec3(0.2,0.3,0.4)*amb + vec3(0.8,0.7,0.5)*dif);
+vec3 dshade(Hit hit, PointLight light) {
+    float dif = clamp(dot(hit.normal, light.direction), 0.0, 1.0);
+    float amb = 0.5 + 0.5 * dot(hit.normal, vec3(0.0,0.8,0.6));
+    return sqrt(vec3(0.2,0.3,0.4) * amb + vec3(0.8,0.7,0.5) * dif);
 }
 
 vec3 shade(Ray ray, Hit hit, PointLight light) {
@@ -325,6 +328,51 @@ float sdf_sphere(SDFPrimitive sphere, vec3 position) {
     return length(sphere.origin - position) - sphere.scale;
 }
 
+vec4 qsqr(vec4 a) {
+    return vec4(a.x * a.x - a.y * a.y - a.z * a.z - a.w * a.w,
+        2.0 * a.x * a.y,
+        2.0 * a.x * a.z,
+        2.0 * a.x * a.w);
+}
+
+float sdf_julia(SDFPrimitive julia, vec3 position) {
+    vec4 c = vec4(0.3, 0.3, 0.3, ubo.time);
+    vec4 z = vec4(position.xyz, 0.0);
+    float md2 = 1.0;
+    float mz2 = dot(z, z);
+    vec3 z_abs = abs(z.xyz);
+    vec4 trap = vec4(z_abs.xyz, dot(z, z));
+    for (int i = 0; i < 9; i++) {
+        md2 *= 4.0 * mz2;
+        z = qsqr(z) + c;
+        z_abs = abs(z.xyz);
+        trap = vec4(z_abs.xyz, dot(z, z));
+        mz2 = dot(z, z);
+        if (mz2 > 4.0) break;
+    }
+    return 0.25 * sqrt(mz2 / md2) * log(mz2);
+}
+
+float sdf_mandelbulb(SDFPrimitive bulb, vec3 position) {
+    float power = ubo.time;
+    float dr = 1.0;
+    float r = 0.0;
+    vec3 z = position;
+    for (int i = 0; i < 15; i++) {
+        r = length(z);
+        if (r > 2.0)
+            break;
+        float theta = acos(z.z / r) * power;
+        float phi = atan(z.y, z.x) * power;
+        float zr = pow(r, power);
+        dr = pow(r, power - 1) * power * dr + 1;
+        z = zr * vec3(sin(theta) * cos(phi), sin(phi) * sin(theta), 0.0);
+        z += position;
+    }
+
+    return 0.5 * log(r) * r / dr;
+}
+
 float smin(float a, float b, float k) {
     k *= 1.0;
     float r = exp2(-a/k) + exp2(-b/k);
@@ -338,6 +386,10 @@ float sdf(vec3 position) {
         float curr_dist = 0.0;
         if (prim.type == SDF_SPHERE) {
             curr_dist = sdf_sphere(prim, position);
+        } else if (prim.type == SDF_JULIA) {
+            curr_dist = sdf_julia(prim, position);
+        } else if (prim.type == SDF_MANDELBULB) {
+            curr_dist = sdf_mandelbulb(prim, position);
         }
         if (ubo.sdfsmooth == 0.0)
             distance = min(curr_dist, distance);
@@ -412,14 +464,16 @@ void main() {
             if (ubo.lighting != 0)
                 color = shade(ray, hit, light);
             else
-                color = dshade(hit);
+                color = dshade(hit, light);
             if (ubo.reflections != 0) reflect_color(ray, hit, MAX_BOUNCES, color);
         }
     } else if (ubo.sdf != 0) {
         // raymarch to get distance
         hit = raymarch(ray);
-        if (hit.distance > 0.0)
-            color = dshade(hit);
+        if (hit.distance > 0.0) {
+            light = default_light(hit);
+            color = dshade(hit, light);
+        }
     }
     draw_light(ray, hit, light, color);
 

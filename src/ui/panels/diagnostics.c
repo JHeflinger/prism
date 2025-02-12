@@ -4,6 +4,7 @@
 #include <easymemory.h>
 
 BOOL g_vsync_enabled = TRUE;
+BOOL g_time_paused = TRUE;
 
 float poop = 0.0f;
 
@@ -35,6 +36,9 @@ void DrawDevPanel(float width, float height) {
     UIDrawText("Triangles: %d", (int)NumTriangles());
     UIDrawText("SDF Objects: %d", (int)NumSDFs());
     UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
+	UICheckboxLabeled("Time Paused:", &g_time_paused);
+    if (!g_time_paused) RenderConfig()->time += GetFrameTime();
+    UIDragFloatLabeled("Time:", &(RenderConfig()->time), 0.0f, 999999999.0f, 1.00f, width - 20);
 
     UIMoveCursor(0, 20.0f);
 	UICheckboxLabeled("Raytrace:", &(RenderConfig()->raytrace));

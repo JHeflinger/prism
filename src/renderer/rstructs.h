@@ -32,6 +32,8 @@ DECLARE_ARRLIST(Triangle);
 
 typedef enum {
     SDF_SPHERE = 0,
+    SDF_JULIA = 1,
+    SDF_MANDELBULB = 2,
 } SDFType;
 
 typedef struct {
@@ -132,6 +134,7 @@ typedef struct {
     BOOL sdf;
     float sdfsmooth;
     uint32_t maxmarches;
+    float time;
 } RendererConfig;
 
 #endif

@@ -42,6 +42,7 @@ typedef struct {
     alignas(4) uint32_t sdfsize;
     alignas(4) float sdfsmooth;
     alignas(4) uint32_t maxmarches;
+    alignas(4) float time;
 } UniformBufferObject;
 
 typedef struct {
