@@ -392,7 +392,8 @@ float smin(float a, float b, float k) {
 }
 
 float sdf(vec3 position) {
-    float distance = 1.0 / 0.0;
+    float distance = 0.0;
+	bool dinit = false;
     for (uint i = 0; i < ubo.sdfsize; i++) {
         SDFPrimitive prim = sdfIn[i];
         float curr_dist = 0.0;
@@ -405,8 +406,13 @@ float sdf(vec3 position) {
         } else if (prim.type == SDF_BOX) {
 			curr_dist = sdf_box(prim, position);
 		}
+		if (!dinit) {
+			dinit = true;
+			distance = curr_dist;
+			continue;
+		}
         if (ubo.sdfsmooth == 0.0)
-            distance = min(curr_dist, distance);
+            distance = max(curr_dist, distance);
         else
             distance = smin(curr_dist, distance, ubo.sdfsmooth);
     }
