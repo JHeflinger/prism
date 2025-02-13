@@ -78,6 +78,7 @@ void ConfigureViewportPanel(Panel* panel) {
     // submit some sdfs
     //SubmitSDF((SDFPrimitive){SDF_SPHERE, {-0.75, 0.75, -0.75}, 1.0f});
     //SubmitSDF((SDFPrimitive){SDF_SPHERE, {0.75, -0.75, 0.75}, 1.0f});
-    SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f});
+    SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
     //SubmitSDF((SDFPrimitive){SDF_MANDELBULB, {0.0, 0.0, 0.0}, 1.0f});
+    SubmitSDF((SDFPrimitive){SDF_BOX, {0.0, 0.0, 1.2}, 1.0f, {3.0, 3.0, 1.0}});
 }

@@ -34,12 +34,14 @@ typedef enum {
     SDF_SPHERE = 0,
     SDF_JULIA = 1,
     SDF_MANDELBULB = 2,
+	SDF_BOX = 3,
 } SDFType;
 
 typedef struct {
     alignas(4) uint32_t type;
     alignas(16) vec3 origin;
     alignas(4) float scale;
+	alignas(16) vec3 dim;
 } SDFPrimitive;
 DECLARE_ARRLIST(SDFPrimitive);
 

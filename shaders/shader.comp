@@ -8,6 +8,7 @@
 #define SDF_SPHERE 0
 #define SDF_JULIA 1
 #define SDF_MANDELBULB 2
+#define SDF_BOX 3
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
 	vec3 look;
@@ -95,6 +96,7 @@ struct SDFPrimitive {
     uint type;
     vec3 origin;
     float scale;
+	vec3 dim;
 };
 
 layout(set = 0, binding = 1) buffer RayGeneratorSSBOIn {
@@ -378,6 +380,11 @@ float sdf_mandelbulb(SDFPrimitive bulb, vec3 position) {
     return 0.5 * log(r) * r / dr;
 }
 
+float sdf_box(SDFPrimitive box, vec3 position) {
+	vec3 q = abs(box.origin - position) - box.dim;
+	return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+}
+
 float smin(float a, float b, float k) {
     k *= 1.0;
     float r = exp2(-a/k) + exp2(-b/k);
@@ -395,7 +402,9 @@ float sdf(vec3 position) {
             curr_dist = sdf_julia(prim, position);
         } else if (prim.type == SDF_MANDELBULB) {
             curr_dist = sdf_mandelbulb(prim, position);
-        }
+        } else if (prim.type == SDF_BOX) {
+			curr_dist = sdf_box(prim, position);
+		}
         if (ubo.sdfsmooth == 0.0)
             distance = min(curr_dist, distance);
         else
