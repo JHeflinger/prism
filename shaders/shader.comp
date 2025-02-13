@@ -412,7 +412,7 @@ float sdf(vec3 position) {
 			continue;
 		}
         if (ubo.sdfsmooth == 0.0)
-            distance = max(curr_dist, distance);
+            distance = min(curr_dist, distance); // union, change based on intersection or whatever
         else
             distance = smin(curr_dist, distance, ubo.sdfsmooth);
     }
@@ -506,9 +506,9 @@ void main() {
 		vec2 base_ray = vec2(rgIn.x, rgIn.y);
 		color += raycolor(base_ray + vec2(-0.5, -0.5));
 		color += raycolor(base_ray + vec2(0.5, 0.5));
-		color += raycolor(base_ray + vec2(0.5, -0.5));
-		color += raycolor(base_ray + vec2(-0.5, 0.5));
-		color /= 4.0;
+		// color += raycolor(base_ray + vec2(0.5, -0.5));
+		// color += raycolor(base_ray + vec2(-0.5, 0.5));
+		color /= 2.0;
 	}
     
     // failures
