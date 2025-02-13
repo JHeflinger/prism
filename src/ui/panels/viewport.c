@@ -21,9 +21,10 @@ void DrawViewportPanel(float width, float height) {
         if (phi > M_PI - 0.001f) phi = M_PI - 0.001f;
     }
 	if (IsKeyDown(KEY_SPACE) && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+		float distance_correction = radius / 600.0f;
 		vec3 lookat_pos = { camera.look.x, camera.look.y, camera.look.z };
 		vec3 camera_pos = { camera.position.x, camera.position.y, camera.position.z };
-		vec2 mouse_delta = { GetMouseDelta().x / 100.0f, GetMouseDelta().y / 100.0f };
+		vec2 mouse_delta = { GetMouseDelta().x * distance_correction, GetMouseDelta().y * distance_correction };
 		vec3 forward;
 		glm_vec3_sub(lookat_pos, camera_pos, forward);
 		glm_vec3_normalize(forward);
@@ -44,9 +45,9 @@ void DrawViewportPanel(float width, float height) {
 		camera.look.y += movement[1];
 		camera.look.z += movement[2];
 	}
-    camera.position.x = radius * sin(phi) * cos(theta);
-    camera.position.y = radius * sin(phi) * sin(theta);
-    camera.position.z = radius * cos(phi);
+    camera.position.x = camera.look.x + (radius * sin(phi) * cos(theta));
+    camera.position.y = camera.look.y + (radius * sin(phi) * sin(theta));
+    camera.position.z = camera.look.z + (radius * cos(phi));
 	camera.fov = 90.0f;
     SetViewportSlice(width, height);
     MoveCamera(camera);
