@@ -40,6 +40,7 @@ void DrawDevPanel(float width, float height) {
     if (!g_time_paused) RenderConfig()->time += GetFrameTime();
     UIDragFloatLabeled("Time:", &(RenderConfig()->time), 0.0f, 999999999.0f, 1.00f, width - 20);
     UIDragFloatLabeled("Frameless:", &(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 20);
+	UICheckboxLabeled("Anti-Aliasing:", &(RenderConfig()->antialiasing));
 
     UIMoveCursor(0, 20.0f);
 	UICheckboxLabeled("Raytrace:", &(RenderConfig()->raytrace));

@@ -38,6 +38,7 @@ void InitializeRenderer() {
 	g_renderer.config.sdf = TRUE;
     g_renderer.config.sdfsmooth = 0.0f;
     g_renderer.config.maxmarches = 100;
+    g_renderer.config.antialiasing = TRUE;
 
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };

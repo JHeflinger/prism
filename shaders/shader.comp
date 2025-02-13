@@ -34,6 +34,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     float sdfsmooth;
     uint maxmarches;
     float time;
+    uint antialiasing;
 } ubo;
 
 struct RayGenerator {
@@ -136,7 +137,7 @@ bool cut_viewport(RayGenerator rg) {
     return false;
 }
 
-Ray create_ray(RayGenerator rg) {
+Ray create_ray(vec2 rg) {
 	float r = ubo.width / 2.0;
 	float b = ubo.height / 2.0;
 	float l = -1.0 * r;
@@ -336,7 +337,7 @@ vec4 qsqr(vec4 a) {
 }
 
 float sdf_julia(SDFPrimitive julia, vec3 position) {
-    vec4 c = 0.45*cos( vec4(0.5,3.9,1.4,1.1) + (ubo.time / 4.0)*vec4(1.2,1.7,1.3,2.5) ) - vec4(0.3,0.0,0.0,0.0);
+    vec4 c = 0.45*cos( vec4(0.5,3.9,1.4,1.1) + ubo.time*.15*vec4(1.2,1.7,1.3,2.5) ) - vec4(0.3,0.0,0.0,0.0);
     vec4 z = vec4(position.xyz, 0.0);
     float md2 = 1.0;
     float mz2 = dot(z, z);
@@ -404,15 +405,12 @@ float sdf(vec3 position) {
 }
 
 vec3 sdf_normal(vec3 position) {
-    vec3 v1 = vec3(
-        sdf(position + vec3(EPS, 0.0, 0.0)),
-        sdf(position + vec3(0.0, EPS, 0.0)),
-        sdf(position + vec3(0.0, 0.0, EPS)));
-    vec3 v2 = vec3(
-        sdf(position - vec3(EPS, 0.0, 0.0)),
-        sdf(position - vec3(0.0, EPS, 0.0)),
-        sdf(position - vec3(0.0, 0.0, EPS)));
-    return normalize(v1 - v2);
+    vec2 k = vec2(1,-1);
+    return normalize(
+        k.xyy*sdf(position + k.xyy*EPS) + 
+        k.yyx*sdf(position + k.yyx*EPS) + 
+        k.yxy*sdf(position + k.yxy*EPS) + 
+        k.xxx*sdf(position + k.xxx*EPS));
 }
 
 Hit raymarch(Ray ray) {
@@ -452,7 +450,7 @@ void main() {
     if (cut_viewport(rgIn)) return;
 
 	// create ray
-    Ray ray = create_ray(rgIn);
+    Ray ray = create_ray(vec2(rgIn.x, rgIn.y));
 
     // colors
     vec3 color = abs(ray.direction) / 1.0;
@@ -479,6 +477,7 @@ void main() {
             color = dshade(hit, light);
         }
     }
+    
     draw_light(ray, hit, light, color);
 
     // failures

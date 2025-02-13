@@ -135,6 +135,7 @@ typedef struct {
     float sdfsmooth;
     uint32_t maxmarches;
     float time;
+    BOOL antialiasing;
 } RendererConfig;
 
 #endif
