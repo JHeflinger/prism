@@ -38,12 +38,15 @@ void DrawViewportPanel(float width, float height) {
 		glm_vec3_scale(right, mouse_delta[0], right);
 		glm_vec3_scale(up, mouse_delta[1], up);
 		glm_vec3_add(right, up, movement);
-		camera.position.x += movement[0];
-		camera.position.y += movement[1];
-		camera.position.z += movement[2];
 		camera.look.x += movement[0];
 		camera.look.y += movement[1];
 		camera.look.z += movement[2];
+	}
+	if (IsKeyPressed(KEY_GRAVE)) {
+		radius = 3.0f;
+		theta = 0.0f;
+		phi = 0.78f;
+		camera.look = (Vector3){ 0, 0, 0 };
 	}
     camera.position.x = camera.look.x + (radius * sin(phi) * cos(theta));
     camera.position.y = camera.look.y + (radius * sin(phi) * sin(theta));
