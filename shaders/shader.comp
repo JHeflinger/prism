@@ -491,8 +491,6 @@ void main() {
 	float chance = 1.0 - pow(1.0 - ubo.frameless, rgIn.time);
 	float rnum = random((rgIn.x * rgIn.y) / (123.456789 + (ubo.seed % 100)));
 	bool update_signal = rnum <= chance;
-	imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(rnum, rnum, rnum, 1.0));
-    return;
 	if (!update_signal) {
         imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(0.0));
         return;
