@@ -2,6 +2,8 @@
 #include "renderer/renderer.h"
 #include "core/log.h"
 
+RenderTexture2D g_viewport_target;
+
 Model model;
 Mesh mesh;
 int i = 0;
@@ -54,14 +56,26 @@ void DrawViewportPanel(float width, float height) {
 	camera.fov = 90.0f;
     SetViewportSlice(width, height);
     MoveCamera(camera);
-    Render();
-    Draw(0, 0, width, height);
+    DrawTexturePro(
+        g_viewport_target.texture,
+        (Rectangle){ 0, 0, g_viewport_target.texture.width, -g_viewport_target.texture.height },
+        (Rectangle){ 0, 0, g_viewport_target.texture.width, g_viewport_target.texture.height },
+        (Vector2){ 0, 0 }, 0, WHITE);
     radius -= GetMouseWheelMove() / 4.0f;
+}
+
+void UpdateViewportPanel(float width, float height) {
+    Render();
+    BeginTextureMode(g_viewport_target);
+    Draw(0, 0, width, height);
+    EndTextureMode();
 }
 
 void ConfigureViewportPanel(Panel* panel) {
     SetupPanel(panel, "Viewport");
     panel->draw = DrawViewportPanel;
+    panel->update = UpdateViewportPanel;
+    g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
 
     Model model = LoadModel("assets/models/room.obj");
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");

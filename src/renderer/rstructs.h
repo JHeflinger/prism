@@ -77,7 +77,6 @@ typedef struct {
     alignas(4) uint32_t x;
     alignas(4) uint32_t y;
 	alignas(4) float time;
-	alignas(4) uint32_t state;
 } RayGenerator;
 
 typedef struct {
@@ -98,7 +97,7 @@ typedef struct {
 DECLARE_ARRLIST(NodeBVH);
 
 typedef struct {
-	RenderTexture2D targets[CPUSWAP_LENGTH];
+	RenderTexture2D target;
 	size_t index;
     void* reference;
 } CPUSwap;

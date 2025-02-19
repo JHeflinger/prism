@@ -59,10 +59,8 @@ void InitializeRenderer() {
 	LOG_ASSERT(result, "Failed to initialize vulkan");
 
     // set up cpu swap
-	for (int i = 0; i < CPUSWAP_LENGTH; i++) {
-		g_renderer.swapchain.targets[i] = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
-		LOG_ASSERT(IsRenderTextureValid(g_renderer.swapchain.targets[i]), "Unable to load target texture");
-	}
+	g_renderer.swapchain.target = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
+	LOG_ASSERT(IsRenderTextureValid(g_renderer.swapchain.target), "Unable to load target texture");
 
     // configure stat profiler
     ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 10);
@@ -79,8 +77,7 @@ void DestroyRenderer() {
     VCLEAN_Vulkan(&(g_renderer.vulkan));
 
     // unload cpu swap textures
-	for (int i = 0; i < CPUSWAP_LENGTH; i++)
-		UnloadRenderTexture(g_renderer.swapchain.targets[i]);
+	UnloadRenderTexture(g_renderer.swapchain.target);
 }
 
 SimpleCamera GetCamera() {
@@ -289,7 +286,7 @@ void Render() {
         async_update = TRUE;
 
         // update render target
-        glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.targets[g_renderer.swapchain.index].texture.id);
+        glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.target.texture.id);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_renderer.dimensions.x, g_renderer.dimensions.y, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
         glBindTexture(GL_TEXTURE_2D, 0);
         
@@ -301,14 +298,13 @@ void Render() {
 }
 
 void Draw(float x, float y, float w, float h) {
-	size_t index = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
 	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
 	float psuedo_h = h * (g_renderer.dimensions.y / (float)GetScreenHeight());
     DrawTexturePro(
-        g_renderer.swapchain.targets[index].texture,
+        g_renderer.swapchain.target.texture,
         (Rectangle){
-            (g_renderer.swapchain.targets[index].texture.width / 2.0f) - (psuedo_w/2.0f),
-            (g_renderer.swapchain.targets[index].texture.height / 2.0f) - (psuedo_h/2.0f),
+            (g_renderer.swapchain.target.texture.width / 2.0f) - (psuedo_w/2.0f),
+            (g_renderer.swapchain.target.texture.height / 2.0f) - (psuedo_h/2.0f),
             psuedo_w,
             psuedo_h },
         (Rectangle){ x, y, w, h},

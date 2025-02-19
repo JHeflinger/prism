@@ -42,7 +42,6 @@ struct RayGenerator {
     uint x;
     uint y;
 	float time;
-	uint state;
 };
 
 struct Ray {
@@ -492,22 +491,10 @@ void main() {
 	float chance = 1.0 - pow(1.0 - ubo.frameless, rgIn.time);
 	float rnum = random((rgIn.x * rgIn.y) / 123.456789);
 	bool update_signal = rnum <= chance;
-	if (!update_signal) return;
-	/*
-	if (rgIn.state == 0) {
-		if (!update_signal) return;
-		raygenIn[gl_GlobalInvocationID.x].state = 1;
-	} else if (rgIn.state == 1) {
-		if (!update_signal) raygenIn[gl_GlobalInvocationID.x].state = 2;
-	} else {
-		if (!update_signal) {
-			raygenIn[gl_GlobalInvocationID.x].state = 0;
-			return;
-		} else {
-			raygenIn[gl_GlobalInvocationID.x].state = 1;
-		}
-	} */
-	// this still doesn't work because the "backup" update is done in series as well...
+	if (!update_signal) {
+        imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(0.0));
+        return;
+    }
 
 	// clear ray history
 	raygenIn[gl_GlobalInvocationID.x].time = 0.0;
@@ -533,8 +520,8 @@ void main() {
 
     // write to image
 	if (ubo.frameless < 1.0) {
-		vec4 prev_color = imageLoad(outputImage, ivec2(rgIn.x, rgIn.y));
-		color = mix(color, prev_color.xyz, 0.5);
-	}
-    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
+        imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
+	} else {
+        imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
+    }
 }

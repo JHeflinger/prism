@@ -105,11 +105,16 @@ typedef struct {
 } VulkanGeometry;
 
 typedef struct {
+    VulkanImage image;
+} VulkanTarget;
+
+typedef struct {
     VulkanGeneral general;
     VulkanGeometry geometry;
     VulkanRenderContext context;
     VulkanDataBuffer bridge;
     VulkanScheduler scheduler;
+    VulkanTarget target;
 } VulkanCore;
 
 typedef struct {

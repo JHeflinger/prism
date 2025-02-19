@@ -16,6 +16,7 @@ typedef struct {
     char name[MAX_NAME_LEN];
     RenderTexture2D texture;
     PanelFunction draw;
+    PanelFunction update;
 } Panel;
 
 typedef struct {

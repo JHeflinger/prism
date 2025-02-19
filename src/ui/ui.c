@@ -88,6 +88,9 @@ void UpdateUI(UI* ui) {
                 ui->divide = GetMouseX() - ui->x;
         }
     }
+
+    // update panel
+    if (ui->panel.update) ui->panel.update(ui->w, ui->h);
 }
 
 void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {

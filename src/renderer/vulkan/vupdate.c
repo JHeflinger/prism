@@ -204,8 +204,6 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
 }
 
 void VUPDT_UniformBuffers(UBOArray* ubos) {
-	static float ft = 0.0f;
-	if (g_vupdt_renderer_ref->swapchain.index == 0) ft = GetFrameTime();
     #define RAYVEC_TO_GLMVEC(gv, rv) { gv[0] = rv.x; gv[1] = rv.y; gv[2] = rv.z; }
     UniformBufferObject ubo = { 0 };
 	RAYVEC_TO_GLMVEC(ubo.position, g_vupdt_renderer_ref->camera.position);
@@ -224,7 +222,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
     ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
     ubo.bvhsize = g_vupdt_renderer_ref->geometry.bvh.size;
-	ubo.frametime = ft;
+	ubo.frametime = GetFrameTime();
 	ubo.frameless = g_vupdt_renderer_ref->config.frameless;
 	ubo.seed = rand();
 	ubo.shadows = (uint32_t)g_vupdt_renderer_ref->config.shadows;
