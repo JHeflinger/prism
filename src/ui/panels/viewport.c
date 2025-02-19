@@ -122,8 +122,8 @@ void ConfigureViewportPanel(Panel* panel) {
     UnloadModel(model);
 
     // submit some sdfs
-    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {-0.75, 0.75, -0.75}, 1.0f});
-    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {0.75, -0.75, 0.75}, 1.0f, {0.0, 0.0, 0.0}});
+    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {-2.75, 2.75, -2.75}, 1.0f, {0.0, 0.0, 0.0}});
+    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {2.75, -2.75, 2.75}, 1.0f, {0.0, 0.0, 0.0}});
     //SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0, 0}, 1.0f, {0.0, 0.0, 0.0}});
     SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
     //SubmitSDF((SDFPrimitive){SDF_MANDELBULB, {0.0, 0.0, 0.0}, 1.0f});
