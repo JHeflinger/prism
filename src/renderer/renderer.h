@@ -45,4 +45,6 @@ Vector2 RenderResolution();
 
 RendererConfig* RenderConfig();
 
+float RenderFrameTime();
+
 #endif

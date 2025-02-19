@@ -519,9 +519,9 @@ void main() {
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);
 
     // write to image
-	if (ubo.frameless < 1.0) {
-        imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
-	} else {
-        imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
+    if (ubo.frameless < 1.0) {
+	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 0.5));
+    } else {
+	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
     }
 }

@@ -14,6 +14,7 @@ Renderer g_renderer = { 0 };
 TriangleID g_triangle_id = 0;
 SDFID g_sdf_id = 0;
 Vector2 g_override_resolution = { 0 };
+float g_rft = 0.0f;
 
 void SetViewportSlice(size_t w, size_t h) {
 	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
@@ -199,6 +200,9 @@ void ClearMaterials() {
 void Render() {
     static BOOL async_update = TRUE;
 
+    // update render frame time;
+    g_rft += GetFrameTime();
+
     // detect changes in described data
     if (async_update) {
         // profile for stats
@@ -262,6 +266,9 @@ void Render() {
 
         // update uniform buffers
         VUPDT_UniformBuffers(&(g_renderer.vulkan.core.context.renderdata.ubos));
+
+        // reset renderer frame time
+        g_rft = 0.0f;
 
         // reset command buffer and record it
         vkResetCommandBuffer(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index], 0);
@@ -331,4 +338,8 @@ Vector2 RenderResolution() {
 
 RendererConfig* RenderConfig() {
     return &(g_renderer.config);
+}
+
+float RenderFrameTime() {
+    return g_rft * CPUSWAP_LENGTH;
 }
