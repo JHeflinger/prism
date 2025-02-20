@@ -27,6 +27,12 @@ void RemoveSDF(SDFID id);
 
 void ClearSDFs();
 
+LightID SubmitLight(PointLight light);
+
+void RemoveLight(LightID id);
+
+void ClearLights();
+
 MaterialID SubmitMaterial(SurfaceMaterial material);
 
 void ClearMaterials();
@@ -40,6 +46,10 @@ float RenderTime();
 size_t NumTriangles();
 
 size_t NumSDFs();
+
+size_t NumMaterials();
+
+size_t NumLights();
 
 Vector2 RenderResolution();
 

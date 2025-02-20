@@ -4,6 +4,8 @@
 #include "data/config.h"
 #include "renderer/vulkan/vstructs.h"
 
+BOOL VINIT_Lights(VulkanDataBuffer* lights);
+
 BOOL VINIT_Queue(VkQueue* queue);
 
 BOOL VINIT_Commands(VulkanCommands* commands);

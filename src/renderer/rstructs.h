@@ -12,8 +12,10 @@
 typedef uint32_t MaterialID;
 typedef uint64_t TriangleID;
 typedef uint64_t SDFID;
+typedef uint32_t LightID;
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARRLIST(SDFID);
+DECLARE_ARRLIST(LightID);
 
 typedef struct {
     Vector3 position;
@@ -107,9 +109,11 @@ typedef struct {
     size_t max_bvh;
     size_t max_materials;
     size_t max_sdfs;
+    size_t max_lights;
     BOOL update_triangles;
     BOOL update_materials;
     BOOL update_sdfs;
+    BOOL update_lights;
 } ChangeSet;
 
 typedef struct {
@@ -117,6 +121,16 @@ typedef struct {
 } RendererStats;
 
 typedef struct {
+    alignas(16) vec3 position;
+    alignas(16) vec3 ambient;
+    alignas(16) vec3 diffuse;
+    alignas(16) vec3 specular;
+} PointLight;
+DECLARE_ARRLIST(PointLight);
+
+typedef struct {
+    ARRLIST_PointLight lights;
+    ARRLIST_LightID lids;
     ARRLIST_Triangle triangles;
     ARRLIST_TriangleID tids;
     ARRLIST_TriangleBB tbbs;

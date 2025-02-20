@@ -7,6 +7,15 @@
 
 Renderer* g_vupdt_renderer_ref = NULL;
 
+void VUPDT_Lights(VulkanDataBuffer* lights) {
+    if (sizeof(PointLight) * g_vupdt_renderer_ref->geometry.lights.maxsize == 0) return;
+    VUTIL_CopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.lights.data,
+        sizeof(PointLight) * g_vupdt_renderer_ref->geometry.lights.size,
+        sizeof(PointLight) * g_vupdt_renderer_ref->geometry.lights.maxsize,
+        lights->buffer);
+}
+
 void VUPDT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
     if (sizeof(NodeBVH) * g_vupdt_renderer_ref->geometry.bvh.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
@@ -236,6 +245,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     ubo.maxmarches = g_vupdt_renderer_ref->config.maxmarches;
     ubo.time = g_vupdt_renderer_ref->config.time;
     ubo.antialiasing = (uint32_t)g_vupdt_renderer_ref->config.antialiasing;
+    ubo.lightssize = g_vupdt_renderer_ref->geometry.lights.size;
     memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     #undef RAYVEC_TO_GLMVEC
 }

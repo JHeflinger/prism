@@ -44,6 +44,7 @@ typedef struct {
     alignas(4) uint32_t maxmarches;
     alignas(4) float time;
     alignas(4) uint32_t antialiasing;
+    alignas(4) uint32_t lightssize;
 } UniformBufferObject;
 
 typedef struct {
@@ -102,6 +103,7 @@ typedef struct {
     VulkanDataBuffer materials;
     VulkanDataBuffer bvh;
     VulkanDataBuffer sdfs;
+    VulkanDataBuffer lights;
 } VulkanGeometry;
 
 typedef struct {

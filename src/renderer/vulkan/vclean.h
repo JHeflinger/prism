@@ -3,6 +3,8 @@
 
 #include "renderer/vulkan/vstructs.h"
 
+void VCLEAN_Lights(VulkanDataBuffer* lights);
+
 void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh);
 
 void VCLEAN_Triangles(VulkanDataBuffer* triangles);

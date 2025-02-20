@@ -3,6 +3,10 @@
 
 Renderer* g_vlcean_renderer_ref = NULL;
 
+void VCLEAN_Lights(VulkanDataBuffer* lights) {
+    VUTIL_DestroyBuffer(*lights);
+}
+
 void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
     VUTIL_DestroyBuffer(*bvh);
 }
@@ -24,6 +28,7 @@ void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Materials(&(geometry->materials));
     VCLEAN_BoundingVolumeHierarchy(&(geometry->bvh));
     VCLEAN_SDFs(&(geometry->sdfs));
+    VCLEAN_Lights(&(geometry->lights));
 }
 
 void VCLEAN_Metadata(VulkanMetadata* metadata) {

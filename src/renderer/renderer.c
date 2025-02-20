@@ -13,6 +13,7 @@
 Renderer g_renderer = { 0 };
 TriangleID g_triangle_id = 0;
 SDFID g_sdf_id = 0;
+LightID g_light_id = 0;
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
 
@@ -35,8 +36,8 @@ void InitializeRenderer() {
 	g_renderer.config.shadows = TRUE;
 	g_renderer.config.reflections = TRUE;
 	g_renderer.config.lighting = TRUE;
-	g_renderer.config.raytrace = FALSE;
-	g_renderer.config.sdf = TRUE;
+	g_renderer.config.raytrace = TRUE;
+	g_renderer.config.sdf = FALSE;
     g_renderer.config.sdfsmooth = 0.0f;
     g_renderer.config.maxmarches = 100;
     g_renderer.config.antialiasing = FALSE;
@@ -72,6 +73,7 @@ void DestroyRenderer() {
     ClearTriangles();
     ClearMaterials();
     ClearSDFs();
+    ClearLights();
     ARRLIST_NodeBVH_clear(&(g_renderer.geometry.bvh));
 
     // destroy vulkan resources
@@ -186,6 +188,39 @@ void ClearSDFs() {
     g_renderer.geometry.changes.update_sdfs = TRUE;
 }
 
+LightID SubmitLight(PointLight light) {
+    g_renderer.geometry.changes.update_lights = TRUE;
+    ARRLIST_LightID_add(&(g_renderer.geometry.lids), g_light_id);
+    ARRLIST_PointLight_add(&(g_renderer.geometry.lights), light);
+    g_light_id++;
+    return g_light_id - 1;
+}
+
+void RemoveLight(LightID id) {
+    size_t ind = 0;
+    BOOL found = false;
+    for (size_t i = 0; i < g_renderer.geometry.lights.size; i++) {
+        if (g_renderer.geometry.lids.data[i] == id) {
+            ind = i;
+            found = TRUE;
+            break;
+        }
+    }
+    if (found) {
+        ARRLIST_PointLight_remove(&(g_renderer.geometry.lights), ind);
+        ARRLIST_LightID_remove(&(g_renderer.geometry.lids), ind);
+        g_renderer.geometry.changes.update_lights = TRUE;
+    } else {
+        LOG_FATAL("Unable to remove nonexistant light");
+    }
+}
+
+void ClearLights() {
+    ARRLIST_LightID_clear(&(g_renderer.geometry.lids));
+    ARRLIST_PointLight_clear(&(g_renderer.geometry.lights));
+    g_renderer.geometry.changes.update_lights = TRUE;
+}
+
 MaterialID SubmitMaterial(SurfaceMaterial material) {
     ARRLIST_SurfaceMaterial_add(&(g_renderer.geometry.materials), material);
     g_renderer.geometry.changes.update_materials = TRUE;
@@ -211,7 +246,8 @@ void Render() {
         BOOL descriptor_changes = 
             g_renderer.geometry.changes.update_triangles |
             g_renderer.geometry.changes.update_materials |
-            g_renderer.geometry.changes.update_sdfs;
+            g_renderer.geometry.changes.update_sdfs |
+            g_renderer.geometry.changes.update_lights;
 
         // update triangles if needed
         if (g_renderer.geometry.changes.update_triangles) {
@@ -258,6 +294,19 @@ void Render() {
                 VINIT_Materials(&(g_renderer.vulkan.core.geometry.materials));
             } else {
                 VUPDT_Materials(&(g_renderer.vulkan.core.geometry.materials));
+            }
+        }
+
+        // update lights if needed
+        if (g_renderer.geometry.changes.update_lights) {
+            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
+            g_renderer.geometry.changes.update_lights = FALSE;
+            if (g_renderer.geometry.changes.max_lights != g_renderer.geometry.lights.maxsize) {
+                g_renderer.geometry.changes.max_lights = g_renderer.geometry.lights.maxsize;
+                VCLEAN_Lights(&(g_renderer.vulkan.core.geometry.lights));
+                VINIT_Lights(&(g_renderer.vulkan.core.geometry.lights));
+            } else {
+                VUPDT_Lights(&(g_renderer.vulkan.core.geometry.lights));
             }
         }
 
@@ -330,6 +379,14 @@ size_t NumTriangles() {
 
 size_t NumSDFs() {
     return g_renderer.geometry.sdfs.size;
+}
+
+size_t NumMaterials() {
+    return g_renderer.geometry.materials.size;
+}
+
+size_t NumLights() {
+    return g_renderer.geometry.lights.size;
 }
 
 Vector2 RenderResolution() {

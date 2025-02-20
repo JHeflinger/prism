@@ -520,7 +520,7 @@ void main() {
 
     // write to image
     if (ubo.frameless < 1.0) {
-	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 0.5));
+	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 0.1));
     } else {
 	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
     }

@@ -7,3 +7,5 @@ IMPL_ARRLIST(TriangleBB);
 IMPL_ARRLIST(SurfaceMaterial);
 IMPL_ARRLIST(NodeBVH);
 IMPL_ARRLIST(SDFPrimitive);
+IMPL_ARRLIST(LightID);
+IMPL_ARRLIST(PointLight);
