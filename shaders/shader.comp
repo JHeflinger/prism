@@ -36,6 +36,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint maxmarches;
     float time;
     uint antialiasing;
+    uint lightssize;
 } ubo;
 
 struct RayGenerator {
@@ -80,8 +81,6 @@ struct PointLight {
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
-    float distance;
-    vec3 direction;
 };
 
 struct NodeBVH {
@@ -119,6 +118,10 @@ layout(set = 0, binding = 5) readonly buffer BVHSSBOIn {
 
 layout(set = 0, binding = 6) readonly buffer SDFSSBOIn {
     SDFPrimitive sdfIn[ ];
+};
+
+layout(set = 0, binding = 7) readonly buffer LightSSBOIn {
+    PointLight lightIn[ ];
 };
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
@@ -226,15 +229,15 @@ Hit raytrace(Ray ray) {
     return hit;
 }
 
-bool is_shadowed(Hit hit, PointLight light) {
+bool is_shadowed(Hit hit, PointLight light, vec3 light_direction, float light_distance) {
     if (hit.distance < 0.0 || ubo.shadows == 0) return false;
-    if (dot(hit.normal, light.direction) < 0.0) return true;
+    if (dot(hit.normal, light_direction) < 0.0) return true;
     bool shadowed = false;
     Ray ray;
     ray.position = light.position;
-    ray.direction = light.direction * -1.0;
+    ray.direction = light_direction * -1.0;
     Hit shit = raytrace(ray);
-    shadowed = shit.distance > 0.0 && shit.distance < light.distance - EPS;
+    shadowed = shit.distance > 0.0 && shit.distance < light_distance - EPS;
     return shadowed;
 }
 
@@ -247,8 +250,12 @@ vec3 dshade(Hit hit) {
 vec3 shade(Ray ray, Hit hit, PointLight light) {
     vec3 color = abs(ray.direction) / 1.0;
     if (hit.distance > 0) {
+        // calculate light stuff
+        vec3 light_direction = normalize(hit.position - light.position) * -1.0;
+        float light_distance = length(hit.position - light.position);
+
         // shadows
-        bool shadowed = is_shadowed(hit, light);
+        bool shadowed = is_shadowed(hit, light, light_direction, light_distance);
 
         // material
         Material material = materialIn[hit.material];
@@ -258,10 +265,10 @@ vec3 shade(Ray ray, Hit hit, PointLight light) {
 
         // diffuse light
         if (!shadowed)
-            color += material.diffuse * light.diffuse * dot(light.direction, hit.normal);
+            color += material.diffuse * light.diffuse * dot(light_direction, hit.normal);
 
         // specular light
-        vec3 reflection = normalize(reflect(light.direction, hit.normal));
+        vec3 reflection = normalize(reflect(light_direction, hit.normal));
         float specular_const = dot(reflection, ray.direction);
         if (specular_const >= 0 && !shadowed)
             color += light.specular * material.specular * pow(specular_const, material.shiny);
@@ -272,14 +279,12 @@ vec3 shade(Ray ray, Hit hit, PointLight light) {
     return color;
 }
 
-PointLight default_light(Hit hit) {
+PointLight default_light() {
     PointLight light;
-    light.position = vec3(1.0, 1.0, 1.5);
+    light.position = ubo.position;
     light.ambient = vec3(1.0, 1.0, 1.0);
     light.diffuse = vec3(1.0, 1.0, 1.0);
     light.specular = vec3(1.0, 1.0, 1.0);
-    light.direction = normalize(hit.position - light.position) * -1.0;
-    light.distance = length(hit.position - light.position);
     return light;
 }
 
@@ -310,9 +315,25 @@ void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
                 rray.position = rhit.position + (rray.direction * EPS);
                 rhit = raytrace(rray);
                 rhit.position = ubo.position + (rray.direction * rhit.distance); // should we keep this in? should this be using ubo.position...
-                PointLight light = default_light(rhit);
+                PointLight light = default_light();
                 reflectionvals[num_colors] = material.reflection;
-                colors[num_colors++] = shade(ray, rhit, light);
+                colors[num_colors] = abs(rray.direction) / 1.0;
+                if (rhit.distance >= 0.0) {
+                    uint num_lights = max(1, ubo.lightssize);
+                    PointLight light;
+                    colors[num_colors] = vec3(0.0);
+                    for (uint i = 0; i < num_lights; i++) {
+                        if (ubo.lightssize > 0) {
+                            light = lightIn[i];
+                        } else {
+                            light = default_light();
+                        }
+                        colors[num_colors] += shade(ray, rhit, light);
+                    }
+                } else if (rhit.distance >= 0.0) {
+                    color = dshade(hit);
+                }
+                num_colors++;
                 if (rhit.distance <= 0.0 || materialIn[rhit.material].reflection <= 0.0) break;
                 material = materialIn[rhit.material];
             }
@@ -457,25 +478,34 @@ vec3 raycolor(vec2 ray_coordinate) {
     // trace/march
     Hit hit;
     hit.distance = -1.0;
-    PointLight light = default_light(hit);
+    uint num_lights = max(1, ubo.lightssize);
     if (ubo.raytrace != 0) {
         hit = raytrace(ray);
         if (hit.distance > 0.0) {
-            light = default_light(hit);
-            if (ubo.lighting != 0)
-                color = shade(ray, hit, light);
-            else
+            PointLight light;
+            if (ubo.lighting != 0) {
+                color = vec3(0.0, 0.0, 0.0);
+                for (uint i = 0; i < num_lights; i++) {
+                    if (ubo.lightssize > 0) {
+                        light = lightIn[i];
+                    } else {
+                        light = default_light();
+                    }
+                    color += shade(ray, hit, light);
+                }
+            } else {
                 color = dshade(hit);
+            }
             if (ubo.reflections != 0) reflect_color(ray, hit, MAX_BOUNCES, color);
         }
     } else if (ubo.sdf != 0) {
-        // raymarch to get distance
         hit = raymarch(ray);
         if (hit.distance > 0.0) {
             color = dshade(hit);
         }
     }
-	draw_light(ray, hit, light, color);
+    for (uint i = 0; i < ubo.lightssize; i++)
+	    draw_light(ray, hit, lightIn[i], color);
 	
 	return color;
 }
@@ -510,8 +540,6 @@ void main() {
 		vec2 base_ray = vec2(rgIn.x, rgIn.y);
 		color += raycolor(base_ray + vec2(-0.5, -0.5));
 		color += raycolor(base_ray + vec2(0.5, 0.5));
-		// color += raycolor(base_ray + vec2(0.5, -0.5));
-		// color += raycolor(base_ray + vec2(-0.5, 0.5));
 		color /= 2.0;
 	}
     

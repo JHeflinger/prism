@@ -151,7 +151,14 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         arrsize = arrsize > 0 ? arrsize : 1;
         sdfBufferInfo.range = arrsize;
 
-        VkWriteDescriptorSet descriptorWrites[7] = { 0 };
+        VkDescriptorBufferInfo lightBufferInfo = { 0 };
+        lightBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.lights.buffer;
+        lightBufferInfo.offset = 0;
+        arrsize = sizeof(PointLight) * g_vupdt_renderer_ref->geometry.lights.size;
+        arrsize = arrsize > 0 ? arrsize : 1;
+        lightBufferInfo.range = arrsize;
+
+        VkWriteDescriptorSet descriptorWrites[8] = { 0 };
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptors->sets[i];
@@ -209,7 +216,15 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[6].descriptorCount = 1;
         descriptorWrites[6].pBufferInfo = &sdfBufferInfo;
 
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 7, descriptorWrites, 0, NULL);
+        descriptorWrites[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[7].dstSet = descriptors->sets[i];
+        descriptorWrites[7].dstBinding = 7;
+        descriptorWrites[7].dstArrayElement = 0;
+        descriptorWrites[7].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[7].descriptorCount = 1;
+        descriptorWrites[7].pBufferInfo = &lightBufferInfo;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 8, descriptorWrites, 0, NULL);
     }
 }
 
