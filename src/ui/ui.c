@@ -41,7 +41,7 @@ void UpdateUI(UI* ui) {
                     (size_t)GetMouseY() < ui->y + ui->divide + buffer &&
                     (size_t)GetMouseY() > ui->y + ui->divide - buffer) {
                     g_divider_instance = ui;
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) g_divider_active = TRUE;
+                    if (InputButtonPressed(IK_MOUSELEFT)) g_divider_active = TRUE;
                 }
             } else {
                 if ((size_t)GetMouseY() < ui->y + ui->h &&
@@ -49,7 +49,7 @@ void UpdateUI(UI* ui) {
                     (size_t)GetMouseX() < ui->x + ui->divide + buffer &&
                     (size_t)GetMouseX() > ui->x + ui->divide - buffer) {
                     g_divider_instance = ui;
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) g_divider_active = TRUE;
+                    if (InputButtonPressed(IK_MOUSELEFT)) g_divider_active = TRUE;
                 }
             }
         } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
@@ -59,14 +59,14 @@ void UpdateUI(UI* ui) {
 
     // dev split
     if (InputKeyDown(IK_DEV) &&
-        (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || 
-        IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) &&
+        (InputButtonPressed(IK_MOUSELEFT) || 
+        InputButtonPressed(IK_MOUSERIGHT)) &&
         CheckCollisionPointRec(
             GetMousePosition(), 
             (Rectangle){ui->x, ui->y, ui->w, ui->h}) &&
         !ui->left &&
         !ui->right) {
-        ui->vertical = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+        ui->vertical = InputButtonPressed(IK_MOUSELEFT);
         UI* left = GenerateUI();
         UI* right = GenerateUI();
         if (ui->vertical) {
@@ -185,7 +185,7 @@ void UIDrawText(const char* text, ...) {
 }
 
 void UIDragFloat(float* value, float min, float max, float speed, size_t w) {
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+    if (InputButtonDown(IK_MOUSELEFT) &&
         CheckCollisionPointRec(
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, w, LINE_HEIGHT - 4})) {
@@ -215,7 +215,7 @@ void UIMoveCursor(float x, float y) {
 }
 
 void UICheckbox(BOOL* value) {
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+    if (InputButtonPressed(IK_MOUSELEFT) &&
         CheckCollisionPointRec(
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x + 2, g_ui_cursor.y + g_ui_position.y + 2, LINE_HEIGHT - 4, LINE_HEIGHT - 4})) {
@@ -240,7 +240,7 @@ void UICheckboxLabeled(const char* label, BOOL* value) {
 }
 
 void UIDragUInt(uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+    if (InputButtonDown(IK_MOUSELEFT) &&
         CheckCollisionPointRec(
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, w, LINE_HEIGHT - 4})) {

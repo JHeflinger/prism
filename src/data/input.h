@@ -4,21 +4,39 @@
 #include "data/config.h"
 #include <raylib.h>
 
-#define NUMKEYS 1
+#define NUMKEYS 3
+#define NUMBTNS 2
 
 typedef enum {
     IK_DEV = 0,
+    IK_PAN_CAMERA = 1,
+    IK_RESET_CAMERA = 2
 } InputKey;
+
+typedef enum {
+    IK_MOUSELEFT = 0,
+    IK_MOUSERIGHT = 1,
+} InputButton;
 
 typedef struct {
     BOOL initialized;
+    BOOL blocked;
     KeyboardKey keymap[NUMKEYS];
+    MouseButton btnmap[NUMBTNS];
 } InputMap;
 
 void InitializeInput();
 
+void BlockInput();
+
+void UnblockInput();
+
 BOOL InputKeyPressed(InputKey key);
 
 BOOL InputKeyDown(InputKey key);
+
+BOOL InputButtonPressed(InputButton btn);
+
+BOOL InputButtonDown(InputButton btn);
 
 #endif

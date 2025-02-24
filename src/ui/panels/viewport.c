@@ -1,6 +1,7 @@
 #include "viewport.h"
 #include "renderer/renderer.h"
 #include "core/log.h"
+#include "data/input.h"
 #include <rlgl.h>
 
 RenderTexture2D g_viewport_target;
@@ -14,16 +15,13 @@ void DrawViewportPanel(float width, float height) {
     static float theta = 0.0f;
     static float phi = 0.78f;
     SimpleCamera camera = GetCamera();
-    if (IsKeyDown(KEY_R)) {
-        theta += GetFrameTime();
-    }
-    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+    if (InputButtonDown(IK_MOUSERIGHT)) {
         phi -= GetMouseDelta().y / 225.0;
         theta -= GetMouseDelta().x / 400.0f;
         if (phi < 0.001f) phi = 0.001f;
         if (phi > M_PI - 0.001f) phi = M_PI - 0.001f;
     }
-	if (IsKeyDown(KEY_SPACE) && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+	if (InputKeyDown(IK_PAN_CAMERA) && InputButtonDown(IK_MOUSELEFT)) {
 		float distance_correction = radius / 600.0f;
 		vec3 lookat_pos = { camera.look.x, camera.look.y, camera.look.z };
 		vec3 camera_pos = { camera.position.x, camera.position.y, camera.position.z };
@@ -45,7 +43,7 @@ void DrawViewportPanel(float width, float height) {
 		camera.look.y += movement[1];
 		camera.look.z += movement[2];
 	}
-	if (IsKeyPressed(KEY_GRAVE)) {
+	if (InputKeyPressed(IK_RESET_CAMERA)) {
 		radius = 3.0f;
 		theta = 0.0f;
 		phi = 0.78f;
