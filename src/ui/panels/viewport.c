@@ -81,7 +81,7 @@ void ConfigureViewportPanel(Panel* panel) {
     panel->update = UpdateViewportPanel;
     g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
 
-    Model model = LoadModel("assets/models/room.obj");
+    Model model = LoadModel("assets/models/buddha.obj");
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
     Mesh mesh = model.meshes[0];
     SurfaceMaterial material = {

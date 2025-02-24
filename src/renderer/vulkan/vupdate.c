@@ -248,7 +248,16 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
     ubo.bvhsize = g_vupdt_renderer_ref->geometry.bvh.size;
 	ubo.frametime = RenderFrameTime();
-	ubo.frameless = g_vupdt_renderer_ref->config.frameless;
+    if (g_vupdt_renderer_ref->config.autoframeless) {
+        #define TARGET_FRAMETIME 0.016f
+        if (RenderFrameTime() > 0) {
+            g_vupdt_renderer_ref->config.frameless *= (TARGET_FRAMETIME / RenderFrameTime());
+            if (g_vupdt_renderer_ref->config.frameless > 1.0f)
+                g_vupdt_renderer_ref->config.frameless = 1.0f;
+        }
+        #undef TARGET_FRAMETIME
+    }
+    ubo.frameless = g_vupdt_renderer_ref->config.frameless;
 	ubo.seed = rand();
 	ubo.shadows = (uint32_t)g_vupdt_renderer_ref->config.shadows;
 	ubo.reflections = (uint32_t)g_vupdt_renderer_ref->config.reflections;

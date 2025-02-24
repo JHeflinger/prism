@@ -39,6 +39,7 @@ void DrawDevPanel(float width, float height) {
 	UICheckboxLabeled("Time Paused:", &g_time_paused);
     if (!g_time_paused) RenderConfig()->time += GetFrameTime();
     UIDragFloatLabeled("Time:", &(RenderConfig()->time), 0.0f, 999999999.0f, 1.00f, width - 20);
+	UICheckboxLabeled("Automatic Frameless:", &(RenderConfig()->autoframeless));
     UIDragFloatLabeled("Frameless:", &(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 20);
 	UICheckboxLabeled("Anti-Aliasing:", &(RenderConfig()->antialiasing));
 

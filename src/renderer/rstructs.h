@@ -152,6 +152,7 @@ typedef struct {
     uint32_t maxmarches;
     float time;
     BOOL antialiasing;
+    BOOL autoframeless;
 } RendererConfig;
 
 #endif

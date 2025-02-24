@@ -41,6 +41,7 @@ void InitializeRenderer() {
     g_renderer.config.sdfsmooth = 0.0f;
     g_renderer.config.maxmarches = 100;
     g_renderer.config.antialiasing = FALSE;
+    g_renderer.config.autoframeless = FALSE;
 
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };
@@ -398,5 +399,5 @@ RendererConfig* RenderConfig() {
 }
 
 float RenderFrameTime() {
-    return g_rft * CPUSWAP_LENGTH;
+    return g_rft;
 }
