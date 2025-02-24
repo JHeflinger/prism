@@ -13,6 +13,7 @@ Vector2 g_ui_position = { 0 };
 char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
 
 #define LINE_HEIGHT 20
+#define NAMEBAR_HEIGHT 25
 
 UI* GenerateUI() {
     UI* ui = EZALLOC(1, sizeof(UI));
@@ -55,7 +56,6 @@ void UpdateUI(UI* ui) {
             g_divider_active = FALSE;
         }
     }
-
 
     // dev split
     if (InputKeyDown(IK_DEV) &&
@@ -130,8 +130,16 @@ void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
         }
     } else {
         DrawRectangle(x, y, w, h, MappedColor(PANEL_BG_COLOR));
+        float namebar_dif = ui->panel.name[0] != 0 && strcmp(ui->panel.name, "Viewport") != 0 ? NAMEBAR_HEIGHT : 0.0f;
+        if (namebar_dif > 0.0) {
+            DrawRectangle(x, y, w, NAMEBAR_HEIGHT, MappedColor(PANEL_NB_COLOR));
+            float tag_len = MeasureTextEx(FontAsset(), ui->panel.name, LINE_HEIGHT, 0).x;
+            DrawRectangle(x, y + NAMEBAR_HEIGHT / 2, tag_len + 20, NAMEBAR_HEIGHT / 2, MappedColor(PANEL_NBG_COLOR));
+            DrawRectangleRounded((Rectangle){x, y, tag_len + 20, 3 * NAMEBAR_HEIGHT / 4}, 10, 10, MappedColor(PANEL_NBG_COLOR));
+            DrawTextEx(FontAsset(), ui->panel.name, (Vector2){ x + 10, y + NAMEBAR_HEIGHT - LINE_HEIGHT - 2 }, LINE_HEIGHT, 0, WHITE);
+        }
         if (IsRenderTextureValid(ui->panel.texture))
-            DrawTexturePro(ui->panel.texture.texture, (Rectangle){ 0, 0, w, -1*((int)h) }, (Rectangle){ x, y, w, h }, (Vector2){ 0, 0 }, 0.0f, (Color){ 255, 255, 255, 255 });
+            DrawTexturePro(ui->panel.texture.texture, (Rectangle){ 0, y + namebar_dif, w, -1*((int)h - namebar_dif) }, (Rectangle){ x, y + namebar_dif, w, h - namebar_dif }, (Vector2){ 0, 0 }, 0.0f, (Color){ 255, 255, 255, 255 });
         size_t th = 1;
         if (y != 0) DrawLineEx((Vector2){x, y + (th/2)}, (Vector2){x + w, y + (th/2)}, th, MappedColor(PANEL_DIVIDER_COLOR));
         if (x != 0) DrawLineEx((Vector2){x + (th/2), y}, (Vector2){x + (th/2), y + h}, th, MappedColor(PANEL_DIVIDER_COLOR));
@@ -146,8 +154,9 @@ void PreRenderUI(UI* ui) {
         PreRenderUI((UI*)(ui->left));
         PreRenderUI((UI*)(ui->right));
     } else if (IsRenderTextureValid(ui->panel.texture) && ui->panel.draw) {
-        g_ui_cursor = (Vector2){ 10, 10 };
+        g_ui_cursor = (Vector2){ 10, 5 };
         g_ui_position = (Vector2){ ui->x , ui->y };
+        if (ui->panel.name[0] != 0 && strcmp(ui->panel.name, "Viewport") != 0) g_ui_position.y += NAMEBAR_HEIGHT;
         BeginTextureMode(ui->panel.texture);
         ClearBackground((Color){0, 0, 0, 0});
         ui->panel.draw(ui->w, ui->h);

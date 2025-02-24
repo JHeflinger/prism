@@ -47,7 +47,7 @@ def handle():
         for root, dirs, files in os.walk("src"):
             for file in files:
                 filepath = os.path.join(root, file)
-                if ".h" in filepath:
+                if ".h" in filepath or ".c" in filepath:
                     prev_line = ""
                     with open(filepath, 'r') as file:
                         linecount = 0

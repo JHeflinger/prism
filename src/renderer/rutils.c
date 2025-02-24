@@ -178,7 +178,6 @@ void SplitBVH(ARRLIST_NodeBVH* bvh, size_t index, ARRLIST_TriangleBB* geometry, 
             bvh->data[index].max);
     }
     
-    
     #undef CBVH
     #undef BVHMIN
     #undef BVHMAX
