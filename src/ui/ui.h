@@ -61,4 +61,6 @@ void UIDragUInt(uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, siz
 
 void UIDragUIntLabeled(const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w);
 
+BOOL UIButton(const char* label, size_t w);
+
 #endif

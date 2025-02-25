@@ -139,7 +139,14 @@ void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
             DrawTextEx(FontAsset(), ui->panel.name, (Vector2){ x + 10, y + NAMEBAR_HEIGHT - LINE_HEIGHT - 2 }, LINE_HEIGHT, 0, WHITE);
         }
         if (IsRenderTextureValid(ui->panel.texture))
-            DrawTexturePro(ui->panel.texture.texture, (Rectangle){ 0, y + namebar_dif, w, -1*((int)h - namebar_dif) }, (Rectangle){ x, y + namebar_dif, w, h - namebar_dif }, (Vector2){ 0, 0 }, 0.0f, (Color){ 255, 255, 255, 255 });
+            DrawTexturePro(
+                ui->panel.texture.texture,
+                (Rectangle){ 0, ui->panel.texture.texture.height - h + namebar_dif, w, -1*((int)h - namebar_dif) },
+                (Rectangle){ x, y + namebar_dif, w, h - namebar_dif },
+                (Vector2){ 0, 0 },
+                0.0f,
+                (Color){ 255, 255, 255, 255 });
+
         size_t th = 1;
         if (y != 0) DrawLineEx((Vector2){x, y + (th/2)}, (Vector2){x + w, y + (th/2)}, th, MappedColor(PANEL_DIVIDER_COLOR));
         if (x != 0) DrawLineEx((Vector2){x + (th/2), y}, (Vector2){x + (th/2), y + h}, th, MappedColor(PANEL_DIVIDER_COLOR));
@@ -265,4 +272,12 @@ void UIDragUIntLabeled(const char* label, uint32_t* value, uint32_t min, uint32_
     float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
     UIMoveCursor(xdif + 5, -LINE_HEIGHT);
     UIDragUInt(value, min, max, speed, w - 5 - xdif);
+}
+
+BOOL UIButton(const char* label, size_t w) {
+    Vector2 text_size = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0);
+    float button_width = w < text_size.x + 20 ? text_size.x + 20 : w;
+    Color color = RED;
+    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 1, button_width, LINE_HEIGHT - 2, color);
+    return FALSE;
 }

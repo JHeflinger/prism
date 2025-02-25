@@ -6,10 +6,6 @@
 
 RenderTexture2D g_viewport_target;
 
-Model model;
-Mesh mesh;
-int i = 0;
-
 void DrawViewportPanel(float width, float height) {
     static float radius = 3.0f;
     static float theta = 0.0f;
@@ -78,7 +74,7 @@ void ConfigureViewportPanel(Panel* panel) {
     panel->draw = DrawViewportPanel;
     panel->update = UpdateViewportPanel;
     g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
-
+/*
     Model model = LoadModel("assets/models/sphere.obj");
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
     Mesh mesh = model.meshes[0];
@@ -138,5 +134,5 @@ void ConfigureViewportPanel(Panel* panel) {
         {0.5, 0.5, 0.5},
         {0.5, 0.5, 0.5},
         {0.5, 0.5, 0.5},
-    });
+    });*/
 }
