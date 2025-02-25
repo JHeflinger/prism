@@ -11,6 +11,8 @@ BOOL g_divider_active = FALSE;
 Vector2 g_ui_cursor = { 0 };
 Vector2 g_ui_position = { 0 };
 char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
+Popup* g_popup = NULL;
+Popup* g_popup_origin = NULL;
 
 #define LINE_HEIGHT 20
 #define NAMEBAR_HEIGHT 25
@@ -93,7 +95,7 @@ void UpdateUI(UI* ui) {
     if (ui->panel.update) ui->panel.update(ui->w, ui->h);
 }
 
-void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
+void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     LOG_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
     ui->w = w;
     ui->h = h;
@@ -103,11 +105,11 @@ void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     if (ui->left && ui->right) {
         // draw inner ui
         if (ui->vertical) {
-            DrawUI((UI*)(ui->left), x, y, w, ui->divide);
-            DrawUI((UI*)(ui->right), x, y + ui->divide, w, h - ui->divide);
+            DrawUI_helper((UI*)(ui->left), x, y, w, ui->divide);
+            DrawUI_helper((UI*)(ui->right), x, y + ui->divide, w, h - ui->divide);
         } else {
-            DrawUI((UI*)(ui->left), x, y, ui->divide, h);
-            DrawUI((UI*)(ui->right), x + ui->divide, y, w - ui->divide, h);
+            DrawUI_helper((UI*)(ui->left), x, y, ui->divide, h);
+            DrawUI_helper((UI*)(ui->right), x + ui->divide, y, w - ui->divide, h);
         }
 
         // draw divider
@@ -155,11 +157,31 @@ void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     }
 }
 
-void PreRenderUI(UI* ui) {
+void DrawPopup(size_t x, size_t y, size_t w, size_t h) {
+    LOG_ASSERT(g_popup != NULL, "Cannot draw a null popup!");
+    DrawRectangle(x, y, w, h, (Color){ 255, 255, 255, 50 });
+    if (g_popup->behavior != NULL) {
+        int result = g_popup->behavior(x, y, w, h);
+        if (result >= (int)g_popup->options) {
+            CleanPopup(g_popup_origin);
+            g_popup_origin = NULL;
+            g_popup = NULL;
+        } else if (result > 0) {
+            g_popup = ((Popup**)g_popup->results)[result];
+        }
+    }
+}
+
+void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
+    DrawUI_helper(ui, x, y, w, h);
+    if (g_popup != NULL) DrawPopup(x, y, w, h);
+}
+
+void PreRenderUI_helper(UI* ui) {
     LOG_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
     if (ui->left && ui->right) {
-        PreRenderUI((UI*)(ui->left));
-        PreRenderUI((UI*)(ui->right));
+        PreRenderUI_helper((UI*)(ui->left));
+        PreRenderUI_helper((UI*)(ui->right));
     } else if (IsRenderTextureValid(ui->panel.texture) && ui->panel.draw) {
         g_ui_cursor = (Vector2){ 10, 5 };
         g_ui_position = (Vector2){ ui->x , ui->y };
@@ -171,7 +193,17 @@ void PreRenderUI(UI* ui) {
     }
 }
 
+void PreRenderUI(UI* ui) {
+    if (g_popup != NULL) BlockInput();
+    PreRenderUI_helper(ui);
+    UnblockInput();
+}
+
 void DestroyUI(UI* ui) {
+    if (g_popup_origin != NULL) {
+        CleanPopup(g_popup_origin);
+        g_popup_origin = NULL;
+    }
     if (ui->left) DestroyUI((UI*)ui->left);
     if (ui->right) DestroyUI((UI*)ui->right);
     if (!ui->left && !ui->right) DestroyPanel(&(ui->panel));
@@ -293,4 +325,9 @@ BOOL UIButton(const char* label, size_t w) {
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
     return clicked;
+}
+
+void UIPopup(Popup* popup) {
+    g_popup = popup;
+    g_popup_origin = popup;
 }

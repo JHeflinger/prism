@@ -3,7 +3,7 @@
 
 void DrawOverviewPanel(float width, float height) {
     if (UIButton("This is my button", 20)) {
-        LOG_INFO("clicked!");
+        UIPopup(GenerateAddObjectPopup());
     }
 }
 

@@ -2,6 +2,7 @@
 #define UI_H
 
 #include "data/config.h"
+#include "ui/popup.h"
 #include <raylib.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -62,5 +63,7 @@ void UIDragUInt(uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, siz
 void UIDragUIntLabeled(const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w);
 
 BOOL UIButton(const char* label, size_t w);
+
+void UIPopup(Popup* popup);
 
 #endif

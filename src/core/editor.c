@@ -39,7 +39,6 @@ void InitEditor() {
 }
 
 void UpdateEditor() {
-    UnblockInput();
     UpdateUI(g_ui);
 }
 
