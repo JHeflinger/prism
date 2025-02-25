@@ -277,7 +277,20 @@ void UIDragUIntLabeled(const char* label, uint32_t* value, uint32_t min, uint32_
 BOOL UIButton(const char* label, size_t w) {
     Vector2 text_size = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0);
     float button_width = w < text_size.x + 20 ? text_size.x + 20 : w;
-    Color color = RED;
+    Color color = MappedColor(PANEL_BTN_BG_COLOR);
+    BOOL clicked = FALSE;
+    if (CheckCollisionPointRec(
+            GetMousePosition(),
+            (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 1, button_width, LINE_HEIGHT - 2})) {
+        color = MappedColor(PANEL_BTN_HVR_COLOR);
+        if (InputButtonDown(IK_MOUSELEFT)) color = MappedColor(PANEL_BTN_PRS_COLOR);
+        clicked = InputButtonPressed(IK_MOUSELEFT);
+    }
     DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 1, button_width, LINE_HEIGHT - 2, color);
-    return FALSE;
+    Vector2 texpos = g_ui_cursor;
+    texpos.x += (button_width - text_size.x) / 2.0f;
+    DrawTextEx(FontAsset(), label, texpos, LINE_HEIGHT, 0, WHITE);
+    g_ui_cursor.y += LINE_HEIGHT;
+    g_ui_cursor.x = 10;
+    return clicked;
 }

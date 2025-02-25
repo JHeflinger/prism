@@ -1,7 +1,10 @@
 #include "overview.h"
+#include "core/log.h"
 
 void DrawOverviewPanel(float width, float height) {
-    UIButton("This is my button", 0);
+    if (UIButton("This is my button", 20)) {
+        LOG_INFO("clicked!");
+    }
 }
 
 void UpdateOverviewPanel(float width, float height) {
