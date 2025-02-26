@@ -9,7 +9,7 @@
 PointLight g_point_light = { 0 };
 SurfaceMaterial g_material = { 0 };
 vec3 g_cube_position = { 0 };
-vec3 g_cube_scale = { 0 };
+vec3 g_cube_scale = { 1.0, 1.0, 1.0 };
 
 int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 250;
@@ -260,7 +260,89 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
-        // submit cube here
+        // bottom face
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            0
+        });
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            0
+        });
+
+        // top face
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            0
+        });
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            0
+        });
+
+        // right face
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            0
+        });
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            0
+        });
+
+        // left face
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            0
+        });
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            0
+        });
+
+        // front face
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            0
+        });
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            0
+        });
+
+        // back face
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            0
+        });
+        SubmitTriangle((Triangle){
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] - g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[0] + g_cube_scale[1]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f},
+            0
+        });
         return 0;
     }
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
