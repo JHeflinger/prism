@@ -159,14 +159,14 @@ void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
 
 void DrawPopup(size_t x, size_t y, size_t w, size_t h) {
     LOG_ASSERT(g_popup != NULL, "Cannot draw a null popup!");
-    DrawRectangle(x, y, w, h, (Color){ 255, 255, 255, 50 });
+    DrawRectangle(x, y, w, h, (Color){ 255, 255, 255, 100 });
     if (g_popup->behavior != NULL) {
         int result = g_popup->behavior(x, y, w, h);
         if (result >= (int)g_popup->options) {
             CleanPopup(g_popup_origin);
             g_popup_origin = NULL;
             g_popup = NULL;
-        } else if (result > 0) {
+        } else if (result >= 0) {
             g_popup = ((Popup**)g_popup->results)[result];
         }
     }
@@ -246,6 +246,16 @@ void UIDragFloatLabeled(const char* label, float* value, float min, float max, f
     float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
     UIMoveCursor(xdif + 5, -LINE_HEIGHT);
     UIDragFloat(value, min, max, speed, w - 5 - xdif);
+}
+
+void UISetCursor(float x, float y) {
+    g_ui_cursor.x = x;
+    g_ui_cursor.y = y;
+}
+
+void UISetPosition(float x, float y) {
+    g_ui_position.x = x;
+    g_ui_position.y = y;
 }
 
 void UIMoveCursor(float x, float y) {
@@ -330,4 +340,11 @@ BOOL UIButton(const char* label, size_t w) {
 void UIPopup(Popup* popup) {
     g_popup = popup;
     g_popup_origin = popup;
+}
+
+float UITextWidth(const char* text, ...) {
+    va_list args;
+    va_start(args, text);
+    vsnprintf(g_ui_text_buffer, MAX_LINE_WIDTH - 1, text, args);
+    return MeasureTextEx(FontAsset(), g_ui_text_buffer, LINE_HEIGHT, 0).x;
 }

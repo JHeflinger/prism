@@ -67,6 +67,14 @@ void InitializeRenderer() {
 
     // configure stat profiler
     ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 10);
+
+    // default material
+    SubmitMaterial((SurfaceMaterial){
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f},
+        0, 0, 0, 0, 0, 0
+    });
 }
 
 void DestroyRenderer() {

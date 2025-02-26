@@ -52,6 +52,10 @@ void UIDragFloat(float* value, float min, float max, float speed, size_t w);
 
 void UIDragFloatLabeled(const char* label, float* value, float min, float max, float speed, size_t w);
 
+void UISetCursor(float x, float y);
+
+void UISetPosition(float x, float y);
+
 void UIMoveCursor(float x, float y);
 
 void UICheckbox(BOOL* value);
@@ -65,5 +69,7 @@ void UIDragUIntLabeled(const char* label, uint32_t* value, uint32_t min, uint32_
 BOOL UIButton(const char* label, size_t w);
 
 void UIPopup(Popup* popup);
+
+float UITextWidth(const char* text, ...);
 
 #endif
