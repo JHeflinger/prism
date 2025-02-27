@@ -13,6 +13,7 @@ Vector2 g_ui_position = { 0 };
 char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
 Popup* g_popup = NULL;
 Popup* g_popup_origin = NULL;
+PersistantUIData* g_active_ui_element = NULL;
 
 #define LINE_HEIGHT 20
 #define NAMEBAR_HEIGHT 25
@@ -27,7 +28,7 @@ void SetupPanel(Panel* panel, const char* name) {
     panel->texture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
 }
 
-void UpdateUI(UI* ui) {   
+void UpdateUI(UI* ui) {
     LOG_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
     if (ui->left && ui->right) {
         // update further down
@@ -138,7 +139,7 @@ void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
             float tag_len = MeasureTextEx(FontAsset(), ui->panel.name, LINE_HEIGHT, 0).x;
             DrawRectangle(x, y + NAMEBAR_HEIGHT / 2, tag_len + 20, NAMEBAR_HEIGHT / 2, MappedColor(PANEL_NBG_COLOR));
             DrawRectangleRounded((Rectangle){x, y, tag_len + 20, 3 * NAMEBAR_HEIGHT / 4}, 10, 10, MappedColor(PANEL_NBG_COLOR));
-            DrawTextEx(FontAsset(), ui->panel.name, (Vector2){ x + 10, y + NAMEBAR_HEIGHT - LINE_HEIGHT - 2 }, LINE_HEIGHT, 0, WHITE);
+            DrawTextEx(FontAsset(), ui->panel.name, (Vector2){ x + 10, y + NAMEBAR_HEIGHT - LINE_HEIGHT - 2 }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
         }
         if (IsRenderTextureValid(ui->panel.texture))
             DrawTexturePro(
@@ -173,6 +174,7 @@ void DrawPopup(size_t x, size_t y, size_t w, size_t h) {
 }
 
 void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
+    if (InputButtonUp(IK_MOUSELEFT)) g_active_ui_element = NULL;
     DrawUI_helper(ui, x, y, w, h);
     if (g_popup != NULL) DrawPopup(x, y, w, h);
 }
@@ -212,22 +214,26 @@ void DestroyUI(UI* ui) {
 
 void DestroyPanel(Panel* panel) {
     if (IsRenderTextureValid(panel->texture)) UnloadRenderTexture(panel->texture);
+    if (panel->clean) panel->clean();
 }
 
 void UIDrawText(const char* text, ...) {
     va_list args;
     va_start(args, text);
     vsnprintf(g_ui_text_buffer, MAX_LINE_WIDTH - 1, text, args);
-    DrawTextEx(FontAsset(), g_ui_text_buffer, g_ui_cursor, LINE_HEIGHT, 0, WHITE);
+    DrawTextEx(FontAsset(), g_ui_text_buffer, g_ui_cursor, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
 }
 
-void UIDragFloat(float* value, float min, float max, float speed, size_t w) {
-    if (InputButtonDown(IK_MOUSELEFT) &&
+void UIDragFloat_(PersistantUIData* data, float* value, float min, float max, float speed, size_t w) {
+    if (InputButtonPressed(IK_MOUSELEFT) &&
         CheckCollisionPointRec(
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, w, LINE_HEIGHT - 4})) {
+        g_active_ui_element = data;
+    }
+    if (g_active_ui_element == data) {
         *value += GetMouseDelta().x * speed;
         if (*value < min) *value = min;
         if (*value > max) *value = max;
@@ -236,16 +242,16 @@ void UIDragFloat(float* value, float min, float max, float speed, size_t w) {
     snprintf(buffer, 32, "%.3f", *value);
     Vector2 text_size = MeasureTextEx(FontAsset(), buffer, LINE_HEIGHT, 0);
     DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 2, w, LINE_HEIGHT - 4, MappedColor(UI_DRAG_FLOAT_COLOR));
-    DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, WHITE);
+    DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
 }
 
-void UIDragFloatLabeled(const char* label, float* value, float min, float max, float speed, size_t w) {
+void UIDragFloatLabeled_(PersistantUIData* data, const char* label, float* value, float min, float max, float speed, size_t w) {
     UIDrawText(label);
     float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
     UIMoveCursor(xdif + 5, -LINE_HEIGHT);
-    UIDragFloat(value, min, max, speed, w - 5 - xdif);
+    UIDragFloat_(data, value, min, max, speed, w - 5 - xdif);
 }
 
 void UISetCursor(float x, float y) {
@@ -288,11 +294,14 @@ void UICheckboxLabeled(const char* label, BOOL* value) {
 	UICheckbox(value);
 }
 
-void UIDragUInt(uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
-    if (InputButtonDown(IK_MOUSELEFT) &&
+void UIDragUInt_(PersistantUIData* data, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
+    if (InputButtonPressed(IK_MOUSELEFT) &&
         CheckCollisionPointRec(
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, w, LINE_HEIGHT - 4})) {
+        g_active_ui_element = data;
+    }
+    if (g_active_ui_element == data) {
         if (GetMouseDelta().x * speed < 0 && GetMouseDelta().x * speed * -1 > *value)
             *value = 0;
         else
@@ -304,16 +313,16 @@ void UIDragUInt(uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, siz
     snprintf(buffer, 32, "%llu", (long long unsigned int)(*value));
     Vector2 text_size = MeasureTextEx(FontAsset(), buffer, LINE_HEIGHT, 0);
     DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 2, w, LINE_HEIGHT - 4, MappedColor(UI_DRAG_INT_COLOR));
-    DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, WHITE);
+    DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
 }
 
-void UIDragUIntLabeled(const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
+void UIDragUIntLabeled_(PersistantUIData* data, const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
     UIDrawText(label);
     float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
     UIMoveCursor(xdif + 5, -LINE_HEIGHT);
-    UIDragUInt(value, min, max, speed, w - 5 - xdif);
+    UIDragUInt_(data, value, min, max, speed, w - 5 - xdif);
 }
 
 BOOL UIButton(const char* label, size_t w) {
@@ -331,7 +340,7 @@ BOOL UIButton(const char* label, size_t w) {
     DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 1, button_width, LINE_HEIGHT - 2, color);
     Vector2 texpos = g_ui_cursor;
     texpos.x += (button_width - text_size.x) / 2.0f;
-    DrawTextEx(FontAsset(), label, texpos, LINE_HEIGHT, 0, WHITE);
+    DrawTextEx(FontAsset(), label, texpos, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
     return clicked;
@@ -347,4 +356,46 @@ float UITextWidth(const char* text, ...) {
     va_start(args, text);
     vsnprintf(g_ui_text_buffer, MAX_LINE_WIDTH - 1, text, args);
     return MeasureTextEx(FontAsset(), g_ui_text_buffer, LINE_HEIGHT, 0).x;
+}
+
+void UIDivider(size_t w) {
+    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + (LINE_HEIGHT/2.0f) - 1, w, 2, MappedColor(UI_DIVIDER_COLOR));
+    g_ui_cursor.y += LINE_HEIGHT;
+    g_ui_cursor.x = 10;
+}
+
+void UIDropList_(PersistantUIData* data, const char* label, size_t width, size_t num_items, char** items) {
+    float clickwidth = UITextWidth(label) + 25;
+    clickwidth = clickwidth < width ? width : clickwidth;
+    if (CheckCollisionPointRec(
+            GetMousePosition(),
+            (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, clickwidth, LINE_HEIGHT - 4})) {
+        DrawRectangle(
+            g_ui_cursor.x, g_ui_cursor.y + 2, clickwidth, LINE_HEIGHT - 4,
+            InputButtonDown(IK_MOUSELEFT) ? MappedColor(PANEL_BTN_PRS_COLOR) : MappedColor(PANEL_BTN_HVR_COLOR));
+        if (InputButtonPressed(IK_MOUSELEFT)) data->arbitrary_bool = !data->arbitrary_bool;
+    }
+    if (data->arbitrary_bool) {
+        DrawTriangle(
+            (Vector2){g_ui_cursor.x + 5, g_ui_cursor.y + LINE_HEIGHT/2.0f - 5},
+            (Vector2){g_ui_cursor.x + 10, g_ui_cursor.y + LINE_HEIGHT/2.0f + 5},
+            (Vector2){g_ui_cursor.x + 15, g_ui_cursor.y + LINE_HEIGHT/2.0f - 5},
+            MappedColor(UI_TEXT_COLOR));
+    } else {
+        DrawTriangle(
+            (Vector2){g_ui_cursor.x + 5, g_ui_cursor.y + LINE_HEIGHT/2.0f - 5},
+            (Vector2){g_ui_cursor.x + 5, g_ui_cursor.y + LINE_HEIGHT/2.0f + 5},
+            (Vector2){g_ui_cursor.x + 15, g_ui_cursor.y + LINE_HEIGHT/2.0f},
+            MappedColor(UI_TEXT_COLOR));
+    }
+    g_ui_cursor.x += 20;
+    UIDrawText(label);
+    if (data->arbitrary_bool) {
+        float top = g_ui_cursor.y;
+        for (size_t i = 0; i < num_items; i++) {
+            g_ui_cursor.x += 30;
+            UIDrawText(items[i]);
+        }
+        if (num_items > 0) DrawRectangle(g_ui_cursor.x + 20, top + 5, 2, num_items*LINE_HEIGHT - 5, MappedColor(PANEL_BTN_HVR_COLOR));
+    }
 }

@@ -3,6 +3,7 @@
 
 #include "data/config.h"
 #include "data/profile.h"
+#include "data/strings.h"
 #include "renderer/vulkan/vconfig.h"
 #include <easyobjects.h>
 #include <raylib.h>
@@ -71,9 +72,6 @@ DECLARE_ARRLIST(SurfaceMaterial);
 #define BVH_LEFT_ONLY 1
 #define BVH_RIGHT_ONLY 2
 #define BVH_BOTH 3
-
-typedef const char* StaticString;
-DECLARE_ARRLIST(StaticString);
 
 typedef struct {
     alignas(4) uint32_t x;

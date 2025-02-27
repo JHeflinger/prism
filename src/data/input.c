@@ -34,6 +34,12 @@ BOOL InputKeyDown(InputKey key) {
     return IsKeyDown(g_input_map.keymap[key]);
 }
 
+BOOL InputKeyUp(InputKey key) {
+    LOG_ASSERT(key < NUMKEYS, "Invalid key code");
+    if (g_input_map.blocked) return FALSE;
+    return IsKeyUp(g_input_map.keymap[key]);
+}
+
 BOOL InputButtonPressed(InputButton btn) {
     LOG_ASSERT(btn < NUMBTNS, "Invalid button code");
     if (g_input_map.blocked) return FALSE;
@@ -44,4 +50,10 @@ BOOL InputButtonDown(InputButton btn) {
     LOG_ASSERT(btn < NUMBTNS, "Invalid button code");
     if (g_input_map.blocked) return FALSE;
     return IsMouseButtonDown(g_input_map.btnmap[btn]);
+}
+
+BOOL InputButtonUp(InputButton btn) {
+    LOG_ASSERT(btn < NUMBTNS, "Invalid button code");
+    if (g_input_map.blocked) return FALSE;
+    return IsMouseButtonUp(g_input_map.btnmap[btn]);
 }

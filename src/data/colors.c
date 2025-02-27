@@ -16,7 +16,9 @@ void InitializeColors() {
     g_color_map.colors[PANEL_NBG_COLOR] = (Color){ 65, 65, 65, 255 };
     g_color_map.colors[PANEL_BTN_BG_COLOR] = (Color){ 75, 75, 75, 255 };
     g_color_map.colors[PANEL_BTN_HVR_COLOR] = (Color){ 95, 95, 95, 255 };
-    g_color_map.colors[PANEL_BTN_PRS_COLOR] = (Color){ 55, 55, 55, 255 };
+    g_color_map.colors[PANEL_BTN_PRS_COLOR] = (Color){ 65, 65, 65, 255 };
+    g_color_map.colors[UI_DIVIDER_COLOR] = (Color){ 100, 100, 100, 255 };
+    g_color_map.colors[UI_TEXT_COLOR] = (Color){ 255, 255, 255, 255 };
     g_color_map.initialized = TRUE;
 }
 

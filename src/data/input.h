@@ -35,8 +35,12 @@ BOOL InputKeyPressed(InputKey key);
 
 BOOL InputKeyDown(InputKey key);
 
+BOOL InputKeyUp(InputKey key);
+
 BOOL InputButtonPressed(InputButton btn);
 
 BOOL InputButtonDown(InputButton btn);
+
+BOOL InputButtonUp(InputButton btn);
 
 #endif

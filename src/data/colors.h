@@ -4,7 +4,7 @@
 #include "data/config.h"
 #include <raylib.h>
 
-#define NUMCOLORS 13
+#define NUMCOLORS 15
 
 typedef enum {
     PANEL_BG_COLOR = 0,
@@ -20,6 +20,8 @@ typedef enum {
     PANEL_BTN_BG_COLOR = 10,
     PANEL_BTN_HVR_COLOR = 11,
     PANEL_BTN_PRS_COLOR = 12,
+    UI_DIVIDER_COLOR = 13,
+    UI_TEXT_COLOR = 14
 } ColorKey;
 
 typedef struct {
