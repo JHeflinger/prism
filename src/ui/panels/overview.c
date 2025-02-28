@@ -1,7 +1,7 @@
 #include "overview.h"
-#include "core/log.h"
 #include "renderer/renderer.h"
 #include "data/strings.h"
+#include "ui/panels/edit.h"
 
 size_t g_num_lights_tracker = 0;
 size_t g_num_materials_tracker = 0;
@@ -15,9 +15,9 @@ void DrawOverviewPanel(float width, float height) {
         UIPopup(GenerateAddObjectPopup());
     }
     UIDivider(width - 20);
-    UIDropList("Materials", width - 20, g_num_materials_tracker, g_materials_list.data);
+    UIDropList("Materials", width - 20, g_num_materials_tracker, g_materials_list.data, SetEditMaterial);
     UIMoveCursor(0, 5);
-    UIDropList("Lights", width - 20, g_num_lights_tracker, g_lights_list.data);
+    UIDropList("Lights", width - 20, g_num_lights_tracker, g_lights_list.data, SetEditLight);
 }
 
 void UpdateOverviewPanel(float width, float height) {

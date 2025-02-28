@@ -42,6 +42,7 @@ void DrawDevPanel(float width, float height) {
 	UICheckboxLabeled("Automatic Frameless:", &(RenderConfig()->autoframeless));
     UIDragFloatLabeled("Frameless:", &(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 20);
 	UICheckboxLabeled("Anti-Aliasing:", &(RenderConfig()->antialiasing));
+	UICheckboxLabeled("Grid:", &(RenderConfig()->grid));
 
     UIMoveCursor(0, 20.0f);
 	UICheckboxLabeled("Raytrace:", &(RenderConfig()->raytrace));

@@ -37,6 +37,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     float time;
     uint antialiasing;
     uint lightssize;
+    uint grid;
 } ubo;
 
 struct RayGenerator {
@@ -247,8 +248,13 @@ vec3 dshade(Hit hit) {
     return sqrt(vec3(0.2,0.3,0.4) * amb + vec3(0.8,0.7,0.5) * dif);
 }
 
+vec3 background_color(Ray ray) {
+    return vec3(0.12);
+    //return abs(ray.direction) / 1.0;
+}
+
 vec3 shade(Ray ray, Hit hit, PointLight light) {
-    vec3 color = abs(ray.direction) / 1.0;
+    vec3 color = background_color(ray);
     if (hit.distance > 0) {
         // calculate light stuff
         vec3 light_direction = normalize(hit.position - light.position) * -1.0;
@@ -468,20 +474,34 @@ Hit raymarch(Ray ray) {
     return hit;
 }
 
+float plane_intersect(Ray ray, vec3 planepoint, vec3 normal) {
+    return dot(planepoint - ray.position, normal) / dot(ray.direction, normal);
+}
+
 vec3 raycolor(vec2 ray_coordinate) {
 	// create ray
     Ray ray = create_ray(ray_coordinate);
 
     // colors
-    vec3 color = abs(ray.direction) / 1.0;
+    vec3 color = background_color(ray);
 
     // trace/march
     Hit hit;
     hit.distance = -1.0;
+    float grid_plane_distance = plane_intersect(ray, vec3(0, 0, 0), vec3(0, 0, 1.0));
+    vec3 grid_plane_point = ray.position + (ray.direction * grid_plane_distance);
+    float grid_plane_tolerance = grid_plane_distance / 300.0;
+    float grid_x_tolerance = 0.0;//0.05 * (dot(normalize(ubo.look), vec3(0.0, 1.0, 0.0)) + 1.0);
+    float grid_y_tolerance = 0.0;//0.05 * (dot(normalize(ubo.look), vec3(1.0, 0.0, 0.0)) + 1.0);
     uint num_lights = max(1, ubo.lightssize);
     if (ubo.raytrace != 0) {
         hit = raytrace(ray);
-        if (hit.distance > 0.0) {
+        if (ubo.grid > 0 && grid_plane_distance > 0.0 &&
+            (hit.distance <= 0.0 || hit.distance > grid_plane_distance) &&
+            (fract(grid_plane_point.x) < grid_plane_tolerance + grid_x_tolerance ||
+                fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
+            color = vec3(0.5);
+        } else if (hit.distance > 0.0) {
             PointLight light;
             if (ubo.lighting != 0) {
                 color = vec3(0.0, 0.0, 0.0);
@@ -500,7 +520,12 @@ vec3 raycolor(vec2 ray_coordinate) {
         }
     } else if (ubo.sdf != 0) {
         hit = raymarch(ray);
-        if (hit.distance > 0.0) {
+        if (ubo.grid > 0 && grid_plane_distance > 0.0 &&
+            (hit.distance <= 0.0 || hit.distance > grid_plane_distance) &&
+            (fract(grid_plane_point.x) < grid_plane_tolerance + grid_x_tolerance ||
+                fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
+            color = vec3(0.5);
+        } else if (hit.distance > 0.0) {
             color = dshade(hit);
         }
     }

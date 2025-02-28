@@ -45,6 +45,7 @@ typedef struct {
     alignas(4) float time;
     alignas(4) uint32_t antialiasing;
     alignas(4) uint32_t lightssize;
+    alignas(4) uint32_t grid;
 } UniformBufferObject;
 
 typedef struct {

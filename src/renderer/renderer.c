@@ -42,6 +42,7 @@ void InitializeRenderer() {
     g_renderer.config.maxmarches = 100;
     g_renderer.config.antialiasing = FALSE;
     g_renderer.config.autoframeless = FALSE;
+    g_renderer.config.grid = TRUE;
 
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };

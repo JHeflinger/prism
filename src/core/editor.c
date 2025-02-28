@@ -8,6 +8,7 @@
 #include "ui/panels/diagnostics.h"
 #include "ui/panels/viewport.h"
 #include "ui/panels/overview.h"
+#include "ui/panels/edit.h"
 #include "renderer/renderer.h"
 #include <raylib.h>
 #include <easymemory.h>
@@ -30,11 +31,15 @@ void InitEditor() {
     g_ui->right = GenerateUI();
     ((UI*)g_ui->right)->right = GenerateUI();
     ((UI*)g_ui->right)->left = GenerateUI();
-    ((UI*)g_ui->right)->divide = GetScreenHeight() / 2;
+    ((UI*)g_ui->right)->divide = GetScreenHeight() - 540;
     ((UI*)g_ui->right)->vertical = TRUE;
+    ((UI*)g_ui->left)->right = GenerateUI();
+    ((UI*)g_ui->left)->left = GenerateUI();
+    ((UI*)g_ui->left)->divide = 300;
     ConfigureDiagnosticsPanel(&(((UI*)(((UI*)g_ui->right)->right))->panel));
     ConfigureOverviewPanel(&(((UI*)(((UI*)g_ui->right)->left))->panel));
-    ConfigureViewportPanel(&(((UI*)(g_ui->left))->panel));
+    ConfigureViewportPanel(&(((UI*)(((UI*)g_ui->left)->right))->panel));
+    ConfigureEditPanel(&(((UI*)(((UI*)g_ui->left)->left))->panel));
     g_ui->divide = (3 * GetScreenWidth())/4;
 }
 

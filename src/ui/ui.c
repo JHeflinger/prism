@@ -364,7 +364,7 @@ void UIDivider(size_t w) {
     g_ui_cursor.x = 10;
 }
 
-void UIDropList_(PersistantUIData* data, const char* label, size_t width, size_t num_items, char** items) {
+void UIDropList_(PersistantUIData* data, const char* label, size_t width, size_t num_items, char** items, SelectFunction func) {
     float clickwidth = UITextWidth(label) + 25;
     clickwidth = clickwidth < width ? width : clickwidth;
     if (CheckCollisionPointRec(
@@ -394,6 +394,14 @@ void UIDropList_(PersistantUIData* data, const char* label, size_t width, size_t
         float top = g_ui_cursor.y;
         for (size_t i = 0; i < num_items; i++) {
             g_ui_cursor.x += 30;
+            if (func && CheckCollisionPointRec(
+                GetMousePosition(),
+                (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, clickwidth - 30, LINE_HEIGHT - 4})) {
+                DrawRectangle(
+                    g_ui_cursor.x, g_ui_cursor.y + 2, clickwidth - 30, LINE_HEIGHT - 4,
+                    InputButtonDown(IK_MOUSELEFT) ? MappedColor(PANEL_BTN_PRS_COLOR) : MappedColor(PANEL_BTN_HVR_COLOR));
+                if (InputButtonPressed(IK_MOUSELEFT)) func(i);
+            }
             UIDrawText(items[i]);
         }
         if (num_items > 0) DrawRectangle(g_ui_cursor.x + 20, top + 5, 2, num_items*LINE_HEIGHT - 5, MappedColor(PANEL_BTN_HVR_COLOR));
