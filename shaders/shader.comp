@@ -323,7 +323,7 @@ void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
                 rhit.position = ubo.position + (rray.direction * rhit.distance); // should we keep this in? should this be using ubo.position...
                 PointLight light = default_light();
                 reflectionvals[num_colors] = material.reflection;
-                colors[num_colors] = abs(rray.direction) / 1.0;
+                colors[num_colors] = background_color(rray);
                 if (rhit.distance >= 0.0) {
                     uint num_lights = max(1, ubo.lightssize);
                     PointLight light;

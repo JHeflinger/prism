@@ -12,8 +12,8 @@
 #define MAX_LINE_WIDTH 2048
 
 #define PERSISTANT_UI(func, ...) \
-    {static PersistantUIData s_ui_data_##__COUNTER__ = { 0 }; \
-    func(&s_ui_data_##__COUNTER__, __VA_ARGS__);}
+    ({static PersistantUIData s_ui_data_##__COUNTER__ = { 0 }; \
+    func(&s_ui_data_##__COUNTER__, __VA_ARGS__);})
 
 typedef void (*PanelFunction)(float width, float height);
 typedef void (*CleanFunction)(void);
@@ -60,13 +60,13 @@ void DestroyPanel(Panel* panel);
 
 void UIDrawText(const char* text, ...);
 
-void UIDragFloat_(PersistantUIData* data, float* value, float min, float max, float speed, size_t w);
+BOOL UIDragFloat_(PersistantUIData* data, float* value, float min, float max, float speed, size_t w);
 #define UIDragFloat(value, min, max, speed, w) \
-    PERSISTANT_UI(UIDragFloat_, value, min, max, speed, w);
+    PERSISTANT_UI(UIDragFloat_, value, min, max, speed, w)
 
-void UIDragFloatLabeled_(PersistantUIData* data, const char* label, float* value, float min, float max, float speed, size_t w);
+BOOL UIDragFloatLabeled_(PersistantUIData* data, const char* label, float* value, float min, float max, float speed, size_t w);
 #define UIDragFloatLabeled(label, value, min, max, speed, w) \
-    PERSISTANT_UI(UIDragFloatLabeled_, label, value, min, max, speed, w);
+    PERSISTANT_UI(UIDragFloatLabeled_, label, value, min, max, speed, w)
 
 void UISetCursor(float x, float y);
 
@@ -74,17 +74,19 @@ void UISetPosition(float x, float y);
 
 void UIMoveCursor(float x, float y);
 
+Vector2 UIGetCursor();
+
 void UICheckbox(BOOL* value);
 
 void UICheckboxLabeled(const char* label, BOOL* value);
 
-void UIDragUInt_(PersistantUIData* data, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w);
+BOOL UIDragUInt_(PersistantUIData* data, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w);
 #define UIDragUInt(value, min, max, speed, w) \
-    PERSISTANT_UI(UIDragUInt_, value, min, max, speed, w);
+    PERSISTANT_UI(UIDragUInt_, value, min, max, speed, w)
 
-void UIDragUIntLabeled_(PersistantUIData* data, const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w);
+BOOL UIDragUIntLabeled_(PersistantUIData* data, const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w);
 #define UIDragUIntLabeled(label, value, min, max, speed, w) \
-    PERSISTANT_UI(UIDragUIntLabeled_, label, value, min, max, speed, w);
+    PERSISTANT_UI(UIDragUIntLabeled_, label, value, min, max, speed, w)
 
 BOOL UIButton(const char* label, size_t w);
 
@@ -96,6 +98,6 @@ void UIDivider(size_t w);
 
 void UIDropList_(PersistantUIData* data, const char* label, size_t width, size_t num_items, char** items, SelectFunction func);
 #define UIDropList(label, width, num_items, items, func) \
-    PERSISTANT_UI(UIDropList_, label, width, num_items, items, func);
+    PERSISTANT_UI(UIDropList_, label, width, num_items, items, func)
 
 #endif

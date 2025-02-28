@@ -395,8 +395,26 @@ size_t NumMaterials() {
     return g_renderer.geometry.materials.size;
 }
 
+SurfaceMaterial* MaterialReference(size_t index) {
+    LOG_ASSERT(index < g_renderer.geometry.materials.size, "Invalid material index requested");
+    return &(g_renderer.geometry.materials.data[index]);
+}
+
+void UpdateMaterials() {
+    g_renderer.geometry.changes.update_materials = TRUE;
+}
+
 size_t NumLights() {
     return g_renderer.geometry.lights.size;
+}
+
+PointLight* LightReference(size_t index) {
+    LOG_ASSERT(index < g_renderer.geometry.lights.size, "Invalid light index requested");
+    return &(g_renderer.geometry.lights.data[index]);
+}
+
+void UpdateLights() {
+    g_renderer.geometry.changes.update_lights = TRUE;
 }
 
 Vector2 RenderResolution() {

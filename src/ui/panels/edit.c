@@ -1,5 +1,6 @@
 #include "edit.h"
 #include "data/config.h"
+#include "renderer/renderer.h"
 #include "core/log.h"
 
 typedef enum {
@@ -26,9 +27,161 @@ void SetEditLight(size_t index) {
 void DrawEditPanel(float width, float height) {
     if (g_item_selected) {
         if (g_edit_type == EDIT_MATERIAL) {
-
+            BOOL edited = FALSE;
+            SurfaceMaterial* matref = MaterialReference(g_edit_item_index);
+            float component_width = (width - 20 - (3 * 15) - (2 * 10)) / 3.0f;
+            UIMoveCursor((width - 20 - UITextWidth("Edit Material")) / 2.0f, 0);
+            UIDrawText("Edit Material");
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Ambient") / 2) - 10, 0);
+            UIDrawText("Ambient");
+            UIMoveCursor(0, 5);
+            UIDrawText("r");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(matref->ambient[0]), 0, 1.0f, 0.05f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("g");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(matref->ambient[1]), 0, 1.0f, 0.05f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("b");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(matref->ambient[2]), 0, 1.0f, 0.05f, component_width);
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Diffuse") / 2) - 10, 0);
+            UIDrawText("Diffuse");
+            UIMoveCursor(0, 5);
+            UIDrawText("r");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(matref->diffuse[0]), 0, 1.0f, 0.05f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("g");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(matref->diffuse[1]), 0, 1.0f, 0.05f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("b");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(matref->diffuse[2]), 0, 1.0f, 0.05f, component_width);
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Specular") / 2) - 10, 0);
+            UIDrawText("Specular");
+            UIMoveCursor(0, 5);
+            UIDrawText("r");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(matref->specular[0]), 0, 1.0f, 0.05f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("g");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(matref->specular[1]), 0, 1.0f, 0.05f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("b");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(matref->specular[2]), 0, 1.0f, 0.05f, component_width);
+            UIMoveCursor(0, 35);
+            float sboxwidth = width - 20 - 140;
+            UIDrawText("Reflection");
+            UIMoveCursor(140, -20);
+            edited |= UIDragFloat(&(matref->reflect), 0, 1.0f, 0.01f, sboxwidth);
+            UIMoveCursor(0, 5);
+            UIDrawText("Refraction");
+            UIMoveCursor(140, -20);
+            edited |= UIDragFloat(&(matref->refract), 0, 1.0f, 0.01f, sboxwidth);
+            UIMoveCursor(0, 5);
+            UIDrawText("Refraction Index");
+            UIMoveCursor(140, -20);
+            edited |= UIDragFloat(&(matref->rindex), 0, 1.0f, 0.01f, sboxwidth);
+            UIMoveCursor(0, 5);
+            UIDrawText("Transparency");
+            UIMoveCursor(140, -20);
+            edited |= UIDragFloat(&(matref->transparency), 0, 1.0f, 0.01f, sboxwidth);
+            UIMoveCursor(0, 5);
+            UIDrawText("Shininess");
+            UIMoveCursor(140, -20);
+            edited |= UIDragFloat(&(matref->shiny), 0, FLT_MAX, 0.01f, sboxwidth);
+            UIMoveCursor(0, 5);
+            UIDrawText("Glossiness");
+            UIMoveCursor(140, -20);
+            edited |= UIDragFloat(&(matref->glossy), 0, 1.0f, 0.01f, sboxwidth);
+            if (edited) UpdateMaterials();
+            if (g_edit_item_index != 0) {
+                if (UIGetCursor().y + 60 < height) {
+                    UISetCursor(UIGetCursor().x, height - 60);
+                }
+                UIMoveCursor((width - 20 - 200) / 2.0f, 0);
+                if (UIButton("Delete", 200)) LOG_WARN("This functionality is not implemented yet");
+            }
         } else if (g_edit_type == EDIT_LIGHT) {
-
+            BOOL edited = FALSE;
+            PointLight* lref = LightReference(g_edit_item_index);
+            float component_width = (width - 20 - (3 * 15) - (2 * 10)) / 3.0f;
+            UIMoveCursor((width - 20 - UITextWidth("Edit Light")) / 2.0f, 0);
+            UIDrawText("Edit Light");
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Position") / 2) - 10, 0);
+            UIDrawText("Position");
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(lref->position[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(lref->position[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(lref->position[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Ambient") / 2) - 10, 0);
+            UIDrawText("Ambient");
+            UIMoveCursor(0, 5);
+            UIDrawText("r");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(lref->ambient[0]), 0.0f, 1.0f, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("g");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(lref->ambient[1]), 0.0f, 1.0f, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("b");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(lref->ambient[2]), 0.0f, 1.0f, 0.1f, component_width);
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Diffuse") / 2) - 10, 0);
+            UIDrawText("Diffuse");
+            UIMoveCursor(0, 5);
+            UIDrawText("r");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(lref->diffuse[0]), 0.0f, 1.0f, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("g");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(lref->diffuse[1]), 0.0f, 1.0f, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("b");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(lref->diffuse[2]), 0.0f, 1.0f, 0.1f, component_width);
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Specular") / 2) - 10, 0);
+            UIDrawText("Specular");
+            UIMoveCursor(0, 5);
+            UIDrawText("r");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(lref->specular[0]), 0.0f, 1.0f, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("g");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(lref->specular[1]), 0.0f, 1.0f, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("b");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(lref->specular[2]), 0.0f, 1.0f, 0.1f, component_width);
+            if (edited) UpdateLights();
+            if (UIGetCursor().y + 60 < height) {
+                UISetCursor(UIGetCursor().x, height - 60);
+            }
+            UIMoveCursor((width - 20 - 200) / 2.0f, 0);
+            if (UIButton("Delete", 200)) LOG_WARN("This functionality is not implemented yet");
         } else {
             LOG_FATAL("Unhandled edit type detected");
         }

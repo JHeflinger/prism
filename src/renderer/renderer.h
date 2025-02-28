@@ -49,7 +49,15 @@ size_t NumSDFs();
 
 size_t NumMaterials();
 
+SurfaceMaterial* MaterialReference(size_t index);
+
+void UpdateMaterials();
+
 size_t NumLights();
+
+PointLight* LightReference(size_t index);
+
+void UpdateLights();
 
 Vector2 RenderResolution();
 

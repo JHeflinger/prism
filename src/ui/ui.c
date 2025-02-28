@@ -226,7 +226,8 @@ void UIDrawText(const char* text, ...) {
     g_ui_cursor.x = 10;
 }
 
-void UIDragFloat_(PersistantUIData* data, float* value, float min, float max, float speed, size_t w) {
+BOOL UIDragFloat_(PersistantUIData* data, float* value, float min, float max, float speed, size_t w) {
+    BOOL ret = FALSE;
     if (InputButtonPressed(IK_MOUSELEFT) &&
         CheckCollisionPointRec(
             GetMousePosition(),
@@ -234,9 +235,11 @@ void UIDragFloat_(PersistantUIData* data, float* value, float min, float max, fl
         g_active_ui_element = data;
     }
     if (g_active_ui_element == data) {
+        float prev = *value;
         *value += GetMouseDelta().x * speed;
         if (*value < min) *value = min;
         if (*value > max) *value = max;
+        if (prev != *value) ret = TRUE;
     }
     char buffer[32] = { 0 };
     snprintf(buffer, 32, "%.3f", *value);
@@ -245,13 +248,14 @@ void UIDragFloat_(PersistantUIData* data, float* value, float min, float max, fl
     DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
+    return ret;
 }
 
-void UIDragFloatLabeled_(PersistantUIData* data, const char* label, float* value, float min, float max, float speed, size_t w) {
+BOOL UIDragFloatLabeled_(PersistantUIData* data, const char* label, float* value, float min, float max, float speed, size_t w) {
     UIDrawText(label);
     float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
     UIMoveCursor(xdif + 5, -LINE_HEIGHT);
-    UIDragFloat_(data, value, min, max, speed, w - 5 - xdif);
+    return UIDragFloat_(data, value, min, max, speed, w - 5 - xdif);
 }
 
 void UISetCursor(float x, float y) {
@@ -267,6 +271,10 @@ void UISetPosition(float x, float y) {
 void UIMoveCursor(float x, float y) {
     g_ui_cursor.x += x;
     g_ui_cursor.y += y;
+}
+
+Vector2 UIGetCursor() {
+    return g_ui_cursor;
 }
 
 void UICheckbox(BOOL* value) {
@@ -294,7 +302,8 @@ void UICheckboxLabeled(const char* label, BOOL* value) {
 	UICheckbox(value);
 }
 
-void UIDragUInt_(PersistantUIData* data, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
+BOOL UIDragUInt_(PersistantUIData* data, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
+    BOOL ret = FALSE;
     if (InputButtonPressed(IK_MOUSELEFT) &&
         CheckCollisionPointRec(
             GetMousePosition(),
@@ -302,12 +311,14 @@ void UIDragUInt_(PersistantUIData* data, uint32_t* value, uint32_t min, uint32_t
         g_active_ui_element = data;
     }
     if (g_active_ui_element == data) {
+        uint32_t prev = *value;
         if (GetMouseDelta().x * speed < 0 && GetMouseDelta().x * speed * -1 > *value)
             *value = 0;
         else
             *value += GetMouseDelta().x * speed;
         if (*value < min) *value = min;
         if (*value > max) *value = max;
+        if (prev != *value) ret = TRUE;
     }
     char buffer[32] = { 0 };
     snprintf(buffer, 32, "%llu", (long long unsigned int)(*value));
@@ -316,13 +327,14 @@ void UIDragUInt_(PersistantUIData* data, uint32_t* value, uint32_t min, uint32_t
     DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
+    return ret;
 }
 
-void UIDragUIntLabeled_(PersistantUIData* data, const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
+BOOL UIDragUIntLabeled_(PersistantUIData* data, const char* label, uint32_t* value, uint32_t min, uint32_t max, uint32_t speed, size_t w) {
     UIDrawText(label);
     float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
     UIMoveCursor(xdif + 5, -LINE_HEIGHT);
-    UIDragUInt_(data, value, min, max, speed, w - 5 - xdif);
+    return UIDragUInt_(data, value, min, max, speed, w - 5 - xdif);
 }
 
 BOOL UIButton(const char* label, size_t w) {
