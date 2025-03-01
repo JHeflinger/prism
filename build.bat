@@ -21,21 +21,21 @@ echo Building shaders...
 set SHADERS_DIR=shaders
 set "startTime=%time: =0%"
 for /r %SHADERS_DIR% %%f in (*.vert) do (
-    glslc %%f -o "build/shaders/%%~nxf.spv"
+    "platform/windows/glslc/glslc.exe" %%f -o "build/shaders/%%~nxf.spv"
     if %ERRORLEVEL% NEQ 0 (
         echo Building vertex [31mFailed[0m with error code %ERRORLEVEL%
         exit /b %ERRORLEVEL%
     )
 )
 for /r %SHADERS_DIR% %%f in (*.frag) do (
-    glslc %%f -o "build/shaders/%%~nxf.spv"
+    "platform/windows/glslc/glslc.exe" %%f -o "build/shaders/%%~nxf.spv"
     if %ERRORLEVEL% NEQ 0 (
         echo Building fragment [31mFailed[0m with error code %ERRORLEVEL%
         exit /b %ERRORLEVEL%
     )
 )
 for /r %SHADERS_DIR% %%f in (*.comp) do (
-    glslc %%f -o "build/shaders/%%~nxf.spv"
+    "platform/windows/glslc/glslc.exe" %%f -o "build/shaders/%%~nxf.spv"
     if %ERRORLEVEL% NEQ 0 (
         echo Building compute [31mFailed[0m with error code %ERRORLEVEL%
         exit /b %ERRORLEVEL%

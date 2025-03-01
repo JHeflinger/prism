@@ -412,8 +412,8 @@ BOOL VINIT_Targets(VulkanImage* targets_arr) {
 BOOL VINIT_General(VulkanGeneral* general) {
 	// error check for validation layer support
     if (ENABLE_VK_VALIDATION_LAYERS && !VUTIL_CheckValidationLayerSupport()) {
-		LOG_FATAL("Requested validation layers are not available");
-		return FALSE;
+		LOG_WARN("Requested validation layers are not available");
+        SUPER_DISABLE_VALIDATION_LAYERS();
 	}
 
     // create app info (technically optional)
