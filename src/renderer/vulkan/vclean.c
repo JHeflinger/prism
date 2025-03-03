@@ -67,8 +67,10 @@ void VCLEAN_RenderContext(VulkanRenderContext* context) {
 
     VCLEAN_RenderData(&(context->renderdata));
 
-    vkDestroyPipeline(g_vlcean_renderer_ref->vulkan.core.general.interface, context->pipeline.pipeline, NULL);
-    vkDestroyPipelineLayout(g_vlcean_renderer_ref->vulkan.core.general.interface, context->pipeline.layout, NULL);
+    for (size_t i = 0; i < PIPELINE_LENGTH; i++) {
+        vkDestroyPipeline(g_vlcean_renderer_ref->vulkan.core.general.interface, context->pipeline.pipeline[i], NULL);
+        vkDestroyPipelineLayout(g_vlcean_renderer_ref->vulkan.core.general.interface, context->pipeline.layout[i], NULL);
+    }
 }
 
 void VCLEAN_Bridge(VulkanDataBuffer* bridge) {

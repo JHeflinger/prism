@@ -1,0 +1,580 @@
+#version 450
+
+#define MAX_RECURSIVE_DEPTH 2000
+#define MAX_BOUNCES 1
+#define EPS 0.0001
+#define SDF_LIMIT 0.0001
+
+#define SDF_SPHERE 0
+#define SDF_JULIA 1
+#define SDF_MANDELBULB 2
+#define SDF_BOX 3
+
+layout(set = 0, binding = 0) uniform UniformBufferObject {
+	vec3 look;
+	vec3 position;
+	vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    float fov;
+    float width;
+    float height;
+    uint triangles;
+    vec2 viewport;
+    uint bvhsize;
+	float frametime;
+	float frameless;
+	uint seed;
+	uint shadows;
+	uint reflections;
+	uint lighting;
+    uint raytrace;
+    uint sdf;
+    uint sdfsize;
+    float sdfsmooth;
+    uint maxmarches;
+    float time;
+    uint antialiasing;
+    uint lightssize;
+    uint grid;
+} ubo;
+
+struct RayGenerator {
+    uint x;
+    uint y;
+	float time;
+};
+
+struct Ray {
+    vec3 position;
+    vec3 direction;
+};
+
+struct Hit {
+    float distance;
+    uint material;
+    vec3 normal;
+    vec3 position;
+};
+
+struct Triangle {
+    vec3 a;
+    vec3 b;
+    vec3 c;
+    uint material;
+};
+
+struct Material {
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float reflection;
+    float refraction;
+    float rindex;
+    float transparency;
+    float shiny;
+    float glossy;
+};
+
+struct PointLight {
+    vec3 position;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
+struct NodeBVH {
+    vec3 min;
+    vec3 max;
+    uint config;
+    uint left;
+    uint right;
+};
+
+struct SDFPrimitive {
+    uint type;
+    vec3 origin;
+    float scale;
+	vec3 dim;
+};
+
+layout(set = 0, binding = 1) buffer RayGeneratorSSBOIn {
+   RayGenerator raygenIn[ ];
+};
+
+layout(set = 0, binding = 2, rgba8) uniform image2D outputImage;
+
+layout(set = 0, binding = 3) readonly buffer TriangleSSBOIn {
+    Triangle triangleIn[ ];
+};
+
+layout(set = 0, binding = 4) readonly buffer MaterialSSBOIn {
+    Material materialIn[ ];
+};
+
+layout(set = 0, binding = 5) readonly buffer BVHSSBOIn {
+    NodeBVH bvhIn[ ];
+};
+
+layout(set = 0, binding = 6) readonly buffer SDFSSBOIn {
+    SDFPrimitive sdfIn[ ];
+};
+
+layout(set = 0, binding = 7) readonly buffer LightSSBOIn {
+    PointLight lightIn[ ];
+};
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+bool stack_failure = false;
+
+float random(float n) {
+	return fract(sin(n) * 43758.5453123);
+}
+
+bool cut_viewport(RayGenerator rg) {
+    if (ubo.viewport.x != 0 &&
+        (rg.x < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
+        (rg.x > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return true;
+    if (ubo.viewport.y != 0 &&
+        (rg.y < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
+        (rg.y > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return true;
+    return false;
+}
+
+Ray create_ray(vec2 rg) {
+	float r = ubo.width / 2.0;
+	float b = ubo.height / 2.0;
+	float l = -1.0 * r;
+	float t = -1.0 * b;
+    float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
+    float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
+	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
+    Ray ray;
+    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+    ray.position = ubo.position;
+    return ray;
+}
+
+bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
+    Triangle tri = triangleIn[triangle_ind];
+    hit.normal = normalize(cross(tri.b - tri.a, tri.c - tri.b));
+    hit.distance = dot(tri.a - ray.position, hit.normal) / dot(ray.direction, hit.normal);
+    if (hit.distance > 0) {
+        vec3 hit_at = ray.position + (ray.direction * hit.distance);
+        if (dot(cross(tri.b - tri.a, hit_at - tri.a), hit.normal) > 0 &&
+            dot(cross(tri.c - tri.b, hit_at - tri.b), hit.normal) > 0 &&
+            dot(cross(tri.a - tri.c, hit_at - tri.c), hit.normal) > 0) {
+            hit.material = tri.material;
+            hit.position = ray.position + (ray.direction * hit.distance);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool aabb_intersect(Ray ray, uint node_ind) {
+    float entrance = 0.0;
+    float exit = 3.402823466e+38;
+    for (int i = 0; i < 3; i++) {
+        float slab_a = bvhIn[node_ind].min[i];
+        float slab_b = bvhIn[node_ind].max[i];
+        float inv_dir = 1.0 / ray.direction[i];
+        float origin = ray.position[i];
+        float closest = (slab_a - origin) * inv_dir;
+        float farthest = (slab_b - origin) * inv_dir;
+        if (farthest < closest) {
+            float temp = farthest;
+            farthest = closest;
+            closest = temp;
+        }
+        if (farthest < entrance || closest > exit) return false;
+        exit = farthest < exit ? farthest : exit;
+        entrance = closest > entrance ? closest : entrance;
+    }
+    return true;
+}
+
+Hit raytrace(Ray ray) {
+    Hit hit;
+    hit.distance = -1.0;
+    if (ubo.bvhsize == 0) return hit;
+    if (!aabb_intersect(ray, 0)) return hit;
+    uint stack[MAX_RECURSIVE_DEPTH];
+    int stack_ptr = 0;
+    stack[stack_ptr++] = 0;
+    while (stack_ptr > 0) {
+        NodeBVH node = bvhIn[stack[--stack_ptr]];
+        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
+        if (node.config == 0) {
+            Hit trihit;
+            if (triangle_intersect(ray, node.left, trihit)) {
+                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
+                    hit = trihit;
+                }
+            }
+        } else if (node.config == 1) {
+            if (aabb_intersect(ray, node.left))
+                stack[stack_ptr++] = node.left;
+        } else if (node.config == 2) {
+            if (aabb_intersect(ray, node.right))
+                stack[stack_ptr++] = node.right;
+        } else {
+            if (aabb_intersect(ray, node.left))
+                stack[stack_ptr++] = node.left;
+            if (aabb_intersect(ray, node.right))
+                stack[stack_ptr++] = node.right;
+        }
+    }
+    return hit;
+}
+
+bool is_shadowed(Hit hit, PointLight light, vec3 light_direction, float light_distance) {
+    if (hit.distance < 0.0 || ubo.shadows == 0) return false;
+    if (dot(hit.normal, light_direction) < 0.0) return true;
+    bool shadowed = false;
+    Ray ray;
+    ray.position = light.position;
+    ray.direction = light_direction * -1.0;
+    Hit shit = raytrace(ray);
+    shadowed = shit.distance > 0.0 && shit.distance < light_distance - EPS;
+    return shadowed;
+}
+
+vec3 dshade(Hit hit) {
+    float dif = clamp(dot(hit.normal, vec3(0.7,0.6,0.4)), 0.0, 1.0);
+    float amb = 0.5 + 0.5 * dot(hit.normal, vec3(0.0,0.8,0.6));
+    return sqrt(vec3(0.2,0.3,0.4) * amb + vec3(0.8,0.7,0.5) * dif);
+}
+
+vec3 background_color(Ray ray) {
+    return vec3(0.12);
+    //return abs(ray.direction) / 1.0;
+}
+
+vec3 shade(Ray ray, Hit hit, PointLight light) {
+    vec3 color = background_color(ray);
+    if (hit.distance > 0) {
+        // calculate light stuff
+        vec3 light_direction = normalize(hit.position - light.position) * -1.0;
+        float light_distance = length(hit.position - light.position);
+
+        // shadows
+        bool shadowed = is_shadowed(hit, light, light_direction, light_distance);
+
+        // material
+        Material material = materialIn[hit.material];
+
+        // ambient light
+        color = material.ambient * light.ambient;
+
+        // diffuse light
+        if (!shadowed)
+            color += material.diffuse * light.diffuse * dot(light_direction, hit.normal);
+
+        // specular light
+        vec3 reflection = normalize(reflect(light_direction, hit.normal));
+        float specular_const = dot(reflection, ray.direction);
+        if (specular_const >= 0 && !shadowed)
+            color += light.specular * material.specular * pow(specular_const, material.shiny);
+
+        // divide to ensure not above 1, 1, 1
+        color /= 3.0;
+    }
+    return color;
+}
+
+PointLight default_light() {
+    PointLight light;
+    light.position = ubo.position;
+    light.ambient = vec3(1.0, 1.0, 1.0);
+    light.diffuse = vec3(1.0, 1.0, 1.0);
+    light.specular = vec3(1.0, 1.0, 1.0);
+    return light;
+}
+
+void draw_light(Ray ray, Hit hit, PointLight light, inout vec3 color) {
+    float light_radius = 1.0;
+    vec3 l_t = ray.position + (dot(light.position - ray.position, ray.direction) * ray.direction);
+    float l_d = length(l_t - light.position);
+    vec3 light_color = (light.ambient + light.diffuse + light.specular) / 3.0;
+    if (l_t != ray.position &&
+        (hit.distance <= 0 || length(l_t - ray.position) < hit.distance) && 
+        l_d < light_radius) {
+        float brilliance = 1.0 - (l_d / light_radius);
+        color = mix(color, light_color, pow(brilliance, 5));
+    }
+}
+
+void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
+    if (hit.distance >= 0.0) {
+        Material material = materialIn[hit.material];
+        if (material.reflection > 0.0) {
+            vec3 colors[MAX_BOUNCES];
+            float reflectionvals[MAX_BOUNCES];
+            int num_colors = 0;
+            Hit rhit = hit;
+            Ray rray = ray;
+            for (int i = 0; i < bounces; i++) {
+                rray.direction = reflect(rray.direction, rhit.normal);
+                rray.position = rhit.position + (rray.direction * EPS);
+                rhit = raytrace(rray);
+                rhit.position = ubo.position + (rray.direction * rhit.distance); // should we keep this in? should this be using ubo.position...
+                PointLight light = default_light();
+                reflectionvals[num_colors] = material.reflection;
+                colors[num_colors] = background_color(rray);
+                if (rhit.distance >= 0.0) {
+                    uint num_lights = max(1, ubo.lightssize);
+                    PointLight light;
+                    colors[num_colors] = vec3(0.0);
+                    for (uint i = 0; i < num_lights; i++) {
+                        if (ubo.lightssize > 0) {
+                            light = lightIn[i];
+                        } else {
+                            light = default_light();
+                        }
+                        colors[num_colors] += shade(ray, rhit, light);
+                    }
+                } else if (rhit.distance >= 0.0) {
+                    color = dshade(hit);
+                }
+                num_colors++;
+                if (rhit.distance <= 0.0 || materialIn[rhit.material].reflection <= 0.0) break;
+                material = materialIn[rhit.material];
+            }
+            for (int i = num_colors - 1; i >= 0; i--) {
+                if (i == 0) {
+                    color = mix(color, colors[i], reflectionvals[i]);
+                } else {
+                    colors[i - 1] = mix(colors[i - 1], colors[i], reflectionvals[i]);
+                }
+            }
+        }
+    }
+}
+
+float sdf_sphere(SDFPrimitive sphere, vec3 position) {
+    return length(sphere.origin - position) - sphere.scale;
+}
+
+vec4 qsqr(vec4 a) {
+    return vec4(a.x * a.x - a.y * a.y - a.z * a.z - a.w * a.w,
+        2.0 * a.x * a.y,
+        2.0 * a.x * a.z,
+        2.0 * a.x * a.w);
+}
+
+float sdf_julia(SDFPrimitive julia, vec3 position) {
+    vec4 c = 0.45*cos( vec4(0.5,3.9,1.4,1.1) + ubo.time*.15*vec4(1.2,1.7,1.3,2.5) ) - vec4(0.3,0.0,0.0,0.0);
+    vec4 z = vec4(position.xyz, 0.0);
+    float md2 = 1.0;
+    float mz2 = dot(z, z);
+    vec3 z_abs = abs(z.xyz);
+    vec4 trap = vec4(z_abs.xyz, dot(z, z));
+    for (int i = 0; i < 11; i++) {
+        md2 *= 4.0 * mz2;
+        z = qsqr(z) + c;
+        z_abs = abs(z.xyz);
+        trap = vec4(z_abs.xyz, dot(z, z));
+        mz2 = dot(z, z);
+        if (mz2 > 4.0) break;
+    }
+    return 0.25 * sqrt(mz2 / md2) * log(mz2);
+}
+
+float sdf_mandelbulb(SDFPrimitive bulb, vec3 position) {
+    float power = ubo.time;
+    float dr = 1.0;
+    float r = 0.0;
+    vec3 z = position;
+    for (int i = 0; i < 15; i++) {
+        r = length(z);
+        if (r > 2.0)
+            break;
+        float theta = acos(z.z / r);
+        float phi = atan(z.y, z.x);
+        dr = pow(r, power - 1.0) * power * dr + 1.0;
+
+        float zr = pow(r, power);
+        theta = theta*power;
+        phi = phi*power;
+
+        z = zr * vec3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
+        z += position;
+    }
+
+    return 0.5 * log(r) * r / dr;
+}
+
+float sdf_box(SDFPrimitive box, vec3 position) {
+	vec3 q = abs(box.origin - position) - box.dim;
+	return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+}
+
+float smin(float a, float b, float k) {
+    k *= 1.0;
+    float r = exp2(-a/k) + exp2(-b/k);
+    return -k*log2(r);
+}
+
+float sdf(vec3 position) {
+    float distance = 0.0;
+	bool dinit = false;
+    for (uint i = 0; i < ubo.sdfsize; i++) {
+        SDFPrimitive prim = sdfIn[i];
+        float curr_dist = 0.0;
+        if (prim.type == SDF_SPHERE) {
+            curr_dist = sdf_sphere(prim, position);
+        } else if (prim.type == SDF_JULIA) {
+            curr_dist = sdf_julia(prim, position);
+        } else if (prim.type == SDF_MANDELBULB) {
+            curr_dist = sdf_mandelbulb(prim, position);
+        } else if (prim.type == SDF_BOX) {
+			curr_dist = sdf_box(prim, position);
+		}
+		if (!dinit) {
+			dinit = true;
+			distance = curr_dist;
+			continue;
+		}
+        if (ubo.sdfsmooth == 0.0)
+            distance = min(curr_dist, distance); // union, change based on intersection or whatever
+        else
+            distance = smin(curr_dist, distance, ubo.sdfsmooth);
+    }
+    return distance;
+}
+
+vec3 sdf_normal(vec3 position) {
+    vec2 k = vec2(1,-1);
+    return normalize(
+        k.xyy*sdf(position + k.xyy*EPS) + 
+        k.yyx*sdf(position + k.yyx*EPS) + 
+        k.yxy*sdf(position + k.yxy*EPS) + 
+        k.xxx*sdf(position + k.xxx*EPS));
+}
+
+Hit raymarch(Ray ray) {
+    Hit hit;
+    hit.distance = -1.0;
+    hit.position = ray.position;
+    float last_march = -1.0;
+    for (uint i = 0; i < ubo.maxmarches; i++) {
+        float curr_march = sdf(ray.position);
+        if (curr_march <= SDF_LIMIT) {
+            hit.distance = length(ray.position - hit.position);
+            hit.position = ray.position;
+            hit.normal = sdf_normal(ray.position);
+            return hit;
+        }
+        ray.position += ray.direction * curr_march;
+        last_march = curr_march;
+    }
+    return hit;
+}
+
+float plane_intersect(Ray ray, vec3 planepoint, vec3 normal) {
+    return dot(planepoint - ray.position, normal) / dot(ray.direction, normal);
+}
+
+vec3 raycolor(vec2 ray_coordinate) {
+	// create ray
+    Ray ray = create_ray(ray_coordinate);
+
+    // colors
+    vec3 color = background_color(ray);
+
+    // trace/march
+    Hit hit;
+    hit.distance = -1.0;
+    float grid_plane_distance = plane_intersect(ray, vec3(0, 0, 0), vec3(0, 0, 1.0));
+    vec3 grid_plane_point = ray.position + (ray.direction * grid_plane_distance);
+    float grid_plane_tolerance = grid_plane_distance / 300.0;
+    float grid_x_tolerance = 0.0;//0.05 * (dot(normalize(ubo.look), vec3(0.0, 1.0, 0.0)) + 1.0);
+    float grid_y_tolerance = 0.0;//0.05 * (dot(normalize(ubo.look), vec3(1.0, 0.0, 0.0)) + 1.0);
+    uint num_lights = max(1, ubo.lightssize);
+    if (ubo.raytrace != 0) {
+        hit = raytrace(ray);
+        if (ubo.grid > 0 && grid_plane_distance > 0.0 &&
+            (hit.distance <= 0.0 || hit.distance > grid_plane_distance) &&
+            (fract(grid_plane_point.x) < grid_plane_tolerance + grid_x_tolerance ||
+                fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
+            color = vec3(0.5);
+        } else if (hit.distance > 0.0) {
+            PointLight light;
+            if (ubo.lighting != 0) {
+                color = vec3(0.0, 0.0, 0.0);
+                for (uint i = 0; i < num_lights; i++) {
+                    if (ubo.lightssize > 0) {
+                        light = lightIn[i];
+                    } else {
+                        light = default_light();
+                    }
+                    color += shade(ray, hit, light);
+                }
+            } else {
+                color = dshade(hit);
+            }
+            if (ubo.reflections != 0) reflect_color(ray, hit, MAX_BOUNCES, color);
+        }
+    } else if (ubo.sdf != 0) {
+        hit = raymarch(ray);
+        if (ubo.grid > 0 && grid_plane_distance > 0.0 &&
+            (hit.distance <= 0.0 || hit.distance > grid_plane_distance) &&
+            (fract(grid_plane_point.x) < grid_plane_tolerance + grid_x_tolerance ||
+                fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
+            color = vec3(0.5);
+        } else if (hit.distance > 0.0) {
+            color = dshade(hit);
+        }
+    }
+    for (uint i = 0; i < ubo.lightssize; i++)
+	    draw_light(ray, hit, lightIn[i], color);
+	
+	return color;
+}
+
+void main() {
+	// update ray history
+	raygenIn[gl_GlobalInvocationID.x].time += ubo.frametime;
+
+	// get ray generator
+    RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
+
+	// calculate frame chance
+	float chance = 1.0 - pow(1.0 - ubo.frameless, rgIn.time);
+	float rnum = random((rgIn.x * rgIn.y) / (123.456789 + (ubo.seed % 100)));
+	bool update_signal = rnum <= chance;
+	if (!update_signal) {
+        imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(0.0));
+        return;
+    }
+
+	// clear ray history
+	raygenIn[gl_GlobalInvocationID.x].time = 0.0;
+
+	// reject any rays outside of the viewport
+    if (cut_viewport(rgIn)) return;
+
+	// calculate ray color
+	vec3 color = vec3(0, 0, 0);
+	if (ubo.antialiasing == 0) {
+		color = raycolor(vec2(rgIn.x, rgIn.y));
+	} else {
+		vec2 base_ray = vec2(rgIn.x, rgIn.y);
+		color += raycolor(base_ray + vec2(-0.5, -0.5));
+		color += raycolor(base_ray + vec2(0.5, 0.5));
+		color /= 2.0;
+	}
+    
+    // failures
+    if (stack_failure) color = vec3(1.0, 0.0, 0.0);
+
+    // write to image
+    if (ubo.frameless < 1.0) {
+	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 0.1));
+    } else {
+	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
+    }
+}

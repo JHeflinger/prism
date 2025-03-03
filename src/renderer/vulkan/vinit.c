@@ -267,8 +267,10 @@ BOOL VINIT_RenderData(VulkanRenderData* renderdata) {
 }
 
 BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
-    SimpleFile* compshadercode = ReadFile("build/shaders/shader.comp.spv");
+    SimpleFile* compshadercode = ReadFile("build/shaders/render.comp.spv");
+    SimpleFile* overlayshadercode = ReadFile("build/shaders/overlay.comp.spv");
 	VkShaderModule compshader = VUTIL_CreateShader(compshadercode);
+    VkShaderModule overlayshader = VUTIL_CreateShader(overlayshadercode);
 
 	VkPipelineShaderStageCreateInfo compShaderStageInfo = { 0 };
 	compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -283,7 +285,7 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
 
     VkResult result = vkCreatePipelineLayout(
         g_vinit_renderer_ref->vulkan.core.general.interface,
-        &pipelineLayoutInfo, NULL, &(pipeline->layout));
+        &pipelineLayoutInfo, NULL, pipeline->layout);
     if (result != VK_SUCCESS) {
         LOG_FATAL("Failed to create pipeline layout!");
         return FALSE;
@@ -291,19 +293,21 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
 
     VkComputePipelineCreateInfo pipelineInfo = { 0 };
     pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    pipelineInfo.layout = pipeline->layout;
+    pipelineInfo.layout = pipeline->layout[0];
     pipelineInfo.stage = compShaderStageInfo;
 
     result = vkCreateComputePipelines(
         g_vinit_renderer_ref->vulkan.core.general.interface,
-        VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &(pipeline->pipeline));
+        VK_NULL_HANDLE, 1, &pipelineInfo, NULL, pipeline->pipeline);
     if (result != VK_SUCCESS) {
         LOG_FATAL("Failed to create pipeline!");
         return FALSE;
     }
 
     FreeFile(compshadercode);
+    FreeFile(overlayshadercode);
 	vkDestroyShaderModule(g_vinit_renderer_ref->vulkan.core.general.interface, compshader, NULL);
+	vkDestroyShaderModule(g_vinit_renderer_ref->vulkan.core.general.interface, overlayshader, NULL);
     return TRUE;
 }
 

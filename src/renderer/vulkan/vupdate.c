@@ -63,12 +63,12 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
         vkCmdBindPipeline(
             command,
             VK_PIPELINE_BIND_POINT_COMPUTE,
-            g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline);
+            g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline[0]);
 
         vkCmdBindDescriptorSets(
             command,
             VK_PIPELINE_BIND_POINT_COMPUTE,
-            g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout,
+            g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[0],
             0,
             1,
             &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors.sets[g_vupdt_renderer_ref->swapchain.index]),

@@ -1,32 +1,6 @@
-design philosophy:
-    - blender but make it i3
-    - why?
-        - because I hate using trackpad
-
-ui todos:
-    - focused panel
-    - tabbed panels
-    - closeable panels
-    - move panels with keybinds
-    - accomodate screen resize
-
-ideas:
-    - psuedo-frameless:
-        - after getting raytracing working:
-        - trace a random # of rays
-            - if a frame takes greater than a certain time to render, reduce the random # next frame
-            - if a frame takes less, do the opposite
-                - just make sure you do this scaled in accordance to how much faster/slower it is
-
-after tutorial hell:
-    - condense as much as possible
-    - refactor to have raylib-type functionality
-    - explore:
-        - Push constants
-        - Instanced rendering
-        - Dynamic uniforms
-        - Separate images and sampler descriptors
-        - Pipeline cache
-        - Multi-threaded command buffer generation
-        - Multiple subpasses
-        - Compute shaders
+- pass in mouse coordinates
+- highlight triangle based on previous frame (we can be ok with the 1 frame time lag in exchange for optimal processing speed)
+- 2 outbuffers:
+    - 1 is how many things are selected
+    - 2 are the things that are selected
+- we want to read those from gpu only when we release our click
