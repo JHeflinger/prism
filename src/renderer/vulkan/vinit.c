@@ -356,12 +356,15 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
     pipelineLayoutInfos[0].setLayoutCount = 1;
     pipelineLayoutInfos[0].pSetLayouts = &(g_vinit_renderer_ref->vulkan.core.context.renderdata.descriptors[0].layout);
     pipelineLayoutInfos[1].sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfos[1].setLayoutCount = 0;
+    pipelineLayoutInfos[1].setLayoutCount = 1;
     pipelineLayoutInfos[1].pSetLayouts = &(g_vinit_renderer_ref->vulkan.core.context.renderdata.descriptors[1].layout);
 
     VkResult result = vkCreatePipelineLayout(
         g_vinit_renderer_ref->vulkan.core.general.interface,
-        pipelineLayoutInfos, NULL, pipeline->layout);
+        &(pipelineLayoutInfos[0]), NULL, &(pipeline->layout[0]));
+	result |= vkCreatePipelineLayout(
+        g_vinit_renderer_ref->vulkan.core.general.interface,
+        &(pipelineLayoutInfos[1]), NULL, &(pipeline->layout[1]));
     if (result != VK_SUCCESS) {
         LOG_FATAL("Failed to create pipeline layout!");
         return FALSE;
