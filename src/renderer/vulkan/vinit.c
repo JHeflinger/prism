@@ -95,125 +95,192 @@ BOOL VINIT_UniformBuffers(UBOArray* ubos) {
 }
 
 BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
-    // create descriptor set layout
-    VkDescriptorSetLayoutBinding uboLayoutBinding = { 0 };
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    // render descriptors
+    {
+        VkDescriptorSetLayoutBinding uboLayoutBinding = { 0 };
+        uboLayoutBinding.binding = 0;
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding ssboLayoutBinding = { 0 };
-    ssboLayoutBinding.binding = 1;
-    ssboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    ssboLayoutBinding.descriptorCount = 1;
-    ssboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        VkDescriptorSetLayoutBinding ssboLayoutBinding = { 0 };
+        ssboLayoutBinding.binding = 1;
+        ssboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        ssboLayoutBinding.descriptorCount = 1;
+        ssboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding imageLayoutBinding = { 0 };
-    imageLayoutBinding.binding = 2;
-    imageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    imageLayoutBinding.descriptorCount = 1;
-    imageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        VkDescriptorSetLayoutBinding imageLayoutBinding = { 0 };
+        imageLayoutBinding.binding = 2;
+        imageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        imageLayoutBinding.descriptorCount = 1;
+        imageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding trianglesLayoutBinding = { 0 };
-    trianglesLayoutBinding.binding = 3;
-    trianglesLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    trianglesLayoutBinding.descriptorCount = 1;
-    trianglesLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        VkDescriptorSetLayoutBinding trianglesLayoutBinding = { 0 };
+        trianglesLayoutBinding.binding = 3;
+        trianglesLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        trianglesLayoutBinding.descriptorCount = 1;
+        trianglesLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding materialsLayoutBinding = { 0 };
-    materialsLayoutBinding.binding = 4;
-    materialsLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    materialsLayoutBinding.descriptorCount = 1;
-    materialsLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        VkDescriptorSetLayoutBinding materialsLayoutBinding = { 0 };
+        materialsLayoutBinding.binding = 4;
+        materialsLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        materialsLayoutBinding.descriptorCount = 1;
+        materialsLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding bvhLayoutBinding = { 0 };
-    bvhLayoutBinding.binding = 5;
-    bvhLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    bvhLayoutBinding.descriptorCount = 1;
-    bvhLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        VkDescriptorSetLayoutBinding bvhLayoutBinding = { 0 };
+        bvhLayoutBinding.binding = 5;
+        bvhLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        bvhLayoutBinding.descriptorCount = 1;
+        bvhLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding sdfLayoutBinding = { 0 };
-    sdfLayoutBinding.binding = 6;
-    sdfLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    sdfLayoutBinding.descriptorCount = 1;
-    sdfLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        VkDescriptorSetLayoutBinding sdfLayoutBinding = { 0 };
+        sdfLayoutBinding.binding = 6;
+        sdfLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        sdfLayoutBinding.descriptorCount = 1;
+        sdfLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding lightLayoutBinding = { 0 };
-    lightLayoutBinding.binding = 7;
-    lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    lightLayoutBinding.descriptorCount = 1;
-    lightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        VkDescriptorSetLayoutBinding lightLayoutBinding = { 0 };
+        lightLayoutBinding.binding = 7;
+        lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        lightLayoutBinding.descriptorCount = 1;
+        lightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding bindings[] = { 
-        uboLayoutBinding,
-        ssboLayoutBinding,
-        imageLayoutBinding,
-        trianglesLayoutBinding,
-        materialsLayoutBinding,
-        bvhLayoutBinding,
-        sdfLayoutBinding,
-        lightLayoutBinding
-    };
+        VkDescriptorSetLayoutBinding bindings[] = { 
+            uboLayoutBinding,
+            ssboLayoutBinding,
+            imageLayoutBinding,
+            trianglesLayoutBinding,
+            materialsLayoutBinding,
+            bvhLayoutBinding,
+            sdfLayoutBinding,
+            lightLayoutBinding
+        };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 8;
-    layoutInfo.pBindings = bindings;
+        VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 8;
+        layoutInfo.pBindings = bindings;
 
-    VkResult result = vkCreateDescriptorSetLayout(
-        g_vinit_renderer_ref->vulkan.core.general.interface,
-        &layoutInfo, NULL, &(descriptors->layout));
-    if (result != VK_SUCCESS) {
-        LOG_FATAL("Failed to create descriptor set layout!");
-        return FALSE;
+        VkResult result = vkCreateDescriptorSetLayout(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            &layoutInfo, NULL, &(descriptors[0].layout));
+        if (result != VK_SUCCESS) {
+            LOG_FATAL("Failed to create descriptor set layout!");
+            return FALSE;
+        }
+
+        VkDescriptorPoolSize poolSizes[8] = { 0 };
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[1].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        poolSizes[2].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[3].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[4].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[5].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[5].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[6].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[6].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[7].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[7].descriptorCount = CPUSWAP_LENGTH;
+
+        VkDescriptorPoolCreateInfo poolInfo = { 0 };
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 8;
+        poolInfo.pPoolSizes = poolSizes;
+        poolInfo.maxSets = CPUSWAP_LENGTH;
+        result = vkCreateDescriptorPool(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            &poolInfo, NULL, &(descriptors[0].pool));
+        if (result != VK_SUCCESS) {
+            LOG_FATAL("Failed to create descriptor pool!");
+            return FALSE;
+        }
+
+        VkDescriptorSetLayout layouts[CPUSWAP_LENGTH];
+        for (size_t i = 0; i < CPUSWAP_LENGTH; i++) layouts[i] = descriptors[0].layout;
+        VkDescriptorSetAllocateInfo allocInfo = { 0 };
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptors[0].pool;
+        allocInfo.descriptorSetCount = CPUSWAP_LENGTH;
+        allocInfo.pSetLayouts = layouts;
+        result = vkAllocateDescriptorSets(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            &allocInfo, descriptors[0].sets);
+        if (result != VK_SUCCESS) {
+            LOG_FATAL("Failed to create descriptor sets!");
+            return FALSE;
+        }
     }
 
-    // create descriptor pool
-    VkDescriptorPoolSize poolSizes[8] = { 0 };
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[1].descriptorCount = CPUSWAP_LENGTH;
-    poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    poolSizes[2].descriptorCount = CPUSWAP_LENGTH;
-    poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[3].descriptorCount = CPUSWAP_LENGTH;
-    poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[4].descriptorCount = CPUSWAP_LENGTH;
-    poolSizes[5].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[5].descriptorCount = CPUSWAP_LENGTH;
-    poolSizes[6].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[6].descriptorCount = CPUSWAP_LENGTH;
-    poolSizes[7].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[7].descriptorCount = CPUSWAP_LENGTH;
+    // overlay descripors
+    {
+        VkDescriptorSetLayoutBinding ssboLayoutBinding = { 0 };
+        ssboLayoutBinding.binding = 0;
+        ssboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        ssboLayoutBinding.descriptorCount = 1;
+        ssboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorPoolCreateInfo poolInfo = { 0 };
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 8;
-    poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = CPUSWAP_LENGTH;
-    result = vkCreateDescriptorPool(
-        g_vinit_renderer_ref->vulkan.core.general.interface,
-        &poolInfo, NULL, &(descriptors->pool));
-    if (result != VK_SUCCESS) {
-        LOG_FATAL("Failed to create descriptor pool!");
-        return FALSE;
-    }
+        VkDescriptorSetLayoutBinding imageLayoutBinding = { 0 };
+        imageLayoutBinding.binding = 1;
+        imageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        imageLayoutBinding.descriptorCount = 1;
+        imageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    // create descriptor sets
-    VkDescriptorSetLayout layouts[CPUSWAP_LENGTH];
-    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) layouts[i] = descriptors->layout;
-    VkDescriptorSetAllocateInfo allocInfo = { 0 };
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptors->pool;
-    allocInfo.descriptorSetCount = CPUSWAP_LENGTH;
-    allocInfo.pSetLayouts = layouts;
-    result = vkAllocateDescriptorSets(
-        g_vinit_renderer_ref->vulkan.core.general.interface,
-        &allocInfo, descriptors->sets);
-    if (result != VK_SUCCESS) {
-        LOG_FATAL("Failed to create descriptor sets!");
-        return FALSE;
+        VkDescriptorSetLayoutBinding bindings[] = {
+            ssboLayoutBinding,
+            imageLayoutBinding,
+        };
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 2;
+        layoutInfo.pBindings = bindings;
+
+        VkResult result = vkCreateDescriptorSetLayout(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            &layoutInfo, NULL, &(descriptors[1].layout));
+        if (result != VK_SUCCESS) {
+            LOG_FATAL("Failed to create descriptor set layout!");
+            return FALSE;
+        }
+
+        VkDescriptorPoolSize poolSizes[2] = { 0 };
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        poolSizes[1].descriptorCount = CPUSWAP_LENGTH;
+
+        VkDescriptorPoolCreateInfo poolInfo = { 0 };
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 2;
+        poolInfo.pPoolSizes = poolSizes;
+        poolInfo.maxSets = CPUSWAP_LENGTH;
+        result = vkCreateDescriptorPool(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            &poolInfo, NULL, &(descriptors[1].pool));
+        if (result != VK_SUCCESS) {
+            LOG_FATAL("Failed to create descriptor pool!");
+            return FALSE;
+        }
+
+        VkDescriptorSetLayout layouts[CPUSWAP_LENGTH];
+        for (size_t i = 0; i < CPUSWAP_LENGTH; i++) layouts[i] = descriptors[1].layout;
+        VkDescriptorSetAllocateInfo allocInfo = { 0 };
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptors[1].pool;
+        allocInfo.descriptorSetCount = CPUSWAP_LENGTH;
+        allocInfo.pSetLayouts = layouts;
+        result = vkAllocateDescriptorSets(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            &allocInfo, descriptors[1].sets);
+        if (result != VK_SUCCESS) {
+            LOG_FATAL("Failed to create descriptor sets!");
+            return FALSE;
+        }
     }
 
     VUPDT_DescriptorSets(descriptors);
@@ -262,7 +329,7 @@ BOOL VINIT_ShaderStorageBuffers(VulkanDataBuffer* ssbo_array) {
 BOOL VINIT_RenderData(VulkanRenderData* renderdata) {
 	if (!VINIT_ShaderStorageBuffers(renderdata->ssbos)) return FALSE;
 	if (!VINIT_UniformBuffers(&(renderdata->ubos))) return FALSE;
-	if (!VINIT_Descriptors(&(renderdata->descriptors))) return FALSE;
+	if (!VINIT_Descriptors(renderdata->descriptors)) return FALSE;
     return TRUE;
 }
 
@@ -278,27 +345,39 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
 	compShaderStageInfo.module = compshader;
 	compShaderStageInfo.pName = "main";
 
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { 0 };
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &(g_vinit_renderer_ref->vulkan.core.context.renderdata.descriptors.layout);
+	VkPipelineShaderStageCreateInfo overlayShaderStageInfo = { 0 };
+	overlayShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	overlayShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	overlayShaderStageInfo.module = overlayshader;
+	overlayShaderStageInfo.pName = "main";
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfos[2] = { 0 };
+    pipelineLayoutInfos[0].sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfos[0].setLayoutCount = 1;
+    pipelineLayoutInfos[0].pSetLayouts = &(g_vinit_renderer_ref->vulkan.core.context.renderdata.descriptors[0].layout);
+    pipelineLayoutInfos[1].sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfos[1].setLayoutCount = 0;
+    pipelineLayoutInfos[1].pSetLayouts = &(g_vinit_renderer_ref->vulkan.core.context.renderdata.descriptors[1].layout);
 
     VkResult result = vkCreatePipelineLayout(
         g_vinit_renderer_ref->vulkan.core.general.interface,
-        &pipelineLayoutInfo, NULL, pipeline->layout);
+        pipelineLayoutInfos, NULL, pipeline->layout);
     if (result != VK_SUCCESS) {
         LOG_FATAL("Failed to create pipeline layout!");
         return FALSE;
     }
 
-    VkComputePipelineCreateInfo pipelineInfo = { 0 };
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    pipelineInfo.layout = pipeline->layout[0];
-    pipelineInfo.stage = compShaderStageInfo;
+    VkComputePipelineCreateInfo pipelineInfos[2] = { 0 };
+    pipelineInfos[0].sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfos[0].layout = pipeline->layout[0];
+    pipelineInfos[0].stage = compShaderStageInfo;
+    pipelineInfos[1].sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfos[1].layout = pipeline->layout[1];
+    pipelineInfos[1].stage = overlayShaderStageInfo;
 
     result = vkCreateComputePipelines(
         g_vinit_renderer_ref->vulkan.core.general.interface,
-        VK_NULL_HANDLE, 1, &pipelineInfo, NULL, pipeline->pipeline);
+        VK_NULL_HANDLE, 2, pipelineInfos, NULL, pipeline->pipeline);
     if (result != VK_SUCCESS) {
         LOG_FATAL("Failed to create pipeline!");
         return FALSE;

@@ -90,7 +90,7 @@ typedef struct {
 } VulkanScheduler;
 
 typedef struct {
-    VulkanDescriptors descriptors;
+    VulkanDescriptors descriptors[PIPELINE_LENGTH];
     UBOArray ubos;
     VulkanDataBuffer ssbos[CPUSWAP_LENGTH];
 } VulkanRenderData;

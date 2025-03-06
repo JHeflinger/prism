@@ -71,7 +71,29 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[0],
             0,
             1,
-            &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors.sets[g_vupdt_renderer_ref->swapchain.index]),
+            &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors[0].sets[g_vupdt_renderer_ref->swapchain.index]),
+            0,
+            NULL);
+
+        float imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
+        float imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
+        vkCmdDispatch(command, ceil((imgw * imgh) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
+    }
+
+    // editor overlay
+    {
+        vkCmdBindPipeline(
+            command,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline[1]);
+
+        vkCmdBindDescriptorSets(
+            command,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[1],
+            0,
+            1,
+            &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors[1].sets[g_vupdt_renderer_ref->swapchain.index]),
             0,
             NULL);
 
@@ -161,7 +183,7 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         VkWriteDescriptorSet descriptorWrites[8] = { 0 };
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = descriptors->sets[i];
+        descriptorWrites[0].dstSet = descriptors[0].sets[i];
         descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -169,7 +191,7 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[0].pBufferInfo = &bufferInfo;
 
         descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = descriptors->sets[i];
+        descriptorWrites[1].dstSet = descriptors[0].sets[i];
         descriptorWrites[1].dstBinding = 1;
         descriptorWrites[1].dstArrayElement = 0;
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -177,7 +199,7 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[1].pBufferInfo = &storageBufferInfo;
 
         descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[2].dstSet = descriptors->sets[i];
+        descriptorWrites[2].dstSet = descriptors[0].sets[i];
         descriptorWrites[2].dstBinding = 2;
         descriptorWrites[2].dstArrayElement = 0;
         descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -185,7 +207,7 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[2].pImageInfo = &imageInfo;
 
         descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[3].dstSet = descriptors->sets[i];
+        descriptorWrites[3].dstSet = descriptors[0].sets[i];
         descriptorWrites[3].dstBinding = 3;
         descriptorWrites[3].dstArrayElement = 0;
         descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -193,7 +215,7 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[3].pBufferInfo = &triangleBufferInfo;
 
         descriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[4].dstSet = descriptors->sets[i];
+        descriptorWrites[4].dstSet = descriptors[0].sets[i];
         descriptorWrites[4].dstBinding = 4;
         descriptorWrites[4].dstArrayElement = 0;
         descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -201,7 +223,7 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[4].pBufferInfo = &materialsBufferInfo;
 
         descriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[5].dstSet = descriptors->sets[i];
+        descriptorWrites[5].dstSet = descriptors[0].sets[i];
         descriptorWrites[5].dstBinding = 5;
         descriptorWrites[5].dstArrayElement = 0;
         descriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -209,7 +231,7 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[5].pBufferInfo = &bvhBufferInfo;
 
         descriptorWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[6].dstSet = descriptors->sets[i];
+        descriptorWrites[6].dstSet = descriptors[0].sets[i];
         descriptorWrites[6].dstBinding = 6;
         descriptorWrites[6].dstArrayElement = 0;
         descriptorWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -217,7 +239,7 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[6].pBufferInfo = &sdfBufferInfo;
 
         descriptorWrites[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[7].dstSet = descriptors->sets[i];
+        descriptorWrites[7].dstSet = descriptors[0].sets[i];
         descriptorWrites[7].dstBinding = 7;
         descriptorWrites[7].dstArrayElement = 0;
         descriptorWrites[7].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -225,6 +247,36 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[7].pBufferInfo = &lightBufferInfo;
 
         vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 8, descriptorWrites, 0, NULL);
+    }
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VkDescriptorBufferInfo storageBufferInfo = { 0 };
+        storageBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ssbos[i].buffer;
+        storageBufferInfo.offset = 0;
+        storageBufferInfo.range = sizeof(RayGenerator) * imgw * imgh;
+
+        VkDescriptorImageInfo imageInfo = { 0 };
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        imageInfo.imageView = g_vupdt_renderer_ref->vulkan.core.context.targets[i].view;
+
+        VkWriteDescriptorSet descriptorWrites[2] = { 0 };
+
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = descriptors[1].sets[i];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &storageBufferInfo;
+
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = descriptors[1].sets[i];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pImageInfo = &imageInfo;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 2, descriptorWrites, 0, NULL);
     }
 }
 

@@ -321,7 +321,7 @@ void Render() {
         }
 
         // update descriptor sets if needed
-        if (descriptor_changes) VUPDT_DescriptorSets(&(g_renderer.vulkan.core.context.renderdata.descriptors));
+        if (descriptor_changes) VUPDT_DescriptorSets(g_renderer.vulkan.core.context.renderdata.descriptors);
 
         // update uniform buffers
         VUPDT_UniformBuffers(&(g_renderer.vulkan.core.context.renderdata.ubos));

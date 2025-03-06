@@ -4,3 +4,14 @@
     - 1 is how many things are selected
     - 2 are the things that are selected
 - we want to read those from gpu only when we release our click
+
+= create new pipeline
+- updaet that in vinit
+- set up descriptor sets to take in:
+	- mouse pixel position
+	- index framebuffer
+	- image buffer
+^ use this to do hover highlighting
+- then set up new pipeline to output the hovered triangle
+- ^ use this to do select face
+- then figure out doing multiule
