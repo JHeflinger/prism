@@ -44,6 +44,7 @@ struct RayGenerator {
     uint x;
     uint y;
 	float time;
+    uint tid;
 };
 
 struct Ray {
@@ -478,7 +479,7 @@ float plane_intersect(Ray ray, vec3 planepoint, vec3 normal) {
     return dot(planepoint - ray.position, normal) / dot(ray.direction, normal);
 }
 
-vec3 raycolor(vec2 ray_coordinate) {
+vec3 raycolor(vec2 ray_coordinate, inout uint hit_id) {
 	// create ray
     Ray ray = create_ray(ray_coordinate);
 
@@ -502,6 +503,7 @@ vec3 raycolor(vec2 ray_coordinate) {
                 fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
             color = vec3(0.5);
         } else if (hit.distance > 0.0) {
+            hit_id = 1;
             PointLight light;
             if (ubo.lighting != 0) {
                 color = vec3(0.0, 0.0, 0.0);
@@ -526,6 +528,7 @@ vec3 raycolor(vec2 ray_coordinate) {
                 fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
             color = vec3(0.5);
         } else if (hit.distance > 0.0) {
+            hit_id = 1;
             color = dshade(hit);
         }
     }
@@ -559,14 +562,16 @@ void main() {
 
 	// calculate ray color
 	vec3 color = vec3(0, 0, 0);
+    uint hit_id = 0;
 	if (ubo.antialiasing == 0) {
-		color = raycolor(vec2(rgIn.x, rgIn.y));
+		color = raycolor(vec2(rgIn.x, rgIn.y), hit_id);
 	} else {
 		vec2 base_ray = vec2(rgIn.x, rgIn.y);
-		color += raycolor(base_ray + vec2(-0.5, -0.5));
-		color += raycolor(base_ray + vec2(0.5, 0.5));
+		color += raycolor(base_ray + vec2(-0.5, -0.5), hit_id);
+		color += raycolor(base_ray + vec2(0.5, 0.5), hit_id);
 		color /= 2.0;
 	}
+    raygenIn[gl_GlobalInvocationID.x].tid = hit_id;
     
     // failures
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);

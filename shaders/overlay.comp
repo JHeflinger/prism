@@ -4,6 +4,7 @@ struct RayGenerator {
     uint x;
     uint y;
 	float time;
+    uint tid;
 };
 
 layout(binding = 0) buffer RayGeneratorSSBOIn {
@@ -16,5 +17,7 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 void main() {
     RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
-	//imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(1.0, 0.0, 0.0, 1.0));
+    if (rgIn.tid != 0) {
+        imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(1.0, 0.0, 0.0, 1.0));
+    }
 }
