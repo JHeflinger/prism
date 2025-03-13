@@ -13,11 +13,19 @@ layout(binding = 0) buffer RayGeneratorSSBOIn {
 
 layout(binding = 1, rgba8) uniform image2D outputImage;
 
+layout(binding = 2) uniform OverlayUniformBufferObject {
+	uint mouse_x;
+    uint mouse_y;
+} ubo;
+
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 void main() {
     RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
     if (rgIn.tid != 0) {
+        //imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(1.0, 0.0, 0.0, 1.0));
+    }
+    if (abs(rgIn.x - ubo.mouse_x) < 20 && abs(rgIn.y - ubo.mouse_y) < 20) {
         imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(1.0, 0.0, 0.0, 1.0));
     }
 }

@@ -16,6 +16,7 @@ SDFID g_sdf_id = 0;
 LightID g_light_id = 0;
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
+Rectangle g_viewport_dims = { 0 };
 
 void SetViewportSlice(size_t w, size_t h) {
 	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
@@ -427,4 +428,12 @@ RendererConfig* RenderConfig() {
 
 float RenderFrameTime() {
     return g_rft;
+}
+
+void SetViewportRec(Rectangle rec) {
+    g_viewport_dims = rec;
+}
+
+Rectangle GetViewportRec() {
+    return g_viewport_dims;
 }

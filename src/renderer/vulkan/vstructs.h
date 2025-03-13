@@ -51,13 +51,20 @@ typedef struct {
 } UniformBufferObject;
 
 typedef struct {
+    alignas(4) uint32_t mouse_x;
+    alignas(4) uint32_t mouse_y;
+} OverlayUniformBufferObject;
+
+typedef struct {
     VkBuffer buffer;
     VkDeviceMemory memory;
 } VulkanDataBuffer;
 
 typedef struct {
     VulkanDataBuffer objects[CPUSWAP_LENGTH];
+    VulkanDataBuffer overlay_objects[CPUSWAP_LENGTH];
     void* mapped[CPUSWAP_LENGTH];
+    void* overlay_mapped[CPUSWAP_LENGTH];
 } UBOArray;
 
 typedef struct {

@@ -78,18 +78,26 @@ BOOL VINIT_Syncro(VulkanSyncro* syncro) {
 }
 
 BOOL VINIT_UniformBuffers(UBOArray* ubos) {
-    VkDeviceSize size = sizeof(UniformBufferObject);
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VUTIL_CreateBuffer(
-            size,
+            sizeof(UniformBufferObject),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             &(ubos->objects[i]));
+        VUTIL_CreateBuffer(
+            sizeof(OverlayUniformBufferObject),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &(ubos->overlay_objects[i]));
 
         vkMapMemory(
             g_vinit_renderer_ref->vulkan.core.general.interface,
             ubos->objects[i].memory,
-            0, size, 0, &(ubos->mapped[i]));
+            0, sizeof(UniformBufferObject), 0, &(ubos->mapped[i]));
+        vkMapMemory(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            ubos->overlay_objects[i].memory,
+            0, sizeof(OverlayUniformBufferObject), 0, &(ubos->overlay_mapped[i]));
     }
     return TRUE;
 }
@@ -230,14 +238,21 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
         imageLayoutBinding.descriptorCount = 1;
         imageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+        VkDescriptorSetLayoutBinding uboLayoutBinding = { 0 };
+        uboLayoutBinding.binding = 2;
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
         VkDescriptorSetLayoutBinding bindings[] = {
             ssboLayoutBinding,
             imageLayoutBinding,
+            uboLayoutBinding
         };
 
         VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 2;
+        layoutInfo.bindingCount = 3;
         layoutInfo.pBindings = bindings;
 
         VkResult result = vkCreateDescriptorSetLayout(
@@ -248,15 +263,17 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             return FALSE;
         }
 
-        VkDescriptorPoolSize poolSizes[2] = { 0 };
+        VkDescriptorPoolSize poolSizes[3] = { 0 };
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         poolSizes[1].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[2].descriptorCount = CPUSWAP_LENGTH;
 
         VkDescriptorPoolCreateInfo poolInfo = { 0 };
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = 2;
+        poolInfo.poolSizeCount = 3;
         poolInfo.pPoolSizes = poolSizes;
         poolInfo.maxSets = CPUSWAP_LENGTH;
         result = vkCreateDescriptorPool(

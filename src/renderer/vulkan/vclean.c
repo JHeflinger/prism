@@ -53,6 +53,7 @@ void VCLEAN_RenderData(VulkanRenderData* renderdata) {
     }
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VUTIL_DestroyBuffer(renderdata->ubos.objects[i]);
+        VUTIL_DestroyBuffer(renderdata->ubos.overlay_objects[i]);
     }
     for (size_t i = 0; i < PIPELINE_LENGTH; i++) {
         vkDestroyDescriptorPool(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].pool, NULL);

@@ -258,7 +258,12 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
         imageInfo.imageView = g_vupdt_renderer_ref->vulkan.core.context.targets[i].view;
 
-        VkWriteDescriptorSet descriptorWrites[2] = { 0 };
+        VkDescriptorBufferInfo bufferInfo = { 0 };
+        bufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ubos.overlay_objects[i].buffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(OverlayUniformBufferObject);
+
+        VkWriteDescriptorSet descriptorWrites[3] = { 0 };
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptors[1].sets[i];
@@ -276,54 +281,80 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = &imageInfo;
 
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 2, descriptorWrites, 0, NULL);
+        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = descriptors[1].sets[i];
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 3, descriptorWrites, 0, NULL);
     }
 }
 
 void VUPDT_UniformBuffers(UBOArray* ubos) {
     #define RAYVEC_TO_GLMVEC(gv, rv) { gv[0] = rv.x; gv[1] = rv.y; gv[2] = rv.z; }
-    UniformBufferObject ubo = { 0 };
-	RAYVEC_TO_GLMVEC(ubo.position, g_vupdt_renderer_ref->camera.position);
-	RAYVEC_TO_GLMVEC(ubo.look, g_vupdt_renderer_ref->camera.look);
-    glm_vec3_sub(ubo.look, ubo.position, ubo.look);
-	RAYVEC_TO_GLMVEC(ubo.up, g_vupdt_renderer_ref->camera.up);
-    glm_vec3_normalize(ubo.up);
-    glm_vec3_normalize(ubo.look);
-    glm_vec3_negate_to(ubo.look, ubo.w);
-    glm_vec3_crossn(ubo.up, ubo.w, ubo.u);
-    glm_vec3_crossn(ubo.w, ubo.u, ubo.v);
-	ubo.fov = glm_rad(g_vupdt_renderer_ref->camera.fov);
-	ubo.width = g_vupdt_renderer_ref->dimensions.x;
-	ubo.height = g_vupdt_renderer_ref->dimensions.y;
-    ubo.triangles = g_vupdt_renderer_ref->geometry.triangles.size;
-    ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
-    ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
-    ubo.bvhsize = g_vupdt_renderer_ref->geometry.bvh.size;
-	ubo.frametime = RenderFrameTime();
-    if (g_vupdt_renderer_ref->config.autoframeless) {
-        #define TARGET_FRAMETIME 0.016f
-        if (RenderFrameTime() > 0) {
-            g_vupdt_renderer_ref->config.frameless *= (TARGET_FRAMETIME / RenderFrameTime());
-            if (g_vupdt_renderer_ref->config.frameless > 1.0f)
-                g_vupdt_renderer_ref->config.frameless = 1.0f;
+    // core uniform buffer
+    {
+        UniformBufferObject ubo = { 0 };
+        RAYVEC_TO_GLMVEC(ubo.position, g_vupdt_renderer_ref->camera.position);
+        RAYVEC_TO_GLMVEC(ubo.look, g_vupdt_renderer_ref->camera.look);
+        glm_vec3_sub(ubo.look, ubo.position, ubo.look);
+        RAYVEC_TO_GLMVEC(ubo.up, g_vupdt_renderer_ref->camera.up);
+        glm_vec3_normalize(ubo.up);
+        glm_vec3_normalize(ubo.look);
+        glm_vec3_negate_to(ubo.look, ubo.w);
+        glm_vec3_crossn(ubo.up, ubo.w, ubo.u);
+        glm_vec3_crossn(ubo.w, ubo.u, ubo.v);
+        ubo.fov = glm_rad(g_vupdt_renderer_ref->camera.fov);
+        ubo.width = g_vupdt_renderer_ref->dimensions.x;
+        ubo.height = g_vupdt_renderer_ref->dimensions.y;
+        ubo.triangles = g_vupdt_renderer_ref->geometry.triangles.size;
+        ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
+        ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
+        ubo.bvhsize = g_vupdt_renderer_ref->geometry.bvh.size;
+        ubo.frametime = RenderFrameTime();
+        if (g_vupdt_renderer_ref->config.autoframeless) {
+            #define TARGET_FRAMETIME 0.016f
+            if (RenderFrameTime() > 0) {
+                g_vupdt_renderer_ref->config.frameless *= (TARGET_FRAMETIME / RenderFrameTime());
+                if (g_vupdt_renderer_ref->config.frameless > 1.0f)
+                    g_vupdt_renderer_ref->config.frameless = 1.0f;
+            }
+            #undef TARGET_FRAMETIME
         }
-        #undef TARGET_FRAMETIME
+        ubo.frameless = g_vupdt_renderer_ref->config.frameless;
+        ubo.seed = rand();
+        ubo.shadows = (uint32_t)g_vupdt_renderer_ref->config.shadows;
+        ubo.reflections = (uint32_t)g_vupdt_renderer_ref->config.reflections;
+        ubo.lighting = (uint32_t)g_vupdt_renderer_ref->config.lighting;
+        ubo.raytrace = (uint32_t)g_vupdt_renderer_ref->config.raytrace;
+        ubo.sdf = (uint32_t)g_vupdt_renderer_ref->config.sdf;
+        ubo.sdfsize = g_vupdt_renderer_ref->geometry.sdfs.size;
+        ubo.sdfsmooth = g_vupdt_renderer_ref->config.sdfsmooth;
+        ubo.maxmarches = g_vupdt_renderer_ref->config.maxmarches;
+        ubo.time = g_vupdt_renderer_ref->config.time;
+        ubo.antialiasing = (uint32_t)g_vupdt_renderer_ref->config.antialiasing;
+        ubo.lightssize = g_vupdt_renderer_ref->geometry.lights.size;
+        ubo.grid = (uint32_t)g_vupdt_renderer_ref->config.grid;
+        memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
-    ubo.frameless = g_vupdt_renderer_ref->config.frameless;
-	ubo.seed = rand();
-	ubo.shadows = (uint32_t)g_vupdt_renderer_ref->config.shadows;
-	ubo.reflections = (uint32_t)g_vupdt_renderer_ref->config.reflections;
-	ubo.lighting = (uint32_t)g_vupdt_renderer_ref->config.lighting;
-    ubo.raytrace = (uint32_t)g_vupdt_renderer_ref->config.raytrace;
-    ubo.sdf = (uint32_t)g_vupdt_renderer_ref->config.sdf;
-    ubo.sdfsize = g_vupdt_renderer_ref->geometry.sdfs.size;
-    ubo.sdfsmooth = g_vupdt_renderer_ref->config.sdfsmooth;
-    ubo.maxmarches = g_vupdt_renderer_ref->config.maxmarches;
-    ubo.time = g_vupdt_renderer_ref->config.time;
-    ubo.antialiasing = (uint32_t)g_vupdt_renderer_ref->config.antialiasing;
-    ubo.lightssize = g_vupdt_renderer_ref->geometry.lights.size;
-    ubo.grid = (uint32_t)g_vupdt_renderer_ref->config.grid;
-    memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
+
+    // overlay uniform buffer
+    {
+        OverlayUniformBufferObject ubo = { 0 };
+        Rectangle viewport_rec = GetViewportRec();
+        Vector2 renderer_dimensions = g_vupdt_renderer_ref->dimensions;
+        Vector2 offset = {
+            viewport_rec.x + (viewport_rec.width / 2.0f) - (renderer_dimensions.x / 2.0f),
+            viewport_rec.y + (viewport_rec.height / 2.0f) - (renderer_dimensions.y / 2.0f)
+        };
+
+        ubo.mouse_x = GetMouseX() + offset.x;
+        ubo.mouse_y = GetMouseY() + offset.y;
+        memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
+    }
     #undef RAYVEC_TO_GLMVEC
 }
 

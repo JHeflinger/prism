@@ -3,6 +3,7 @@
 #include "data/input.h"
 #include "data/colors.h"
 #include "data/assets.h"
+#include "renderer/renderer.h"
 #include <easymemory.h>
 #include <string.h>
 
@@ -134,6 +135,7 @@ void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     } else {
         DrawRectangle(x, y, w, h, MappedColor(PANEL_BG_COLOR));
         float namebar_dif = ui->panel.name[0] != 0 && strcmp(ui->panel.name, "Viewport") != 0 ? NAMEBAR_HEIGHT : 0.0f;
+        if (strcmp(ui->panel.name, "Viewport") == 0) SetViewportRec((Rectangle){ x, y + namebar_dif, w, h - namebar_dif });
         if (namebar_dif > 0.0) {
             DrawRectangle(x, y, w, NAMEBAR_HEIGHT, MappedColor(PANEL_NB_COLOR));
             float tag_len = MeasureTextEx(FontAsset(), ui->panel.name, LINE_HEIGHT, 0).x;

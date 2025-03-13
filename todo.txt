@@ -15,3 +15,6 @@
 - then set up new pipeline to output the hovered triangle
 - ^ use this to do select face
 - then figure out doing multiule
+
+BUGS:
+	- overlay doesn't work when using a specified resolution?

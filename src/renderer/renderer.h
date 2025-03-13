@@ -65,4 +65,8 @@ RendererConfig* RenderConfig();
 
 float RenderFrameTime();
 
+void SetViewportRec(Rectangle rec);
+
+Rectangle GetViewportRec();
+
 #endif
