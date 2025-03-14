@@ -351,8 +351,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
             viewport_rec.y + (viewport_rec.height / 2.0f) - (renderer_dimensions.y / 2.0f)
         };
 
-        ubo.mouse_x = GetMouseX() + offset.x;
-        ubo.mouse_y = GetMouseY() + offset.y;
+        ubo.mouse_x = GetMouseX() - offset.x;
+        ubo.mouse_y = GetMouseY() - offset.y;
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
     #undef RAYVEC_TO_GLMVEC
