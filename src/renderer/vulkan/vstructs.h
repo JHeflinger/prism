@@ -48,12 +48,20 @@ typedef struct {
     alignas(4) uint32_t antialiasing;
     alignas(4) uint32_t lightssize;
     alignas(4) uint32_t grid;
+    alignas(4) uint32_t mouse_x;
+    alignas(4) uint32_t mouse_y;
 } UniformBufferObject;
 
 typedef struct {
     alignas(4) uint32_t mouse_x;
     alignas(4) uint32_t mouse_y;
+	alignas(4) uint32_t image_width;
+	alignas(4) uint32_t image_height;
 } OverlayUniformBufferObject;
+
+typedef struct {
+	alignas(4) uint32_t hovered_tid;
+} OverlaySSBO;
 
 typedef struct {
     VkBuffer buffer;
@@ -100,6 +108,7 @@ typedef struct {
     VulkanDescriptors descriptors[PIPELINE_LENGTH];
     UBOArray ubos;
     VulkanDataBuffer ssbos[CPUSWAP_LENGTH];
+	VulkanDataBuffer overlay_ssbo;
 } VulkanRenderData;
 
 typedef struct {

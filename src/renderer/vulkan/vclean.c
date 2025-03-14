@@ -59,6 +59,7 @@ void VCLEAN_RenderData(VulkanRenderData* renderdata) {
         vkDestroyDescriptorPool(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].pool, NULL);
         vkDestroyDescriptorSetLayout(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].layout, NULL);
     }
+	VUTIL_DestroyBuffer(renderdata->overlay_ssbo);
 }
 
 void VCLEAN_RenderContext(VulkanRenderContext* context) {

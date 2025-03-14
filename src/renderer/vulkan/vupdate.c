@@ -180,7 +180,12 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         arrsize = arrsize > 0 ? arrsize : 1;
         lightBufferInfo.range = arrsize;
 
-        VkWriteDescriptorSet descriptorWrites[8] = { 0 };
+        VkDescriptorBufferInfo overlaySSBOBufferInfo = { 0 };
+        overlaySSBOBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_ssbo.buffer;
+        overlaySSBOBufferInfo.offset = 0;
+        overlaySSBOBufferInfo.range = sizeof(OverlaySSBO);
+
+        VkWriteDescriptorSet descriptorWrites[9] = { 0 };
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptors[0].sets[i];
@@ -246,7 +251,15 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[7].descriptorCount = 1;
         descriptorWrites[7].pBufferInfo = &lightBufferInfo;
 
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 8, descriptorWrites, 0, NULL);
+        descriptorWrites[8].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[8].dstSet = descriptors[0].sets[i];
+        descriptorWrites[8].dstBinding = 8;
+        descriptorWrites[8].dstArrayElement = 0;
+        descriptorWrites[8].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[8].descriptorCount = 1;
+        descriptorWrites[8].pBufferInfo = &overlaySSBOBufferInfo;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 9, descriptorWrites, 0, NULL);
     }
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VkDescriptorBufferInfo storageBufferInfo = { 0 };
@@ -262,6 +275,11 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         bufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ubos.overlay_objects[i].buffer;
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(OverlayUniformBufferObject);
+
+        VkDescriptorBufferInfo overlaySSBOBufferInfo = { 0 };
+        overlaySSBOBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_ssbo.buffer;
+        overlaySSBOBufferInfo.offset = 0;
+        overlaySSBOBufferInfo.range = sizeof(OverlaySSBO);
 
         VkWriteDescriptorSet descriptorWrites[3] = { 0 };
 
@@ -289,7 +307,15 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         descriptorWrites[2].descriptorCount = 1;
         descriptorWrites[2].pBufferInfo = &bufferInfo;
 
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 3, descriptorWrites, 0, NULL);
+        descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[3].dstSet = descriptors[1].sets[i];
+        descriptorWrites[3].dstBinding = 3;
+        descriptorWrites[3].dstArrayElement = 0;
+        descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[3].descriptorCount = 1;
+        descriptorWrites[3].pBufferInfo = &overlaySSBOBufferInfo;
+
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 4, descriptorWrites, 0, NULL);
     }
 }
 
@@ -338,6 +364,15 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.antialiasing = (uint32_t)g_vupdt_renderer_ref->config.antialiasing;
         ubo.lightssize = g_vupdt_renderer_ref->geometry.lights.size;
         ubo.grid = (uint32_t)g_vupdt_renderer_ref->config.grid;
+        Rectangle viewport_rec = GetViewportRec();
+        Vector2 renderer_dimensions = g_vupdt_renderer_ref->dimensions;
+        Vector2 offset = {
+            viewport_rec.x + (viewport_rec.width / 2.0f) - (renderer_dimensions.x / 2.0f),
+            viewport_rec.y + (viewport_rec.height / 2.0f) - (renderer_dimensions.y / 2.0f)
+        };
+
+        ubo.mouse_x = GetMouseX() - offset.x;
+        ubo.mouse_y = GetMouseY() - offset.y;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 
@@ -353,6 +388,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 
         ubo.mouse_x = GetMouseX() - offset.x;
         ubo.mouse_y = GetMouseY() - offset.y;
+		ubo.image_width = g_vupdt_renderer_ref->dimensions.x;
+		ubo.image_height = g_vupdt_renderer_ref->dimensions.y;
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
     #undef RAYVEC_TO_GLMVEC

@@ -6,6 +6,15 @@
 
 Renderer* g_vinit_renderer_ref = NULL;
 
+BOOL VINIT_OverlaySSBO(VulkanDataBuffer* ssbo) {
+	VUTIL_CreateBuffer(
+		sizeof(OverlaySSBO),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		ssbo);
+	return TRUE;
+}
+
 BOOL VINIT_Lights(VulkanDataBuffer* lights) {
     size_t arrsize = sizeof(PointLight) * g_vinit_renderer_ref->geometry.lights.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
@@ -153,6 +162,12 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
         lightLayoutBinding.descriptorCount = 1;
         lightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+        VkDescriptorSetLayoutBinding overlaySSBOLayoutBinding = { 0 };
+        overlaySSBOLayoutBinding.binding = 8;
+        overlaySSBOLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        overlaySSBOLayoutBinding.descriptorCount = 1;
+        overlaySSBOLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
         VkDescriptorSetLayoutBinding bindings[] = { 
             uboLayoutBinding,
             ssboLayoutBinding,
@@ -161,12 +176,13 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             materialsLayoutBinding,
             bvhLayoutBinding,
             sdfLayoutBinding,
-            lightLayoutBinding
+            lightLayoutBinding,
+			overlaySSBOLayoutBinding
         };
 
         VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 8;
+        layoutInfo.bindingCount = 9;
         layoutInfo.pBindings = bindings;
 
         VkResult result = vkCreateDescriptorSetLayout(
@@ -177,7 +193,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             return FALSE;
         }
 
-        VkDescriptorPoolSize poolSizes[8] = { 0 };
+        VkDescriptorPoolSize poolSizes[9] = { 0 };
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -194,10 +210,12 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
         poolSizes[6].descriptorCount = CPUSWAP_LENGTH;
         poolSizes[7].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[7].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[8].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[8].descriptorCount = CPUSWAP_LENGTH;
 
         VkDescriptorPoolCreateInfo poolInfo = { 0 };
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = 8;
+        poolInfo.poolSizeCount = 9;
         poolInfo.pPoolSizes = poolSizes;
         poolInfo.maxSets = CPUSWAP_LENGTH;
         result = vkCreateDescriptorPool(
@@ -244,15 +262,22 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
         uboLayoutBinding.descriptorCount = 1;
         uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+        VkDescriptorSetLayoutBinding overlaySSBOLayoutBinding = { 0 };
+        overlaySSBOLayoutBinding.binding = 3;
+        overlaySSBOLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        overlaySSBOLayoutBinding.descriptorCount = 1;
+        overlaySSBOLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
         VkDescriptorSetLayoutBinding bindings[] = {
             ssboLayoutBinding,
             imageLayoutBinding,
-            uboLayoutBinding
+            uboLayoutBinding,
+			overlaySSBOLayoutBinding
         };
 
         VkDescriptorSetLayoutCreateInfo layoutInfo = { 0 };
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 3;
+        layoutInfo.bindingCount = 4;
         layoutInfo.pBindings = bindings;
 
         VkResult result = vkCreateDescriptorSetLayout(
@@ -263,17 +288,19 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             return FALSE;
         }
 
-        VkDescriptorPoolSize poolSizes[3] = { 0 };
+        VkDescriptorPoolSize poolSizes[4] = { 0 };
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[0].descriptorCount = CPUSWAP_LENGTH;
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         poolSizes[1].descriptorCount = CPUSWAP_LENGTH;
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[2].descriptorCount = CPUSWAP_LENGTH;
+        poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[3].descriptorCount = CPUSWAP_LENGTH;
 
         VkDescriptorPoolCreateInfo poolInfo = { 0 };
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = 3;
+        poolInfo.poolSizeCount = 4;
         poolInfo.pPoolSizes = poolSizes;
         poolInfo.maxSets = CPUSWAP_LENGTH;
         result = vkCreateDescriptorPool(
@@ -347,6 +374,7 @@ BOOL VINIT_ShaderStorageBuffers(VulkanDataBuffer* ssbo_array) {
 BOOL VINIT_RenderData(VulkanRenderData* renderdata) {
 	if (!VINIT_ShaderStorageBuffers(renderdata->ssbos)) return FALSE;
 	if (!VINIT_UniformBuffers(&(renderdata->ubos))) return FALSE;
+	if (!VINIT_OverlaySSBO(&(renderdata->overlay_ssbo))) return FALSE;
 	if (!VINIT_Descriptors(renderdata->descriptors)) return FALSE;
     return TRUE;
 }

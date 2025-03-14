@@ -7,7 +7,7 @@ struct RayGenerator {
     uint tid;
 };
 
-layout(binding = 0) buffer RayGeneratorSSBOIn {
+layout(binding = 0) readonly buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
 
@@ -16,16 +16,45 @@ layout(binding = 1, rgba8) uniform image2D outputImage;
 layout(binding = 2) uniform OverlayUniformBufferObject {
 	uint mouse_x;
     uint mouse_y;
+	uint image_width;
+	uint image_height;
 } ubo;
+
+layout(binding = 3) buffer OverlaySSBO {
+	uint hovered_tid;
+};
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 void main() {
     RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
-    if (rgIn.tid != 0) {
-        //imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(1.0, 0.0, 0.0, 1.0));
+    if (hovered_tid != -1 && rgIn.tid == hovered_tid) {
+		int radius = 4;
+		int minx = 0;
+		int miny = 0;
+		int maxx = int(rgIn.x);
+		int maxy = int(rgIn.y);
+		if (rgIn.x > radius) minx = int(rgIn.x) - radius;
+		if (rgIn.y > radius) miny = int(rgIn.y) - radius;
+		if (maxx + radius < ubo.image_width) maxx += radius;
+		if (maxy + radius < ubo.image_height) maxy += radius;
+		bool border = false;
+		for (int x = minx; x < maxx; x++) {
+			for (int y = miny; y < maxy; y++) {
+				RayGenerator rg = raygenIn[y*ubo.image_width + x];
+				if (rg.tid != hovered_tid) {
+					border = true;
+				}
+			}
+		}
+		if (border) {
+			imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(1.0, 0.52, 0.0, 1.0));
+		} else {
+			vec4 oldc = imageLoad(outputImage, ivec2(rgIn.x, rgIn.y));
+			imageStore(outputImage, ivec2(rgIn.x, rgIn.y), mix(oldc, vec4(1.0, 0.52, 0.0, 1.0), 0.2));
+		}
     }
     if (abs(rgIn.x - ubo.mouse_x) < 20 && abs(rgIn.y - ubo.mouse_y) < 20) {
-        imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(1.0, 0.0, 0.0, 1.0));
+        //imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(1.0, 0.0, 0.0, 1.0));
     }
 }

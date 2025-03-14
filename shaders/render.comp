@@ -38,6 +38,8 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint antialiasing;
     uint lightssize;
     uint grid;
+	uint mouse_x;
+	uint mouse_y;
 } ubo;
 
 struct RayGenerator {
@@ -126,6 +128,10 @@ layout(set = 0, binding = 7) readonly buffer LightSSBOIn {
     PointLight lightIn[ ];
 };
 
+layout(set = 0, binding = 8) buffer OverlaySSBO {
+	uint hovered_tid;
+};
+
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 bool stack_failure = false;
@@ -197,7 +203,7 @@ bool aabb_intersect(Ray ray, uint node_ind) {
     return true;
 }
 
-Hit raytrace(Ray ray) {
+Hit raytrace(Ray ray, inout uint hit_id) {
     Hit hit;
     hit.distance = -1.0;
     if (ubo.bvhsize == 0) return hit;
@@ -213,6 +219,7 @@ Hit raytrace(Ray ray) {
             if (triangle_intersect(ray, node.left, trihit)) {
                 if (hit.distance == -1.0 || trihit.distance < hit.distance) {
                     hit = trihit;
+					hit_id = node.left;
                 }
             }
         } else if (node.config == 1) {
@@ -238,7 +245,8 @@ bool is_shadowed(Hit hit, PointLight light, vec3 light_direction, float light_di
     Ray ray;
     ray.position = light.position;
     ray.direction = light_direction * -1.0;
-    Hit shit = raytrace(ray);
+	uint dummy_id = 0;
+    Hit shit = raytrace(ray, dummy_id);
     shadowed = shit.distance > 0.0 && shit.distance < light_distance - EPS;
     return shadowed;
 }
@@ -320,7 +328,8 @@ void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
             for (int i = 0; i < bounces; i++) {
                 rray.direction = reflect(rray.direction, rhit.normal);
                 rray.position = rhit.position + (rray.direction * EPS);
-                rhit = raytrace(rray);
+				uint dummy_id = 0;
+                rhit = raytrace(rray, dummy_id);
                 rhit.position = ubo.position + (rray.direction * rhit.distance); // should we keep this in? should this be using ubo.position...
                 PointLight light = default_light();
                 reflectionvals[num_colors] = material.reflection;
@@ -496,14 +505,13 @@ vec3 raycolor(vec2 ray_coordinate, inout uint hit_id) {
     float grid_y_tolerance = 0.0;//0.05 * (dot(normalize(ubo.look), vec3(1.0, 0.0, 0.0)) + 1.0);
     uint num_lights = max(1, ubo.lightssize);
     if (ubo.raytrace != 0) {
-        hit = raytrace(ray);
+        hit = raytrace(ray, hit_id);
         if (ubo.grid > 0 && grid_plane_distance > 0.0 &&
             (hit.distance <= 0.0 || hit.distance > grid_plane_distance) &&
             (fract(grid_plane_point.x) < grid_plane_tolerance + grid_x_tolerance ||
                 fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
             color = vec3(0.5);
         } else if (hit.distance > 0.0) {
-            hit_id = 1;
             PointLight light;
             if (ubo.lighting != 0) {
                 color = vec3(0.0, 0.0, 0.0);
@@ -528,7 +536,6 @@ vec3 raycolor(vec2 ray_coordinate, inout uint hit_id) {
                 fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
             color = vec3(0.5);
         } else if (hit.distance > 0.0) {
-            hit_id = 1;
             color = dshade(hit);
         }
     }
@@ -562,7 +569,7 @@ void main() {
 
 	// calculate ray color
 	vec3 color = vec3(0, 0, 0);
-    uint hit_id = 0;
+    uint hit_id = -1;
 	if (ubo.antialiasing == 0) {
 		color = raycolor(vec2(rgIn.x, rgIn.y), hit_id);
 	} else {
@@ -581,5 +588,10 @@ void main() {
 	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 0.1));
     } else {
 	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
+    }
+	
+	// set mouse hovered id
+    if (rgIn.x == ubo.mouse_x && rgIn.y == ubo.mouse_y) {
+		hovered_tid = hit_id;
     }
 }
