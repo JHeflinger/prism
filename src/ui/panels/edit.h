@@ -8,6 +8,8 @@ void SetEditMaterial(size_t index);
 
 void SetEditLight(size_t index);
 
+void SetEditTriangle(size_t index);
+
 void ConfigureEditPanel(Panel* panel);
 
 #endif

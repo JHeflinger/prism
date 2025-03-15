@@ -9,8 +9,8 @@
 #include <cglm/cglm.h>
 
 typedef uint32_t MaterialID;
-typedef uint64_t TriangleID;
-typedef uint64_t SDFID;
+typedef uint32_t TriangleID;
+typedef uint32_t SDFID;
 typedef uint32_t LightID;
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARRLIST(SDFID);

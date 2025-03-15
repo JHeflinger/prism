@@ -1,20 +1,24 @@
-- pass in mouse coordinates
-- highlight triangle based on previous frame (we can be ok with the 1 frame time lag in exchange for optimal processing speed)
-- 2 outbuffers:
-    - 1 is how many things are selected
-    - 2 are the things that are selected
-- we want to read those from gpu only when we release our click
-
-= create new pipeline
-- updaet that in vinit
-- set up descriptor sets to take in:
-	- mouse pixel position
-	- index framebuffer
-	- image buffer
-^ use this to do hover highlighting
-- then set up new pipeline to output the hovered triangle
-- ^ use this to do select face
-- then figure out doing multiule
+NEXT:
+	- highlight selected face
+	- select multiple faces via holding shift
+	- select all seen faces via dragging box
 
 BUGS:
 	- overlay doesn't work when using a specified resolution?
+	- outputted tid flickers sometimes, only when reflections is turned on
+
+OPTIMIZATION:
+	- when updating resources just update the resources that need to be updated
+	- cache optimization 
+	- textures
+	- condense everything to one buffer
+	- window dimension changes
+	- accelerated sdfs via octtree
+	- paintable textures with physically accurate blending
+
+GENERAL:
+	- implement delete buttons on edit panel
+	- make triangles double sided
+	- rotate triangles
+	- use mouse to move vertices
+	- extrude triangles

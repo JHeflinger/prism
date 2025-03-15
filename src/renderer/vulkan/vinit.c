@@ -9,7 +9,7 @@ Renderer* g_vinit_renderer_ref = NULL;
 BOOL VINIT_OverlaySSBO(VulkanDataBuffer* ssbo) {
 	VUTIL_CreateBuffer(
 		sizeof(OverlaySSBO),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		ssbo);
 	return TRUE;

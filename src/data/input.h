@@ -33,11 +33,15 @@ void UnblockInput();
 
 BOOL InputKeyPressed(InputKey key);
 
+BOOL InputKeyReleased(InputKey key);
+
 BOOL InputKeyDown(InputKey key);
 
 BOOL InputKeyUp(InputKey key);
 
 BOOL InputButtonPressed(InputButton btn);
+
+BOOL InputButtonReleased(InputButton btn);
 
 BOOL InputButtonDown(InputButton btn);
 

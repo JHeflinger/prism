@@ -4,7 +4,8 @@
 
 typedef enum {
     EDIT_MATERIAL,
-    EDIT_LIGHT
+    EDIT_LIGHT,
+    EDIT_SINGLE_TRIANGLE
 } EditType;
 
 size_t g_edit_item_index = 0;
@@ -21,6 +22,12 @@ void SetEditLight(size_t index) {
     g_item_selected = TRUE;
     g_edit_item_index = index;
     g_edit_type = EDIT_LIGHT;
+}
+
+void SetEditTriangle(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_SINGLE_TRIANGLE;
 }
 
 void DrawEditPanel(float width, float height) {
@@ -176,6 +183,79 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor((2*component_width) + 65, -20);
             edited |= UIDragFloat(&(lref->specular[2]), 0.0f, 1.0f, 0.1f, component_width);
             if (edited) UpdateLights();
+            if (UIGetCursor().y + 60 < height) {
+                UISetCursor(UIGetCursor().x, height - 60);
+            }
+            UIMoveCursor((width - 20 - 200) / 2.0f, 0);
+            if (UIButton("Delete", 200)) LOG_WARN("This functionality is not implemented yet");
+        } else if (g_edit_type == EDIT_SINGLE_TRIANGLE) {
+            BOOL edited = FALSE;
+            Triangle* tref = TriangleReference(g_edit_item_index);
+            float component_width = (width - 20 - (3 * 15) - (2 * 10)) / 3.0f;
+            UIMoveCursor((width - 20 - UITextWidth("Edit Face")) / 2.0f, 0);
+            UIDrawText("Edit Face");
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Vertices") / 2) - 10, 0);
+            UIDrawText("Vertices");
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(tref->a[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(tref->a[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(tref->a[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(tref->b[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(tref->b[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(tref->b[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(tref->c[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(tref->c[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(tref->c[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Move Face") / 2) - 10, 0);
+            UIDrawText("Move Face");
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            vec3 old_a = {tref->a[0], tref->a[1], tref->a[2]};
+            edited |= UIDragFloat(&(tref->a[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(tref->a[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(tref->a[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            glm_vec3_sub(tref->a, old_a, old_a);
+            glm_vec3_add(tref->b, old_a, tref->b);
+            glm_vec3_add(tref->c, old_a, tref->c);
+            if (edited) {
+                RecalculateTriangleBB(g_edit_item_index);
+                UpdateTriangles();
+            }
             if (UIGetCursor().y + 60 < height) {
                 UISetCursor(UIGetCursor().x, height - 60);
             }

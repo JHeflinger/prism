@@ -17,6 +17,7 @@ LightID g_light_id = 0;
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
 Rectangle g_viewport_dims = { 0 };
+OverlaySSBO g_exposed_overlay_ssbo = { 0 };
 
 void SetViewportSlice(size_t w, size_t h) {
 	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
@@ -348,6 +349,14 @@ void Render() {
     // wait for and reset rendering fence
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
     if (vkGetFenceStatus(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]) == VK_SUCCESS) {
+        // copy overlay results to host
+        VUTIL_CopyBufferToHost(
+            (void*)(&g_exposed_overlay_ssbo),
+            sizeof(OverlaySSBO),
+            sizeof(OverlaySSBO),
+            g_renderer.vulkan.core.context.renderdata.overlay_ssbo.buffer);
+
+        // reset fences and update swapchain index
         vkResetFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]));
         g_renderer.swapchain.index = new_ind;
         async_update = TRUE;
@@ -436,4 +445,62 @@ void SetViewportRec(Rectangle rec) {
 
 Rectangle GetViewportRec() {
     return g_viewport_dims;
+}
+
+TriangleID HoveredTriangle() {
+    if (g_exposed_overlay_ssbo.hovered_tid == (uint32_t)-1) return (TriangleID)-1;
+    return (TriangleID)g_exposed_overlay_ssbo.hovered_tid;
+}
+
+size_t HoveredTriangleIndex(TriangleID tid) {
+    for (size_t i = 0; i < g_renderer.geometry.tids.size; i++) {
+        if (g_renderer.geometry.tids.data[i] == tid) {
+            return i;
+        }
+    }
+    LOG_FATAL("This triangle does not exist!");
+    return 0;
+}
+
+Triangle* TriangleReference(size_t index) {
+    LOG_ASSERT(index < g_renderer.geometry.triangles.size, "Invalid triangle index requested");
+    return &(g_renderer.geometry.triangles.data[index]);
+}
+
+void RecalculateTriangleBB(size_t index) {
+    LOG_ASSERT(index < g_renderer.geometry.triangles.size, "Invalid triangle index requested");
+    Triangle triangle = g_renderer.geometry.triangles.data[index];
+    TriangleBB bb = {
+        {
+            triangle.a[0] < triangle.b[0] ?
+                (triangle.a[0] < triangle.c[0] ? triangle.a[0] : triangle.c[0]) :
+                (triangle.b[0] < triangle.c[0] ? triangle.b[0] : triangle.c[0]),
+            triangle.a[1] < triangle.b[1] ?
+                (triangle.a[1] < triangle.c[1] ? triangle.a[1] : triangle.c[1]) :
+                (triangle.b[1] < triangle.c[1] ? triangle.b[1] : triangle.c[1]),
+            triangle.a[2] < triangle.b[2] ?
+                (triangle.a[2] < triangle.c[2] ? triangle.a[2] : triangle.c[2]) :
+                (triangle.b[2] < triangle.c[2] ? triangle.b[2] : triangle.c[2])
+        },
+        {
+            triangle.a[0] > triangle.b[0] ?
+                (triangle.a[0] > triangle.c[0] ? triangle.a[0] : triangle.c[0]) :
+                (triangle.b[0] > triangle.c[0] ? triangle.b[0] : triangle.c[0]),
+            triangle.a[1] > triangle.b[1] ?
+                (triangle.a[1] > triangle.c[1] ? triangle.a[1] : triangle.c[1]) :
+                (triangle.b[1] > triangle.c[1] ? triangle.b[1] : triangle.c[1]),
+            triangle.a[2] > triangle.b[2] ?
+                (triangle.a[2] > triangle.c[2] ? triangle.a[2] : triangle.c[2]) :
+                (triangle.b[2] > triangle.c[2] ? triangle.b[2] : triangle.c[2])
+        },
+        { 0, 0, 0 }
+    };
+    bb.centroid[0] = ((bb.max[0] - bb.min[0]) / 2.0f) + bb.min[0];
+    bb.centroid[1] = ((bb.max[1] - bb.min[1]) / 2.0f) + bb.min[1];
+    bb.centroid[2] = ((bb.max[2] - bb.min[2]) / 2.0f) + bb.min[2];
+    g_renderer.geometry.tbbs.data[index] = bb;
+}
+
+void UpdateTriangles() {
+    g_renderer.geometry.changes.update_triangles = TRUE;
 }

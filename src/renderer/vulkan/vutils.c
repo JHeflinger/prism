@@ -29,7 +29,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VUTIL_VulkanDebugCallback(
             pCallbackData->pMessage);
 		exit(1);
     }
-
     return VK_FALSE;
 }
 
@@ -119,6 +118,21 @@ void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize
     memcpy(data, hostdata, size);
     vkUnmapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory);
     VUTIL_CopyBuffer(stagingBuffer.buffer, buffer, buffersize);
+    VUTIL_DestroyBuffer(stagingBuffer);
+}
+
+void VUTIL_CopyBufferToHost(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {
+    VulkanDataBuffer stagingBuffer;
+    VUTIL_CreateBuffer(
+        buffersize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &stagingBuffer);
+    VUTIL_CopyBuffer(buffer, stagingBuffer.buffer, buffersize);
+    void* data;
+    vkMapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory, 0, buffersize, 0, &data);
+    memcpy(hostdata, data, size);
+    vkUnmapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory);
     VUTIL_DestroyBuffer(stagingBuffer);
 }
 
