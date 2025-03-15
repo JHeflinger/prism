@@ -1,5 +1,5 @@
 #include "input.h"
-#include "core/log.h"
+#include <easylogger.h>
 
 InputMap g_input_map = { 0 };
 

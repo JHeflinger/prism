@@ -2,7 +2,6 @@
 #define VUTILS_H
 
 #include "core/file.h"
-#include <vulkan/vulkan.h>
 #include "renderer/vulkan/vstructs.h"
 
 void VUTIL_SetVulkanUtilsContext(Renderer* renderer);

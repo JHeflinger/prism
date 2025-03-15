@@ -133,6 +133,77 @@ def handle():
                                                 print("The implementation for \"" + interm + "\" has an improperly formatted \"{\", please put a space bar character between the function and the curly brace")
                                             vulnerabilities += 1
 
+        # repetitive header audit for headers
+        header_map = dict()
+        for root, dirs, files in os.walk("src"):
+            for file in files:
+                filepath = os.path.join(root, file)
+                if ".h" in filepath:
+                    header_name = filepath[4:].replace('\\', '/')
+                    header_map[header_name] = [set(), set()] # first is primary headers, second are flushed headers
+                    with open(filepath, 'r') as file:
+                        for line in file:
+                            if ("#include " in line):
+                                pinclude = line.strip().replace("#include ", "").replace("\"", "").replace("<", "").replace(">", "")
+                                header_map[header_name][0].add(pinclude)
+        recursive_failure = False
+        for header in list(header_map.keys()):
+            for primary in list(header_map[header][0]):
+                if (primary in header_map.keys()):
+                    def get_in_depth_headers(dive_header, update_header, hmap):
+                        total_v = 0
+                        for secondary in list(hmap[dive_header][0]):
+                            if secondary == update_header:
+                                total_v += 1
+                                print(f"Recursive include detected from src/{update_header} in src/{dive_header}")
+                                return [total_v, True]
+                            hmap[update_header][1].add(secondary)
+                            if secondary in hmap.keys():
+                                res = get_in_depth_headers(secondary, update_header, hmap)
+                                total_v += res[0]
+                                if res[1]:
+                                    return [total_v, True]
+                        return [total_v, False]
+                    result = get_in_depth_headers(primary, header, header_map)
+                    vulnerabilities += result[0]
+                    recursive_failure = result[1]
+                if recursive_failure:
+                    break
+            if recursive_failure:
+                break
+        for header in list(header_map.keys()):
+            for primary in list(header_map[header][0]):
+                if (primary in header_map[header][1]):
+                    vulnerabilities += 1
+                    if (primary not in header_map.keys()):
+                        print(f"Useless include detected from src/{header} - <{primary}> is not needed")
+                    else:
+                        print(f"Useless include detected from src/{header} - src/{primary} is not needed")
+            
+        # repetitive header audit for sources
+        sources_map = dict()
+        for root, dirs, files in os.walk("src"):
+            for file in files:
+                filepath = os.path.join(root, file)
+                if ".c" in filepath:
+                    source_name = filepath[4:].replace('\\', '/')
+                    sources_map[source_name] = set()
+                    with open(filepath, 'r') as file:
+                        for line in file:
+                            if ("#include " in line):
+                                pinclude = line.strip().replace("#include ", "").replace("\"", "").replace("<", "").replace(">", "")
+                                sources_map[source_name].add(pinclude)
+        for source in list(sources_map.keys()):
+            for inc in list(sources_map[source]):
+                hkey = source.replace(".c", ".h")
+                if hkey in header_map.keys():
+                    if inc in header_map[hkey][1]:
+                        vulnerabilities += 1
+                        if (inc not in header_map.keys()):
+                            print(f"Useless include detected from src/{source} - <{inc}> is not needed")
+                        else:
+                            print(f"Useless include detected from src/{source} - src/{inc} is not needed")
+
         quality = "\033[32m"
         if (vulnerabilities > 10):
             quality = "\033[31m"

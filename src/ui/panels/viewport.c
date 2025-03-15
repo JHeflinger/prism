@@ -1,6 +1,6 @@
 #include "viewport.h"
 #include "renderer/renderer.h"
-#include "core/log.h"
+#include <easylogger.h>
 #include "data/input.h"
 #include <rlgl.h>
 
@@ -74,8 +74,8 @@ void ConfigureViewportPanel(Panel* panel) {
     panel->draw = DrawViewportPanel;
     panel->update = UpdateViewportPanel;
     g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
-/*
-    Model model = LoadModel("assets/models/sphere.obj");
+    
+    Model model = LoadModel("assets/models/room.obj");
     LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
     Mesh mesh = model.meshes[0];
     SurfaceMaterial material = {
@@ -119,20 +119,20 @@ void ConfigureViewportPanel(Panel* panel) {
     //SubmitSDF((SDFPrimitive){SDF_SPHERE, {-2.75, 2.75, -2.75}, 1.0f, {0.0, 0.0, 0.0}});
     //SubmitSDF((SDFPrimitive){SDF_SPHERE, {2.75, -2.75, 2.75}, 1.0f, {0.0, 0.0, 0.0}});
     //SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0, 0}, 1.0f, {0.0, 0.0, 0.0}});
-    SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
+    //SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
     //SubmitSDF((SDFPrimitive){SDF_MANDELBULB, {0.0, 0.0, 0.0}, 1.0f});
     //SubmitSDF((SDFPrimitive){SDF_BOX, {0.0, 0.0, -1.2}, 1.0f, {2.0, 2.0, 1.0}});
 
     SubmitLight((PointLight) {
-        {1.0, 1.0, 1.5},
-        {0.5, 0.5, 0.5},
-        {0.5, 0.5, 0.5},
-        {0.5, 0.5, 0.5},
+        {1.5, 0.0, 0.5},
+        {0.1, 0.1, 0.1},
+        {1.0, 0.0, 1.0},
+        {0.0, 1.0, 1.0},
     });
     SubmitLight((PointLight) {
-        {0.5, 1.0, 1.5},
-        {0.5, 0.5, 0.5},
-        {0.5, 0.5, 0.5},
-        {0.5, 0.5, 0.5},
-    });*/
+        {0.0, 1.5, 0.5},
+        {0.1, 0.1, 0.1},
+        {0.0, 1.0, 1.0},
+        {1.0, 1.0, 0.0},
+    });
 }

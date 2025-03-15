@@ -3,7 +3,7 @@
 #include "data/input.h"
 #include "data/colors.h"
 #include "data/assets.h"
-#include "core/log.h"
+#include <easylogger.h>
 #include "ui/ui.h"
 #include "ui/panels/diagnostics.h"
 #include "ui/panels/viewport.h"

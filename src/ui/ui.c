@@ -1,5 +1,5 @@
 #include "ui.h"
-#include "core/log.h"
+#include <easylogger.h>
 #include "data/input.h"
 #include "data/colors.h"
 #include "data/assets.h"

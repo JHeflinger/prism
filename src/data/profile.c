@@ -1,5 +1,5 @@
 #include "profile.h"
-#include "core/log.h"
+#include <easylogger.h>
 #include <raylib.h>
 #include <string.h>
 

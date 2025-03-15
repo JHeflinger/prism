@@ -1,5 +1,5 @@
 #include "file.h"
-#include "core/log.h"
+#include <easylogger.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <easymemory.h>

@@ -1,7 +1,6 @@
 #include "edit.h"
-#include "data/config.h"
 #include "renderer/renderer.h"
-#include "core/log.h"
+#include <easylogger.h>
 
 typedef enum {
     EDIT_MATERIAL,

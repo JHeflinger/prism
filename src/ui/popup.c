@@ -1,7 +1,7 @@
 #include "popup.h"
 #include "data/input.h"
 #include "data/colors.h"
-#include "core/log.h"
+#include <easylogger.h>
 #include "ui/ui.h"
 #include "renderer/renderer.h"
 #include <easymemory.h>

@@ -1,5 +1,5 @@
 #include "colors.h"
-#include "core/log.h"
+#include <easylogger.h>
 
 ColorMap g_color_map = { 0 };
 

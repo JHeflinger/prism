@@ -84,6 +84,9 @@ set SOURCES=!SOURCES! "vendor/EasyObjects/include/easymemory.c"
 :: add EasyThreads vendor
 set INCLUDES=!INCLUDES! -I"vendor/EasyThreads/include"
 
+:: add EasyLogger vendor
+set INCLUDES=!INCLUDES! -I"vendor/EasyLogger/include"
+
 :: add vulkan vendor
 set INCLUDES=!INCLUDES! -I"platform/windows/vulkan/include"
 set LIBS=!LIBS! -L"platform/windows/vulkan/libs"

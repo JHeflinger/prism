@@ -1,5 +1,5 @@
 #include "vinit.h"
-#include "core/log.h"
+#include <easylogger.h>
 #include "renderer/vulkan/vutils.h"
 #include "renderer/vulkan/vupdate.h"
 #include <GLFW/glfw3.h>

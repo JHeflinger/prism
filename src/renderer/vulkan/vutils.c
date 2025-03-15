@@ -1,5 +1,5 @@
 #include "vutils.h"
-#include "core/log.h"
+#include <easylogger.h>
 
 Renderer* g_vutil_renderer_ref = NULL;
 
@@ -21,7 +21,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VUTIL_VulkanDebugCallback(
             LOG_RESET,
             pCallbackData->pMessage);
     } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        LOG_TRACE("%s[FATAL] [VULKAN] [%s]%s %s",
+        printf("%s[FATAL] [VULKAN] [%s]%s %s",
             LOG_RED,
             (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ? "GENERAL" :
                 (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ? "VALIDATION" : "PERFORMANCE")),

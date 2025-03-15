@@ -90,6 +90,9 @@ SOURCES="$SOURCES vendor/EasyObjects/include/easymemory.c"
 # add EasyThreads vendor
 INCLUDES="$INCLUDES -Ivendor/EasyThreads/include"
 
+# add EasyLogger vendor
+INCLUDES="$INCLUDES -Ivendor/EasyLogger/include"
+
 # add cglm vendor
 INCLUDES="$INCLUDES -Ivendor/cglm/include"
 

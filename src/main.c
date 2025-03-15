@@ -1,5 +1,5 @@
 #include "core/editor.h"
-#include "core/log.h"
+#include <easylogger.h>
 #include "renderer/renderer.h"
 
 int main(int argc, char** argv) {

@@ -1,5 +1,5 @@
 #include "rutils.h"
-#include "core/log.h"
+#include <easylogger.h>
 
 #define BVH_LIMIT 0.01f
 

@@ -1,7 +1,6 @@
 #ifndef VINIT_H
 #define VINIT_H
 
-#include "data/config.h"
 #include "renderer/vulkan/vstructs.h"
 
 BOOL VINIT_OverlaySSBO(VulkanDataBuffer* ssbo);

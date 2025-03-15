@@ -4,3 +4,6 @@
 [submodule "vendor/EasyThreads"]
 	path = vendor/EasyThreads
 	url = https://github.com/JHeflinger/EasyThreads
+[submodule "vendor/EasyLogger"]
+	path = vendor/EasyLogger
+	url = https://github.com/JHeflinger/EasyLogger.git
