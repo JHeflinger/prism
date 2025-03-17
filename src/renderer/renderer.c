@@ -5,6 +5,7 @@
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vclean.h"
 #include "renderer/rutils.h"
+#include "renderer/overlay.h"
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
 #include <string.h>
@@ -16,8 +17,6 @@ SDFID g_sdf_id = 0;
 LightID g_light_id = 0;
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
-Rectangle g_viewport_dims = { 0 };
-OverlaySSBO g_exposed_overlay_ssbo = { 0 };
 
 void SetViewportSlice(size_t w, size_t h) {
 	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
@@ -78,6 +77,9 @@ void InitializeRenderer() {
         {0.0f, 0.0f, 0.0f},
         0, 0, 0, 0, 0, 0
     });
+
+    // set overlay context
+    SetOverlayContext(&g_renderer);
 }
 
 void DestroyRenderer() {
@@ -351,7 +353,7 @@ void Render() {
     if (vkGetFenceStatus(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]) == VK_SUCCESS) {
         // copy overlay results to host
         VUTIL_CopyBufferToHost(
-            (void*)(&g_exposed_overlay_ssbo),
+            (void*)(ExposedOverlaySSBO()),
             sizeof(OverlaySSBO),
             sizeof(OverlaySSBO),
             g_renderer.vulkan.core.context.renderdata.overlay_ssbo.buffer);
@@ -437,29 +439,6 @@ RendererConfig* RenderConfig() {
 
 float RenderFrameTime() {
     return g_rft;
-}
-
-void SetViewportRec(Rectangle rec) {
-    g_viewport_dims = rec;
-}
-
-Rectangle GetViewportRec() {
-    return g_viewport_dims;
-}
-
-TriangleID HoveredTriangle() {
-    if (g_exposed_overlay_ssbo.hovered_tid == (uint32_t)-1) return (TriangleID)-1;
-    return (TriangleID)g_exposed_overlay_ssbo.hovered_tid;
-}
-
-size_t HoveredTriangleIndex(TriangleID tid) {
-    for (size_t i = 0; i < g_renderer.geometry.tids.size; i++) {
-        if (g_renderer.geometry.tids.data[i] == tid) {
-            return i;
-        }
-    }
-    LOG_FATAL("This triangle does not exist!");
-    return 0;
 }
 
 Triangle* TriangleReference(size_t index) {

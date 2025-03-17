@@ -18,6 +18,7 @@ layout(binding = 2) uniform OverlayUniformBufferObject {
     uint mouse_y;
 	uint image_width;
 	uint image_height;
+	uint single_selected_tid;
 } ubo;
 
 layout(binding = 3) buffer OverlaySSBO {
@@ -26,9 +27,9 @@ layout(binding = 3) buffer OverlaySSBO {
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-void main() {
+void highlight_triangle(uint htid) {
     RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
-    if (hovered_tid != -1 && rgIn.tid == hovered_tid) {
+    if (htid != -1 && rgIn.tid == htid) {
 		int radius = 4;
 		int minx = 0;
 		int miny = 0;
@@ -42,7 +43,7 @@ void main() {
 		for (int x = minx; x < maxx; x++) {
 			for (int y = miny; y < maxy; y++) {
 				RayGenerator rg = raygenIn[y*ubo.image_width + x];
-				if (rg.tid != hovered_tid) {
+				if (rg.tid != htid) {
 					border = true;
 				}
 			}
@@ -54,7 +55,10 @@ void main() {
 			imageStore(outputImage, ivec2(rgIn.x, rgIn.y), mix(oldc, vec4(1.0, 0.52, 0.0, 1.0), 0.2));
 		}
     }
-    if (abs(rgIn.x - ubo.mouse_x) < 20 && abs(rgIn.y - ubo.mouse_y) < 20) {
-        //imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(1.0, 0.0, 0.0, 1.0));
-    }
+}
+
+void main() {
+    highlight_triangle(hovered_tid);
+	if (hovered_tid != ubo.single_selected_tid)
+		highlight_triangle(ubo.single_selected_tid);
 }

@@ -65,14 +65,6 @@ RendererConfig* RenderConfig();
 
 float RenderFrameTime();
 
-void SetViewportRec(Rectangle rec);
-
-Rectangle GetViewportRec();
-
-TriangleID HoveredTriangle();
-
-size_t HoveredTriangleIndex(TriangleID tid);
-
 Triangle* TriangleReference(size_t index);
 
 void RecalculateTriangleBB(size_t index);

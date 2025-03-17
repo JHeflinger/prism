@@ -6,6 +6,7 @@ NEXT:
 BUGS:
 	- overlay doesn't work when using a specified resolution?
 	- outputted tid flickers sometimes, only when reflections is turned on
+		- actually when anything is turned on, but when turning refelctions off it stops some of the flickering sometimes?
 
 OPTIMIZATION:
 	- when updating resources just update the resources that need to be updated

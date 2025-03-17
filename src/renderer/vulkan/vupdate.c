@@ -4,6 +4,7 @@
 #include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vclean.h"
 #include "renderer/renderer.h"
+#include "renderer/overlay.h"
 
 Renderer* g_vupdt_renderer_ref = NULL;
 
@@ -390,6 +391,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.mouse_y = GetMouseY() - offset.y;
 		ubo.image_width = g_vupdt_renderer_ref->dimensions.x;
 		ubo.image_height = g_vupdt_renderer_ref->dimensions.y;
+        ubo.single_selected_tid = GetSelectedTriangle();
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
     #undef RAYVEC_TO_GLMVEC

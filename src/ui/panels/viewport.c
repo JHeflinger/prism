@@ -1,5 +1,6 @@
 #include "viewport.h"
 #include "renderer/renderer.h"
+#include "renderer/overlay.h"
 #include "data/input.h"
 #include "ui/panels/edit.h"
 #include <easylogger.h>
@@ -71,6 +72,7 @@ void UpdateViewportPanel(float width, float height) {
             TriangleID tid = HoveredTriangle();
             if (tid != (TriangleID)-1) {
                 SetEditTriangle(HoveredTriangleIndex(tid));
+                SetSelectedTriangle(tid);
             }
         }
     }

@@ -4,6 +4,7 @@
 #include "data/colors.h"
 #include "data/assets.h"
 #include "renderer/renderer.h"
+#include "renderer/overlay.h"
 #include <easymemory.h>
 #include <string.h>
 
