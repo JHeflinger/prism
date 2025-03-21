@@ -1,7 +1,10 @@
 NEXT:
-	- highlight selected face
 	- select multiple faces via holding shift
 	- select all seen faces via dragging box
+		- triangles how hold value of if they are selected or not
+		- overlay will just draw selected if the current triangle on the pixel is selected
+		- then we can easily add to this and update this by sending commands to gpu that can do it in O(1) time
+		- for modifying we can then send a modify commmand to gpu that does it and then updates cpu host buffer based on gpu 
 
 BUGS:
 	- overlay doesn't work when using a specified resolution?
