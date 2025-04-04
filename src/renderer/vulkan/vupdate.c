@@ -322,6 +322,16 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
 
 void VUPDT_UniformBuffers(UBOArray* ubos) {
     #define RAYVEC_TO_GLMVEC(gv, rv) { gv[0] = rv.x; gv[1] = rv.y; gv[2] = rv.z; }
+	// relative mouse coords
+    Rectangle viewport_rec = GetViewportRec();
+    Vector2 renderer_dimensions = g_vupdt_renderer_ref->dimensions;
+    Vector2 offset = {
+        viewport_rec.x + (viewport_rec.width / 2.0f) - (GetScreenWidth() / 2.0f),
+        viewport_rec.y + (viewport_rec.height / 2.0f) - (GetScreenHeight() / 2.0f)
+    };
+    uint32_t mx = (GetMouseX() - offset.x) * (renderer_dimensions.x / GetScreenWidth());
+    uint32_t my = (GetMouseY() - offset.y) * (renderer_dimensions.y / GetScreenHeight());
+
     // core uniform buffer
     {
         UniformBufferObject ubo = { 0 };
@@ -365,30 +375,16 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.antialiasing = (uint32_t)g_vupdt_renderer_ref->config.antialiasing;
         ubo.lightssize = g_vupdt_renderer_ref->geometry.lights.size;
         ubo.grid = (uint32_t)g_vupdt_renderer_ref->config.grid;
-        Rectangle viewport_rec = GetViewportRec();
-        Vector2 renderer_dimensions = g_vupdt_renderer_ref->dimensions;
-        Vector2 offset = {
-            viewport_rec.x + (viewport_rec.width / 2.0f) - (renderer_dimensions.x / 2.0f),
-            viewport_rec.y + (viewport_rec.height / 2.0f) - (renderer_dimensions.y / 2.0f)
-        };
-
-        ubo.mouse_x = GetMouseX() - offset.x;
-        ubo.mouse_y = GetMouseY() - offset.y;
+        ubo.mouse_x = mx;
+        ubo.mouse_y = my;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 
     // overlay uniform buffer
     {
         OverlayUniformBufferObject ubo = { 0 };
-        Rectangle viewport_rec = GetViewportRec();
-        Vector2 renderer_dimensions = g_vupdt_renderer_ref->dimensions;
-        Vector2 offset = {
-            viewport_rec.x + (viewport_rec.width / 2.0f) - (renderer_dimensions.x / 2.0f),
-            viewport_rec.y + (viewport_rec.height / 2.0f) - (renderer_dimensions.y / 2.0f)
-        };
-
-        ubo.mouse_x = GetMouseX() - offset.x;
-        ubo.mouse_y = GetMouseY() - offset.y;
+        ubo.mouse_x = mx;
+        ubo.mouse_y = my;
 		ubo.image_width = g_vupdt_renderer_ref->dimensions.x;
 		ubo.image_height = g_vupdt_renderer_ref->dimensions.y;
         ubo.single_selected_tid = GetSelectedTriangle();

@@ -594,4 +594,9 @@ void main() {
     if (rgIn.x == ubo.mouse_x && rgIn.y == ubo.mouse_y) {
 		hovered_tid = hit_id;
     }
+
+	// set hovered id to -1 if out of image bounds
+	if (ubo.mouse_x > ubo.width || ubo.mouse_y > ubo.height) {
+		hovered_tid = -1;
+	}
 }
