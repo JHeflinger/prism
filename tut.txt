@@ -1,0 +1,20 @@
+gcc -c foo.c -o foo.o
+gcc -c bar.c -o bar.o
+gcc main.c foo.o bar.o -o myprogram
+
+echo "Hello, world!" > output.txt
+
+// append
+echo "Another line" >> output.txt
+
+while IFS= read -r line; do
+    echo "Read line: $line"
+done < input.txt
+
+for i in {1..5}; do
+    echo "Line $i" >> output.txt
+done
+
+while IFS= read -r line; do
+    echo "Modified: $line" >> output.txt
+done < input.txt

@@ -6,11 +6,22 @@ if [ ! -d "build" ]; then
 	mkdir "build"
 fi
 
-# create shaders directory if it does not exist
+# create all build directories if it does not exist
 cd build
 if [ ! -d "shaders" ]; then
 	mkdir "shaders"
 fi
+if [ ! -d "cache" ]; then
+	mkdir "cache"
+fi
+if [ ! -d "objects" ]; then
+	mkdir "objects"
+fi
+cd cache
+if [ ! -d "shaders" ]; then
+	mkdir "shaders"
+fi
+cd ..
 cd ..
 
 # compile shaders
@@ -31,6 +42,10 @@ while IFS= read -r file; do
 	fi
 done < <(find "shaders" -type f -name "*.frag")
 while IFS= read -r file; do
+	if [ ! -d "build/cache/$file" ]; then
+		echo -e "Compiling $file..."
+		echo $file >"build/cache/$file"
+	fi
 	glslc $file -o "build/$file.spv"
 	if [ $? -ne 0 ]; then
 		echo -e "Build compute \033[31mfailed\033[0m"
