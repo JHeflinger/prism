@@ -1,6 +1,20 @@
 # audit codebase
 python scripts/help.py audit
 
+# initialize vars for building
+SRC_DIR="src"
+INCLUDES=""
+SOURCES=""
+LIBS=""
+LINKS=""
+
+# production build flags
+PROD=""
+if [ "$1" == "prod" ]; then
+	echo "Optimizing for production build..."
+	PROD="-O3 -DPROD_BUILD"
+fi
+
 # create build directory if it does not exist
 if [ ! -d "build" ]; then
 	mkdir "build"
@@ -59,20 +73,6 @@ mm=$(((elapsed % 3600000) / 60000))
 ss=$(((elapsed % 60000) / 1000))
 cc=$((elapsed % 1000))
 echo -e "\033[32mFinished\033[0m building shaders in ${hh}:${mm}:${ss}.${cc}"
-
-# initialize vars for building
-SRC_DIR="src"
-INCLUDES=""
-SOURCES=""
-LIBS=""
-LINKS=""
-
-# production build flags
-PROD=""
-if [ "$1" == "prod" ]; then
-	echo "Optimizing for production build..."
-	PROD="-O3 -DPROD_BUILD"
-fi
 
 # get src includes and sources
 while IFS= read -r dir; do
