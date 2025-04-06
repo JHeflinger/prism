@@ -3,8 +3,10 @@ python scripts/help.py audit
 
 # initialize vars for building
 SRC_DIR="src"
+CDIR="$(pwd)"
 INCLUDES=""
 SOURCES=""
+OBJECTS=""
 LIBS=""
 LINKS=""
 
@@ -28,59 +30,72 @@ fi
 if [ ! -d "cache" ]; then
 	mkdir "cache"
 fi
-if [ ! -d "objects" ]; then
-	mkdir "objects"
+if [ ! -d "vendor" ]; then
+	mkdir "vendor"
 fi
 cd cache
 if [ ! -d "shaders" ]; then
 	mkdir "shaders"
 fi
+if [ ! -d "src" ]; then
+	mkdir "src"
+fi
 cd ..
 cd ..
 
+# set up cache folders
+find "$SRC_DIR" -type d | while read -r SUBPATH; do
+	REL="${SUBPATH#$CDIR/$SRC_DIR}"
+	DESTDIR="build/cache/$REL"
+	if [ ! -d "$DESTDIR" ]; then
+		mkdir -p "$DESTDIR"
+	fi
+done
+
 # compile shaders
-echo "Building shaders..."
+echo "Compiling shaders..."
 startTime=$(date +%s%N)
+SHADERS_UP_TO_DATE="true"
 while IFS= read -r file; do
-	glslc $file -o "build/$file.spv"
-	if [ $? -ne 0 ]; then
-		echo -e "Building vertex \033[31mfailed\033[0m"
-		exit 1
+	filename=$(basename "$file")
+	if [ ! -f "build/cache/shaders/$filename" ]; then
+		SHADERS_UP_TO_DATE="false"
+		echo "- [$filename]"
+		glslc $file -o "build/shaders/$filename.spv"
+		if [ $? -ne 0 ]; then
+			echo -e "Building shader \033[31mfailed\033[0m"
+			exit 1
+		fi
+		cp $file "build/cache/shaders/$filename"
+	else
+		if ! cmp -s $file "build/cache/shaders/$filename"; then
+			SHADERS_UP_TO_DATE="false"
+			echo "- [$filename]"
+			glslc $file -o "build/shaders/$filename.spv"
+			if [ $? -ne 0 ]; then
+				echo -e "Building shader \033[31mfailed\033[0m"
+				exit 1
+			fi
+			cp $file "build/cache/shaders/$filename"
+		fi
 	fi
-done < <(find "shaders" -type f -name "*.vert")
-while IFS= read -r file; do
-	glslc $file -o "build/$file.spv"
-	if [ $? -ne 0 ]; then
-		echo -e "Build fragment \033[31mfailed\033[0m"
-		exit 1
-	fi
-done < <(find "shaders" -type f -name "*.frag")
-while IFS= read -r file; do
-	if [ ! -d "build/cache/$file" ]; then
-		echo -e "Compiling $file..."
-		echo $file >"build/cache/$file"
-	fi
-	glslc $file -o "build/$file.spv"
-	if [ $? -ne 0 ]; then
-		echo -e "Build compute \033[31mfailed\033[0m"
-		exit 1
-	fi
-done < <(find "shaders" -type f -name "*.comp")
+done < <(find "shaders" -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \))
 endTime=$(date +%s%N)
 elapsed=$(((endTime - startTime) / 1000000))
 hh=$((elapsed / 3600000))
 mm=$(((elapsed % 3600000) / 60000))
 ss=$(((elapsed % 60000) / 1000))
 cc=$((elapsed % 1000))
-echo -e "\033[32mFinished\033[0m building shaders in ${hh}:${mm}:${ss}.${cc}"
+if [ "$SHADERS_UP_TO_DATE" == "true" ]; then
+	echo -e "Shaders are currently \033[32mup to date\033[0m"
+else
+	echo -e "\033[32mFinished\033[0m building shaders in ${hh}:${mm}:${ss}.${cc}"
+fi
 
-# get src includes and sources
+# get includes
 while IFS= read -r dir; do
 	INCLUDES="$INCLUDES -I$dir"
 done < <(find "$SRC_DIR" -type d)
-while IFS= read -r file; do
-	SOURCES="$SOURCES $file"
-done < <(find "$SRC_DIR" -type f -name "*.c")
 
 # add raylib vendor
 INCLUDES="$INCLUDES -Ivendor/raylib/include"
@@ -111,10 +126,66 @@ INCLUDES="$INCLUDES -Ivendor/EasyLogger/include"
 # add cglm vendor
 INCLUDES="$INCLUDES -Ivendor/cglm/include"
 
-# compile
-echo "Building prism..."
+# compile vendor
+if [ ! -z "$SOURCES" ]; then
+	if [ ! -f "build/vendor/vendor.o" ]; then
+		echo "Compiling vendors..."
+		gcc -Wall -Wextra -Wno-unused-parameter -c$SOURCES$INCLUDES$LIBS$LINKS -o build/vendor/vendor.o $PROD
+		if [ $? -ne 0 ]; then
+			echo -e "Building vendors \033[31mfailed\033[0m"
+			exit 1
+		fi
+	fi
+	OBJECTS="$OBJECTS build/vendor/vendor.o"
+fi
+
+# compile obj files
+echo "Compiling sources..."
 startTime=$(date +%s%N)
-gcc -Wall -Wextra -Wno-unused-parameter$SOURCES$INCLUDES$LIBS$LINKS -o build/prism $PROD
+SOURCES_UP_TO_DATE="true"
+FOUND_MAIN="false"
+while IFS= read -r file; do
+	REL="${file#$CDIR/$SRC_DIR}"
+	DESTDIR="build/cache/$REL"
+	filename=$(basename "$file")
+	if [ "$filename" != "main.c" ]; then
+		if [ ! -f $DESTDIR ]; then
+			set SOURCES_UP_TO_DATE="false"
+			echo "- [$filename]"
+			gcc -Wall -Wextra -Wno-unused-parameter -c $file$INCLUDES$LIBS$LINKS -o $DESTDIR.o $PROD
+			if [ $? -ne 0 ]; then
+				echo -e "Building source \"$filename\" \033[31mfailed\033[0m"
+				exit 1
+			fi
+			cp $file $DESTDIR
+		else
+			if ! cmp -s $file $DESTDIR; then
+				set SOURCES_UP_TO_DATE="false"
+				echo "- [$filename]"
+				gcc -Wall -Wextra -Wno-unused-parameter -c $file$INCLUDES$LIBS$LINKS -o $DESTDIR.o $PROD
+				if [ $? -ne 0 ]; then
+					echo -e "Building source \"$filename\" \033[31mfailed\033[0m"
+					exit 1
+				fi
+				cp $file $DESTDIR
+			fi
+		fi
+		OBJECTS="$OBJECTS $DESTDIR.o"
+	else
+		FOUND_MAIN="true"
+	fi
+done < <(find "$SRC_DIR" -type f -name "*.c")
+if [ "$SOURCES_UP_TO_DATE" == "true" ]; then
+	echo -e "Sources are currently \033[32mup to date\033[0m"
+fi
+if [ "$FOUND_MAIN" == "false" ]; then
+	echo -e "\033[31mError\033[0m: unable to compile without a detected \"src/main.c\" file"
+	exit 1
+fi
+
+# compile executable
+echo "Building executable..."
+gcc -Wall -Wextra -Wno-unused-parameter src/main.c$OBJECTS$INCLUDES$LIBS$LINKS -o build/prism $PROD
 if [ $? -ne 0 ]; then
 	echo -e "Build \033[31mFailed\033[0m"
 	exit 1

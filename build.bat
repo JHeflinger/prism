@@ -94,7 +94,7 @@ if %SHADERS_UP_TO_DATE%=="true" (
     echo [32mFinished[0m building shaders in %hh:~1%%time:~2,1%%mm:~1%%time:~2,1%%ss:~1%%time:~8,1%%cc:~1%
 )
 
-:: get src includes and sources
+:: get includes
 for /r %SRC_DIR% %%d in (.) do (
     set INCLUDES=!INCLUDES! -I"%%d"
 )
@@ -193,6 +193,8 @@ if %FOUND_MAIN%=="false" (
     echo [31mError[0m: unable to compile without a detected "src/main.c" file!
     exit /b !ERRORLEVEL!
 )
+
+:: compile executable
 echo Building executable...
 gcc -Wall -Wextra -Wno-unused-parameter src/main.c%OBJECTS%%INCLUDES%%LIBS%%LINKS% -o build/prism.exe %PROD%
 if !ERRORLEVEL! NEQ 0 (
