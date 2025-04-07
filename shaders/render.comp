@@ -9,6 +9,7 @@
 #define SDF_JULIA 1
 #define SDF_MANDELBULB 2
 #define SDF_BOX 3
+#define SDF_CLOUD 4
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
 	vec3 look;
@@ -442,6 +443,8 @@ float sdf(vec3 position) {
             curr_dist = sdf_mandelbulb(prim, position);
         } else if (prim.type == SDF_BOX) {
 			curr_dist = sdf_box(prim, position);
+		} else if (prim.type == SDF_CLOUD) {
+			curr_dist = sdf_sphere(prim, position);
 		}
 		if (!dinit) {
 			dinit = true;

@@ -36,6 +36,7 @@ typedef enum {
     SDF_JULIA = 1,
     SDF_MANDELBULB = 2,
 	SDF_BOX = 3,
+	SDF_CLOUD = 4
 } SDFType;
 
 typedef struct {
