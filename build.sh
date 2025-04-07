@@ -1,6 +1,9 @@
 # audit codebase
 python scripts/help.py audit
 
+# total timing
+t_startTime=$(date +%s%N)
+
 # initialize vars for building
 SRC_DIR="src"
 CDIR="$(pwd)"
@@ -60,22 +63,24 @@ while IFS= read -r file; do
 	filename=$(basename "$file")
 	if [ ! -f "build/cache/shaders/$filename" ]; then
 		SHADERS_UP_TO_DATE="false"
-		echo "- [$filename]"
+		echo -e "- [$filename] \033[33m(compiling...)\033[0m"
 		glslc $file -o "build/shaders/$filename.spv"
 		if [ $? -ne 0 ]; then
 			echo -e "Building shader \033[31mfailed\033[0m"
 			exit 1
 		fi
+		echo -e "\033[1A\033[0K- [$filename] \033[32mOK\033[0m"
 		cp $file "build/cache/shaders/$filename"
 	else
 		if ! cmp -s $file "build/cache/shaders/$filename"; then
 			SHADERS_UP_TO_DATE="false"
-			echo "- [$filename]"
+			echo -e "- [$filename] \033[33m(compiling...)\033[0m"
 			glslc $file -o "build/shaders/$filename.spv"
 			if [ $? -ne 0 ]; then
 				echo -e "Building shader \033[31mfailed\033[0m"
 				exit 1
 			fi
+			echo -e "\033[1A\033[0K- [$filename] \033[32mOK\033[0m"
 			cp $file "build/cache/shaders/$filename"
 		fi
 	fi
@@ -87,7 +92,7 @@ mm=$(((elapsed % 3600000) / 60000))
 ss=$(((elapsed % 60000) / 1000))
 cc=$((elapsed % 1000))
 if [ "$SHADERS_UP_TO_DATE" == "true" ]; then
-	echo -e "Shaders are currently \033[32mup to date\033[0m"
+	echo -e "\033[1A\033[0KShaders are currently \033[32mup to date\033[0m"
 else
 	echo -e "\033[32mFinished\033[0m building shaders in ${hh}:${mm}:${ss}.${cc}"
 fi
@@ -127,6 +132,7 @@ INCLUDES="$INCLUDES -Ivendor/EasyLogger/include"
 INCLUDES="$INCLUDES -Ivendor/cglm/include"
 
 # compile vendor
+startTime=$(date +%s%N)
 if [ ! -z "$SOURCES" ]; then
 	if [ ! -f "build/vendor/vendor.o" ]; then
 		echo "Compiling vendors..."
@@ -135,6 +141,13 @@ if [ ! -z "$SOURCES" ]; then
 			echo -e "Building vendors \033[31mfailed\033[0m"
 			exit 1
 		fi
+		endTime=$(date +%s%N)
+		elapsed=$(((endTime - startTime) / 1000000))
+		hh=$((elapsed / 3600000))
+		mm=$(((elapsed % 3600000) / 60000))
+		ss=$(((elapsed % 60000) / 1000))
+		cc=$((elapsed % 1000))
+		echo -e "\033[32mFinished\033[0m compiling vendors in ${hh}:${mm}:${ss}.${cc}"
 	fi
 	OBJECTS="$OBJECTS build/vendor/vendor.o"
 fi
@@ -150,23 +163,25 @@ while IFS= read -r file; do
 	filename=$(basename "$file")
 	if [ "$filename" != "main.c" ]; then
 		if [ ! -f $DESTDIR ]; then
-			set SOURCES_UP_TO_DATE="false"
-			echo "- [$filename]"
+			SOURCES_UP_TO_DATE="false"
+			echo -e "- [$filename] \033[33m(compiling...)\033[0m"
 			gcc -Wall -Wextra -Wno-unused-parameter -c $file$INCLUDES$LIBS$LINKS -o $DESTDIR.o $PROD
 			if [ $? -ne 0 ]; then
 				echo -e "Building source \"$filename\" \033[31mfailed\033[0m"
 				exit 1
 			fi
+			echo -e "\033[1A\033[0K- [$filename] \033[32mOK\033[0m"
 			cp $file $DESTDIR
 		else
 			if ! cmp -s $file $DESTDIR; then
-				set SOURCES_UP_TO_DATE="false"
-				echo "- [$filename]"
+				SOURCES_UP_TO_DATE="false"
+				echo -e "- [$filename] \033[33m(compiling...)\033[0m"
 				gcc -Wall -Wextra -Wno-unused-parameter -c $file$INCLUDES$LIBS$LINKS -o $DESTDIR.o $PROD
 				if [ $? -ne 0 ]; then
 					echo -e "Building source \"$filename\" \033[31mfailed\033[0m"
 					exit 1
 				fi
+				echo -e "\033[1A\033[0K- [$filename] \033[32mOK\033[0m"
 				cp $file $DESTDIR
 			fi
 		fi
@@ -176,7 +191,15 @@ while IFS= read -r file; do
 	fi
 done < <(find "$SRC_DIR" -type f -name "*.c")
 if [ "$SOURCES_UP_TO_DATE" == "true" ]; then
-	echo -e "Sources are currently \033[32mup to date\033[0m"
+	echo -e "\033[1A\033[0KSources are currently \033[32mup to date\033[0m"
+else
+	endTime=$(date +%s%N)
+	elapsed=$(((endTime - startTime) / 1000000))
+	hh=$((elapsed / 3600000))
+	mm=$(((elapsed % 3600000) / 60000))
+	ss=$(((elapsed % 60000) / 1000))
+	cc=$((elapsed % 1000))
+	echo -e "\033[32mFinished\033[0m compiling sources in ${hh}:${mm}:${ss}.${cc}"
 fi
 if [ "$FOUND_MAIN" == "false" ]; then
 	echo -e "\033[31mError\033[0m: unable to compile without a detected \"src/main.c\" file"
@@ -185,6 +208,7 @@ fi
 
 # compile executable
 echo "Building executable..."
+startTime=$(date +%s%N)
 gcc -Wall -Wextra -Wno-unused-parameter src/main.c$OBJECTS$INCLUDES$LIBS$LINKS -o build/prism $PROD
 if [ $? -ne 0 ]; then
 	echo -e "Build \033[31mFailed\033[0m"
@@ -197,3 +221,10 @@ mm=$(((elapsed % 3600000) / 60000))
 ss=$(((elapsed % 60000) / 1000))
 cc=$((elapsed % 1000))
 echo -e "\033[32mFinished\033[0m building executable in ${hh}:${mm}:${ss}.${cc}"
+endTime=$(date +%s%N)
+elapsed=$(((endTime - t_startTime) / 1000000))
+hh=$((elapsed / 3600000))
+mm=$(((elapsed % 3600000) / 60000))
+ss=$(((elapsed % 60000) / 1000))
+cc=$((elapsed % 1000))
+echo -e "\033[32mFinished\033[0m total build in ${hh}:${mm}:${ss}.${cc}"
