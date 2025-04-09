@@ -137,8 +137,49 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 bool stack_failure = false;
 
-float random(float n) {
-	return fract(sin(n) * 43758.5453123);
+float random(float n) { // from https://iquilezles.org/articles/morenoise/
+	return fract(n*17.0*fract(n*0.3183099));
+}
+
+float noise(in vec3 x) { // from https://iquilezles.org/articles/morenoise/
+    vec3 p = floor(x);
+    vec3 w = fract(x);
+    vec3 u = w*w*w*(w*(w*6.0-15.0)+10.0);
+    float n = p.x + 317.0*p.y + 157.0*p.z;
+    float a = random(n+0.0);
+    float b = random(n+1.0);
+    float c = random(n+317.0);
+    float d = random(n+318.0);
+    float e = random(n+157.0);
+	float f = random(n+158.0);
+    float g = random(n+474.0);
+    float h = random(n+475.0);
+    float k0 =   a;
+    float k1 =   b - a;
+    float k2 =   c - a;
+    float k3 =   e - a;
+    float k4 =   a - b - c + d;
+    float k5 =   a - c - e + g;
+    float k6 =   a - b - e + f;
+    float k7 = - a + b + c - d + e - f - g + h;
+    return -1.0+2.0*(k0 + k1*u.x + k2*u.y + k3*u.z + k4*u.x*u.y + k5*u.y*u.z + k6*u.z*u.x + k7*u.x*u.y*u.z);
+}
+
+float fbm(in vec3 x) { // from https://iquilezles.org/articles/fbm/
+	float f = 2.0;
+    float s = 0.5;
+    float a = 0.0;
+    float b = 0.5;
+	mat3 m3 = mat3(0.00,  0.80,  0.60,
+                  -0.80,  0.36, -0.48,
+                  -0.60, -0.48,  0.64);
+    for(int i = 0; i < 4; i++) {
+		float n = noise(x);
+        a += b*n;
+        b *= s;
+        x = f*m3*x;
+    }
+	return a;
 }
 
 bool cut_viewport(RayGenerator rg) {
@@ -423,6 +464,14 @@ float sdf_box(SDFPrimitive box, vec3 position) {
 	return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
 }
 
+float sdf_cloud(SDFPrimitive cloud, vec3 position) {
+    //return length(sphere.origin - position) - sphere.scale;
+	float sphere = sdf_sphere(cloud, position);
+	float fbmval = 1 * fbm(position / 1.2);
+	float dist = sphere + fbmval;
+    return dist;
+}
+
 float smin(float a, float b, float k) {
     k *= 1.0;
     float r = exp2(-a/k) + exp2(-b/k);
@@ -444,7 +493,7 @@ float sdf(vec3 position) {
         } else if (prim.type == SDF_BOX) {
 			curr_dist = sdf_box(prim, position);
 		} else if (prim.type == SDF_CLOUD) {
-			curr_dist = sdf_sphere(prim, position);
+			curr_dist = sdf_cloud(prim, position);
 		}
 		if (!dinit) {
 			dinit = true;
