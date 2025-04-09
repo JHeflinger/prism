@@ -137,6 +137,10 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 bool stack_failure = false;
 
+float beer(float absorption, float dist) {
+    return exp(-absorption*dist);
+}
+
 float random(float n) { // from https://iquilezles.org/articles/morenoise/
 	return fract(n*17.0*fract(n*0.3183099));
 }
