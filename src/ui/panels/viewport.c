@@ -158,5 +158,5 @@ void ConfigureViewportPanel(Panel* panel) {
 	#endif
 
 	//SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
-	SubmitSDF((SDFPrimitive){SDF_CLOUD, {0.0, 0.0, 1.0}, 0.5f, {0.0, 0.0, 0.0}});
+	//SubmitSDF((SDFPrimitive){SDF_CLOUD, {0.0, 0.0, 2.0}, 2.0f, {0.0, 0.0, 0.0}});
 }

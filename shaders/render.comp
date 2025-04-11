@@ -1,6 +1,8 @@
 #version 450
 
 #define MAX_RECURSIVE_DEPTH 2000
+#define MAX_VOLUME_MARCHES 100
+#define ABSORPTION_COEFFICIENT 0.5
 #define MAX_BOUNCES 1
 #define EPS 0.0001
 #define SDF_LIMIT 0.0001
@@ -305,7 +307,6 @@ vec3 dshade(Hit hit) {
 
 vec3 background_color(Ray ray) {
     return vec3(0.12);
-    //return abs(ray.direction) / 1.0;
 }
 
 vec3 shade(Ray ray, Hit hit, PointLight light) {
@@ -471,7 +472,7 @@ float sdf_box(SDFPrimitive box, vec3 position) {
 float sdf_cloud(SDFPrimitive cloud, vec3 position) {
     //return length(sphere.origin - position) - sphere.scale;
 	float sphere = sdf_sphere(cloud, position);
-	float fbmval = 1 * fbm(position / 1.2);
+	float fbmval = 1 * fbm((position + 2.0 * vec3(ubo.time, 0.0, ubo.time)) / 1.2);
 	float dist = sphere + fbmval;
     return dist;
 }
@@ -519,6 +520,59 @@ vec3 sdf_normal(vec3 position) {
         k.yyx*sdf(position + k.yyx*EPS) + 
         k.yxy*sdf(position + k.yxy*EPS) + 
         k.xxx*sdf(position + k.xxx*EPS));
+}
+
+float light_visibility(Ray ray, float max_dist, int max_steps, float march_size) {
+    float t = 0.0f;
+    float visibility = 1.0f;
+    for(int i = 0; i < max_steps; i++) {                       
+        t += march_size;
+        if(t > max_dist) break;
+
+        vec3 position = ray.position + t*ray.direction;
+        if(sdf(position) < 0.0) {
+            visibility *= beer(ABSORPTION_COEFFICIENT, march_size);
+        }
+    }
+    return visibility;
+}
+
+vec3 vshade(Ray ray, Hit hit) {
+    float visibility = 1.0;
+    const float stepsize = 0.05;
+    const vec3 volume_albedo = vec3(0.8);
+    vec3 vcolor = vec3(0.12);
+    for (uint i = 0; i < MAX_VOLUME_MARCHES; i++) {
+        hit.distance += stepsize;
+        if (hit.distance > 100) break; // do this dynamically or better later
+        vec3 pos = ray.position + (hit.distance * ray.direction);
+        float sdfdist = sdf(pos);
+        if (sdfdist < 0.0) {
+            float prev = visibility;
+            float density = min(abs(sdfdist), 1.0);
+            visibility *= beer(ABSORPTION_COEFFICIENT * density, stepsize);
+            float absorption = prev - visibility;
+            uint num_lights = max(1, ubo.lightssize);
+            for (uint i = 0; i < num_lights; i++) {
+                PointLight light;
+                if (ubo.lightssize > 0) {
+                    light = lightIn[i];
+                } else {
+                    light = default_light();
+                }
+                float ldist = length(light.position - pos);
+                float attenuation = 15.0 / pow(ldist, 1.65);
+                vec3 lcolor = (light.ambient + light.diffuse + light.specular) / 3.0;
+                Ray lray;
+                lray.position = pos;
+                lray.direction = light.position - pos;
+                float lvisibility = light_visibility(lray, ldist, MAX_VOLUME_MARCHES / 4, stepsize * 2);
+                vcolor += absorption * lvisibility * volume_albedo * lcolor * attenuation;
+            }
+        }
+    }
+
+    return vcolor;
 }
 
 Hit raymarch(Ray ray) {
@@ -592,7 +646,8 @@ vec3 raycolor(vec2 ray_coordinate, inout uint hit_id) {
                 fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
             color = vec3(0.5);
         } else if (hit.distance > 0.0) {
-            color = dshade(hit);
+            //color = dshade(hit);
+            color = vshade(ray, hit);
         }
     }
     for (uint i = 0; i < ubo.lightssize; i++)
