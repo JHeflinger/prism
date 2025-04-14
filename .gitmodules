@@ -7,3 +7,6 @@
 [submodule "vendor/EasyLogger"]
 	path = vendor/EasyLogger
 	url = https://github.com/JHeflinger/EasyLogger.git
+[submodule "vendor/EasyC"]
+	path = vendor/EasyC
+	url = https://github.com/JHeflinger/EasyC.git
