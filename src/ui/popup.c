@@ -360,22 +360,22 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 }
 
 Popup* GenerateEmptyPopup() {
-    return EZALLOC(1, sizeof(Popup));
+    return EZ_ALLOC(1, sizeof(Popup));
 }
 
 void CleanPopup(Popup* popup) {
     if (popup->options != 0)
         for (size_t i = 0; i < popup->options; i++)
             CleanPopup(((Popup**)popup->results)[i]);
-    if (popup->options > 0) EZFREE(popup->results);
-    EZFREE(popup);
+    if (popup->options > 0) EZ_FREE(popup->results);
+    EZ_FREE(popup);
 }
 
 Popup* GenerateAddObjectPopup() {
     Popup* popup = GenerateEmptyPopup();
     popup->options = 3;
     popup->behavior = add_object_popup_stage_0;
-    popup->results = EZALLOC(popup->options, sizeof(Popup*));
+    popup->results = EZ_ALLOC(popup->options, sizeof(Popup*));
     PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0};
     for (size_t i = 0; i < popup->options; i++) {
         Popup* next = GenerateEmptyPopup();

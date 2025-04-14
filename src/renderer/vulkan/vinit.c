@@ -48,7 +48,7 @@ BOOL VINIT_Commands(VulkanCommands* commands) {
 		g_vinit_renderer_ref->vulkan.core.general.interface,
 		&poolInfo, NULL, &(commands->pool));
     if (result != VK_SUCCESS) {
-		LOG_FATAL("Failed to create command pool!");
+		EZ_FATAL("Failed to create command pool!");
 		return FALSE;
 	}
 
@@ -63,7 +63,7 @@ BOOL VINIT_Commands(VulkanCommands* commands) {
 		&allocInfo,
 		commands->commands);
     if (result != VK_SUCCESS) {
-		LOG_FATAL("Failed to create command buffer");
+		EZ_FATAL("Failed to create command buffer");
 		return FALSE;
 	}
 
@@ -79,7 +79,7 @@ BOOL VINIT_Syncro(VulkanSyncro* syncro) {
 			g_vinit_renderer_ref->vulkan.core.general.interface,
 			&fenceInfo, NULL, &(syncro->fences[i]));
         if (result != VK_SUCCESS) {
-			LOG_FATAL("Failed to create fence");
+			EZ_FATAL("Failed to create fence");
 			return FALSE;
 		}
     }
@@ -189,7 +189,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             g_vinit_renderer_ref->vulkan.core.general.interface,
             &layoutInfo, NULL, &(descriptors[0].layout));
         if (result != VK_SUCCESS) {
-            LOG_FATAL("Failed to create descriptor set layout!");
+            EZ_FATAL("Failed to create descriptor set layout!");
             return FALSE;
         }
 
@@ -222,7 +222,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             g_vinit_renderer_ref->vulkan.core.general.interface,
             &poolInfo, NULL, &(descriptors[0].pool));
         if (result != VK_SUCCESS) {
-            LOG_FATAL("Failed to create descriptor pool!");
+            EZ_FATAL("Failed to create descriptor pool!");
             return FALSE;
         }
 
@@ -237,7 +237,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             g_vinit_renderer_ref->vulkan.core.general.interface,
             &allocInfo, descriptors[0].sets);
         if (result != VK_SUCCESS) {
-            LOG_FATAL("Failed to create descriptor sets!");
+            EZ_FATAL("Failed to create descriptor sets!");
             return FALSE;
         }
     }
@@ -284,7 +284,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             g_vinit_renderer_ref->vulkan.core.general.interface,
             &layoutInfo, NULL, &(descriptors[1].layout));
         if (result != VK_SUCCESS) {
-            LOG_FATAL("Failed to create descriptor set layout!");
+            EZ_FATAL("Failed to create descriptor set layout!");
             return FALSE;
         }
 
@@ -307,7 +307,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             g_vinit_renderer_ref->vulkan.core.general.interface,
             &poolInfo, NULL, &(descriptors[1].pool));
         if (result != VK_SUCCESS) {
-            LOG_FATAL("Failed to create descriptor pool!");
+            EZ_FATAL("Failed to create descriptor pool!");
             return FALSE;
         }
 
@@ -322,7 +322,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
             g_vinit_renderer_ref->vulkan.core.general.interface,
             &allocInfo, descriptors[1].sets);
         if (result != VK_SUCCESS) {
-            LOG_FATAL("Failed to create descriptor sets!");
+            EZ_FATAL("Failed to create descriptor sets!");
             return FALSE;
         }
     }
@@ -334,7 +334,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
 BOOL VINIT_ShaderStorageBuffers(VulkanDataBuffer* ssbo_array) {
     uint32_t imgw = (uint32_t)g_vinit_renderer_ref->dimensions.x;
     uint32_t imgh = (uint32_t)g_vinit_renderer_ref->dimensions.y;
-    RayGenerator* raygens = EZALLOC(imgw * imgh, sizeof(RayGenerator));
+    RayGenerator* raygens = EZ_ALLOC(imgw * imgh, sizeof(RayGenerator));
     for (uint32_t x = 0; x < imgw; x++) {
         for (uint32_t y = 0; y < imgh; y++) {
             raygens[y*imgw + x].x = x;
@@ -367,7 +367,7 @@ BOOL VINIT_ShaderStorageBuffers(VulkanDataBuffer* ssbo_array) {
 
     vkDestroyBuffer(g_vinit_renderer_ref->vulkan.core.general.interface, stagingBuffer.buffer, NULL);
     vkFreeMemory(g_vinit_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory, NULL);
-    EZFREE(raygens);
+    EZ_FREE(raygens);
     return TRUE;
 }
 
@@ -412,7 +412,7 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
         g_vinit_renderer_ref->vulkan.core.general.interface,
         &(pipelineLayoutInfos[1]), NULL, &(pipeline->layout[1]));
     if (result != VK_SUCCESS) {
-        LOG_FATAL("Failed to create pipeline layout!");
+        EZ_FATAL("Failed to create pipeline layout!");
         return FALSE;
     }
 
@@ -428,7 +428,7 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
         g_vinit_renderer_ref->vulkan.core.general.interface,
         VK_NULL_HANDLE, 2, pipelineInfos, NULL, pipeline->pipeline);
     if (result != VK_SUCCESS) {
-        LOG_FATAL("Failed to create pipeline!");
+        EZ_FATAL("Failed to create pipeline!");
         return FALSE;
     }
 
@@ -544,7 +544,7 @@ BOOL VINIT_Targets(VulkanImage* targets_arr) {
 BOOL VINIT_General(VulkanGeneral* general) {
 	// error check for validation layer support
     if (ENABLE_VK_VALIDATION_LAYERS && !VUTIL_CheckValidationLayerSupport()) {
-		LOG_WARN("Requested validation layers are not available");
+		EZ_WARN("Requested validation layers are not available");
         SUPER_DISABLE_VALIDATION_LAYERS();
 	}
 
@@ -581,7 +581,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
     // create instance
     VkResult result = vkCreateInstance(&createInfo, NULL, &(general->instance));
     if (result != VK_SUCCESS) {
-		LOG_FATAL("Failed to create vulkan instance");
+		EZ_FATAL("Failed to create vulkan instance");
 		return FALSE;
 	}
 
@@ -595,7 +595,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
 		createInfo.pUserData = NULL;
 		PFN_vkCreateDebugUtilsMessengerEXT messenger_extension = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(general->instance, "vkCreateDebugUtilsMessengerEXT");
 		if (messenger_extension == NULL) {
-			LOG_FATAL("Failed to set up debug messenger");
+			EZ_FATAL("Failed to set up debug messenger");
 			return FALSE;
 		}
 		messenger_extension(general->instance, &createInfo, NULL, &(general->messenger));
@@ -605,10 +605,10 @@ BOOL VINIT_General(VulkanGeneral* general) {
 	uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(general->instance, &deviceCount, NULL);
     if (deviceCount == 0) {
-		LOG_FATAL("No devices with vulkan support were found");
+		EZ_FATAL("No devices with vulkan support were found");
 		return FALSE;
 	}
-    VkPhysicalDevice* devices = EZALLOC(deviceCount, sizeof(VkPhysicalDevice));
+    VkPhysicalDevice* devices = EZ_ALLOC(deviceCount, sizeof(VkPhysicalDevice));
     vkEnumeratePhysicalDevices(general->instance, &deviceCount, devices);
     uint32_t score = 0;
     uint32_t ind = 0;
@@ -633,11 +633,11 @@ BOOL VINIT_General(VulkanGeneral* general) {
         }
     }
     if (score == 0) {
-		LOG_FATAL("A suitable GPU could not be found");
+		EZ_FATAL("A suitable GPU could not be found");
 		return FALSE;
 	}
     general->gpu = devices[ind];
-    EZFREE(devices);
+    EZ_FREE(devices);
 
 	// create device interface
 	VulkanFamilyGroup families = VUTIL_FindQueueFamilies(general->gpu);
@@ -665,7 +665,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
     }
     result = vkCreateDevice(general->gpu, &deviceCreateInfo, NULL, &(general->interface));
 	if (result != VK_SUCCESS) {
-		LOG_FATAL("Failed to create logical device");
+		EZ_FATAL("Failed to create logical device");
 		return FALSE;
 	}
 

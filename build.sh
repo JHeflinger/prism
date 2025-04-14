@@ -118,18 +118,14 @@ INCLUDES="$INCLUDES -Ivendor/stb_image/include"
 LINKS="$LINKS -lglfw"
 LINKS="$LINKS -lvulkan"
 
-# add EasyObjects vendor
-INCLUDES="$INCLUDES -Ivendor/EasyObjects/include"
-SOURCES="$SOURCES vendor/EasyObjects/include/easymemory.c"
-
-# add EasyThreads vendor
-INCLUDES="$INCLUDES -Ivendor/EasyThreads/include"
-
-# add EasyLogger vendor
-INCLUDES="$INCLUDES -Ivendor/EasyLogger/include"
-
 # add cglm vendor
 INCLUDES="$INCLUDES -Ivendor/cglm/include"
+
+# add EasyC vendor
+INCLUDES="$INCLUDES -Ivendor/EasyC/include"
+while IFS= read -r file; do
+	SOURCES="$SOURCES $file"
+done < <(find "vendor/EasyC/include" -type f -name "*.c")
 
 # compile vendor
 startTime=$(date +%s%N)

@@ -23,49 +23,49 @@ void UnblockInput() {
 }
 
 BOOL InputKeyPressed(InputKey key) {
-    LOG_ASSERT(key < NUMKEYS, "Invalid key code");
+    EZ_ASSERT(key < NUMKEYS, "Invalid key code");
     if (g_input_map.blocked) return FALSE;
     return IsKeyPressed(g_input_map.keymap[key]);
 }
 
 BOOL InputKeyReleased(InputKey key) {
-    LOG_ASSERT(key < NUMKEYS, "Invalid key code");
+    EZ_ASSERT(key < NUMKEYS, "Invalid key code");
     if (g_input_map.blocked) return FALSE;
     return IsKeyReleased(g_input_map.keymap[key]);
 }
 
 BOOL InputKeyDown(InputKey key) {
-    LOG_ASSERT(key < NUMKEYS, "Invalid key code");
+    EZ_ASSERT(key < NUMKEYS, "Invalid key code");
     if (g_input_map.blocked) return FALSE;
     return IsKeyDown(g_input_map.keymap[key]);
 }
 
 BOOL InputKeyUp(InputKey key) {
-    LOG_ASSERT(key < NUMKEYS, "Invalid key code");
+    EZ_ASSERT(key < NUMKEYS, "Invalid key code");
     if (g_input_map.blocked) return FALSE;
     return IsKeyUp(g_input_map.keymap[key]);
 }
 
 BOOL InputButtonPressed(InputButton btn) {
-    LOG_ASSERT(btn < NUMBTNS, "Invalid button code");
+    EZ_ASSERT(btn < NUMBTNS, "Invalid button code");
     if (g_input_map.blocked) return FALSE;
     return IsMouseButtonPressed(g_input_map.btnmap[btn]);
 }
 
 BOOL InputButtonReleased(InputButton btn) {
-    LOG_ASSERT(btn < NUMBTNS, "Invalid button code");
+    EZ_ASSERT(btn < NUMBTNS, "Invalid button code");
     if (g_input_map.blocked) return FALSE;
     return IsMouseButtonReleased(g_input_map.btnmap[btn]);
 }
 
 BOOL InputButtonDown(InputButton btn) {
-    LOG_ASSERT(btn < NUMBTNS, "Invalid button code");
+    EZ_ASSERT(btn < NUMBTNS, "Invalid button code");
     if (g_input_map.blocked) return FALSE;
     return IsMouseButtonDown(g_input_map.btnmap[btn]);
 }
 
 BOOL InputButtonUp(InputButton btn) {
-    LOG_ASSERT(btn < NUMBTNS, "Invalid button code");
+    EZ_ASSERT(btn < NUMBTNS, "Invalid button code");
     if (g_input_map.blocked) return FALSE;
     return IsMouseButtonUp(g_input_map.btnmap[btn]);
 }

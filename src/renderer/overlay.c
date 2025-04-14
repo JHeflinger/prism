@@ -29,7 +29,7 @@ size_t HoveredTriangleIndex(TriangleID tid) {
             return i;
         }
     }
-    LOG_FATAL("This triangle does not exist!");
+    EZ_FATAL("This triangle does not exist!");
     return 0;
 }
 

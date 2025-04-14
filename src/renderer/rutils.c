@@ -126,7 +126,7 @@ void SplitBVH(ARRLIST_NodeBVH* bvh, size_t index, ARRLIST_TriangleBB* geometry, 
     } else if (right_children.size > 0) {
         CBVH.branch_config = BVH_RIGHT_ONLY;
     } else {
-        LOG_FATAL("This should never happen");
+        EZ_FATAL("This should never happen");
         CBVH.branch_config = BVH_LEAF;
     }
     if (left_children.size > 1) {

@@ -66,7 +66,7 @@ void CleanEditor() {
 void RunEditor() {
     // Record memory status for clean check
     #ifndef PROD_BUILD
-    size_t memcheck = EZALLOCATED();
+    size_t memcheck = EZ_ALLOCATED();
     #endif
 
     // Initialize editor
@@ -90,5 +90,5 @@ void RunEditor() {
     CleanEditor();
 
     // Clean memory check
-    LOG_ASSERT(memcheck == EZALLOCATED(), "Memory cleanup revealed a leak of %d bytes", (int)(EZALLOCATED() - memcheck));
+    EZ_ASSERT(memcheck == EZ_ALLOCATED(), "Memory cleanup revealed a leak of %d bytes", (int)(EZ_ALLOCATED() - memcheck));
 }

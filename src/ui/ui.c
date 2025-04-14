@@ -21,7 +21,7 @@ PersistantUIData* g_active_ui_element = NULL;
 #define NAMEBAR_HEIGHT 25
 
 UI* GenerateUI() {
-    UI* ui = EZALLOC(1, sizeof(UI));
+    UI* ui = EZ_ALLOC(1, sizeof(UI));
     return ui;
 }
 
@@ -31,7 +31,7 @@ void SetupPanel(Panel* panel, const char* name) {
 }
 
 void UpdateUI(UI* ui) {
-    LOG_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
+    EZ_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
     if (ui->left && ui->right) {
         // update further down
         UpdateUI((UI*)(ui->left));
@@ -99,7 +99,7 @@ void UpdateUI(UI* ui) {
 }
 
 void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
-    LOG_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
+    EZ_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
     ui->w = w;
     ui->h = h;
     ui->x = x;
@@ -162,7 +162,7 @@ void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
 }
 
 void DrawPopup(size_t x, size_t y, size_t w, size_t h) {
-    LOG_ASSERT(g_popup != NULL, "Cannot draw a null popup!");
+    EZ_ASSERT(g_popup != NULL, "Cannot draw a null popup!");
     DrawRectangle(x, y, w, h, (Color){ 255, 255, 255, 100 });
     if (g_popup->behavior != NULL) {
         int result = g_popup->behavior(x, y, w, h);
@@ -183,7 +183,7 @@ void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
 }
 
 void PreRenderUI_helper(UI* ui) {
-    LOG_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
+    EZ_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
     if (ui->left && ui->right) {
         PreRenderUI_helper((UI*)(ui->left));
         PreRenderUI_helper((UI*)(ui->right));
@@ -212,7 +212,7 @@ void DestroyUI(UI* ui) {
     if (ui->left) DestroyUI((UI*)ui->left);
     if (ui->right) DestroyUI((UI*)ui->right);
     if (!ui->left && !ui->right) DestroyPanel(&(ui->panel));
-    EZFREE(ui);
+    EZ_FREE(ui);
 }
 
 void DestroyPanel(Panel* panel) {

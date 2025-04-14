@@ -8,7 +8,7 @@ float ProfileResult(Profiler* profiler) {
 }
 
 void ConfigureProfile(Profiler* profiler, const char* name, size_t step) {
-    if (step >= PROFILER_MAX_DATASTREAM) LOG_FATAL("Profiler step size too big");
+    if (step >= PROFILER_MAX_DATASTREAM) EZ_FATAL("Profiler step size too big");
     profiler->name = name;
     profiler->step = step;
 }

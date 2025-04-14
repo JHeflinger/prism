@@ -114,7 +114,7 @@ void DrawEditPanel(float width, float height) {
                     UISetCursor(UIGetCursor().x, height - 60);
                 }
                 UIMoveCursor((width - 20 - 200) / 2.0f, 0);
-                if (UIButton("Delete", 200)) LOG_WARN("This functionality is not implemented yet");
+                if (UIButton("Delete", 200)) EZ_WARN("This functionality is not implemented yet");
             }
         } else if (g_edit_type == EDIT_LIGHT) {
             BOOL edited = FALSE;
@@ -187,7 +187,7 @@ void DrawEditPanel(float width, float height) {
                 UISetCursor(UIGetCursor().x, height - 60);
             }
             UIMoveCursor((width - 20 - 200) / 2.0f, 0);
-            if (UIButton("Delete", 200)) LOG_WARN("This functionality is not implemented yet");
+            if (UIButton("Delete", 200)) EZ_WARN("This functionality is not implemented yet");
         } else if (g_edit_type == EDIT_SINGLE_TRIANGLE) {
             BOOL edited = FALSE;
             Triangle* tref = TriangleReference(g_edit_item_index);
@@ -260,9 +260,9 @@ void DrawEditPanel(float width, float height) {
                 UISetCursor(UIGetCursor().x, height - 60);
             }
             UIMoveCursor((width - 20 - 200) / 2.0f, 0);
-            if (UIButton("Delete", 200)) LOG_WARN("This functionality is not implemented yet");
+            if (UIButton("Delete", 200)) EZ_WARN("This functionality is not implemented yet");
         } else {
-            LOG_FATAL("Unhandled edit type detected");
+            EZ_FATAL("Unhandled edit type detected");
         }
     } else {
         UISetCursor((width - UITextWidth("No Selected Element"))/2.0f, height / 2.0f - 20);

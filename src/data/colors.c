@@ -23,6 +23,6 @@ void InitializeColors() {
 }
 
 Color MappedColor(ColorKey key) {
-    LOG_ASSERT(key < NUMCOLORS, "Invalid color code");
+    EZ_ASSERT(key < NUMCOLORS, "Invalid color code");
     return g_color_map.colors[key];
 }

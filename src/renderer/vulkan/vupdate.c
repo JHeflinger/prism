@@ -57,7 +57,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     VkCommandBufferBeginInfo beginInfo = { 0 };
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     VkResult result = vkBeginCommandBuffer(command, &beginInfo);
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
+    EZ_ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
 
     // trace rays
     {
@@ -124,7 +124,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     // End command
     result = vkEndCommandBuffer(command);
     if (result != VK_SUCCESS) {
-        LOG_FATAL("Failed to record command!");
+        EZ_FATAL("Failed to record command!");
     }
 }
 

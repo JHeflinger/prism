@@ -20,14 +20,14 @@ void DrawDevPanel(float width, float height) {
         else
             ClearWindowState(FLAG_VSYNC_HINT);
     }
-    if (EZALLOCATED() > 1000000000) {
-        UIDrawText("Memory Usage: %.3f GB (%d bytes)", ((float)EZALLOCATED()) / 1000000000, (int)EZALLOCATED());
-    } else if (EZALLOCATED() > 1000000) {
-        UIDrawText("Memory Usage: %.3f MB (%d bytes)", ((float)EZALLOCATED()) / 1000000, (int)EZALLOCATED());
-    } else if (EZALLOCATED() > 1000) {
-        UIDrawText("Memory Usage: %.3f KB (%d bytes)", ((float)EZALLOCATED()) / 1000, (int)EZALLOCATED());
+    if (EZ_ALLOCATED() > 1000000000) {
+        UIDrawText("Memory Usage: %.3f GB (%d bytes)", ((float)EZ_ALLOCATED()) / 1000000000, (int)EZ_ALLOCATED());
+    } else if (EZ_ALLOCATED() > 1000000) {
+        UIDrawText("Memory Usage: %.3f MB (%d bytes)", ((float)EZ_ALLOCATED()) / 1000000, (int)EZ_ALLOCATED());
+    } else if (EZ_ALLOCATED() > 1000) {
+        UIDrawText("Memory Usage: %.3f KB (%d bytes)", ((float)EZ_ALLOCATED()) / 1000, (int)EZ_ALLOCATED());
     } else {
-        UIDrawText("Memory Usage: %d bytes", (int)EZALLOCATED());
+        UIDrawText("Memory Usage: %d bytes", (int)EZ_ALLOCATED());
     }
 
     UIMoveCursor(0, 20.0f);

@@ -61,11 +61,11 @@ void InitializeRenderer() {
 	VUPDT_SetVulkanUpdateContext(&g_renderer);
 	VCLEAN_SetVulkanCleanContext(&g_renderer);
 	BOOL result = VINIT_Vulkan(&(g_renderer.vulkan));
-	LOG_ASSERT(result, "Failed to initialize vulkan");
+	EZ_ASSERT(result, "Failed to initialize vulkan");
 
     // set up cpu swap
 	g_renderer.swapchain.target = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
-	LOG_ASSERT(IsRenderTextureValid(g_renderer.swapchain.target), "Unable to load target texture");
+	EZ_ASSERT(IsRenderTextureValid(g_renderer.swapchain.target), "Unable to load target texture");
 
     // configure stat profiler
     ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 10);
@@ -158,7 +158,7 @@ void RemoveTriangle(TriangleID id) {
         ARRLIST_TriangleBB_remove(&(g_renderer.geometry.tbbs), ind);
         g_renderer.geometry.changes.update_triangles = TRUE;
     } else {
-        LOG_FATAL("Unable to remove nonexistant triangle");
+        EZ_FATAL("Unable to remove nonexistant triangle");
     }
 }
 
@@ -192,7 +192,7 @@ void RemoveSDF(SDFID id) {
         ARRLIST_SDFID_remove(&(g_renderer.geometry.sdfids), ind);
         g_renderer.geometry.changes.update_sdfs = TRUE;
     } else {
-        LOG_FATAL("Unable to remove nonexistant sdf");
+        EZ_FATAL("Unable to remove nonexistant sdf");
     }
 }
 
@@ -225,7 +225,7 @@ void RemoveLight(LightID id) {
         ARRLIST_LightID_remove(&(g_renderer.geometry.lids), ind);
         g_renderer.geometry.changes.update_lights = TRUE;
     } else {
-        LOG_FATAL("Unable to remove nonexistant light");
+        EZ_FATAL("Unable to remove nonexistant light");
     }
 }
 
@@ -345,7 +345,7 @@ void Render() {
         submitInfo.pCommandBuffers = &(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
         submitInfo.signalSemaphoreCount = 0;
         VkResult result = vkQueueSubmit(g_renderer.vulkan.core.scheduler.queue, 1, &submitInfo, g_renderer.vulkan.core.scheduler.syncro.fences[g_renderer.swapchain.index]);
-        LOG_ASSERT(result == VK_SUCCESS, "failed to submit draw command buffer!");
+        EZ_ASSERT(result == VK_SUCCESS, "failed to submit draw command buffer!");
     }
 
     // wait for and reset rendering fence
@@ -408,7 +408,7 @@ size_t NumMaterials() {
 }
 
 SurfaceMaterial* MaterialReference(size_t index) {
-    LOG_ASSERT(index < g_renderer.geometry.materials.size, "Invalid material index requested");
+    EZ_ASSERT(index < g_renderer.geometry.materials.size, "Invalid material index requested");
     return &(g_renderer.geometry.materials.data[index]);
 }
 
@@ -421,7 +421,7 @@ size_t NumLights() {
 }
 
 PointLight* LightReference(size_t index) {
-    LOG_ASSERT(index < g_renderer.geometry.lights.size, "Invalid light index requested");
+    EZ_ASSERT(index < g_renderer.geometry.lights.size, "Invalid light index requested");
     return &(g_renderer.geometry.lights.data[index]);
 }
 
@@ -442,12 +442,12 @@ float RenderFrameTime() {
 }
 
 Triangle* TriangleReference(size_t index) {
-    LOG_ASSERT(index < g_renderer.geometry.triangles.size, "Invalid triangle index requested");
+    EZ_ASSERT(index < g_renderer.geometry.triangles.size, "Invalid triangle index requested");
     return &(g_renderer.geometry.triangles.data[index]);
 }
 
 void RecalculateTriangleBB(size_t index) {
-    LOG_ASSERT(index < g_renderer.geometry.triangles.size, "Invalid triangle index requested");
+    EZ_ASSERT(index < g_renderer.geometry.triangles.size, "Invalid triangle index requested");
     Triangle triangle = g_renderer.geometry.triangles.data[index];
     TriangleBB bb = {
         {

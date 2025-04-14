@@ -12,20 +12,20 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VUTIL_VulkanDebugCallback(
     VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData) {
-    LOG_ASSERT(pUserData == NULL, "User data has not been set up to be handled");
+    EZ_ASSERT(pUserData == NULL, "User data has not been set up to be handled");
     if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        LOG_WARN("%s[VULKAN] [%s]%s %s",
-            LOG_YELLOW,
+        EZ_WARN("%s[VULKAN] [%s]%s %s",
+            EZ_YELLOW,
             (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ? "GENERAL" :
                 (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ? "VALIDATION" : "PERFORMANCE")),
-            LOG_RESET,
+            EZ_RESET,
             pCallbackData->pMessage);
     } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
         printf("%s[FATAL] [VULKAN] [%s]%s %s",
-            LOG_RED,
+            EZ_RED,
             (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ? "GENERAL" :
                 (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ? "VALIDATION" : "PERFORMANCE")),
-            LOG_RESET,
+            EZ_RESET,
             pCallbackData->pMessage);
 		exit(1);
     }
@@ -36,7 +36,7 @@ BOOL VUTIL_CheckValidationLayerSupport() {
     // grab all available layers
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, NULL);
-    VkLayerProperties* availableLayers = EZALLOC(layerCount, sizeof(VkLayerProperties));
+    VkLayerProperties* availableLayers = EZ_ALLOC(layerCount, sizeof(VkLayerProperties));
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers);
 
     // check if layers in validation layers exist in the available layers
@@ -49,18 +49,18 @@ BOOL VUTIL_CheckValidationLayerSupport() {
             }
         }
         if (!layerFound) {
-            EZFREE(availableLayers);
+            EZ_FREE(availableLayers);
             return FALSE;
         }
     }
-    EZFREE(availableLayers);
+    EZ_FREE(availableLayers);
     return TRUE;
 }
 
 BOOL VUTIL_CheckGPUExtensionSupport(VkPhysicalDevice device) {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, NULL);
-    VkExtensionProperties* availableExtensions = EZALLOC(extensionCount, sizeof(VkExtensionProperties));
+    VkExtensionProperties* availableExtensions = EZ_ALLOC(extensionCount, sizeof(VkExtensionProperties));
     vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, availableExtensions);
     for (size_t i = 0; i < g_vutil_renderer_ref->vulkan.metadata.extensions.device.size; i++) {
         BOOL extensionFound = FALSE;
@@ -71,11 +71,11 @@ BOOL VUTIL_CheckGPUExtensionSupport(VkPhysicalDevice device) {
             }
         }
         if (!extensionFound) {
-            EZFREE(availableExtensions);
+            EZ_FREE(availableExtensions);
             return FALSE;
         }
     }
-    EZFREE(availableExtensions);
+    EZ_FREE(availableExtensions);
     return TRUE;
 }
 
@@ -83,7 +83,7 @@ VulkanFamilyGroup VUTIL_FindQueueFamilies(VkPhysicalDevice gpu) {
     VulkanFamilyGroup group = { 0 };
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, NULL);
-    VkQueueFamilyProperties* queueFamilies = EZALLOC(queueFamilyCount, sizeof(VkQueueFamilyProperties));
+    VkQueueFamilyProperties* queueFamilies = EZ_ALLOC(queueFamilyCount, sizeof(VkQueueFamilyProperties));
     vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies);
     for (uint32_t i = 0; i < queueFamilyCount; i++) {
         if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
@@ -91,7 +91,7 @@ VulkanFamilyGroup VUTIL_FindQueueFamilies(VkPhysicalDevice gpu) {
             break;
         }
     }
-    EZFREE(queueFamilies);
+    EZ_FREE(queueFamilies);
     return group;
 }
 
@@ -102,7 +102,7 @@ VkShaderModule VUTIL_CreateShader(SimpleFile* file) {
 	createInfo.pCode = (const uint32_t*)(file->data);
 	VkShaderModule shader;
 	VkResult result = vkCreateShaderModule(g_vutil_renderer_ref->vulkan.core.general.interface, &createInfo, NULL, &shader);
-	LOG_ASSERT(result == VK_SUCCESS, "Failed to create shader module");
+	EZ_ASSERT(result == VK_SUCCESS, "Failed to create shader module");
 	return shader;
 }
 
@@ -222,7 +222,7 @@ void VUTIL_TransitionImageLayout(
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
     } else {
-        LOG_ASSERT(FALSE, "Unsupported layout transition!");
+        EZ_ASSERT(FALSE, "Unsupported layout transition!");
     }
     vkCmdPipelineBarrier(
         commandBuffer,
@@ -245,7 +245,7 @@ void VUTIL_CreateBuffer(
     bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     VkResult result = vkCreateBuffer(g_vutil_renderer_ref->vulkan.core.general.interface, &bufferInfo, NULL, &(buffer->buffer));
-    LOG_ASSERT(result == VK_SUCCESS, "Unable to create buffer");
+    EZ_ASSERT(result == VK_SUCCESS, "Unable to create buffer");
 
     VkMemoryRequirements memRequirements;
     vkGetBufferMemoryRequirements(g_vutil_renderer_ref->vulkan.core.general.interface, buffer->buffer, &memRequirements);
@@ -253,10 +253,10 @@ void VUTIL_CreateBuffer(
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     Schrodingnum memoryType = VUTIL_FindMemoryType(memRequirements.memoryTypeBits, properties);
-    LOG_ASSERT(memoryType.exists, "Unable to find memory for vertex buffer");
+    EZ_ASSERT(memoryType.exists, "Unable to find memory for vertex buffer");
     allocInfo.memoryTypeIndex = memoryType.value;
     result = vkAllocateMemory(g_vutil_renderer_ref->vulkan.core.general.interface, &allocInfo, NULL, &(buffer->memory));
-    LOG_ASSERT(result == VK_SUCCESS, "Unable to allocate memory for buffer");
+    EZ_ASSERT(result == VK_SUCCESS, "Unable to allocate memory for buffer");
 
     vkBindBufferMemory(g_vutil_renderer_ref->vulkan.core.general.interface, buffer->buffer, buffer->memory, 0);
 }
@@ -292,7 +292,7 @@ void VUTIL_CreateImage(
     imageInfo.samples = numSamples;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     VkResult result = vkCreateImage(g_vutil_renderer_ref->vulkan.core.general.interface, &imageInfo, NULL, &(image->image));
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to create image!");
+    EZ_ASSERT(result == VK_SUCCESS, "Failed to create image!");
 
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(g_vutil_renderer_ref->vulkan.core.general.interface, image->image, &memRequirements);
@@ -301,10 +301,10 @@ void VUTIL_CreateImage(
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     Schrodingnum memoryType = VUTIL_FindMemoryType(memRequirements.memoryTypeBits, properties);
-    LOG_ASSERT(memoryType.exists, "Unable to find valid memory type");
+    EZ_ASSERT(memoryType.exists, "Unable to find valid memory type");
     allocInfo.memoryTypeIndex = memoryType.value;
     result = vkAllocateMemory(g_vutil_renderer_ref->vulkan.core.general.interface, &allocInfo, NULL, &(image->memory));
-    LOG_ASSERT(result == VK_SUCCESS, "Failed to allocate image memory!");
+    EZ_ASSERT(result == VK_SUCCESS, "Failed to allocate image memory!");
 
     vkBindImageMemory(g_vutil_renderer_ref->vulkan.core.general.interface, image->image, image->memory, 0);
     
@@ -320,5 +320,5 @@ void VUTIL_CreateImage(
     viewInfo.subresourceRange.layerCount = 1;
 
     result = vkCreateImageView(g_vutil_renderer_ref->vulkan.core.general.interface, &viewInfo, NULL, &(image->view));
-    LOG_ASSERT(result == VK_SUCCESS, "failed to create texture image view!");
+    EZ_ASSERT(result == VK_SUCCESS, "failed to create texture image view!");
 }
