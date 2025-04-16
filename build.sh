@@ -132,7 +132,8 @@ startTime=$(date +%s%N)
 if [ ! -z "$SOURCES" ]; then
 	if [ ! -f "build/vendor/vendor.o" ]; then
 		echo "Compiling vendors..."
-		gcc -Wall -Wextra -Wno-unused-parameter -c$SOURCES$INCLUDES$LIBS$LINKS -o build/vendor/vendor.o $PROD
+		echo "${SOURCES:1}" | tr ' ' '\n' | sed 's|^|#include "../../|; s|$|"|' >build/vendor/merged_vendors.c
+		gcc -Wall -Wextra -Wno-unused-parameter -c build/vendor/merged_vendors.c$INCLUDES$LIBS$LINKS -o build/vendor/vendor.o $PROD
 		if [ $? -ne 0 ]; then
 			echo -e "Building vendors \033[31mfailed\033[0m"
 			exit 1
