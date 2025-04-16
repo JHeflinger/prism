@@ -112,16 +112,6 @@ set LIBS=!LIBS! -L"vendor/raylib/lib"
 :: add stb_image vendor
 set INCLUDES=!INCLUDES! -I"vendor/stb_image/include"
 
-:: add EasyObjects vendor
-set INCLUDES=!INCLUDES! -I"vendor/EasyObjects/include"
-set SOURCES=!SOURCES! "vendor/EasyObjects/include/easymemory.c"
-
-:: add EasyThreads vendor
-set INCLUDES=!INCLUDES! -I"vendor/EasyThreads/include"
-
-:: add EasyLogger vendor
-set INCLUDES=!INCLUDES! -I"vendor/EasyLogger/include"
-
 :: add vulkan vendor
 set INCLUDES=!INCLUDES! -I"platform/windows/vulkan/include"
 set LIBS=!LIBS! -L"platform/windows/vulkan/libs"
@@ -142,12 +132,24 @@ set LINKS=!LINKS! -lws2_32
 :: add cglm vendor
 set INCLUDES=!INCLUDES! -I"vendor/cglm/include"
 
+:: EasyC vendor
+set INCLUDES=!INCLUDES! -I"vendor/EasyC/include"
+for /r "vendor/EasyC/include" %%f in (*.c) do (
+	set SOURCES=!SOURCES! %%f
+)
+
 :: compile vendor
 set "startTime=%time: =0%"
 if defined SOURCES (
     if NOT exist "build\vendor\vendor.o" (
         echo Compiling vendors...
-        gcc -Wall -Wextra -Wno-unused-parameter -c%SOURCES%%INCLUDES%%LIBS%%LINKS% -o build/vendor/vendor.o %PROD%
+		type nul > "build/vendor/merged_vendors.c"
+		for %%f in (!SOURCES!) do (
+			set "fp=%%f"
+			set "fp=!fp:\=/!"
+			echo #include "../../!fp!" >> "build/vendor/merged_vendors.c"
+		)
+        gcc -Wall -Wextra -Wno-unused-parameter -c build/vendor/merged_vendors.c%INCLUDES%%LIBS%%LINKS% -o build/vendor/vendor.o %PROD%
         if !ERRORLEVEL! NEQ 0 (
             echo Building vendors [31mFailed[0m with error code !ERRORLEVEL!
             exit /b !ERRORLEVEL!
