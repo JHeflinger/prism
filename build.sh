@@ -149,6 +149,53 @@ if [ ! -z "$SOURCES" ]; then
 	OBJECTS="$OBJECTS build/vendor/vendor.o"
 fi
 
+# confirm header files
+echo "Checking dependency tree..."
+CHANGED_HEADERS=""
+startTime=$(date +%s%N)
+while IFS= read -r file; do
+	REL="${file#$CDIR/$SRC_DIR}"
+	DESTDIR="build/cache/$REL"
+	filename=$(basename "$file")
+	if [ ! -f $DESTDIR ]; then
+		CHANGED_HEADERS="$CHANGED_HEADERS $filename"
+		cp $file $DESTDIR
+	else
+		if ! cmp -s $file $DESTDIR; then
+			CHANGED_HEADERS="$CHANGED_HEADERS $filename"
+			cp $file $DESTDIR
+		fi
+	fi
+done < <(find "$SRC_DIR" -type f -name "*.h")
+if [ "$CHANGED_HEADERS" == "" ]; then
+	echo -e "\033[1A\033[0KHeaders are currently \033[32mup to date\033[0m"
+else
+	loopbreak="FALSE"
+	while [ "$loopbreak" != "TRUE" ]; do
+		loopbreak="TRUE"
+		while IFS= read -r file; do
+			REL="${file#$CDIR/$SRC_DIR}"
+			DESTDIR="build/cache/$REL"
+			filename=$(basename "$file")
+			if ! [[ "$CHANGED_HEADERS" == *" $filename "* || "$CHANGED_HEADERS" == *" $filename" ]]; then
+				for header in $CHANGED_HEADERS; do
+					if (grep -q "#include.*$header" "$DESTDIR"); then
+						CHANGED_HEADERS="$CHANGED_HEADERS $filename"
+						loopbreak="FALSE"
+					fi
+				done
+			fi
+		done < <(find "$SRC_DIR" -type f -name "*.h")
+	done
+	endTime=$(date +%s%N)
+	elapsed=$(((endTime - startTime) / 1000000))
+	hh=$((elapsed / 3600000))
+	mm=$(((elapsed % 3600000) / 60000))
+	ss=$(((elapsed % 60000) / 1000))
+	cc=$((elapsed % 1000))
+	echo -e "\033[32mFinished\033[0m tracing dependencies in ${hh}:${mm}:${ss}.${cc}"
+fi
+
 # compile obj files
 echo "Compiling sources..."
 startTime=$(date +%s%N)
@@ -159,6 +206,14 @@ while IFS= read -r file; do
 	DESTDIR="build/cache/$REL"
 	filename=$(basename "$file")
 	if [ "$filename" != "main.c" ]; then
+		if [ -f $DESTDIR ]; then
+			for header in $CHANGED_HEADERS; do
+				if (grep -q "#include.*$header" "$DESTDIR"); then
+					rm $DESTDIR
+					break
+				fi
+			done
+		fi
 		if [ ! -f $DESTDIR ]; then
 			SOURCES_UP_TO_DATE="false"
 			echo -e "- [$filename] \033[33m(compiling...)\033[0m"
