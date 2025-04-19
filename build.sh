@@ -1,6 +1,3 @@
-# audit codebase
-python scripts/help.py audit
-
 # create all build directories if it does not exist
 if [ ! -d "build" ]; then
 	mkdir "build"

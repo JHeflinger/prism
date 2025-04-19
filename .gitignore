@@ -4,3 +4,4 @@ bazel-*
 MODULE.bazel
 build
 *buddha.obj
+.scache/*
