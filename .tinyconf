@@ -1,0 +1,15 @@
+PROJECT src
+MAIN main.c
+INCLUDE vendor/raylib/include
+INCLUDE vendor/stb_image/include
+INCLUDE vendor/cglm/include
+INCLUDE vendor/EasyC/include
+LINK vulkan
+LINK glfw
+LINK GLU
+LINK GL
+LINK pthread
+LINK m
+LINK :linux_amdx64_libraylib.a
+LIB vendor/raylib/lib
+SOURCE vendor/EasyC/include
