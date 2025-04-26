@@ -96,7 +96,7 @@ void ConfigureViewportPanel(Panel* panel) {
 	#ifdef PRELOAD
 
     Model model = LoadModel("assets/models/room.obj");
-    LOG_ASSERT(model.meshCount != 0, "Failed to load model!");
+    EZ_ASSERT(model.meshCount != 0, "Failed to load model!");
     Mesh mesh = model.meshes[0];
     SurfaceMaterial material = {
         { 1.0f, 1.0f, 1.0f },
