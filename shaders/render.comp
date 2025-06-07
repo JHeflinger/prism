@@ -646,8 +646,8 @@ vec3 raycolor(vec2 ray_coordinate, inout uint hit_id) {
                 fract(grid_plane_point.y) < grid_plane_tolerance + grid_y_tolerance)) {
             color = vec3(0.5);
         } else if (hit.distance > 0.0) {
-            //color = dshade(hit);
-            color = vshade(ray, hit);
+            color = dshade(hit);
+            //color = vshade(ray, hit);
         }
     }
     for (uint i = 0; i < ubo.lightssize; i++)
