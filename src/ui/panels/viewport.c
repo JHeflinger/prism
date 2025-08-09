@@ -92,7 +92,7 @@ void ConfigureViewportPanel(Panel* panel) {
     panel->update = UpdateViewportPanel;
     g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
 
-	//#define PRELOAD
+	#define PRELOAD
 	#ifdef PRELOAD
 
     Model model = LoadModel("assets/models/room.obj");
@@ -135,13 +135,6 @@ void ConfigureViewportPanel(Panel* panel) {
     }
     UnloadModel(model);
 
-    // submit some sdfs
-    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {-2.75, 2.75, -2.75}, 1.0f, {0.0, 0.0, 0.0}});
-    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {2.75, -2.75, 2.75}, 1.0f, {0.0, 0.0, 0.0}});
-    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0, 0}, 1.0f, {0.0, 0.0, 0.0}});
-    //SubmitSDF((SDFPrimitive){SDF_MANDELBULB, {0.0, 0.0, 0.0}, 1.0f});
-    //SubmitSDF((SDFPrimitive){SDF_BOX, {0.0, 0.0, -1.2}, 1.0f, {2.0, 2.0, 1.0}});
-
     SubmitLight((PointLight) {
         {1.5, 0.0, 0.5},
         {0.1, 0.1, 0.1},
@@ -157,6 +150,12 @@ void ConfigureViewportPanel(Panel* panel) {
 
 	#endif
 
-	SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
+    // submit some sdfs
+    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {-2.75, 2.75, -2.75}, 1.0f, {0.0, 0.0, 0.0}});
+    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {2.75, -2.75, 2.75}, 1.0f, {0.0, 0.0, 0.0}});
+    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0, 0}, 1.0f, {0.0, 0.0, 0.0}});
+    //SubmitSDF((SDFPrimitive){SDF_MANDELBULB, {0.0, 0.0, 0.0}, 1.0f});
+    //SubmitSDF((SDFPrimitive){SDF_BOX, {0.0, 0.0, -1.2}, 1.0f, {2.0, 2.0, 1.0}});
+	//SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
 	//SubmitSDF((SDFPrimitive){SDF_CLOUD, {0.0, 0.0, 2.0}, 2.0f, {0.0, 0.0, 0.0}});
 }

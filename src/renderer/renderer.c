@@ -37,7 +37,7 @@ void InitializeRenderer() {
 	g_renderer.config.shadows = TRUE;
 	g_renderer.config.reflections = TRUE;
 	g_renderer.config.lighting = TRUE;
-	g_renderer.config.raytrace = FALSE;
+	g_renderer.config.raytrace = TRUE;
 	g_renderer.config.sdf = !g_renderer.config.raytrace;
     g_renderer.config.sdfsmooth = 0.0f;
     g_renderer.config.maxmarches = 100;
