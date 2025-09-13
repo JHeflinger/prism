@@ -165,4 +165,8 @@ typedef struct {
     RendererConfig config;
 } Renderer;
 
+typedef struct {
+
+} VulkanShader;
+
 #endif

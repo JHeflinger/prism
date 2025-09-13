@@ -154,8 +154,8 @@ void ConfigureViewportPanel(Panel* panel) {
     //SubmitSDF((SDFPrimitive){SDF_SPHERE, {-2.75, 2.75, -2.75}, 1.0f, {0.0, 0.0, 0.0}});
     //SubmitSDF((SDFPrimitive){SDF_SPHERE, {2.75, -2.75, 2.75}, 1.0f, {0.0, 0.0, 0.0}});
     //SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0, 0}, 1.0f, {0.0, 0.0, 0.0}});
-    SubmitSDF((SDFPrimitive){SDF_MANDELBULB, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
+    //SubmitSDF((SDFPrimitive){SDF_MANDELBULB, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
     //SubmitSDF((SDFPrimitive){SDF_BOX, {0.0, 0.0, -1.2}, 1.0f, {2.0, 2.0, 1.0}});
-	//SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
+	SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
 	//SubmitSDF((SDFPrimitive){SDF_CLOUD, {0.0, 0.0, 2.0}, 2.0f, {0.0, 0.0, 0.0}});
 }

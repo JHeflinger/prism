@@ -282,7 +282,7 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
         overlaySSBOBufferInfo.offset = 0;
         overlaySSBOBufferInfo.range = sizeof(OverlaySSBO);
 
-        VkWriteDescriptorSet descriptorWrites[3] = { 0 };
+        VkWriteDescriptorSet descriptorWrites[4] = { 0 };
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptors[1].sets[i];

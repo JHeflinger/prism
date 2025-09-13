@@ -408,7 +408,7 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
     VkResult result = vkCreatePipelineLayout(
         g_vinit_renderer_ref->vulkan.core.general.interface,
         &(pipelineLayoutInfos[0]), NULL, &(pipeline->layout[0]));
-	result |= vkCreatePipelineLayout(
+	result &= vkCreatePipelineLayout(
         g_vinit_renderer_ref->vulkan.core.general.interface,
         &(pipelineLayoutInfos[1]), NULL, &(pipeline->layout[1]));
     if (result != VK_SUCCESS) {
