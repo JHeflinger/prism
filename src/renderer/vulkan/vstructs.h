@@ -165,8 +165,22 @@ typedef struct {
     RendererConfig config;
 } Renderer;
 
-typedef struct {
+typedef enum {
+	UNIFORM_BUFFER = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	STORAGE_BUFFER = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+	STORAGE_IMAGE = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+} VulkanVariableType;
 
+typedef struct {
+// descriptor type
+// 
+} VulkanBoundVariable;
+
+DECLARE_ARRLIST(VulkanBoundVariable);
+
+typedef struct {
+// filename
+// bound variables
 } VulkanShader;
 
 DECLARE_ARRLIST(VulkanShader);
