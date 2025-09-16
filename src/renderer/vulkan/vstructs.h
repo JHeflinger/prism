@@ -169,4 +169,6 @@ typedef struct {
 
 } VulkanShader;
 
+DECLARE_ARRLIST(VulkanShader);
+
 #endif
