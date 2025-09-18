@@ -130,8 +130,35 @@ typedef struct {
     VulkanImage image;
 } VulkanTarget;
 
+typedef enum {
+	UNIFORM_BUFFER = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	STORAGE_BUFFER = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+	STORAGE_IMAGE = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+} VulkanVariableType;
+
+typedef struct {
+	BOOL reference;
+	void* value;
+} SchrodingRef;
+
+typedef struct {
+	VulkanVariableType type;
+	SchrodingRef data;
+	SchrodingRef size;
+} VulkanBoundVariable;
+
+DECLARE_ARRLIST(VulkanBoundVariable);
+
+typedef struct {
+	const char* filename;
+	ARRLIST_VulkanBoundVariable variables;
+} VulkanShader;
+
+DECLARE_ARRLIST(VulkanShader);
+
 typedef struct {
     VulkanGeneral general;
+	ARRLIST_VulkanShader shaders;
     VulkanGeometry geometry;
     VulkanRenderContext context;
     VulkanDataBuffer bridge;
@@ -164,25 +191,5 @@ typedef struct {
     Vector2 viewport;
     RendererConfig config;
 } Renderer;
-
-typedef enum {
-	UNIFORM_BUFFER = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-	STORAGE_BUFFER = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-	STORAGE_IMAGE = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-} VulkanVariableType;
-
-typedef struct {
-// descriptor type
-// 
-} VulkanBoundVariable;
-
-DECLARE_ARRLIST(VulkanBoundVariable);
-
-typedef struct {
-// filename
-// bound variables
-} VulkanShader;
-
-DECLARE_ARRLIST(VulkanShader);
 
 #endif
