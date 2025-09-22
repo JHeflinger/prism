@@ -1,4 +1,4 @@
 #include "vstructs.h"
 
-IMPL_ARRLIST(VulkanShader);
+IMPL_ARRLIST_NAMED(VulkanShaderPtr, VulkanShader*);
 IMPL_ARRLIST(VulkanBoundVariable);

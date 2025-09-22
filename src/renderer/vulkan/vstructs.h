@@ -154,11 +154,11 @@ typedef struct {
 	ARRLIST_VulkanBoundVariable variables;
 } VulkanShader;
 
-DECLARE_ARRLIST(VulkanShader);
+DECLARE_ARRLIST_NAMED(VulkanShaderPtr, VulkanShader*);
 
 typedef struct {
     VulkanGeneral general;
-	ARRLIST_VulkanShader shaders;
+	ARRLIST_VulkanShaderPtr shaders;
     VulkanGeometry geometry;
     VulkanRenderContext context;
     VulkanDataBuffer bridge;

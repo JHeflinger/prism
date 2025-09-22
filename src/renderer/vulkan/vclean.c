@@ -3,6 +3,10 @@
 
 Renderer* g_vlcean_renderer_ref = NULL;
 
+void VCLEAN_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
+	ARRLIST_VulkanShaderPtr_clear(shaders);
+}
+
 void VCLEAN_Lights(VulkanDataBuffer* lights) {
     VUTIL_DestroyBuffer(*lights);
 }
@@ -89,6 +93,7 @@ void VCLEAN_Scheduler(VulkanScheduler* scheduler) {
 }
 
 void VCLEAN_Core(VulkanCore* core) {
+	VCLEAN_Shaders(&(core->shaders));
     VCLEAN_Geometry(&(core->geometry));
     VCLEAN_Bridge(&(core->bridge));
     VCLEAN_Scheduler(&(core->scheduler));

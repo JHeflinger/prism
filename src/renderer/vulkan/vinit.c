@@ -6,6 +6,14 @@
 
 Renderer* g_vinit_renderer_ref = NULL;
 
+BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
+	VulkanShader* render_shader = NULL;
+	VulkanShader* overlay_shader = NULL;
+	ARRLIST_VulkanShaderPtr_add(shaders, render_shader);
+	ARRLIST_VulkanShaderPtr_add(shaders, overlay_shader);
+	return TRUE;
+}
+
 BOOL VINIT_OverlaySSBO(VulkanDataBuffer* ssbo) {
 	VUTIL_CreateBuffer(
 		sizeof(OverlaySSBO),
@@ -702,6 +710,7 @@ BOOL VINIT_Metadata(VulkanMetadata* metadata) {
 }
 
 BOOL VINIT_Core(VulkanCore* core) {
+	if (!VINIT_Shaders(&(core->shaders))) return FALSE;
 	if (!VINIT_General(&(core->general))) return FALSE;
 	if (!VINIT_Geometry(&(core->geometry))) return FALSE;
 	if (!VINIT_Scheduler(&(core->scheduler))) return FALSE;

@@ -3,6 +3,8 @@
 
 #include "renderer/vulkan/vstructs.h"
 
+BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders);
+
 BOOL VINIT_OverlaySSBO(VulkanDataBuffer* ssbo);
 
 BOOL VINIT_Lights(VulkanDataBuffer* lights);
