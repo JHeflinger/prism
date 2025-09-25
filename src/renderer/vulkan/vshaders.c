@@ -6,7 +6,7 @@ ARRLIST_VulkanShaderPtr* GenerateDefaultShaders() {
 	
 	// render shader
 	VulkanShader* rShader = EZ_ALLOC(1, sizeof(VulkanShader));	
-	rShader.filename = "build/shaders/"
+	rShader->filename = "build/shaders/render.comp.spv";
 
 	// overlay shader
 	VulkanShader* oShader = EZ_ALLOC(1, sizeof(VulkanShader));

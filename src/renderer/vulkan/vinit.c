@@ -561,7 +561,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Prism Renderer";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.pEngineName = "No Engine";
+    appInfo.pEngineName = "Prism Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
 
@@ -620,6 +620,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
     vkEnumeratePhysicalDevices(general->instance, &deviceCount, devices);
     uint32_t score = 0;
     uint32_t ind = 0;
+    VkPhysicalDeviceProperties deviceProperties;
     for (uint32_t i = 0; i < deviceCount; i++) {
         // check if device is suitable
         VulkanFamilyGroup families = VUTIL_FindQueueFamilies(devices[i]);
@@ -627,7 +628,6 @@ BOOL VINIT_General(VulkanGeneral* general) {
         if (!VUTIL_CheckGPUExtensionSupport(devices[i])) continue;
 
         uint32_t curr_score = 0;
-        VkPhysicalDeviceProperties deviceProperties;
         VkPhysicalDeviceFeatures deviceFeatures;
         vkGetPhysicalDeviceProperties(devices[i], &deviceProperties);
         vkGetPhysicalDeviceFeatures(devices[i], &deviceFeatures);
@@ -644,6 +644,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
 		EZ_FATAL("A suitable GPU could not be found");
 		return FALSE;
 	}
+	strcpy(general->gpuname, deviceProperties.deviceName);
     general->gpu = devices[ind];
     EZ_FREE(devices);
 

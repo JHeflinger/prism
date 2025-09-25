@@ -81,6 +81,7 @@ typedef struct {
     VkInstance instance;
     VkPhysicalDevice gpu;
     VkDevice interface;
+	char gpuname[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE];
 } VulkanGeneral;
 
 typedef struct {

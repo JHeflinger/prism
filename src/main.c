@@ -1,8 +1,10 @@
 #include "core/editor.h"
 #include <easylogger.h>
 #include "renderer/renderer.h"
+#include "test/test.h"
 
 int main(int argc, char** argv) {
+	#ifndef TEST_SUITE
 	if (argc == 3) {
 		int rx = atoi(argv[1]);
 		int ry = atoi(argv[2]);
@@ -11,5 +13,8 @@ int main(int argc, char** argv) {
 	}
     RunEditor();
     EZ_INFO("See you, Space Cowboy");
+	#else
+	Test();
+	#endif
     return 0;
 }
