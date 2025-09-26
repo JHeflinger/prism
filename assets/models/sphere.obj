@@ -1,6 +1,5 @@
 # Blender v2.59 (sub 0) OBJ File: 'Blue_sphere.blend'
 # www.blender.org
-mtllib testsphere.mtl
 o Sphere
 v 0.191341 -0.980785 -0.038060
 v 0.375330 -0.923880 -0.074658

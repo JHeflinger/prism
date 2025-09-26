@@ -1,7 +1,7 @@
 #ifndef TEST_H
 #define TEST_H
 
-#define TEST_SUITE 0
+#include "flag.h"
 
 void Test();
 

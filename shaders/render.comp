@@ -665,6 +665,7 @@ void main() {
 
 	// calculate frame chance
 	float chance = 1.0 - pow(1.0 - ubo.frameless, rgIn.time);
+    if (ubo.frameless >= 1.0) chance = 1.0;
 	float rnum = random((rgIn.x * rgIn.y) / (123.456789 + (ubo.seed % 100)));
 	bool update_signal = rnum <= chance;
 	if (!update_signal) {

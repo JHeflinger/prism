@@ -620,7 +620,6 @@ BOOL VINIT_General(VulkanGeneral* general) {
     vkEnumeratePhysicalDevices(general->instance, &deviceCount, devices);
     uint32_t score = 0;
     uint32_t ind = 0;
-    VkPhysicalDeviceProperties deviceProperties;
     for (uint32_t i = 0; i < deviceCount; i++) {
         // check if device is suitable
         VulkanFamilyGroup families = VUTIL_FindQueueFamilies(devices[i]);
@@ -628,10 +627,11 @@ BOOL VINIT_General(VulkanGeneral* general) {
         if (!VUTIL_CheckGPUExtensionSupport(devices[i])) continue;
 
         uint32_t curr_score = 0;
+        VkPhysicalDeviceProperties deviceProperties;
         VkPhysicalDeviceFeatures deviceFeatures;
         vkGetPhysicalDeviceProperties(devices[i], &deviceProperties);
         vkGetPhysicalDeviceFeatures(devices[i], &deviceFeatures);
-        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) curr_score += 1000;
+        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) curr_score += 10000;
         curr_score += deviceProperties.limits.maxImageDimension2D;
         if (!deviceFeatures.geometryShader) curr_score = 0;
         if (!deviceFeatures.samplerAnisotropy) curr_score = 0;
@@ -644,7 +644,9 @@ BOOL VINIT_General(VulkanGeneral* general) {
 		EZ_FATAL("A suitable GPU could not be found");
 		return FALSE;
 	}
-	strcpy(general->gpuname, deviceProperties.deviceName);
+    VkPhysicalDeviceProperties dp;
+    vkGetPhysicalDeviceProperties(devices[ind], &dp);
+	strcpy(general->gpuname, dp.deviceName);
     general->gpu = devices[ind];
     EZ_FREE(devices);
 
@@ -695,17 +697,9 @@ BOOL VINIT_Metadata(VulkanMetadata* metadata) {
     ARRLIST_StaticString_add(&(metadata->validation), "VK_LAYER_KHRONOS_validation");
 
     // set up required extensions
-    uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    for (size_t i = 0; i < glfwExtensionCount; i++)
-        ARRLIST_StaticString_add(&(metadata->extensions.required), glfwExtensions[i]);
     if (ENABLE_VK_VALIDATION_LAYERS) {
         ARRLIST_StaticString_add(&(metadata->extensions.required), VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
-
-    // set up device extensions
-    ARRLIST_StaticString_add(&(metadata->extensions.device), VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
     return TRUE;
 }

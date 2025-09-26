@@ -44,11 +44,13 @@ void InitializeRenderer() {
     g_renderer.config.antialiasing = FALSE;
     g_renderer.config.autoframeless = FALSE;
     g_renderer.config.grid = TRUE;
+    g_renderer.config.async = TRUE;
 
     // initialize camera
-    g_renderer.camera.position = (Vector3){ 2.0f, 2.0f, 2.0f };
+    g_renderer.camera.position = (Vector3){ 2.11f, 0.0f, 2.133f };
     g_renderer.camera.look = (Vector3){ 0.0f, 0.0f, 0.0f };
     g_renderer.camera.up = (Vector3){ 0.0f, 0.0f, 1.0f };
+    g_renderer.camera.fov = 90.0f;
 
     // set up dimensions
     g_renderer.dimensions = (Vector2){ 
@@ -350,6 +352,8 @@ void Render() {
 
     // wait for and reset rendering fence
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
+    if (!g_renderer.config.async)
+        vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]), VK_TRUE, UINT64_MAX);
     if (vkGetFenceStatus(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]) == VK_SUCCESS) {
         // copy overlay results to host
         VUTIL_CopyBufferToHost(
@@ -482,4 +486,14 @@ void RecalculateTriangleBB(size_t index) {
 
 void UpdateTriangles() {
     g_renderer.geometry.changes.update_triangles = TRUE;
+}
+
+void SaveRender(const char* filepath) {
+    Image image = LoadImageFromTexture(g_renderer.swapchain.target.texture);
+    ExportImage(image, filepath);
+    UnloadImage(image);
+}
+
+char* GPUModel() {
+    return g_renderer.vulkan.core.general.gpuname;
 }

@@ -1,6 +1,6 @@
 @echo off
-call build.bat
+call build.bat %1 %2 %3
 if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
-"build/bin.exe" %1 %2
+"build/bin.exe"

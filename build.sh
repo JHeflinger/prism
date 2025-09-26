@@ -74,8 +74,22 @@ fi
 
 # run builder
 PROD=""
-if [ "$1" == "-p" ] || [ "$2" == "-p" ]; then
+if [ "$1" == "-p" ] || [ "$2" == "-p" ] || [ "$3" == "-p" ]; then
 	PROD="-prod"
+fi
+if [ "$1" == "-t" ] || [ "$2" == "-t" ] || [ "$3" == "-t" ]; then
+	(
+        echo "#ifndef FLAG_H"
+        echo "#define FLAG_H"
+        echo "#define TEST_SUITE"
+        echo "#endif"
+    ) > src/test/flag.h
+else
+	(
+        echo "#ifndef FLAG_H"
+        echo "#define FLAG_H"
+        echo "#endif"
+    ) > src/test/flag.h
 fi
 ./build/tiny_linux.bin -a $PROD
 if [ $? -ne 0 ]; then

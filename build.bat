@@ -77,7 +77,7 @@ if "%1"=="-u" (
     cd ..
 )
 
-:: run builder
+:: set prod flags
 set PROD=
 if "%1"=="-p" (
     set PROD=-prod
@@ -85,6 +85,42 @@ if "%1"=="-p" (
 if "%2"=="-p" (
     set PROD=-prod
 )
+if "%3"=="-p" (
+    set PROD=-prod
+)
+
+:: configure test flag
+(
+    echo #ifndef FLAG_H
+    echo #define FLAG_H
+    echo #endif
+) > src/test/flag.h
+if "%1"=="-t" (
+    (
+        echo #ifndef FLAG_H
+        echo #define FLAG_H
+        echo #define TEST_SUITE
+        echo #endif
+    ) > src/test/flag.h
+)
+if "%2"=="-t" (
+    (
+        echo #ifndef FLAG_H
+        echo #define FLAG_H
+        echo #define TEST_SUITE
+        echo #endif
+    ) > src/test/flag.h
+)
+if "%3"=="-t" (
+    (
+        echo #ifndef FLAG_H
+        echo #define FLAG_H
+        echo #define TEST_SUITE
+        echo #endif
+    ) > src/test/flag.h
+)
+
+:: run builder
 "./build/tiny_windows.exe" -a %PROD%
 if !ERRORLEVEL! NEQ 0 (
     exit /b !ERRORLEVEL!

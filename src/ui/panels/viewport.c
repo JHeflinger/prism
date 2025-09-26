@@ -84,6 +84,11 @@ void UpdateViewportPanel(float width, float height) {
     Draw(0, 0, width, height);
     EndBlendMode();
     EndTextureMode();
+
+    // TEMPORARY
+    if (IsKeyPressed(KEY_S)) {
+        SaveRender("out.png");
+    }
 }
 
 void ConfigureViewportPanel(Panel* panel) {

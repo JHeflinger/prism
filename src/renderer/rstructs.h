@@ -152,6 +152,7 @@ typedef struct {
     BOOL antialiasing;
     BOOL autoframeless;
     BOOL grid;
+    BOOL async;
 } RendererConfig;
 
 #endif
