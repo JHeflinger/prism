@@ -203,18 +203,18 @@ void RUTIL_BoundingVolumeHierarchy(ARRLIST_NodeBVH* bvh, ARRLIST_TriangleBB* geo
         BVH_LEAF, 0, 0
     };
 
+    // set up indices
+    ARRLIST_size_t indices = { 0 };
+
     // resize root
     for (size_t i = 0; i < geometry->size; i++) {
         glm_vec3_minv(root.min, geometry->data[i].min, root.min);
         glm_vec3_maxv(root.max, geometry->data[i].max, root.max);
+        ARRLIST_size_t_add(&indices, i);
     }
 
     // add to bvh
     ARRLIST_NodeBVH_add(bvh, root);
-
-    // set up indices
-    ARRLIST_size_t indices = { 0 };
-    for (size_t i = 0; i < geometry->size; i++) ARRLIST_size_t_add(&indices, i);
 
     // split bvh
     SplitBVH(bvh, 0, geometry, &indices);
