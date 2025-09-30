@@ -2,4 +2,4 @@
 if [ $? -ne 0 ]; then
 	exit 1
 fi
-./build/bin.exe
+./build/bin.exe 400 225
