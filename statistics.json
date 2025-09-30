@@ -49,3 +49,20 @@
 		}
 	]
 },
+{
+	"time": "1759249138",
+	"gpu": "NVIDIA GeForce RTX 4060",
+	"width": 1600,
+	"height": 900,
+	"platform": "WINDOWS",
+	"scenes": [
+		{
+			"name": "Viking Room",
+			"fps": 108.141
+		},
+		{
+			"name": "Sphere",
+			"fps": 146.968
+		}
+	]
+},
