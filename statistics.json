@@ -83,3 +83,20 @@
 		}
 	]
 },
+{
+	"time": "1759261873",
+	"gpu": "Intel(R) UHD Graphics 620 (KBL GT2)",
+	"width": 1600,
+	"height": 900,
+	"platform": "LINUX",
+	"scenes": [
+		{
+			"name": "Viking Room",
+			"fps": 8.74497
+		},
+		{
+			"name": "Sphere",
+			"fps": 7.64832
+		}
+	]
+},
