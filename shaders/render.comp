@@ -239,8 +239,7 @@ bool aabb_intersect(Ray ray, uint node_ind) {
 	float t6 = (bvhIn[node_ind].max.z - ray.position.z)*dfrac.z;
 	float tmin = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
 	float tmax = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
-	if (tmax < 0 || tmin > tmax) return false;
-    return true;
+    return tmax >= 0 && tmin <= tmax;
 }
 
 Hit raytrace(Ray ray, inout uint hit_id) {
