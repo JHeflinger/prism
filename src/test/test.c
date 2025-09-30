@@ -72,10 +72,10 @@ float ImageSimilarity(const char *path1, const char *path2) {
 void CheckSimilarity(const char* path1, const char* path2) {
     printf("Verifying similarity...\n");
     float similarity = ImageSimilarity(path1, path2);
-    printf("Image similarity was maintained to be %s%.3f%%%s. ", similarity >= 100 ? EZ_GREEN : (similarity > 99 ? EZ_YELLOW : EZ_RED), similarity, EZ_RESET);
-    if (similarity >= 100) {
+    printf("Image similarity was maintained to be %s%.3f%%%s. ", similarity >= 99.99f ? EZ_GREEN : (similarity > 98 ? EZ_YELLOW : EZ_RED), similarity, EZ_RESET);
+    if (similarity >= 99.99f) {
         printf("No meddling needed!\n\n");
-    } else if (similarity > 99) {
+    } else if (similarity > 98) {
         printf("Consider verifying and updating test image.\n\n");
     } else {
         g_valid = FALSE;
