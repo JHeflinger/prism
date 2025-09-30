@@ -230,24 +230,16 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
 }
 
 bool aabb_intersect(Ray ray, uint node_ind) {
-    float entrance = 0.0;
-    float exit = 3.402823466e+38;
-    for (int i = 0; i < 3; i++) {
-        float slab_a = bvhIn[node_ind].min[i];
-        float slab_b = bvhIn[node_ind].max[i];
-        float inv_dir = 1.0 / ray.direction[i];
-        float origin = ray.position[i];
-        float closest = (slab_a - origin) * inv_dir;
-        float farthest = (slab_b - origin) * inv_dir;
-        if (farthest < closest) {
-            float temp = farthest;
-            farthest = closest;
-            closest = temp;
-        }
-        if (farthest < entrance || closest > exit) return false;
-        exit = farthest < exit ? farthest : exit;
-        entrance = closest > entrance ? closest : entrance;
-    }
+	vec3 dfrac = vec3(1.0/ray.direction.x, 1.0/ray.direction.y, 1.0/ray.direction.z);
+	float t1 = (bvhIn[node_ind].min.x - ray.position.x)*dfrac.x;
+	float t2 = (bvhIn[node_ind].max.x - ray.position.x)*dfrac.x;
+	float t3 = (bvhIn[node_ind].min.y - ray.position.y)*dfrac.y;
+	float t4 = (bvhIn[node_ind].max.y - ray.position.y)*dfrac.y;
+	float t5 = (bvhIn[node_ind].min.z - ray.position.z)*dfrac.z;
+	float t6 = (bvhIn[node_ind].max.z - ray.position.z)*dfrac.z;
+	float tmin = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
+	float tmax = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
+	if (tmax < 0 || tmin > tmax) return false;
     return true;
 }
 
