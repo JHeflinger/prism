@@ -152,7 +152,7 @@ DECLARE_ARRLIST(VulkanBoundVariable);
 
 typedef struct {
 	const char* filename;
-	ARRLIST_VulkanBoundVariable variables;
+	ARRLIST_VulkanBoundVariable variables[CPUSWAP_LENGTH];
 } VulkanShader;
 
 DECLARE_ARRLIST_NAMED(VulkanShaderPtr, VulkanShader*);

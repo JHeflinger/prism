@@ -3,6 +3,6 @@
 
 #include "renderer/vulkan/vstructs.h"
 
-ARRLIST_VulkanShaderPtr* GenerateDefaultShaders();
+ARRLIST_VulkanShaderPtr* GenerateDefaultShaders(Renderer* renderer);
 
 #endif
