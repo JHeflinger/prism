@@ -100,11 +100,91 @@ ARRLIST_VulkanShaderPtr* GenerateDefaultShaders(Renderer* renderer) {
 				sizeof(SDFPrimitive)
 			}
 		});
+		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.lights.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.lights.size)
+				},
+				sizeof(PointLight)
+			}
+		});
+		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.overlay_ssbo.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)1
+				},
+				sizeof(OverlaySSBO)
+			}
+		});
 	}
 
 	// overlay shader
 	VulkanShader* oShader = EZ_ALLOC(1, sizeof(VulkanShader));
 	oShader->filename = "build/shaders/overlay.comp.spv";
+	for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+		ARRLIST_VulkanBoundVariable_add(&(oShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.ssbos[i].buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)(((size_t)renderer->dimensions.x) * ((size_t)renderer->dimensions.y))
+				},
+				sizeof(RayGenerator)
+			}
+		});
+		ARRLIST_VulkanBoundVariable_add(&(oShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_IMAGE,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.targets[i].view)
+			},
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0 }
+		});
+		ARRLIST_VulkanBoundVariable_add(&(oShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.ubos.overlay_objects[i].buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)1
+				},
+				sizeof(OverlayUniformBufferObject)
+			},
+		});
+		ARRLIST_VulkanBoundVariable_add(&(oShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.overlay_ssbo.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)1
+				},
+				sizeof(OverlaySSBO)
+			},
+		});
+	}
 
 	ARRLIST_VulkanShaderPtr_add(list, rShader);
 	ARRLIST_VulkanShaderPtr_add(list, oShader);
