@@ -8,21 +8,7 @@
 Renderer* g_vinit_renderer_ref = NULL;
 
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
-	VulkanShader* render_shader = NULL;
-	VulkanShader* overlay_shader = NULL;
-	ARRLIST_VulkanShaderPtr_add(shaders, render_shader);
-	ARRLIST_VulkanShaderPtr_add(shaders, overlay_shader);
-	
-	ARRLIST_VulkanShaderPtr* s = GenerateDefaultShaders(g_vinit_renderer_ref);
-	for (size_t i = 0; i < s->size; i++) {
-		for (size_t j = 0; j < CPUSWAP_LENGTH; j++) {
-			ARRLIST_VulkanBoundVariable_clear(&(s->data[i]->variables[j]));
-		}
-		EZ_FREE(s->data[i]);
-	}
-	ARRLIST_VulkanShaderPtr_clear(s);
-	EZ_FREE(s);
-
+	GenerateDefaultShaders(shaders, g_vinit_renderer_ref);
 	return TRUE;
 }
 
