@@ -2,6 +2,7 @@
 #include <easylogger.h>
 #include "renderer/vulkan/vutils.h"
 #include "renderer/vulkan/vupdate.h"
+#include "renderer/vulkan/vshaders.h"
 #include <GLFW/glfw3.h>
 
 Renderer* g_vinit_renderer_ref = NULL;
@@ -11,6 +12,17 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	VulkanShader* overlay_shader = NULL;
 	ARRLIST_VulkanShaderPtr_add(shaders, render_shader);
 	ARRLIST_VulkanShaderPtr_add(shaders, overlay_shader);
+	
+	ARRLIST_VulkanShaderPtr* s = GenerateDefaultShaders(g_vinit_renderer_ref);
+	for (size_t i = 0; i < s->size; i++) {
+		for (size_t j = 0; j < CPUSWAP_LENGTH; j++) {
+			ARRLIST_VulkanBoundVariable_clear(&(s->data[i]->variables[j]));
+		}
+		EZ_FREE(s->data[i]);
+	}
+	ARRLIST_VulkanShaderPtr_clear(s);
+	EZ_FREE(s);
+
 	return TRUE;
 }
 

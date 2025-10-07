@@ -14,9 +14,12 @@ ARRLIST_VulkanShaderPtr* GenerateDefaultShaders(Renderer* renderer) {
 				TRUE,
 				&(renderer->vulkan.core.context.renderdata.ubos.objects[i].buffer)
 			},
-			(SchrodingRef) {
-				FALSE,
-				(void*)(sizeof(UniformBufferObject))
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)1
+				},
+				sizeof(UniformBufferObject)
 			},
 		});
 		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
@@ -25,9 +28,76 @@ ARRLIST_VulkanShaderPtr* GenerateDefaultShaders(Renderer* renderer) {
 				TRUE,
 				&(renderer->vulkan.core.context.renderdata.ssbos[i].buffer)
 			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)(((size_t)renderer->dimensions.x) * ((size_t)renderer->dimensions.y))
+				},
+				sizeof(RayGenerator)
+			}
+		});
+		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_IMAGE,
 			(SchrodingRef) {
-				FALSE,
-				(void*)(sizeof(RayGenerator) * ((uint32_t)renderer->dimensions.x) * ((uint32_t)renderer->dimensions.y))
+				TRUE,
+				&(renderer->vulkan.core.context.targets[i].view)
+			},
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0 }
+		});
+		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.triangles.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				},
+				sizeof(Triangle)
+			}
+		});
+		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.materials.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.materials.size)
+				},
+				sizeof(SurfaceMaterial)
+			}
+		});
+		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.bvh.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.bvh.size)
+				},
+				sizeof(NodeBVH)
+			}
+		});
+		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.sdfs.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.sdfs.size)
+				},
+				sizeof(SDFPrimitive)
 			}
 		});
 	}

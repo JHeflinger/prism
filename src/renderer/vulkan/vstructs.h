@@ -143,9 +143,14 @@ typedef struct {
 } SchrodingRef;
 
 typedef struct {
+	SchrodingRef count;
+	size_t size;
+} SchrodingSize;
+
+typedef struct {
 	VulkanVariableType type;
 	SchrodingRef data;
-	SchrodingRef size;
+	SchrodingSize size;
 } VulkanBoundVariable;
 
 DECLARE_ARRLIST(VulkanBoundVariable);
