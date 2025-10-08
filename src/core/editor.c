@@ -16,7 +16,7 @@
 UI* g_ui = NULL;
 
 void InitEditor() {
-	SetTraceLogLevel(LOG_WARNING);
+	SetTraceLogLevel(LOG_NONE);
     SetConfigFlags(FLAG_VSYNC_HINT /*| FLAG_WINDOW_RESIZABLE*/);
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
     Image icon = LoadImage("assets/images/appico.png");

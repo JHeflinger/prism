@@ -1,9 +1,15 @@
 #include "vclean.h"
 #include "renderer/vulkan/vutils.h"
 
-Renderer* g_vlcean_renderer_ref = NULL;
+Renderer* g_vclean_renderer_ref = NULL;
 
 void VCLEAN_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
+    for (size_t i = 0; i < shaders->size; i++) {
+        for (size_t j = 0; j < CPUSWAP_LENGTH; j++) {
+            ARRLIST_VulkanBoundVariable_clear(&(shaders->data[i]->variables[j]));
+        }
+        EZ_FREE(shaders->data[i]);
+    }
 	ARRLIST_VulkanShaderPtr_clear(shaders);
 }
 
@@ -59,54 +65,57 @@ void VCLEAN_RenderData(VulkanRenderData* renderdata) {
         VUTIL_DestroyBuffer(renderdata->ubos.objects[i]);
         VUTIL_DestroyBuffer(renderdata->ubos.overlay_objects[i]);
     }
-    for (size_t i = 0; i < PIPELINE_LENGTH; i++) {
-        vkDestroyDescriptorPool(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].pool, NULL);
-        vkDestroyDescriptorSetLayout(g_vlcean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].layout, NULL);
+    for (size_t i = 0; i < g_vclean_renderer_ref->vulkan.core.shaders.size; i++) {
+        vkDestroyDescriptorPool(g_vclean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].pool, NULL);
+        vkDestroyDescriptorSetLayout(g_vclean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].layout, NULL);
     }
 	VUTIL_DestroyBuffer(renderdata->overlay_ssbo);
+    EZ_FREE(renderdata->descriptors);
 }
 
 void VCLEAN_RenderContext(VulkanRenderContext* context) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        vkDestroyImageView(g_vlcean_renderer_ref->vulkan.core.general.interface, context->targets[i].view, NULL);
-        vkDestroyImage(g_vlcean_renderer_ref->vulkan.core.general.interface, context->targets[i].image, NULL);
-        vkFreeMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, context->targets[i].memory, NULL);
+        vkDestroyImageView(g_vclean_renderer_ref->vulkan.core.general.interface, context->targets[i].view, NULL);
+        vkDestroyImage(g_vclean_renderer_ref->vulkan.core.general.interface, context->targets[i].image, NULL);
+        vkFreeMemory(g_vclean_renderer_ref->vulkan.core.general.interface, context->targets[i].memory, NULL);
     }
 
     VCLEAN_RenderData(&(context->renderdata));
 
-    for (size_t i = 0; i < PIPELINE_LENGTH; i++) {
-        vkDestroyPipeline(g_vlcean_renderer_ref->vulkan.core.general.interface, context->pipeline.pipeline[i], NULL);
-        vkDestroyPipelineLayout(g_vlcean_renderer_ref->vulkan.core.general.interface, context->pipeline.layout[i], NULL);
+    for (size_t i = 0; i < g_vclean_renderer_ref->vulkan.core.shaders.size; i++) {
+        vkDestroyPipeline(g_vclean_renderer_ref->vulkan.core.general.interface, context->pipeline.pipeline[i], NULL);
+        vkDestroyPipelineLayout(g_vclean_renderer_ref->vulkan.core.general.interface, context->pipeline.layout[i], NULL);
     }
+    EZ_FREE(context->pipeline.pipeline);
+    EZ_FREE(context->pipeline.layout);
 }
 
 void VCLEAN_Bridge(VulkanDataBuffer* bridge) {
-    vkUnmapMemory(g_vlcean_renderer_ref->vulkan.core.general.interface, bridge->memory);
+    vkUnmapMemory(g_vclean_renderer_ref->vulkan.core.general.interface, bridge->memory);
     VUTIL_DestroyBuffer(*bridge);
 }
 
 void VCLEAN_Scheduler(VulkanScheduler* scheduler) {
     for (int i = 0; i < CPUSWAP_LENGTH; i++)
-        vkDestroyFence(g_vlcean_renderer_ref->vulkan.core.general.interface, scheduler->syncro.fences[i], NULL);
-    vkDestroyCommandPool(g_vlcean_renderer_ref->vulkan.core.general.interface, scheduler->commands.pool, NULL);
+        vkDestroyFence(g_vclean_renderer_ref->vulkan.core.general.interface, scheduler->syncro.fences[i], NULL);
+    vkDestroyCommandPool(g_vclean_renderer_ref->vulkan.core.general.interface, scheduler->commands.pool, NULL);
 }
 
 void VCLEAN_Core(VulkanCore* core) {
-	VCLEAN_Shaders(&(core->shaders));
     VCLEAN_Geometry(&(core->geometry));
     VCLEAN_Bridge(&(core->bridge));
     VCLEAN_Scheduler(&(core->scheduler));
     VCLEAN_RenderContext(&(core->context));
     VCLEAN_General(&(core->general));
+	VCLEAN_Shaders(&(core->shaders));
 }
 
 void VCLEAN_Vulkan(VulkanObject* vulkan) {
-    vkDeviceWaitIdle(g_vlcean_renderer_ref->vulkan.core.general.interface);
+    vkDeviceWaitIdle(g_vclean_renderer_ref->vulkan.core.general.interface);
     VCLEAN_Metadata(&(vulkan->metadata));
     VCLEAN_Core(&(vulkan->core));
 }
 
 void VCLEAN_SetVulkanCleanContext(Renderer* renderer) {
-    g_vlcean_renderer_ref = renderer;
+    g_vclean_renderer_ref = renderer;
 }

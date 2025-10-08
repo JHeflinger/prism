@@ -4,8 +4,6 @@
 #include "renderer/rstructs.h"
 #include <vulkan/vulkan.h>
 
-#define PIPELINE_LENGTH 2
-
 typedef struct {
     VkImage image;
     VkImageView view;
@@ -85,8 +83,8 @@ typedef struct {
 } VulkanGeneral;
 
 typedef struct {
-    VkPipeline pipeline[PIPELINE_LENGTH];
-    VkPipelineLayout layout[PIPELINE_LENGTH];
+    VkPipeline* pipeline;
+    VkPipelineLayout* layout;
 } VulkanPipeline;
 
 typedef struct {
@@ -107,7 +105,7 @@ typedef struct {
 } VulkanScheduler;
 
 typedef struct {
-    VulkanDescriptors descriptors[PIPELINE_LENGTH];
+    VulkanDescriptors* descriptors;
     UBOArray ubos;
     VulkanDataBuffer ssbos[CPUSWAP_LENGTH];
 	VulkanDataBuffer overlay_ssbo;

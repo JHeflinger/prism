@@ -155,7 +155,7 @@ void GenerateDefaultShaders(ARRLIST_VulkanShaderPtr* list, Renderer* renderer) {
 			(SchrodingSize) { (SchrodingRef) { 0 }, 0 }
 		});
 		ARRLIST_VulkanBoundVariable_add(&(oShader->variables[i]), (VulkanBoundVariable) {
-			STORAGE_BUFFER,
+			UNIFORM_BUFFER,
 			(SchrodingRef) {
 				TRUE,
 				&(renderer->vulkan.core.context.renderdata.ubos.overlay_objects[i].buffer)

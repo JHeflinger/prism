@@ -59,42 +59,20 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     VkResult result = vkBeginCommandBuffer(command, &beginInfo);
     EZ_ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
 
-    // trace rays
-    {
+    // execute shader stages
+    for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         vkCmdBindPipeline(
             command,
             VK_PIPELINE_BIND_POINT_COMPUTE,
-            g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline[0]);
+            g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline[i]);
 
         vkCmdBindDescriptorSets(
             command,
             VK_PIPELINE_BIND_POINT_COMPUTE,
-            g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[0],
+            g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
             0,
             1,
-            &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors[0].sets[g_vupdt_renderer_ref->swapchain.index]),
-            0,
-            NULL);
-
-        float imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
-        float imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
-        vkCmdDispatch(command, ceil((imgw * imgh) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
-    }
-
-    // editor overlay
-    {
-        vkCmdBindPipeline(
-            command,
-            VK_PIPELINE_BIND_POINT_COMPUTE,
-            g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline[1]);
-
-        vkCmdBindDescriptorSets(
-            command,
-            VK_PIPELINE_BIND_POINT_COMPUTE,
-            g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[1],
-            0,
-            1,
-            &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors[1].sets[g_vupdt_renderer_ref->swapchain.index]),
+            &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors[i].sets[g_vupdt_renderer_ref->swapchain.index]),
             0,
             NULL);
 
@@ -129,194 +107,39 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 }
 
 void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
-    uint32_t imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
-    uint32_t imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
-    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        VkDescriptorBufferInfo bufferInfo = { 0 };
-        bufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ubos.objects[i].buffer;
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UniformBufferObject);
-
-        VkDescriptorBufferInfo storageBufferInfo = { 0 };
-        storageBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ssbos[i].buffer;
-        storageBufferInfo.offset = 0;
-        storageBufferInfo.range = sizeof(RayGenerator) * imgw * imgh;
-
-        VkDescriptorImageInfo imageInfo = { 0 };
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        imageInfo.imageView = g_vupdt_renderer_ref->vulkan.core.context.targets[i].view;
-
-        VkDescriptorBufferInfo triangleBufferInfo = { 0 };
-        triangleBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer;
-        triangleBufferInfo.offset = 0;
-        size_t arrsize = sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.size;
-        arrsize = arrsize > 0 ? arrsize : 1;
-        triangleBufferInfo.range = arrsize;
-
-        VkDescriptorBufferInfo materialsBufferInfo = { 0 };
-        materialsBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.materials.buffer;
-        materialsBufferInfo.offset = 0;
-        arrsize = sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.size;
-        arrsize = arrsize > 0 ? arrsize : 1;
-        materialsBufferInfo.range = arrsize;
-
-        VkDescriptorBufferInfo bvhBufferInfo = { 0 };
-        bvhBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.bvh.buffer;
-        bvhBufferInfo.offset = 0;
-        arrsize = sizeof(NodeBVH) * g_vupdt_renderer_ref->geometry.bvh.size;
-        arrsize = arrsize > 0 ? arrsize : 1;
-        bvhBufferInfo.range = arrsize;
-
-        VkDescriptorBufferInfo sdfBufferInfo = { 0 };
-        sdfBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.sdfs.buffer;
-        sdfBufferInfo.offset = 0;
-        arrsize = sizeof(SDFPrimitive) * g_vupdt_renderer_ref->geometry.sdfs.size;
-        arrsize = arrsize > 0 ? arrsize : 1;
-        sdfBufferInfo.range = arrsize;
-
-        VkDescriptorBufferInfo lightBufferInfo = { 0 };
-        lightBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.geometry.lights.buffer;
-        lightBufferInfo.offset = 0;
-        arrsize = sizeof(PointLight) * g_vupdt_renderer_ref->geometry.lights.size;
-        arrsize = arrsize > 0 ? arrsize : 1;
-        lightBufferInfo.range = arrsize;
-
-        VkDescriptorBufferInfo overlaySSBOBufferInfo = { 0 };
-        overlaySSBOBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_ssbo.buffer;
-        overlaySSBOBufferInfo.offset = 0;
-        overlaySSBOBufferInfo.range = sizeof(OverlaySSBO);
-
-        VkWriteDescriptorSet descriptorWrites[9] = { 0 };
-
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = descriptors[0].sets[i];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = descriptors[0].sets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pBufferInfo = &storageBufferInfo;
-
-        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[2].dstSet = descriptors[0].sets[i];
-        descriptorWrites[2].dstBinding = 2;
-        descriptorWrites[2].dstArrayElement = 0;
-        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        descriptorWrites[2].descriptorCount = 1;
-        descriptorWrites[2].pImageInfo = &imageInfo;
-
-        descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[3].dstSet = descriptors[0].sets[i];
-        descriptorWrites[3].dstBinding = 3;
-        descriptorWrites[3].dstArrayElement = 0;
-        descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorWrites[3].descriptorCount = 1;
-        descriptorWrites[3].pBufferInfo = &triangleBufferInfo;
-
-        descriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[4].dstSet = descriptors[0].sets[i];
-        descriptorWrites[4].dstBinding = 4;
-        descriptorWrites[4].dstArrayElement = 0;
-        descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorWrites[4].descriptorCount = 1;
-        descriptorWrites[4].pBufferInfo = &materialsBufferInfo;
-
-        descriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[5].dstSet = descriptors[0].sets[i];
-        descriptorWrites[5].dstBinding = 5;
-        descriptorWrites[5].dstArrayElement = 0;
-        descriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorWrites[5].descriptorCount = 1;
-        descriptorWrites[5].pBufferInfo = &bvhBufferInfo;
-
-        descriptorWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[6].dstSet = descriptors[0].sets[i];
-        descriptorWrites[6].dstBinding = 6;
-        descriptorWrites[6].dstArrayElement = 0;
-        descriptorWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorWrites[6].descriptorCount = 1;
-        descriptorWrites[6].pBufferInfo = &sdfBufferInfo;
-
-        descriptorWrites[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[7].dstSet = descriptors[0].sets[i];
-        descriptorWrites[7].dstBinding = 7;
-        descriptorWrites[7].dstArrayElement = 0;
-        descriptorWrites[7].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorWrites[7].descriptorCount = 1;
-        descriptorWrites[7].pBufferInfo = &lightBufferInfo;
-
-        descriptorWrites[8].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[8].dstSet = descriptors[0].sets[i];
-        descriptorWrites[8].dstBinding = 8;
-        descriptorWrites[8].dstArrayElement = 0;
-        descriptorWrites[8].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorWrites[8].descriptorCount = 1;
-        descriptorWrites[8].pBufferInfo = &overlaySSBOBufferInfo;
-
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 9, descriptorWrites, 0, NULL);
-    }
-    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        VkDescriptorBufferInfo storageBufferInfo = { 0 };
-        storageBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ssbos[i].buffer;
-        storageBufferInfo.offset = 0;
-        storageBufferInfo.range = sizeof(RayGenerator) * imgw * imgh;
-
-        VkDescriptorImageInfo imageInfo = { 0 };
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        imageInfo.imageView = g_vupdt_renderer_ref->vulkan.core.context.targets[i].view;
-
-        VkDescriptorBufferInfo bufferInfo = { 0 };
-        bufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ubos.overlay_objects[i].buffer;
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(OverlayUniformBufferObject);
-
-        VkDescriptorBufferInfo overlaySSBOBufferInfo = { 0 };
-        overlaySSBOBufferInfo.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_ssbo.buffer;
-        overlaySSBOBufferInfo.offset = 0;
-        overlaySSBOBufferInfo.range = sizeof(OverlaySSBO);
-
-        VkWriteDescriptorSet descriptorWrites[4] = { 0 };
-
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = descriptors[1].sets[i];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &storageBufferInfo;
-
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = descriptors[1].sets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
-
-        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[2].dstSet = descriptors[1].sets[i];
-        descriptorWrites[2].dstBinding = 2;
-        descriptorWrites[2].dstArrayElement = 0;
-        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[2].descriptorCount = 1;
-        descriptorWrites[2].pBufferInfo = &bufferInfo;
-
-        descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[3].dstSet = descriptors[1].sets[i];
-        descriptorWrites[3].dstBinding = 3;
-        descriptorWrites[3].dstArrayElement = 0;
-        descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorWrites[3].descriptorCount = 1;
-        descriptorWrites[3].pBufferInfo = &overlaySSBOBufferInfo;
-
-        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, 4, descriptorWrites, 0, NULL);
+    size_t num_shaders = g_vupdt_renderer_ref->vulkan.core.shaders.size;
+    for (size_t i = 0; i < num_shaders; i++) {
+        VulkanShader* shader = g_vupdt_renderer_ref->vulkan.core.shaders.data[i];
+        size_t vars = shader->variables[0].size;
+        for (size_t j = 0; j < CPUSWAP_LENGTH; j++) {
+            VkDescriptorBufferInfo* bufferInfos = EZ_ALLOC(vars, sizeof(VkDescriptorBufferInfo));
+            VkDescriptorImageInfo* imageInfos = EZ_ALLOC(vars, sizeof(VkDescriptorImageInfo));
+            VkWriteDescriptorSet* descriptorWrites = EZ_ALLOC(vars, sizeof(VkWriteDescriptorSet));
+            for (size_t k = 0; k < vars; k++) {
+                VulkanBoundVariable var = shader->variables[j].data[k];
+                descriptorWrites[k].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                descriptorWrites[k].dstSet = descriptors[i].sets[j];
+                descriptorWrites[k].dstBinding = k;
+                descriptorWrites[k].dstArrayElement = 0;
+                descriptorWrites[k].descriptorType = (VkDescriptorType)var.type;
+                descriptorWrites[k].descriptorCount = 1;
+                if (var.type == STORAGE_IMAGE) {
+                    imageInfos[k].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+                    imageInfos[k].imageView = var.data.reference ? *((VkImageView*)var.data.value) : (VkImageView)var.data.value;
+                    descriptorWrites[k].pImageInfo = &(imageInfos[k]);
+                } else {
+                    bufferInfos[k].buffer = var.data.reference ? *((VkBuffer*)var.data.value) : (VkBuffer)var.data.value;
+                    bufferInfos[k].offset = 0;
+                    bufferInfos[k].range = var.size.count.reference ? var.size.size * (*((size_t*)var.size.count.value)) : var.size.size * (size_t)var.size.count.value;
+                    bufferInfos[k].range = bufferInfos[k].range > 0 ? bufferInfos[k].range : 1;
+                    descriptorWrites[k].pBufferInfo = &(bufferInfos[k]);
+                }
+            }
+            vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, vars, descriptorWrites, 0, NULL);
+            EZ_FREE(bufferInfos);
+            EZ_FREE(imageInfos);
+            EZ_FREE(descriptorWrites);
+        }
     }
 }
 
