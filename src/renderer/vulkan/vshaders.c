@@ -186,4 +186,55 @@ void GenerateDefaultShaders(ARRLIST_VulkanShaderPtr* list, Renderer* renderer) {
 
 	ARRLIST_VulkanShaderPtr_add(list, rShader);
 	ARRLIST_VulkanShaderPtr_add(list, oShader);
+	GenerateShader(renderer, "shaders/overlay.comp", "build/shaders/overlay.comp.spv");
+	exit(0);
+}
+
+char* last_relevant_word(char* str, int len) {
+	for (int i = len - 1; i >= 0; i--) {
+		if (str[i] == ' ') {
+			if (!((str[i + 1] >= 'A' && str[i + 1] <= 'Z') ||
+				(str[i + 1] >= 'a' && str[i + 1] <= 'z'))) {
+				continue;
+			} else {
+				return str + i + 1;
+			}
+		}
+	}
+	return str;
+}
+
+VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char* sourcefile) {
+	VulkanShader* shader = EZ_ALLOC(1, sizeof(VulkanShader));
+	shader->filename = sourcefile;
+	FILE* f = fopen(readfile, "r");
+	if (f) {
+		char line[512] = { 0 };
+		int linecount = 0;
+		while (fgets(line, sizeof(line), f)) {
+			linecount++;
+			int linelen = strlen(line);
+			if (linelen >= 512) 
+				EZ_WARN("Abnormally long line length detected on line %d in shader %s, this may have adverse effects on shader parsing", linecount, readfile);
+			char* bindstr = strstr(line, "layout(binding");
+			if (!bindstr) bindstr = strstr(line, "layout (binding");
+			if (bindstr) {
+				int ind = 0;
+				while (bindstr[ind] != '\0') {
+					if (bindstr[ind] >= '0' && bindstr[ind] <= '9') break;
+					ind++;
+				}
+				if (bindstr[ind] != '\0') {
+					EZ_INFO("%c", bindstr[ind]);
+				}
+				char* identifier = last_relevant_word(line, linelen);
+				EZ_INFO("%s", identifier);
+			}
+		}
+	} else {
+		EZ_ERROR("Shader cannot load invalid file - unable to read file %s", readfile);
+		return NULL;
+	}
+	fclose(f);
+	return shader;
 }
