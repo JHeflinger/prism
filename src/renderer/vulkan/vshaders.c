@@ -23,7 +23,7 @@ void GenerateDefaultShaders(ARRLIST_VulkanShaderPtr* list, Renderer* renderer) {
 		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
 			STORAGE_BUFFER,
 			(SchrodingRef) {
-				TRUE,
+TRUE,
 				&(renderer->vulkan.core.context.renderdata.ssbos[i].buffer)
 			},
 			(SchrodingSize) {
@@ -204,6 +204,46 @@ char* last_relevant_word(char* str, int len) {
 	return str;
 }
 
+BOOL is_alphanumeric(char c) {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+VulkanBoundVariable get_bound_variable(const char* name) {
+	VulkanBoundVariable vbv = { 0 };
+	if (strcmp(name, "OverlayUniformBufferObject")) {
+		return vbv;
+	} else if (strcmp(name, "UniformBufferObject")) {
+		
+		return vbv;
+	} else if (strcmp(name, "RayGeneratorSSBOIn")) {
+
+		return vbv;
+	} else if (strcmp(name, "outputImage")) {
+
+		return vbv;
+	} else if (strcmp(name, "TriangleSSBOIn")) {
+
+		return vbv;
+	} else if (strcmp(name, "MaterialSSBOIn")) {
+
+		return vbv;
+	} else if (strcmp(name, "BVHSSBOIn")) {
+
+		return vbv;
+	} else if (strcmp(name, "SDFSSBOIn")) {
+
+		return vbv;
+	} else if (strcmp(name, "LightSSBOIn")) {
+
+		return vbv;
+	} else if (strcmp(name, "OverlaySSBO")) {
+
+		return vbv;
+	}
+	EZ_WARN("Unable to automatically identify source references of shader variable \"%s\"", name);
+	return (VulkanBoundVariable){ 0 };
+}
+
 VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char* sourcefile) {
 	VulkanShader* shader = EZ_ALLOC(1, sizeof(VulkanShader));
 	shader->filename = sourcefile;
@@ -228,7 +268,13 @@ VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char
 					EZ_INFO("%c", bindstr[ind]);
 				}
 				char* identifier = last_relevant_word(line, linelen);
+				ind = 0;
+				while (identifier[ind] != '\0') {
+					if (!is_alphanumeric(identifier[ind])) identifier[ind] = '\0';
+					ind++;
+				}
 				EZ_INFO("%s", identifier);
+				get_bound_variable(identifier);
 			}
 		}
 	} else {
