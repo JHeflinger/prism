@@ -187,7 +187,7 @@ void GenerateDefaultShaders(ARRLIST_VulkanShaderPtr* list, Renderer* renderer) {
 	ARRLIST_VulkanShaderPtr_add(list, rShader);
 	ARRLIST_VulkanShaderPtr_add(list, oShader);
 	GenerateShader(renderer, "shaders/overlay.comp", "build/shaders/overlay.comp.spv");
-	exit(0);
+	//exit(0);
 }
 
 char* last_relevant_word(char* str, int len) {
