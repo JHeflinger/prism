@@ -1,5 +1,9 @@
 #include "vshaders.h"
 #include <easymemory.h>
+#include <easyobjects.h>
+
+DECLARE_ARRLIST(int);
+IMPL_ARRLIST(int);
 
 void GenerateDefaultShaders(ARRLIST_VulkanShaderPtr* list, Renderer* renderer) {	
 	// render shader
@@ -23,7 +27,7 @@ void GenerateDefaultShaders(ARRLIST_VulkanShaderPtr* list, Renderer* renderer) {
 		ARRLIST_VulkanBoundVariable_add(&(rShader->variables[i]), (VulkanBoundVariable) {
 			STORAGE_BUFFER,
 			(SchrodingRef) {
-TRUE,
+				TRUE,
 				&(renderer->vulkan.core.context.renderdata.ssbos[i].buffer)
 			},
 			(SchrodingSize) {
@@ -187,6 +191,7 @@ TRUE,
 	ARRLIST_VulkanShaderPtr_add(list, rShader);
 	ARRLIST_VulkanShaderPtr_add(list, oShader);
 	GenerateShader(renderer, "shaders/overlay.comp", "build/shaders/overlay.comp.spv");
+	GenerateShader(renderer, "shaders/render.comp", "build/shaders/render.comp.spv");
 	//exit(0);
 }
 
@@ -208,37 +213,151 @@ BOOL is_alphanumeric(char c) {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
-VulkanBoundVariable get_bound_variable(const char* name) {
-	VulkanBoundVariable vbv = { 0 };
+VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, size_t i) {
 	if (strcmp(name, "OverlayUniformBufferObject")) {
-		return vbv;
-	} else if (strcmp(name, "UniformBufferObject")) {
-		
-		return vbv;
+		return (VulkanBoundVariable) {
+			UNIFORM_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.ubos.overlay_objects[i].buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)1
+				},
+				sizeof(OverlayUniformBufferObject)
+			},
+		};
+	} else if (strcmp(name, "UniformBufferObject")) {	
+		return (VulkanBoundVariable) {
+			UNIFORM_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.ubos.objects[i].buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)1
+				},
+				sizeof(UniformBufferObject)
+			},
+		};
 	} else if (strcmp(name, "RayGeneratorSSBOIn")) {
-
-		return vbv;
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.ssbos[i].buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)(((size_t)renderer->dimensions.x) * ((size_t)renderer->dimensions.y))
+				},
+				sizeof(RayGenerator)
+			}
+		};
 	} else if (strcmp(name, "outputImage")) {
-
-		return vbv;
+		return (VulkanBoundVariable) {
+			STORAGE_IMAGE,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.targets[i].view)
+			},
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0 }
+		};
 	} else if (strcmp(name, "TriangleSSBOIn")) {
-
-		return vbv;
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.triangles.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				},
+				sizeof(Triangle)
+			}
+		};
 	} else if (strcmp(name, "MaterialSSBOIn")) {
-
-		return vbv;
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.materials.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.materials.size)
+				},
+				sizeof(SurfaceMaterial)
+			}
+		};
 	} else if (strcmp(name, "BVHSSBOIn")) {
-
-		return vbv;
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.bvh.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.bvh.size)
+				},
+				sizeof(NodeBVH)
+			}
+		};
 	} else if (strcmp(name, "SDFSSBOIn")) {
-
-		return vbv;
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.sdfs.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.sdfs.size)
+				},
+				sizeof(SDFPrimitive)
+			}
+		};
 	} else if (strcmp(name, "LightSSBOIn")) {
-
-		return vbv;
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.lights.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.lights.size)
+				},
+				sizeof(PointLight)
+			}
+		};
 	} else if (strcmp(name, "OverlaySSBO")) {
-
-		return vbv;
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.overlay_ssbo.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)1
+				},
+				sizeof(OverlaySSBO)
+			},
+		};
 	}
 	EZ_WARN("Unable to automatically identify source references of shader variable \"%s\"", name);
 	return (VulkanBoundVariable){ 0 };
@@ -251,6 +370,9 @@ VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char
 	if (f) {
 		char line[512] = { 0 };
 		int linecount = 0;
+		int num_vars = 0;
+		ARRLIST_int indices = { 0 };
+		ARRLIST_VulkanBoundVariable vbvs = { 0 };
 		while (fgets(line, sizeof(line), f)) {
 			linecount++;
 			int linelen = strlen(line);
@@ -265,18 +387,30 @@ VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char
 					ind++;
 				}
 				if (bindstr[ind] != '\0') {
-					EZ_INFO("%c", bindstr[ind]);
+					char numbuff[64] = { 0 };
+					int buffind = 0;
+					while (bindstr[ind] >= '0' && bindstr[ind] <= '9') {
+						numbuff[buffind] = bindstr[ind];
+						buffind++;
+						ind++;
+					}
+					ARRLIST_int_add(&indices, atoi(numbuff));
+					char* identifier = last_relevant_word(line, linelen);
+					ind = 0;
+					while (identifier[ind] != '\0') {
+						if (!is_alphanumeric(identifier[ind])) identifier[ind] = '\0';
+						ind++;
+					}
+					ARRLIST_VulkanBoundVariable_add(&vbvs, get_bound_variable(context, identifier, 0));
+					num_vars++;
+				} else {
+					EZ_WARN("Unable to detect a binding on line %d: %s", linecount, bindstr);
 				}
-				char* identifier = last_relevant_word(line, linelen);
-				ind = 0;
-				while (identifier[ind] != '\0') {
-					if (!is_alphanumeric(identifier[ind])) identifier[ind] = '\0';
-					ind++;
-				}
-				EZ_INFO("%s", identifier);
-				get_bound_variable(identifier);
 			}
 		}
+		EZ_INFO("%d bound variables detected", num_vars);
+		ARRLIST_int_clear(&indices);
+		ARRLIST_VulkanBoundVariable_clear(&vbvs);
 	} else {
 		EZ_ERROR("Shader cannot load invalid file - unable to read file %s", readfile);
 		return NULL;

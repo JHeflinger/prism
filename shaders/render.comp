@@ -13,7 +13,7 @@
 #define SDF_BOX 3
 #define SDF_CLOUD 4
 
-layout(set = 0, binding = 0) uniform UniformBufferObject {
+layout(binding = 0) uniform UniformBufferObject {
 	vec3 look;
 	vec3 position;
 	vec3 up;
@@ -105,33 +105,33 @@ struct SDFPrimitive {
 	vec3 dim;
 };
 
-layout(set = 0, binding = 1) buffer RayGeneratorSSBOIn {
+layout(binding = 1) buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
 
-layout(set = 0, binding = 2, rgba8) uniform image2D outputImage;
+layout(binding = 2, rgba8) uniform image2D outputImage;
 
-layout(set = 0, binding = 3) readonly buffer TriangleSSBOIn {
+layout(binding = 3) readonly buffer TriangleSSBOIn {
     Triangle triangleIn[ ];
 };
 
-layout(set = 0, binding = 4) readonly buffer MaterialSSBOIn {
+layout(binding = 4) readonly buffer MaterialSSBOIn {
     Material materialIn[ ];
 };
 
-layout(set = 0, binding = 5) readonly buffer BVHSSBOIn {
+layout(binding = 5) readonly buffer BVHSSBOIn {
     NodeBVH bvhIn[ ];
 };
 
-layout(set = 0, binding = 6) readonly buffer SDFSSBOIn {
+layout(binding = 6) readonly buffer SDFSSBOIn {
     SDFPrimitive sdfIn[ ];
 };
 
-layout(set = 0, binding = 7) readonly buffer LightSSBOIn {
+layout(binding = 7) readonly buffer LightSSBOIn {
     PointLight lightIn[ ];
 };
 
-layout(set = 0, binding = 8) buffer OverlaySSBO {
+layout(binding = 8) buffer OverlaySSBO {
 	uint hovered_tid;
 };
 
