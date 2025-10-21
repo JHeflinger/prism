@@ -401,7 +401,8 @@ VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char
 						if (!is_alphanumeric(identifier[ind])) identifier[ind] = '\0';
 						ind++;
 					}
-					ARRLIST_VulkanBoundVariable_add(&vbvs, get_bound_variable(context, identifier, 0));
+					for (size_t i = 0; i < CPUSWAP_LENGTH; i++)
+						ARRLIST_VulkanBoundVariable_add(&vbvs, get_bound_variable(context, identifier, i));
 					num_vars++;
 				} else {
 					EZ_WARN("Unable to detect a binding on line %d: %s", linecount, bindstr);
@@ -409,6 +410,11 @@ VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char
 			}
 		}
 		EZ_INFO("%d bound variables detected", num_vars);
+		for (size_t i = 0; i < indices.size; i++) {
+			
+			for (size_t j = 0; j < CPUSWAP_LENGTH; j++) {
+			}
+		}
 		ARRLIST_int_clear(&indices);
 		ARRLIST_VulkanBoundVariable_clear(&vbvs);
 	} else {
