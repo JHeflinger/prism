@@ -8,7 +8,14 @@
 Renderer* g_vinit_renderer_ref = NULL;
 
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
-	GenerateDefaultShaders(shaders, g_vinit_renderer_ref);
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
+        "shaders/render.comp",
+        "build/shaders/render.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
+        "shaders/overlay.comp",
+        "build/shaders/overlay.comp.spv"));
 	return TRUE;
 }
 
