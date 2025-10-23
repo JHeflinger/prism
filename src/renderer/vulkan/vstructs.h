@@ -2,7 +2,6 @@
 #define VSTRUCTS_H
 
 #include "renderer/rstructs.h"
-#include <vulkan/vulkan.h>
 
 typedef struct {
     VkImage image;

@@ -72,6 +72,10 @@ void InitializeRenderer() {
     // configure stat profiler
     ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 10);
 
+    // configure GPU stat cache
+    g_renderer.stats.cache.update_interval = 1.0;
+    PollGPUCache(TRUE);
+
     // default material
     SubmitMaterial((SurfaceMaterial){
         {1.0f, 1.0f, 1.0f},
@@ -496,4 +500,38 @@ void SaveRender(const char* filepath) {
 
 char* GPUModel() {
     return g_renderer.vulkan.core.general.gpuname;
+}
+
+void PollGPUCache(BOOL init) {
+    if (init || (GetTime() - g_renderer.stats.cache.update_timer) > g_renderer.stats.cache.update_interval) {
+        g_renderer.stats.cache.update_timer = GetTime();
+        g_renderer.stats.cache.heap_budget = (VkPhysicalDeviceMemoryBudgetPropertiesEXT) {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT
+        };
+        g_renderer.stats.cache.heap_props = (VkPhysicalDeviceMemoryProperties2) {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,
+            .pNext = &(g_renderer.stats.cache.heap_budget)
+        };
+        vkGetPhysicalDeviceMemoryProperties2(g_renderer.vulkan.core.general.gpu, &(g_renderer.stats.cache.heap_props));
+    }
+}
+
+size_t GPUHeapCount() {
+    return g_renderer.stats.cache.heap_props.memoryProperties.memoryHeapCount;
+}
+
+size_t GPUHeapUsage(size_t i) {
+    return g_renderer.stats.cache.heap_budget.heapUsage[i];
+}
+
+size_t GPUHeapBudget(size_t i) {
+    return g_renderer.stats.cache.heap_budget.heapBudget[i];
+}
+
+const char* GPUHeapType(size_t i) {
+    if (g_renderer.stats.cache.heap_props.memoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+        return "LOCAL";
+    if (g_renderer.stats.cache.heap_props.memoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_MULTI_INSTANCE_BIT)
+        return "MULTI";
+    return "SHARE";
 }

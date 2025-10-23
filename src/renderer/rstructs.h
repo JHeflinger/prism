@@ -5,6 +5,7 @@
 #include "data/strings.h"
 #include "renderer/vulkan/vconfig.h"
 #include <raylib.h>
+#include <vulkan/vulkan.h>
 #define CGLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <cglm/cglm.h>
 
@@ -113,7 +114,15 @@ typedef struct {
 } ChangeSet;
 
 typedef struct {
+    VkPhysicalDeviceMemoryBudgetPropertiesEXT heap_budget;
+    VkPhysicalDeviceMemoryProperties2 heap_props;
+    double update_interval;
+    double update_timer;
+} GPUStatCache;
+
+typedef struct {
     Profiler profile;
+    GPUStatCache cache;
 } RendererStats;
 
 typedef struct {

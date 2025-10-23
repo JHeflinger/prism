@@ -75,4 +75,14 @@ void SaveRender(const char* filepath);
 
 char* GPUModel();
 
+void PollGPUCache(BOOL init);
+
+size_t GPUHeapCount();
+
+size_t GPUHeapUsage(size_t i);
+
+size_t GPUHeapBudget(size_t i);
+
+const char* GPUHeapType(size_t i);
+
 #endif
