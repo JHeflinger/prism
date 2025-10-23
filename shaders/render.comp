@@ -46,8 +46,6 @@ layout(binding = 0) uniform UniformBufferObject {
 } ubo;
 
 struct RayGenerator {
-    uint x;
-    uint y;
 	float time;
     uint tid;
 };
@@ -188,13 +186,13 @@ float fbm(in vec3 x) { // from https://iquilezles.org/articles/fbm/
 	return a;
 }
 
-bool cut_viewport(RayGenerator rg) {
+bool cut_viewport(int rx, int ry) {
     if (ubo.viewport.x != 0 &&
-        (rg.x < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
-        (rg.x > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return true;
+        (rx < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
+        (rx > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return true;
     if (ubo.viewport.y != 0 &&
-        (rg.y < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
-        (rg.y > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return true;
+        (ry < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
+        (ry > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return true;
     return false;
 }
 
@@ -675,13 +673,17 @@ void main() {
 	// get ray generator
     RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
 
+	// create ray generator coordinates	
+	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+
 	// calculate frame chance
 	float chance = 1.0 - pow(1.0 - ubo.frameless, rgIn.time);
     if (ubo.frameless >= 1.0) chance = 1.0;
-	float rnum = random((rgIn.x * rgIn.y) / (123.456789 + (ubo.seed % 100)));
+	float rnum = random((rx * ry) / (123.456789 + (ubo.seed % 100)));
 	bool update_signal = rnum <= chance;
 	if (!update_signal) {
-        imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(0.0));
+        imageStore(outputImage, ivec2(rx, ry), vec4(0.0));
         return;
     }
 
@@ -689,15 +691,15 @@ void main() {
 	raygenIn[gl_GlobalInvocationID.x].time = 0.0;
 
 	// reject any rays outside of the viewport
-    if (cut_viewport(rgIn)) return;
+    if (cut_viewport(rx, ry)) return;
 
 	// calculate ray color
 	vec3 color = vec3(0, 0, 0);
     uint hit_id = -1;
 	if (ubo.antialiasing == 0) {
-		color = raycolor(vec2(rgIn.x, rgIn.y), hit_id);
+		color = raycolor(vec2(rx, ry), hit_id);
 	} else {
-		vec2 base_ray = vec2(rgIn.x, rgIn.y);
+		vec2 base_ray = vec2(rx, ry);
 		color += raycolor(base_ray + vec2(-0.5, -0.5), hit_id);
 		color += raycolor(base_ray + vec2(0.5, 0.5), hit_id);
 		color /= 2.0;
@@ -709,13 +711,13 @@ void main() {
 
     // write to image
     if (ubo.frameless < 1.0) {
-	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 0.1));
+	    imageStore(outputImage, ivec2(rx, ry), vec4(color, 0.1));
     } else {
-	    imageStore(outputImage, ivec2(rgIn.x, rgIn.y), vec4(color, 1.0));
+	    imageStore(outputImage, ivec2(rx, ry), vec4(color, 1.0));
     }
 	
 	// set mouse hovered id
-    if (rgIn.x == ubo.mouse_x && rgIn.y == ubo.mouse_y) {
+    if (rx == ubo.mouse_x && ry == ubo.mouse_y) {
 		hovered_tid = hit_id;
     }
 

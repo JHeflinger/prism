@@ -73,8 +73,6 @@ DECLARE_ARRLIST(SurfaceMaterial);
 #define BVH_BOTH 3
 
 typedef struct {
-    alignas(4) uint32_t x;
-    alignas(4) uint32_t y;
 	alignas(4) float time;
     alignas(4) uint32_t tid;
 } RayGenerator;
