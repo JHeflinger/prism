@@ -530,6 +530,8 @@ BOOL VINIT_Metadata(VulkanMetadata* metadata) {
         ARRLIST_StaticString_add(&(metadata->extensions.required), VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
+	ARRLIST_StaticString_add(&(metadata->extensions.device), "VK_KHR_get_physical_device_properties2");
+
     return TRUE;
 }
 

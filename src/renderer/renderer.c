@@ -505,15 +505,15 @@ char* GPUModel() {
 void PollGPUCache(BOOL init) {
     if (init || (GetTime() - g_renderer.stats.cache.update_timer) > g_renderer.stats.cache.update_interval) {
         g_renderer.stats.cache.update_timer = GetTime();
-        g_renderer.stats.cache.heap_budget = (VkPhysicalDeviceMemoryBudgetPropertiesEXT) {
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT
-        };
-        g_renderer.stats.cache.heap_props = (VkPhysicalDeviceMemoryProperties2) {
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,
-            .pNext = &(g_renderer.stats.cache.heap_budget)
-        };
+        g_renderer.stats.cache.heap_budget = (VkPhysicalDeviceMemoryBudgetPropertiesEXT) { 0 };
+        g_renderer.stats.cache.heap_budget.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
+		g_renderer.stats.cache.heap_budget.pNext = NULL;
+        g_renderer.stats.cache.heap_props = (VkPhysicalDeviceMemoryProperties2) { 0 };
+        g_renderer.stats.cache.heap_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
+        g_renderer.stats.cache.heap_props.pNext = &(g_renderer.stats.cache.heap_budget);
         vkGetPhysicalDeviceMemoryProperties2(g_renderer.vulkan.core.general.gpu, &(g_renderer.stats.cache.heap_props));
     }
+	EZ_INFO("WORKS");
 }
 
 size_t GPUHeapCount() {
