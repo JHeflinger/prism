@@ -118,6 +118,7 @@ typedef struct {
     VkPhysicalDeviceMemoryProperties2 heap_props;
     double update_interval;
     double update_timer;
+	BOOL available;
 } GPUStatCache;
 
 typedef struct {

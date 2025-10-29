@@ -47,8 +47,9 @@ void DrawDevPanel(float width, float height) {
     }
     UIDrawText("CPU Memory Usage: %.3f %s (%llu bytes)", mem_size_compact(EZ_ALLOCATED()), mem_size_descriptor(EZ_ALLOCATED()), (unsigned long long)EZ_ALLOCATED());
     PollGPUCache(FALSE);
-    UIDrawText("GPU Memory Usage:");
     size_t numheaps = GPUHeapCount();
+	if (numheaps == 0) UIDrawText("GPU Memory Usage: UNAVAILABLE");
+	else UIDrawText("GPU Memory Usage:");
     for (size_t i = 0; i < numheaps; i++) {
         size_t allocated = GPUHeapUsage(i);
         size_t budget = GPUHeapBudget(i);

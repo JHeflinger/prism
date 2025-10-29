@@ -504,31 +504,45 @@ char* GPUModel() {
 
 void PollGPUCache(BOOL init) {
     if (init || (GetTime() - g_renderer.stats.cache.update_timer) > g_renderer.stats.cache.update_interval) {
-        g_renderer.stats.cache.update_timer = GetTime();
-        g_renderer.stats.cache.heap_budget = (VkPhysicalDeviceMemoryBudgetPropertiesEXT) { 0 };
-        g_renderer.stats.cache.heap_budget.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
-		g_renderer.stats.cache.heap_budget.pNext = NULL;
-        g_renderer.stats.cache.heap_props = (VkPhysicalDeviceMemoryProperties2) { 0 };
-        g_renderer.stats.cache.heap_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
-        g_renderer.stats.cache.heap_props.pNext = &(g_renderer.stats.cache.heap_budget);
-        vkGetPhysicalDeviceMemoryProperties2(g_renderer.vulkan.core.general.gpu, &(g_renderer.stats.cache.heap_props));
+		if (init) {
+			ARRLIST_StaticString_add(&(g_renderer.vulkan.metadata.extensions.device), "VK_KHR_get_physical_device_properties2");
+			if (!VUTIL_CheckGPUExtensionSupport(g_renderer.vulkan.core.general.gpu)) {
+				g_renderer.stats.cache.available = FALSE;
+			} else {
+				g_renderer.stats.cache.available = TRUE;
+			}
+			ARRLIST_StaticString_remove(&(g_renderer.vulkan.metadata.extensions.device), g_renderer.vulkan.metadata.extensions.device.size - 1);
+		}
+		if (g_renderer.stats.cache.available) {
+			g_renderer.stats.cache.update_timer = GetTime();
+			g_renderer.stats.cache.heap_budget = (VkPhysicalDeviceMemoryBudgetPropertiesEXT) { 0 };
+	        g_renderer.stats.cache.heap_budget.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
+			g_renderer.stats.cache.heap_budget.pNext = NULL;
+			g_renderer.stats.cache.heap_props = (VkPhysicalDeviceMemoryProperties2) { 0 };
+			g_renderer.stats.cache.heap_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
+			g_renderer.stats.cache.heap_props.pNext = &(g_renderer.stats.cache.heap_budget);
+			vkGetPhysicalDeviceMemoryProperties2(g_renderer.vulkan.core.general.gpu, &(g_renderer.stats.cache.heap_props));
+		}
     }
-	EZ_INFO("WORKS");
 }
 
 size_t GPUHeapCount() {
+	if (!g_renderer.stats.cache.available) return 0;
     return g_renderer.stats.cache.heap_props.memoryProperties.memoryHeapCount;
 }
 
 size_t GPUHeapUsage(size_t i) {
+	if (!g_renderer.stats.cache.available) return 0;
     return g_renderer.stats.cache.heap_budget.heapUsage[i];
 }
 
 size_t GPUHeapBudget(size_t i) {
+	if (!g_renderer.stats.cache.available) return 0;
     return g_renderer.stats.cache.heap_budget.heapBudget[i];
 }
 
 const char* GPUHeapType(size_t i) {
+	if (!g_renderer.stats.cache.available) return "Unavailable";
     if (g_renderer.stats.cache.heap_props.memoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
         return "LOCAL";
     if (g_renderer.stats.cache.heap_props.memoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_MULTI_INSTANCE_BIT)
