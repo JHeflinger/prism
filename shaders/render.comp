@@ -228,7 +228,7 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     if (hit.distance <= EPS) return false;
     hit.material = tri.material;
     hit.position = ray.position + (ray.direction * hit.distance);
-    hit.normal = normalize(cross(tri.b - tri.a, tri.c - tri.a));
+    hit.normal = normalize(cross(e1, e2));
     return true;
 }
 
