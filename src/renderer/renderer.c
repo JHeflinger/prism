@@ -505,13 +505,13 @@ char* GPUModel() {
 void PollGPUCache(BOOL init) {
     if (init || (GetTime() - g_renderer.stats.cache.update_timer) > g_renderer.stats.cache.update_interval) {
 		if (init) {
-			ARRLIST_StaticString_add(&(g_renderer.vulkan.metadata.extensions.device), "VK_KHR_get_physical_device_properties2");
+			ARRLIST_StaticString_add(&(g_renderer.vulkan.metadata.extensions.required), "VK_KHR_get_physical_device_properties2");
 			if (!VUTIL_CheckGPUExtensionSupport(g_renderer.vulkan.core.general.gpu)) {
 				g_renderer.stats.cache.available = FALSE;
 			} else {
 				g_renderer.stats.cache.available = TRUE;
 			}
-			ARRLIST_StaticString_remove(&(g_renderer.vulkan.metadata.extensions.device), g_renderer.vulkan.metadata.extensions.device.size - 1);
+			ARRLIST_StaticString_remove(&(g_renderer.vulkan.metadata.extensions.required), g_renderer.vulkan.metadata.extensions.required.size - 1);
 		}
 		if (g_renderer.stats.cache.available) {
 			g_renderer.stats.cache.update_timer = GetTime();
