@@ -5,6 +5,7 @@ NEXT:
 		- overlay will just draw selected if the current triangle on the pixel is selected
 		- then we can easily add to this and update this by sending commands to gpu that can do it in O(1) time
 		- for modifying we can then send a modify commmand to gpu that does it and then updates cpu host buffer based on gpu 
+	- prism wiki and info buttons that open links to relevant pages about options
 
 BUGS:
 	- outputted tid flickers sometimes, only when reflections is turned on
@@ -25,3 +26,24 @@ GENERAL:
 	- rotate triangles
 	- use mouse to move vertices
 	- extrude triangles
+
+RENDERING:
+	- offline iterative rendering pipeline
+	- light attenuation
+	- soft shadows
+	- dynamically sized dispatch groups between shader stages 
+	- different types of lights
+	- depth of field
+	- real motion blur
+	- textures
+	- mipmapping and bilinear and trilinear filtering
+	- refraction
+	- convert triangles to indices representations 
+	- structure of arrays
+	- auto resolution
+	- direction assisted raymarching
+	- seperate compositor panel
+	- backface culling so can ignore tri hits
+	- sdf construction pipeline with building blocks
+	- texture units
+	- barycentric mapped coordinates for meshes into sdfs or primitives
