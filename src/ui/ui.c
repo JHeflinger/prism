@@ -8,6 +8,8 @@
 #include <easymemory.h>
 #include <string.h>
 
+IMPL_ARRLIST(Panel);
+
 UI* g_divider_instance = NULL;
 BOOL g_divider_active = FALSE;
 Vector2 g_ui_cursor = { 0 };
@@ -36,7 +38,7 @@ void UpdateUI(UI* ui) {
         // update further down
         UpdateUI((UI*)(ui->left));
         UpdateUI((UI*)(ui->right));
-        
+
         // handle hovering and active dragging
         size_t buffer = 5;
         if (!g_divider_active) {
@@ -95,7 +97,8 @@ void UpdateUI(UI* ui) {
     }
 
     // update panel
-    if (ui->panel.update) ui->panel.update(ui->w, ui->h);
+	for (size_t i = 0; i < ui->panels.size; i++)
+	    if (ui->panels.data[i].update) ui->panels.data[i].update(ui->w, ui->h);
 }
 
 void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
@@ -135,19 +138,30 @@ void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
         }
     } else {
         DrawRectangle(x, y, w, h, MappedColor(PANEL_BG_COLOR));
-        float namebar_dif = ui->panel.name[0] != 0 && strcmp(ui->panel.name, "Viewport") != 0 ? NAMEBAR_HEIGHT : 0.0f;
-        if (strcmp(ui->panel.name, "Viewport") == 0) SetViewportRec((Rectangle){ x, y + namebar_dif, w, h - namebar_dif });
+        float namebar_dif = ui->panels.data[ui->selected].name[0] != 0 && !ui->panels.data[ui->selected].flush ? NAMEBAR_HEIGHT : 0.0f;
+        if (strcmp(ui->panels.data[ui->selected].name, "Viewport") == 0) SetViewportRec((Rectangle){ x, y + namebar_dif, w, h - namebar_dif });
         if (namebar_dif > 0.0) {
             DrawRectangle(x, y, w, NAMEBAR_HEIGHT, MappedColor(PANEL_NB_COLOR));
-            float tag_len = MeasureTextEx(FontAsset(), ui->panel.name, LINE_HEIGHT, 0).x;
-            DrawRectangle(x, y + NAMEBAR_HEIGHT / 2, tag_len + 20, NAMEBAR_HEIGHT / 2, MappedColor(PANEL_NBG_COLOR));
-            DrawRectangleRounded((Rectangle){x, y, tag_len + 20, 3 * NAMEBAR_HEIGHT / 4}, 10, 10, MappedColor(PANEL_NBG_COLOR));
-            DrawTextEx(FontAsset(), ui->panel.name, (Vector2){ x + 10, y + NAMEBAR_HEIGHT - LINE_HEIGHT - 2 }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+			int xplus = x;
+			for (size_t i = 0; i < ui->panels.size; i++) {
+				if (ui->panels.data[i].name[0] == 0) continue;
+				BOOL selected = ui->selected == i;
+				Color deselectedtc = MappedColor(UI_TEXT_COLOR);
+				deselectedtc.a = 150;
+				float tag_len = MeasureTextEx(FontAsset(), ui->panels.data[i].name, LINE_HEIGHT, 0).x;
+				if (InputButtonReleased(IK_MOUSELEFT))
+					if (GetMouseX() > xplus && GetMouseX() < xplus + tag_len + 20 && GetMouseY() > (int)y && GetMouseY() < (int)y + NAMEBAR_HEIGHT)
+						ui->selected = i;
+				DrawRectangle(xplus, y + NAMEBAR_HEIGHT / 2, tag_len + 20, NAMEBAR_HEIGHT / 2, selected ? MappedColor(PANEL_NBGS_COLOR) : MappedColor(PANEL_NBG_COLOR));
+				DrawRectangleRounded((Rectangle){xplus, y, tag_len + 20, 3 * NAMEBAR_HEIGHT / 4}, 10, 10, selected ? MappedColor(PANEL_NBGS_COLOR) : MappedColor(PANEL_NBG_COLOR));
+				DrawTextEx(FontAsset(), ui->panels.data[i].name, (Vector2){ xplus + 10, y + NAMEBAR_HEIGHT - LINE_HEIGHT - 2 }, LINE_HEIGHT, 0, selected ? MappedColor(UI_TEXT_COLOR) : deselectedtc);	
+				xplus += tag_len + 20 + 5;
+			}
         }
-        if (IsRenderTextureValid(ui->panel.texture))
+        if (IsRenderTextureValid(ui->panels.data[ui->selected].texture))
             DrawTexturePro(
-                ui->panel.texture.texture,
-                (Rectangle){ 0, ui->panel.texture.texture.height - h + namebar_dif, w, -1*((int)h - namebar_dif) },
+                ui->panels.data[ui->selected].texture.texture,
+                (Rectangle){ 0, ui->panels.data[ui->selected].texture.texture.height - h + namebar_dif, w, -1*((int)h - namebar_dif) },
                 (Rectangle){ x, y + namebar_dif, w, h - namebar_dif },
                 (Vector2){ 0, 0 },
                 0.0f,
@@ -187,13 +201,13 @@ void PreRenderUI_helper(UI* ui) {
     if (ui->left && ui->right) {
         PreRenderUI_helper((UI*)(ui->left));
         PreRenderUI_helper((UI*)(ui->right));
-    } else if (IsRenderTextureValid(ui->panel.texture) && ui->panel.draw) {
+    } else if (IsRenderTextureValid(ui->panels.data[ui->selected].texture) && ui->panels.data[ui->selected].draw) {
         g_ui_cursor = (Vector2){ 10, 5 };
         g_ui_position = (Vector2){ ui->x , ui->y };
-        if (ui->panel.name[0] != 0 && strcmp(ui->panel.name, "Viewport") != 0) g_ui_position.y += NAMEBAR_HEIGHT;
-        BeginTextureMode(ui->panel.texture);
+        if (ui->panels.data[ui->selected].name[0] != 0 && !ui->panels.data[ui->selected].flush) g_ui_position.y += NAMEBAR_HEIGHT;
+        BeginTextureMode(ui->panels.data[ui->selected].texture);
         ClearBackground((Color){0, 0, 0, 0});
-        ui->panel.draw(ui->w, ui->h);
+        ui->panels.data[ui->selected].draw(ui->w, ui->h);
         EndTextureMode();
     }
 }
@@ -211,7 +225,8 @@ void DestroyUI(UI* ui) {
     }
     if (ui->left) DestroyUI((UI*)ui->left);
     if (ui->right) DestroyUI((UI*)ui->right);
-    if (!ui->left && !ui->right) DestroyPanel(&(ui->panel));
+	for (size_t i = 0; i < ui->panels.size; i++) DestroyPanel(&(ui->panels.data[i]));
+	ARRLIST_Panel_clear(&(ui->panels));
     EZ_FREE(ui);
 }
 

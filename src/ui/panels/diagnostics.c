@@ -89,7 +89,9 @@ void DrawDevPanel(float width, float height) {
     UIDragFloatLabeled("Smooth:", &(RenderConfig()->sdfsmooth), 0.0f, 10000.0f, 0.05f, width - 20);
 }
 
-void ConfigureDiagnosticsPanel(Panel* panel) {
-    SetupPanel(panel, "Diagnostics");
-    panel->draw = DrawDevPanel;
+Panel GenerateDiagnosticsPanel() {
+	Panel p = { 0 };
+	SetupPanel(&p, "Diagnostics");
+	p.draw = DrawDevPanel;
+	return p;
 }

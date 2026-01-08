@@ -270,7 +270,9 @@ void DrawEditPanel(float width, float height) {
     }
 }
 
-void ConfigureEditPanel(Panel* panel) {
-    SetupPanel(panel, "Edit Selected");
-    panel->draw = DrawEditPanel;
+Panel GenerateEditPanel() {
+	Panel p = { 0 };
+	SetupPanel(&p, "Edit Selected");
+	p.draw = DrawEditPanel;
+	return p;
 }

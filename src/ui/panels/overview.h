@@ -3,6 +3,6 @@
 
 #include "ui/ui.h"
 
-void ConfigureOverviewPanel(Panel* panel);
+Panel GenerateOverviewPanel();
 
 #endif

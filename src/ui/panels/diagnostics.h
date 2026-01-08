@@ -3,6 +3,6 @@
 
 #include "ui/ui.h"
 
-void ConfigureDiagnosticsPanel(Panel* panel);
+Panel GenerateDiagnosticsPanel();
 
 #endif

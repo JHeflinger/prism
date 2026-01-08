@@ -54,9 +54,11 @@ void CleanOverviewPanel() {
     ARRLIST_DynamicString_clear(&g_materials_list);
 }
 
-void ConfigureOverviewPanel(Panel* panel) {
-    SetupPanel(panel, "Overview");
-    panel->draw = DrawOverviewPanel;
-    panel->clean = CleanOverviewPanel;
-    panel->update = UpdateOverviewPanel;
+Panel GenerateOverviewPanel() {
+	Panel p = { 0 };
+    SetupPanel(&p, "Overview");
+    p.draw = DrawOverviewPanel;
+    p.clean = CleanOverviewPanel;
+    p.update = UpdateOverviewPanel;
+	return p;
 }

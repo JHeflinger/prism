@@ -3,6 +3,7 @@
 
 #include "data/config.h"
 #include "ui/popup.h"
+#include <easyobjects.h>
 #include <raylib.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -25,7 +26,10 @@ typedef struct {
     PanelFunction draw;
     PanelFunction update;
     CleanFunction clean;
+	BOOL flush;
 } Panel;
+
+DECLARE_ARRLIST(Panel);
 
 typedef struct {
     void* left;
@@ -35,7 +39,8 @@ typedef struct {
     size_t y;
     size_t w;
     size_t h;
-    Panel panel;
+	ARRLIST_Panel panels;
+	size_t selected;
     BOOL vertical;
 } UI;
 

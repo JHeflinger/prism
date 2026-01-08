@@ -3,6 +3,6 @@
 
 #include "ui/ui.h"
 
-void ConfigureViewportPanel(Panel* panel);
+Panel GenerateViewportPanel();
 
 #endif

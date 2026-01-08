@@ -91,10 +91,12 @@ void UpdateViewportPanel(float width, float height) {
     }
 }
 
-void ConfigureViewportPanel(Panel* panel) {
-    SetupPanel(panel, "Viewport");
-    panel->draw = DrawViewportPanel;
-    panel->update = UpdateViewportPanel;
+Panel GenerateViewportPanel() {
+	Panel p = { 0 };
+    SetupPanel(&p, "Viewport");
+	p.flush = TRUE;
+    p.draw = DrawViewportPanel;
+    p.update = UpdateViewportPanel;
     g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
 
 	#define PRELOAD
@@ -155,12 +157,5 @@ void ConfigureViewportPanel(Panel* panel) {
 
 	#endif
 
-    // submit some sdfs
-    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {-2.75, 2.75, -2.75}, 1.0f, {0.0, 0.0, 0.0}});
-    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {2.75, -2.75, 2.75}, 1.0f, {0.0, 0.0, 0.0}});
-    //SubmitSDF((SDFPrimitive){SDF_SPHERE, {0, 0, 0}, 1.0f, {0.0, 0.0, 0.0}});
-    //SubmitSDF((SDFPrimitive){SDF_MANDELBULB, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
-    //SubmitSDF((SDFPrimitive){SDF_BOX, {0.0, 0.0, -1.2}, 1.0f, {2.0, 2.0, 1.0}});
-	SubmitSDF((SDFPrimitive){SDF_JULIA, {0.0, 0.0, 0.0}, 1.0f, {0.0, 0.0, 0.0}});
-	//SubmitSDF((SDFPrimitive){SDF_CLOUD, {0.0, 0.0, 2.0}, 2.0f, {0.0, 0.0, 0.0}});
+	return p;
 }
