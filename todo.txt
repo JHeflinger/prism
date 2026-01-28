@@ -8,8 +8,12 @@ NEXT:
 	- prism wiki and info buttons that open links to relevant pages about options
 
 BUGS:
+    - the async renderer isn't exactly working, need to verify and reimplement probably
 	- outputted tid flickers sometimes, only when reflections is turned on
 		- actually when anything is turned on, but when turning refelctions off it stops some of the flickering sometimes?
+
+SMALL STUFF:
+    - ambient occlusion distance should scale with average triangle max length
 
 OPTIMIZATION:
 	- when updating resources just update the resources that need to be updated
@@ -47,3 +51,16 @@ RENDERING:
 	- sdf construction pipeline with building blocks
 	- texture units
 	- barycentric mapped coordinates for meshes into sdfs or primitives
+
+NOTES:
+    - to address the whole exponential splitting diffraction - we DON'T have to do this, just make sure to transform the spectrum wavelength choose when hitting a fluorescent material
+    - for dielectric materials, we should only be choosing one path, either bounce or refract based on pdf right?
+    - samplibg lambertian should be 2pi[0-1] for theta and r = sqrt[0-1]
+    - lambertian pdf should always be 1/2pi?
+
+1. touch up "default" shading
+1a1a1. for tracing make a function that takes in a max dist and use that to optimize tracing
+1a1a. screen space normals implement curvature ao
+1a1. accumulating ao?
+1a. grid should fade away in distance
+2. switch to full pathtracing no raytracing

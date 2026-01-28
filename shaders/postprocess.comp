@@ -1,0 +1,65 @@
+#version 450
+
+struct RayGenerator {
+    vec3 normal;
+	float time;
+    uint tid;
+    uint occlusions;
+};
+
+layout(binding = 0) uniform UniformBufferObject {
+	vec3 look;
+	vec3 position;
+	vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    float fov;
+    float width;
+    float height;
+    uint triangles;
+    vec2 viewport;
+    uint bvhsize;
+	float frametime;
+	float frameless;
+	uint seed;
+	uint shadows;
+	uint reflections;
+	uint lighting;
+    uint raytrace;
+    uint sdf;
+    uint sdfsize;
+    float sdfsmooth;
+    uint maxmarches;
+    float time;
+    uint antialiasing;
+    uint lightssize;
+    uint grid;
+	uint mouse_x;
+	uint mouse_y;
+    uint ao_samples;
+    uint reset;
+} ubo;
+
+layout(binding = 1) readonly buffer RayGeneratorSSBOIn {
+   RayGenerator raygenIn[ ];
+};
+
+layout(binding = 2, rgba8) uniform image2D outputImage;
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+    RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
+	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+
+	vec3 color = vec3(imageLoad(outputImage, ivec2(rx, ry)));
+    if (length(rgIn.normal) > 0) {
+        // TODO: curvature AO
+    }
+    imageStore(outputImage, ivec2(rx, ry), vec4(color, 1.0));
+
+    // (0.6 + 0.4*ao)
+    // float ao = 1.0f - float(occluded) / float(AO_SAMPLES);
+}

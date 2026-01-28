@@ -173,8 +173,9 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 	return (VulkanBoundVariable){ 0 };
 }
 
-VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char* sourcefile) {
+VulkanShader* GenerateShader(BOOL enabled, Renderer* context, const char* readfile, const char* sourcefile) {
 	VulkanShader* shader = EZ_ALLOC(1, sizeof(VulkanShader));
+    shader->enabled = enabled;
 	shader->filename = sourcefile;
 	FILE* f = fopen(readfile, "r");
 	if (f) {

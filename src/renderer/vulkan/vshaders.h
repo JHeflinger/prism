@@ -3,6 +3,6 @@
 
 #include "renderer/vulkan/vstructs.h"
 
-VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char* sourcefile);
+VulkanShader* GenerateShader(BOOL enabled, Renderer* context, const char* readfile, const char* sourcefile);
 
 #endif

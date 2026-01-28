@@ -134,3 +134,20 @@
 		}
 	]
 },
+{
+	"time": "1769546795",
+	"gpu": "Intel(R) Graphics (RPL-U)",
+	"width": 1600,
+	"height": 900,
+	"platform": "LINUX",
+	"scenes": [
+		{
+			"name": "Viking Room",
+			"fps": 23.9512
+		},
+		{
+			"name": "Sphere",
+			"fps": 24.1524
+		}
+	]
+},

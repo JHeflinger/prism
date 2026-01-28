@@ -1,8 +1,10 @@
 #version 450
 
 struct RayGenerator {
+    vec3 normal;
 	float time;
     uint tid;
+    uint occlusions;
 };
 
 layout(binding = 0) readonly buffer RayGeneratorSSBOIn {

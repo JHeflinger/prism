@@ -47,6 +47,8 @@ typedef struct {
     alignas(4) uint32_t grid;
     alignas(4) uint32_t mouse_x;
     alignas(4) uint32_t mouse_y;
+    alignas(4) uint32_t ao_samples;
+    alignas(4) uint32_t reset;
 } UniformBufferObject;
 
 typedef struct {
@@ -154,6 +156,7 @@ DECLARE_ARRLIST(VulkanBoundVariable);
 
 typedef struct {
 	const char* filename;
+    BOOL enabled;
 	ARRLIST_VulkanBoundVariable variables[CPUSWAP_LENGTH];
 } VulkanShader;
 

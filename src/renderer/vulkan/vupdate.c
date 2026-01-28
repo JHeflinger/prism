@@ -61,6 +61,8 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
     // execute shader stages
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
+        if (!g_vupdt_renderer_ref->vulkan.core.shaders.data[i]->enabled) continue;
+
         vkCmdBindPipeline(
             command,
             VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -155,6 +157,20 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     uint32_t mx = (GetMouseX() - offset.x) * (renderer_dimensions.x / GetScreenWidth());
     uint32_t my = (GetMouseY() - offset.y) * (renderer_dimensions.y / GetScreenHeight());
 
+    // check for camera reset
+    static SimpleCamera old_camera = { 0 };
+    BOOL cam_reset = FALSE;
+    if (old_camera.fov == 0.0f) old_camera = g_vupdt_renderer_ref->camera;
+    if (memcmp(&old_camera, &(g_vupdt_renderer_ref->camera), sizeof(SimpleCamera)) == 0) {
+        cam_reset = TRUE;
+        old_camera = g_vupdt_renderer_ref->camera;
+    }
+
+    // persistant vars
+    static uint32_t ao_samples = 1;
+    ao_samples++;
+    if (cam_reset) ao_samples = 1;
+
     // core uniform buffer
     {
         UniformBufferObject ubo = { 0 };
@@ -200,6 +216,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.grid = (uint32_t)g_vupdt_renderer_ref->config.grid;
         ubo.mouse_x = mx;
         ubo.mouse_y = my;
+        ubo.reset = cam_reset;
+        ubo.ao_samples = ao_samples;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 
