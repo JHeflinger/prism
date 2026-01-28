@@ -61,6 +61,6 @@ NOTES:
 1. touch up "default" shading
 1a1a1. for tracing make a function that takes in a max dist and use that to optimize tracing
 1a1a. screen space normals implement curvature ao
-1a1. accumulating ao?
+1a1. accumulating ao has the same issue frameless used to have
 1a. grid should fade away in distance
 2. switch to full pathtracing no raytracing

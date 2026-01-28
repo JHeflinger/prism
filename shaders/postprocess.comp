@@ -55,11 +55,12 @@ void main() {
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
 
 	vec3 color = vec3(imageLoad(outputImage, ivec2(rx, ry)));
+    float ao = 1.0f;
     if (length(rgIn.normal) > 0) {
+        ao = 1.0f - float(rgIn.occlusions) / float(ubo.ao_samples);
         // TODO: curvature AO
     }
-    imageStore(outputImage, ivec2(rx, ry), vec4(color, 1.0));
-
-    // (0.6 + 0.4*ao)
-    // float ao = 1.0f - float(occluded) / float(AO_SAMPLES);
+    float ao_power_pct = clamp(float(ubo.ao_samples) / 64.0, 0, 1.0) * 0.4;
+    ao = (1.0f - ao_power_pct) + (ao_power_pct * ao);
+    imageStore(outputImage, ivec2(rx, ry), vec4(color * ao, 1.0));
 }
