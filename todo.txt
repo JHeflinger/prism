@@ -64,3 +64,7 @@ NOTES:
 1a1. accumulating ao has the same issue frameless used to have
 1a. grid should fade away in distance
 2. switch to full pathtracing no raytracing
+3. for real time pathtracing - do just each frame is one bounce, accumulate frames
+    3a. for real time, sync after every frame (don't start new path frame until done with the current one or else result may diverge) (idk if this is needed, we can try both ways)
+    3b. for non real time, don't bother syncing just start next path until all are done
+4. hdr curve, like aseprite color curve add points and smooth it out
