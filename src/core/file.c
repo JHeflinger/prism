@@ -6,31 +6,42 @@
 #include <easymemory.h>
 
 char* FileExtension(const char* path) {
-    char *dot = strrchr(path, '.');
-    char *slash1 = strrchr(path, '/');
-    char *slash2 = strrchr(path, '\\');
-    char *slash = slash1 > slash2 ? slash1 : slash2;
-    if (!dot || (slash && dot < slash)) {
-        return NULL;
-    }
+    char* dot = strrchr(path, '.');
+    char* slash1 = strrchr(path, '/');
+    char* slash2 = strrchr(path, '\\');
+    char* slash = slash1 > slash2 ? slash1 : slash2;
+    if (!dot || (slash && dot < slash)) return NULL;
     return dot + 1;
+}
+
+char* StripFilename(char* path) {
+    for (int i = (int)strlen(path) - 1; i >= 0; i--) {
+        if (path[i] == '/' || path[i] == '\\') {
+            if (i == (int)strlen(path) - 1) return NULL;
+            return path + i + 1;
+        }
+    }
+    return NULL;
 }
 
 SimpleFile* ReadFile(const char* filename) {
 	SimpleFile* sfile = EZ_ALLOC(1, sizeof(SimpleFile));
     char* extension = FileExtension(filename);
-    if (strcmp(extension, "obj") == 0 || strcmp(extension, "obj") == 0) {
+    if (strcmp(extension, "obj") == 0 || strcmp(extension, "OBJ") == 0) {
         sfile->type = DOTOBJ;
-    } else if (strcmp(extension, "prism") == 0 || strcmp(extension, "prism") == 0) {
+    } else if (strcmp(extension, "prism") == 0 || strcmp(extension, "PRISM") == 0) {
         sfile->type = DOTPRISM;
-    } else if (strcmp(extension, "spv") == 0 || strcmp(extension, "spv") == 0) {
+    } else if (strcmp(extension, "spv") == 0 || strcmp(extension, "SPV") == 0) {
         sfile->type = DOTSPV;
+    } else if (strcmp(extension, "mtl") == 0 || strcmp(extension, "MTL") == 0) {
+        sfile->type = DOTMTL;
     } else {
         sfile->type = UNKNOWN;
     }
 	FILE* file = fopen(filename, "rb");
     if (file == NULL) {
         EZ_ERROR("Unable to open file \"%s\"", filename);
+        EZ_FREE(sfile);
         return NULL;
     }
 	fseek(file, 0, SEEK_END);

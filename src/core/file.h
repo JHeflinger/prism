@@ -8,7 +8,8 @@ typedef enum {
     UNKNOWN = 0,
     DOTPRISM,
     DOTOBJ,
-    DOTSPV
+    DOTSPV,
+    DOTMTL
 } FileType;
 
 typedef struct {
@@ -22,6 +23,8 @@ typedef struct {
     size_t line;
     size_t cursor;
 } LineParser;
+
+char* StripFilename(char* path);
 
 SimpleFile* ReadFile(const char* filename);
 

@@ -5,9 +5,13 @@
 #include <errno.h>
 #include <ctype.h>
 
+#define MAX_MTLLIB_PATH_SIZE 1024
 #define MAX_OBJ_LINE_SIZE 2048
 #define MAX_OBJ_ARG_SIZE 32
 #define MAX_OBJ_NUM_ARGS 64
+#define MAX_MTL_LINE_SIZE 2048
+#define MAX_MTL_ARG_SIZE 32
+#define MAX_MTL_NUM_ARGS 64
 
 typedef struct {
     float x;
@@ -38,6 +42,7 @@ typedef struct {
     ARRLIST_Vertex normals; // NOTE: per-primitive normals are not implemented yet! This field doesn't have any effect yet!
     ARRLIST_UV uvs; // NOTE: textures are not implemented yet! This field doesn't have any effect yet!
     ARRLIST_Face faces;
+    const char* filepath;
 } StateOBJ;
 
 typedef BOOL (*ParseFunc)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
@@ -121,7 +126,39 @@ BOOL ParseLInt(const char* str, int64_t* value) {
 }
 
 BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
-    EZ_WARN("Parsing mtlllib args have not been implemented yet");
+    if (numargs != 2) {
+        EZ_ERROR("Invalid format for mtllib arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
+        return FALSE;
+    }
+    char mtlloc[MAX_MTLLIB_PATH_SIZE] = { 0 };
+    char mtlpath[MAX_MTLLIB_PATH_SIZE] = { 0 };
+    strcpy(mtlloc, state->filepath);
+    char* fnstart = StripFilename(mtlloc);
+    if (fnstart) fnstart[0] = 0;
+    else mtlloc[0] = 0;
+    sprintf(mtlpath, "%s%s", mtlloc, lineargs[1]);
+    SimpleFile* file = ReadFile(mtlpath);
+    if (!file) {
+        EZ_ERROR("Unable to load invalid filepath to mtllib \"%s\"", mtlpath);
+        return FALSE;
+    }
+    if (file->type != DOTMTL) {
+        EZ_ERROR("\"%s\" is not a .mtl file. Unable to open it with the MTL loader", mtlpath);
+        FreeFile(file);
+        return FALSE;
+    }
+    LineParser parser = Parser(file);
+    char line[MAX_MTL_LINE_SIZE] = { 0 };
+    while (NextLine(&parser, line, MAX_MTL_LINE_SIZE)) {
+        char lineargs[MAX_MTL_NUM_ARGS][MAX_MTL_ARG_SIZE] = { 0 };
+        size_t numargs = ParseLineArgsOBJ(line, lineargs);
+        if (numargs > 0 && lineargs[0][0] != '#') {
+            //ParseFunc p = GetParserFromArgOBJ(lineargs[0]);
+            //if (p) { if (!p(lineargs, numargs, &state)) EZ_ERROR("%s:%d - Unable to parse this field due to an error", filepath, (int)parser.line);
+            //} else EZ_WARN("%s:%d - Unknown OBJ property detected: \"%s\", skipping parsing this field...", filepath, (int)parser.line, lineargs[0]);
+        }
+    }
+    FreeFile(file);
     return TRUE;
 }
 
@@ -277,6 +314,10 @@ BOOL ConstructOBJ(const StateOBJ state) {
 
 BOOL LoadOBJ(const char* filepath) {
     SimpleFile* file = ReadFile(filepath);
+    if (!file) {
+        EZ_ERROR("Unable to load invalid filepath \"%s\"", filepath);
+        return FALSE;
+    }
     if (file->type != DOTOBJ) {
         EZ_ERROR("\"%s\" is not a .obj file. Unable to open it with the OBJ loader", filepath);
         FreeFile(file);
@@ -284,6 +325,7 @@ BOOL LoadOBJ(const char* filepath) {
     }
     LineParser parser = Parser(file);
     StateOBJ state = { 0 };
+    state.filepath = filepath;
     char line[MAX_OBJ_LINE_SIZE] = { 0 };
     while (NextLine(&parser, line, MAX_OBJ_LINE_SIZE)) {
         char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE] = { 0 };
