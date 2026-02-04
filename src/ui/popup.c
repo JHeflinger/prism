@@ -46,6 +46,22 @@ int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIDrawText("Add Material");
 
     UIMoveCursor(0, 15);
+    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Emission") / 2) - 10, 0);
+    UIDrawText("Emission");
+    UIMoveCursor(xpos, 0);
+    UIDrawText("r");
+    UIMoveCursor(xpos + 15, -20);
+    UIDragFloat(&(g_material.emission[0]), 0, 1.0f, 0.05f, 100);
+    UIMoveCursor(xpos + 125, -20);
+    UIDrawText("g");
+    UIMoveCursor(xpos + 140, -20);
+    UIDragFloat(&(g_material.emission[1]), 0, 1.0f, 0.05f, 100);
+    UIMoveCursor(xpos + 250, -20);
+    UIDrawText("b");
+    UIMoveCursor(xpos + 265, -20);
+    UIDragFloat(&(g_material.emission[2]), 0, 1.0f, 0.05f, 100);
+
+    UIMoveCursor(0, 15);
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Ambient") / 2) - 10, 0);
     UIDrawText("Ambient");
     UIMoveCursor(xpos, 0);
@@ -94,29 +110,14 @@ int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIDragFloat(&(g_material.specular[2]), 0, 1.0f, 0.05f, 100);
 
     UIMoveCursor(xpos, 35);
-    UIDrawText("Reflection");
-    UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_material.reflect), 0, 1.0f, 0.01f, 200);
-    UIMoveCursor(xpos, 5);
-    UIDrawText("Refraction");
-    UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_material.refract), 0, 1.0f, 0.01f, 200);
-    UIMoveCursor(xpos, 5);
     UIDrawText("Refraction Index");
     UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_material.rindex), 0, 1.0f, 0.01f, 200);
-    UIMoveCursor(xpos, 5);
-    UIDrawText("Transparency");
-    UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_material.transparency), 0, 1.0f, 0.01f, 200);
+    UIDragFloat(&(g_material.ior), 0, 1.0f, 0.01f, 200);
     UIMoveCursor(xpos, 5);
     UIDrawText("Shininess");
     UIMoveCursor(xpos + 165, -20);
     UIDragFloat(&(g_material.shiny), 0, FLT_MAX, 0.01f, 200);
     UIMoveCursor(xpos, 5);
-    UIDrawText("Glossiness");
-    UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_material.glossy), 0, 1.0f, 0.01f, 200);
 
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {

@@ -40,15 +40,13 @@ struct Triangle {
 };
 
 struct Material {
+    vec3 emission;
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
-    float reflection;
-    float refraction;
     float rindex;
-    float transparency;
     float shiny;
-    float glossy;
+    uint model;
 };
 
 struct PointLight {
@@ -380,6 +378,7 @@ void draw_light(Ray ray, Hit hit, PointLight light, inout vec3 color) {
 void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
     if (hit.distance >= 0.0) {
         Material material = materialIn[hit.material];
+        /*
         if (material.reflection > 0.0) {
             vec3 colors[MAX_BOUNCES];
             float reflectionvals[MAX_BOUNCES];
@@ -421,7 +420,7 @@ void reflect_color(Ray ray, Hit hit, int bounces, inout vec3 color) {
                     colors[i - 1] = mix(colors[i - 1], colors[i], reflectionvals[i]);
                 }
             }
-        }
+        }*/
     }
 }
 

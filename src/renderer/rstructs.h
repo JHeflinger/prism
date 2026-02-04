@@ -56,15 +56,13 @@ typedef struct {
 DECLARE_ARRLIST(TriangleBB);
 
 typedef struct {
+    alignas(16) vec3 emission;
     alignas(16) vec3 ambient;
     alignas(16) vec3 diffuse;
     alignas(16) vec3 specular;
-    alignas(4) float reflect;
-    alignas(4) float refract;
-    alignas(4) float rindex;
-    alignas(4) float transparency;
+    alignas(4) float ior;
     alignas(4) float shiny;
-    alignas(4) float glossy;
+    alignas(4) uint32_t model;
 } SurfaceMaterial;
 DECLARE_ARRLIST(SurfaceMaterial);
 

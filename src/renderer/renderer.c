@@ -78,10 +78,11 @@ void InitializeRenderer() {
 
     // default material
     SubmitMaterial((SurfaceMaterial){
+        {0.0f, 0.0f, 0.0f},
         {1.0f, 1.0f, 1.0f},
         {1.0f, 1.0f, 1.0f},
         {0.0f, 0.0f, 0.0f},
-        0, 0, 0, 0, 0, 0
+        0, 0, 2
     });
 
     // set overlay context

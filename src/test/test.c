@@ -30,15 +30,13 @@ ARRLIST_TestResult g_results = { 0 };
 
 void CreateMaterials() {
 	SurfaceMaterial material = {
+        { 0.0f, 0.0f, 0.0f },
         { 1.0f, 1.0f, 1.0f },
         { 1.0f, 1.0f, 1.0f },
         { 1.0f, 1.0f, 1.0f },
-        0.2f,
-        0,
-        0,
         0,
         1.0f,
-        0
+        2
     };
     g_generic_mat = SubmitMaterial(material);
 }

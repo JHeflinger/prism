@@ -8,6 +8,7 @@ NEXT:
 	- prism wiki and info buttons that open links to relevant pages about options
 
 BUGS:
+    - slecting faces happens regardless of if the mouse is over a popup or in another panel
     - the async renderer isn't exactly working, need to verify and reimplement probably
 	- outputted tid flickers sometimes, only when reflections is turned on
 		- actually when anything is turned on, but when turning refelctions off it stops some of the flickering sometimes?
@@ -23,8 +24,11 @@ OPTIMIZATION:
 	- window dimension changes
 	- accelerated sdfs via octtree
 	- paintable textures with physically accurate blending
+    - compress fields and unpack them using bitwise to reduce PCIE bandwidth and wasted space
 
 GENERAL:
+    - reimlement lights to be generalizable for spotlights, pointlights, and directional lights
+    - dropdown menu for selecting model when editing or adding a material
 	- implement delete buttons on edit panel
 	- make triangles double sided
 	- rotate triangles
