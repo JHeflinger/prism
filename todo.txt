@@ -30,6 +30,7 @@ GENERAL:
 	- rotate triangles
 	- use mouse to move vertices
 	- extrude triangles
+    - represent triangles via vertices and indices
 
 RENDERING:
 	- offline iterative rendering pipeline

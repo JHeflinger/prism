@@ -1,6 +1,8 @@
 #include "diagnostics.h"
 #include "renderer/renderer.h"
 #include "data/assets.h"
+#include "data/input.h"
+#include "renderer/loader.h"
 #include <easymemory.h>
 
 BOOL g_vsync_enabled = TRUE;
@@ -87,6 +89,11 @@ void DrawDevPanel(float width, float height) {
 	UICheckboxLabeled("SDF:", &(RenderConfig()->sdf));
     UIDragUIntLabeled("Max Marches:", &(RenderConfig()->maxmarches), 0, 10000000, 1, width - 20);
     UIDragFloatLabeled("Smooth:", &(RenderConfig()->sdfsmooth), 0.0f, 10000.0f, 0.05f, width - 20);
+
+    if (InputKeyReleased(IK_DEV)) {
+        //LoadOBJ("assets/models/room.obj");
+        LoadOBJ("/home/jason/Dev/ADVGRAPHICS/example-scenes/models/CornellBox/CornellBox-Original.obj");
+    }
 }
 
 Panel GenerateDiagnosticsPanel() {

@@ -64,27 +64,6 @@ void UpdateUI(UI* ui) {
         }
     }
 
-    // dev split
-    if (InputKeyDown(IK_DEV) &&
-        (InputButtonPressed(IK_MOUSELEFT) || 
-        InputButtonPressed(IK_MOUSERIGHT)) &&
-        CheckCollisionPointRec(
-            GetMousePosition(), 
-            (Rectangle){ui->x, ui->y, ui->w, ui->h}) &&
-        !ui->left &&
-        !ui->right) {
-        ui->vertical = InputButtonPressed(IK_MOUSELEFT);
-        UI* left = GenerateUI();
-        UI* right = GenerateUI();
-        if (ui->vertical) {
-            ui->divide = ui->h / 2;
-        } else {
-            ui->divide = ui->w / 2;
-        }
-        ui->left = (void*)left;
-        ui->right = (void*)right;
-    }
-
     // divisor dragging
     if (g_divider_instance == ui && g_divider_active) {
         if (ui->vertical) {
