@@ -1,5 +1,6 @@
 #include "rstructs.h"
 
+IMPL_ARRLIST(MaterialID);
 IMPL_ARRLIST(TriangleID);
 IMPL_ARRLIST(SDFID);
 IMPL_ARRLIST(Triangle);

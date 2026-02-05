@@ -13,6 +13,7 @@ typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
 typedef uint32_t SDFID;
 typedef uint32_t LightID;
+DECLARE_ARRLIST(MaterialID);
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARRLIST(SDFID);
 DECLARE_ARRLIST(LightID);

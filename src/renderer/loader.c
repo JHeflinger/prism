@@ -22,6 +22,11 @@
 }
 
 typedef struct {
+    size_t face_index;
+    size_t material_ind;
+} UseMaterialMarker;
+
+typedef struct {
     float x;
     float y;
     float z;
@@ -41,9 +46,11 @@ typedef struct {
 DECLARE_ARRLIST(Vertex);
 DECLARE_ARRLIST(Face);
 DECLARE_ARRLIST(UV);
+DECLARE_ARRLIST(UseMaterialMarker);
 IMPL_ARRLIST(Vertex);
 IMPL_ARRLIST(Face);
 IMPL_ARRLIST(UV);
+IMPL_ARRLIST(UseMaterialMarker);
 
 typedef struct {
     ARRLIST_Vertex vertices;
@@ -52,6 +59,7 @@ typedef struct {
     ARRLIST_Face faces;
     ARRLIST_DynamicString material_names;
     ARRLIST_SurfaceMaterial materials;
+    ARRLIST_UseMaterialMarker markers;
     const char* filepath;
 } StateOBJ;
 
@@ -67,6 +75,7 @@ void CleanStateOBJ(StateOBJ* state) {
         EZ_FREE(state->material_names.data[i]);
     ARRLIST_DynamicString_clear(&(state->material_names));
     ARRLIST_SurfaceMaterial_clear(&(state->materials));
+    ARRLIST_UseMaterialMarker_clear(&(state->markers));
 }
 
 BOOL IsWhitespace(char c) {
@@ -308,7 +317,21 @@ BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t n
 }
 
 BOOL ParseOBJ_usemtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
-    EZ_WARN("Parsing usemtl args have not been implemented yet");
+    if (numargs != 2) {
+        EZ_ERROR("Invalid format for usemtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
+        return FALSE;
+    }
+    size_t ind = 0;
+    for (size_t i = 0; i < state->material_names.size; i++) {
+        if (strcmp(state->material_names.data[i], lineargs[1]) == 0) {
+            ind = i;
+            goto found;
+        }
+    }
+    EZ_ERROR("No material of name \"%s\" found", lineargs[1]);
+    return FALSE;
+    found:
+    ARRLIST_UseMaterialMarker_add(&(state->markers), (UseMaterialMarker){ state->faces.size, ind });
     return TRUE;
 }
 
@@ -433,7 +456,16 @@ BOOL ConstructOBJ(const StateOBJ state) {
         }
     }
     if (failure) return FALSE;
+    ARRLIST_MaterialID ids = { 0 }; 
+    for (size_t i = 0; i < state.materials.size; i++)
+        ARRLIST_MaterialID_add(&ids, SubmitMaterial(state.materials.data[i]));
+    size_t current_marker = 0;
+    MaterialID current_material = 0;
     for (size_t i = 0; i < state.faces.size; i++) {
+        while (current_marker < state.markers.size && state.markers.data[current_marker].face_index <= i) {
+            current_material = ids.data[state.markers.data[current_marker].material_ind];
+            current_marker++;
+        }
         Triangle triangle = {
             {
                 state.vertices.data[state.faces.data[i].a].x,
@@ -450,10 +482,11 @@ BOOL ConstructOBJ(const StateOBJ state) {
                 state.vertices.data[state.faces.data[i].c].y,
                 state.vertices.data[state.faces.data[i].c].z,
             },
-            0 // default material
+            current_material
         };
         SubmitTriangle(triangle);
     }
+    ARRLIST_MaterialID_clear(&ids);
     return TRUE;
 }
 
