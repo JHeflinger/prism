@@ -124,7 +124,7 @@ float noise(float n) {
 }
 
 float random() {
-    random_seed = (random_seed + 1.23456789) * 0.61803398875;
+    random_seed *= 0.5 + noise(random_seed);
     return noise(random_seed);
 }
 

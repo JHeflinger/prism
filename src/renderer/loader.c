@@ -490,6 +490,11 @@ BOOL ParseOBJ_o(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numarg
     return TRUE;
 }
 
+BOOL ParseOBJ_s(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+    // Not useful for prism right now, implement later if needed
+    return TRUE;
+}
+
 ParseFuncOBJ GetParserFromArgOBJ(const char* header) {
     #define GETPARSER(h) if (strcmp(header, #h) == 0) return ParseOBJ_##h;
     GETPARSER(mtllib);
@@ -500,6 +505,7 @@ ParseFuncOBJ GetParserFromArgOBJ(const char* header) {
     GETPARSER(f);
     GETPARSER(g);
     GETPARSER(o);
+    GETPARSER(s);
     #undef GETPARSER
     return NULL;
 }
