@@ -715,6 +715,7 @@ BOOL LoadXML(const char* filepath) { // TODO: marked for removal
         camera.position = pos;
         camera.look = look;
         camera.up = up;
+        camera.fov = heightangle;
         MoveCamera(camera);
     }
     FreeFile(file);

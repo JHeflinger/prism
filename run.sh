@@ -1,4 +1,4 @@
-./build.sh $1 $2 $3
+./build.sh $1 $2
 if [ $? -ne 0 ]; then
     exit 1
 fi
