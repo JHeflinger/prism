@@ -78,8 +78,6 @@ void UpdateViewportPanel(float width, float height) {
         camera.fov = 90.0f;
         SetViewportSlice(width, height);
         MoveCamera(camera);
-
-        //EZ_INFO("\n\t%.3f %.3f %.3f\n\t%.3f %.3f %.3f\n\t%.3f %.3f %.3f", camera.position.x, camera.position.y, camera.position.z, camera.look.x, camera.look.y, camera.look.z, camera.up.x, camera.up.y, camera.up.z);
     }
 
     // selection controls

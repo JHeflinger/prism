@@ -50,7 +50,7 @@ void InitializeRenderer() {
     g_renderer.camera.position = (Vector3){ 2.11f, 0.0f, 2.133f };
     g_renderer.camera.look = (Vector3){ 0.0f, 0.0f, 0.0f };
     g_renderer.camera.up = (Vector3){ 0.0f, 0.0f, 1.0f };
-    g_renderer.camera.fov = 90.0f;
+    g_renderer.camera.fov = 45.0f;
 
     // set up dimensions
     g_renderer.dimensions = (Vector2){ 

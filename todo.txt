@@ -28,7 +28,6 @@ ICEBOX:
 
 NEXT:
 -1. Saving to scene with specific resolution/samples
-0. XML parsing
 1. Clean up and prune UBO
 2. Expose white point and gamma
 3. Direct light sampling
@@ -44,3 +43,4 @@ NEXT:
 13. Material names
 14. Emission needs to be unbounded in material editor
 15. Account for heightAngle in XML
+16. Make executor output more pretty with a progress bar

@@ -623,8 +623,7 @@ BOOL LoadOBJ(const char* filepath) {
     return TRUE;
 }
 
-// TODO: delete later
-BOOL LoadXML(const char* filepath) {
+BOOL LoadXML(const char* filepath) { // TODO: marked for removal
     EZ_WARN("The XML loader is experimental/unstable and is marked for removal. It is recommended to load scenes from different formats.");
     SimpleFile* file = ReadFile(filepath);
     if (!file) {

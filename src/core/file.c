@@ -14,6 +14,22 @@ char* FileExtension(const char* path) {
     return dot + 1;
 }
 
+FileType GetFileType(const char* path) {
+    char* extension = FileExtension(path);
+    if (strcmp(extension, "obj") == 0 || strcmp(extension, "OBJ") == 0) {
+        return DOTOBJ;
+    } else if (strcmp(extension, "prism") == 0 || strcmp(extension, "PRISM") == 0) {
+        return DOTPRISM;
+    } else if (strcmp(extension, "spv") == 0 || strcmp(extension, "SPV") == 0) {
+        return DOTSPV;
+    } else if (strcmp(extension, "mtl") == 0 || strcmp(extension, "MTL") == 0) {
+        return DOTMTL;
+    } else if (strcmp(extension, "xml") == 0 || strcmp(extension, "XML") == 0) {
+        return DOTXML;
+    }
+    return UNKNOWN;
+}
+
 char* StripFilename(char* path) {
     for (int i = (int)strlen(path) - 1; i >= 0; i--) {
         if (path[i] == '/' || path[i] == '\\') {
@@ -26,20 +42,7 @@ char* StripFilename(char* path) {
 
 SimpleFile* ReadFile(const char* filename) {
 	SimpleFile* sfile = EZ_ALLOC(1, sizeof(SimpleFile));
-    char* extension = FileExtension(filename);
-    if (strcmp(extension, "obj") == 0 || strcmp(extension, "OBJ") == 0) {
-        sfile->type = DOTOBJ;
-    } else if (strcmp(extension, "prism") == 0 || strcmp(extension, "PRISM") == 0) {
-        sfile->type = DOTPRISM;
-    } else if (strcmp(extension, "spv") == 0 || strcmp(extension, "SPV") == 0) {
-        sfile->type = DOTSPV;
-    } else if (strcmp(extension, "mtl") == 0 || strcmp(extension, "MTL") == 0) {
-        sfile->type = DOTMTL;
-    } else if (strcmp(extension, "xml") == 0 || strcmp(extension, "XML") == 0) {
-        sfile->type = DOTXML;
-    } else {
-        sfile->type = UNKNOWN;
-    }
+    sfile->type = GetFileType(filename);
 	FILE* file = fopen(filename, "rb");
     if (file == NULL) {
         EZ_ERROR("Unable to open file \"%s\"", filename);

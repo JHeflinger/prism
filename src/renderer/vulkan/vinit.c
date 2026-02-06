@@ -29,7 +29,7 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
         "shaders/postprocess.comp",
         "build/shaders/postprocess.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        TRUE,
+        FALSE,
         g_vinit_renderer_ref,
         "shaders/overlay.comp",
         "build/shaders/overlay.comp.spv"));
