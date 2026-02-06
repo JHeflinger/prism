@@ -6,12 +6,17 @@
 #include <ctype.h>
 
 #define MAX_MTLLIB_PATH_SIZE 1024
+#define MAX_OBJ_PATH_SIZE 1024
+#define MAX_XML_PATH_SIZE 1024
 #define MAX_OBJ_LINE_SIZE 2048
 #define MAX_OBJ_ARG_SIZE 32
 #define MAX_OBJ_NUM_ARGS 64
 #define MAX_MTL_LINE_SIZE 2048
 #define MAX_MTL_ARG_SIZE 32
 #define MAX_MTL_NUM_ARGS 64
+#define MAX_XML_LINE_SIZE 2048
+#define MAX_XML_ARG_SIZE 32
+#define MAX_XML_NUM_ARGS 64
 
 #define SET_MTL_FLOAT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
 #define SET_MTL_UINT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
@@ -616,6 +621,116 @@ BOOL LoadOBJ(const char* filepath) {
     CleanStateOBJ(&state);
     FreeFile(file);
     return TRUE;
+}
+
+// TODO: delete later
+BOOL LoadXML(const char* filepath) {
+    EZ_WARN("The XML loader is experimental/unstable and is marked for removal. It is recommended to load scenes from different formats.");
+    SimpleFile* file = ReadFile(filepath);
+    if (!file) {
+        EZ_ERROR("Unable to load invalid filepath \"%s\"", filepath);
+        return FALSE;
+    }
+    if (file->type != DOTXML) {
+        EZ_ERROR("\"%s\" is not a .xml file. Unable to open it with the XML loader", filepath);
+        FreeFile(file);
+        return FALSE;
+    }
+    LineParser parser = Parser(file);
+    char line[MAX_XML_LINE_SIZE] = { 0 };
+    char obj[MAX_XML_LINE_SIZE] = { 0 };
+    int camera_params_collected = 0;
+    Vector3 pos;
+    Vector3 up;
+    Vector3 look;
+    float heightangle;
+    while (NextLine(&parser, line, MAX_XML_LINE_SIZE)) {
+        char lineargs[MAX_XML_NUM_ARGS][MAX_XML_ARG_SIZE] = { 0 };
+        size_t numargs = ParseLineArgsOBJ(line, lineargs);
+        if (numargs > 0) {
+            if (strcmp(lineargs[0], "<object") == 0 && numargs == 4) {
+                size_t len = strlen(lineargs[3]);
+                lineargs[3][len - 2] = 0;
+                strcpy(obj, lineargs[3] + 10);
+            } else if (strcmp(lineargs[0], "<pos") == 0) {
+                camera_params_collected |= 1;
+                char x[MAX_XML_ARG_SIZE] = { 0 };
+                char y[MAX_XML_ARG_SIZE] = { 0 };
+                char z[MAX_XML_ARG_SIZE] = { 0 };
+                float xf, yf, zf;
+                memcpy(x, lineargs[1] + 3, strlen(lineargs[1]) - 4);
+                memcpy(y, lineargs[2] + 3, strlen(lineargs[2]) - 4);
+                memcpy(z, lineargs[3] + 3, strlen(lineargs[3]) - 6);
+                if (ParseFloat(x, &xf) && ParseFloat(y, &yf) && ParseFloat(z, &zf)) {
+                    pos = (Vector3){ xf, yf, zf };
+                } else {
+                    EZ_ERROR("Unable to parse camera position arguments \"%s %s %s\"", x, y, z);
+                }
+            } else if (strcmp(lineargs[0], "<up") == 0) {
+                camera_params_collected |= 1 << 1;
+                char x[MAX_XML_ARG_SIZE] = { 0 };
+                char y[MAX_XML_ARG_SIZE] = { 0 };
+                char z[MAX_XML_ARG_SIZE] = { 0 };
+                float xf, yf, zf;
+                memcpy(x, lineargs[1] + 3, strlen(lineargs[1]) - 4);
+                memcpy(y, lineargs[2] + 3, strlen(lineargs[2]) - 4);
+                memcpy(z, lineargs[3] + 3, strlen(lineargs[3]) - 6);
+                if (ParseFloat(x, &xf) && ParseFloat(y, &yf) && ParseFloat(z, &zf)) {
+                    up = (Vector3){ xf, yf, zf };
+                } else {
+                    EZ_ERROR("Unable to parse camera up arguments \"%s %s %s\"", x, y, z);
+                }
+            } else if (strcmp(lineargs[0], "<focus") == 0) {
+                camera_params_collected |= 1 << 2;
+                char x[MAX_XML_ARG_SIZE] = { 0 };
+                char y[MAX_XML_ARG_SIZE] = { 0 };
+                char z[MAX_XML_ARG_SIZE] = { 0 };
+                float xf, yf, zf;
+                memcpy(x, lineargs[1] + 3, strlen(lineargs[1]) - 4);
+                memcpy(y, lineargs[2] + 3, strlen(lineargs[2]) - 4);
+                memcpy(z, lineargs[3] + 3, strlen(lineargs[3]) - 6);
+                if (ParseFloat(x, &xf) && ParseFloat(y, &yf) && ParseFloat(z, &zf)) {
+                    look = (Vector3){ xf, yf, zf };
+                } else {
+                    EZ_ERROR("Unable to parse camera focus arguments \"%s %s %s\"", x, y, z);
+                }
+            } else if (strcmp(lineargs[0], "<heightangle") == 0) {
+                camera_params_collected |= 1 << 3;
+                char x[MAX_XML_ARG_SIZE] = { 0 };
+                float xf;
+                memcpy(x, lineargs[1] + 3, strlen(lineargs[1]) - 6);
+                if (ParseFloat(x, &xf)) {
+                    heightangle = xf;
+                } else {
+                    EZ_ERROR("Unable to parse camera heightangle argument \"%s\"", x);
+                }
+            }
+        }
+    }
+    if (camera_params_collected == 0) {
+        EZ_WARN("No camera parameters collected - default camera settings will be used");
+    } else if (camera_params_collected != 0xf) {
+        EZ_WARN("Unable to find all required camera parameters - default camera settings will be used");
+    } else {
+        SimpleCamera camera = GetCamera();
+        camera.position = pos;
+        camera.look = look;
+        camera.up = up;
+        MoveCamera(camera);
+    }
+    FreeFile(file);
+    if (obj[0] == 0) {
+        EZ_ERROR("No mesh found in XML scene to load");
+        return FALSE;
+    }
+    char xmlloc[MAX_XML_PATH_SIZE] = { 0 };
+    char objpath[MAX_OBJ_PATH_SIZE*3] = { 0 };
+    strcpy(xmlloc, filepath);
+    char* fnstart = StripFilename(xmlloc);
+    if (fnstart) fnstart[0] = 0;
+    else xmlloc[0] = 0;
+    sprintf(objpath, "%s%s", xmlloc, obj);
+    return LoadOBJ(objpath);
 }
 
 BOOL LoadScene(const char* filepath) {

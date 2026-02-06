@@ -24,6 +24,7 @@ ICEBOX:
 20. Resizeable window
 21. Compositing pipeline
 22. SDF construction pipeline using union, intersection, modifiers, etc
+23. Available keybinds tooltop overlay (like monster hunter combo hints)
 
 NEXT:
 -1. Saving to scene with specific resolution/samples
@@ -41,3 +42,5 @@ NEXT:
 11. Backface culling
 12. Fix pipeline flickering issue
 13. Material names
+14. Emission needs to be unbounded in material editor
+15. Account for heightAngle in XML

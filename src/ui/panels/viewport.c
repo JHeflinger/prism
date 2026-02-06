@@ -6,6 +6,7 @@
 #include "renderer/loader.h"
 #include <easylogger.h>
 #include <rlgl.h>
+#include <math.h>
 
 RenderTexture2D g_viewport_target;
 
@@ -18,12 +19,30 @@ void DrawViewportPanel(float width, float height) {
 }
 
 void UpdateViewportPanel(float width, float height) {
+    // reset camera
+    if (InputKeyPressed(IK_RESET_CAMERA)) {
+        //LoadOBJ("/home/jason/Dev/ADVGRAPHICS/example-scenes/models/CornellBox/CornellBox-Sphere.obj");
+        LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
+
+        /* 
+        SimpleCamera camera = GetCamera();
+        camera.position = (Vector3){ 2.11f, 0.0f, 2.133f };
+        camera.look = (Vector3){ 0.0f, 0.0f, 0.0f };
+        camera.up = (Vector3){ 0.0f, 0.0f, 1.0f };
+        camera.fov = 90.0f;
+        MoveCamera(camera);
+        */
+    }
+
     // camera controls
     {
-        static float radius = 3.0f;
-        static float theta = 0.0f;
-        static float phi = 0.78f;
         SimpleCamera camera = GetCamera();
+        vec3 offset;
+        glm_vec3_sub((vec3){ camera.position.x, camera.position.y, camera.position.z }, (vec3){ camera.look.x, camera.look.y, camera.look.z }, offset);
+        float radius = glm_vec3_norm(offset);
+        if (radius < 1e-6f) radius = 1e-6f;
+        float phi   = acosf(offset[2] / radius);
+        float theta = atan2f(offset[1], offset[0]);
         if (InputButtonDown(IK_MOUSERIGHT)) {
             phi -= GetMouseDelta().y / 225.0;
             theta -= GetMouseDelta().x / 400.0f;
@@ -52,24 +71,15 @@ void UpdateViewportPanel(float width, float height) {
             camera.look.y += movement[1];
             camera.look.z += movement[2];
         }
-        if (InputKeyPressed(IK_RESET_CAMERA)) {
-            //radius = 3.0f;
-            //theta = 0.0f;
-            //phi = 0.78f;
-            radius = 2.750;
-            theta = 4.715;
-            phi = 0.001;
-            //camera.look = (Vector3){ 0, 0, 0 };
-            camera.look = (Vector3){ 0, 1, 0 };
-            LoadOBJ("/home/jason/Dev/ADVGRAPHICS/example-scenes/models/CornellBox/CornellBox-Sphere.obj"); 
-        }
+        radius -= GetMouseWheelMove() / 4.0f;
         camera.position.x = camera.look.x + (radius * sin(phi) * cos(theta));
         camera.position.y = camera.look.y + (radius * sin(phi) * sin(theta));
         camera.position.z = camera.look.z + (radius * cos(phi));
         camera.fov = 90.0f;
         SetViewportSlice(width, height);
         MoveCamera(camera);
-        radius -= GetMouseWheelMove() / 4.0f;
+
+        //EZ_INFO("\n\t%.3f %.3f %.3f\n\t%.3f %.3f %.3f\n\t%.3f %.3f %.3f", camera.position.x, camera.position.y, camera.position.z, camera.look.x, camera.look.y, camera.look.z, camera.up.x, camera.up.y, camera.up.z);
     }
 
     // selection controls

@@ -35,6 +35,8 @@ SimpleFile* ReadFile(const char* filename) {
         sfile->type = DOTSPV;
     } else if (strcmp(extension, "mtl") == 0 || strcmp(extension, "MTL") == 0) {
         sfile->type = DOTMTL;
+    } else if (strcmp(extension, "xml") == 0 || strcmp(extension, "XML") == 0) {
+        sfile->type = DOTXML;
     } else {
         sfile->type = UNKNOWN;
     }
