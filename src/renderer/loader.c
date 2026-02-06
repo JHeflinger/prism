@@ -170,7 +170,7 @@ BOOL ParseTriplet(const char* str, int64_t* a, int64_t* b, int64_t* c, size_t* c
             }
         }
     }
-    memcpy(cbuff, str + ptr, strlen(str) - ptr);
+    memcpy(*count == 0 ? abuff : (*count == 1 ? bbuff : cbuff), str + ptr, strlen(str) - ptr);
     *count += 1;
     BOOL success = ParseLInt(abuff, a);
     success &= (*a != 0);
@@ -519,15 +519,15 @@ BOOL ConstructOBJ(const StateOBJ state) {
             EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].c, (int)state.vertices.size);
             failure = TRUE;
         }
-        if (state.faces.data[i].an >= state.normals.size) {
+        if (state.faces.data[i].an >= state.normals.size && state.faces.data[i].an != 0) {
             EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].an, (int)state.normals.size);
             failure = TRUE;
         }
-        if (state.faces.data[i].bn >= state.normals.size) {
+        if (state.faces.data[i].bn >= state.normals.size && state.faces.data[i].bn != 0) {
             EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].bn, (int)state.normals.size);
             failure = TRUE;
         }
-        if (state.faces.data[i].cn >= state.normals.size) {
+        if (state.faces.data[i].cn >= state.normals.size && state.faces.data[i].cn != 0) {
             EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].cn, (int)state.normals.size);
             failure = TRUE;
         }
@@ -560,19 +560,19 @@ BOOL ConstructOBJ(const StateOBJ state) {
                 state.vertices.data[state.faces.data[i].c].z,
             },
             {
-                state.normals.data[state.faces.data[i].an].x,
-                state.normals.data[state.faces.data[i].an].y,
-                state.normals.data[state.faces.data[i].an].z,
+                state.normals.size > 0 ? state.normals.data[state.faces.data[i].an].x : 0,
+                state.normals.size > 0 ? state.normals.data[state.faces.data[i].an].y : 0,
+                state.normals.size > 0 ? state.normals.data[state.faces.data[i].an].z : 0,
             },
             {
-                state.normals.data[state.faces.data[i].bn].x,
-                state.normals.data[state.faces.data[i].bn].y,
-                state.normals.data[state.faces.data[i].bn].z,
+                state.normals.size > 0 ? state.normals.data[state.faces.data[i].bn].x : 0,
+                state.normals.size > 0 ? state.normals.data[state.faces.data[i].bn].y : 0,
+                state.normals.size > 0 ? state.normals.data[state.faces.data[i].bn].z : 0,
             },
             {
-                state.normals.data[state.faces.data[i].cn].x,
-                state.normals.data[state.faces.data[i].cn].y,
-                state.normals.data[state.faces.data[i].cn].z,
+                state.normals.size > 0 ? state.normals.data[state.faces.data[i].cn].x : 0,
+                state.normals.size > 0 ? state.normals.data[state.faces.data[i].cn].y : 0,
+                state.normals.size > 0 ? state.normals.data[state.faces.data[i].cn].z : 0,
             },
             current_material
         };

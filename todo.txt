@@ -1,78 +1,41 @@
+OFFLINE:
+1. bounce-per-frame should be ultimately faster bc we're not stacking lagging path times
+
+ICEBOX:
+1. Select multiple faces via holding shift
+2. Select all seen faces via dragging box
+3. Wiki + Info buttons
+4. Outputted TID flickers at certain angles
+5. Reimplement SDFs properly, represent in scene as boxes if marching isn't enabled, otherwise march instead of trace
+6. Volumetrics
+7. Diffraction
+9. Spectral
+10. Frameless
+11. Point/Spot/Directional lights
+12. Delete buttons on edit panel
+12. Rotate triangles
+13. Extrude triangles
+14. Convert to vertex-index model
+15. Use mouse to move vertices
+16. Offline rendering pipeline
+17. Depth of field
+18. Textures/mipmapping/bilinear/trilinear filtering
+19. Dynamically adjustable resolution (window is max resolution, scale down viewport and usage from there)
+20. Resizeable window
+21. Compositing pipeline
+22. SDF construction pipeline using union, intersection, modifiers, etc
+
 NEXT:
-	- select multiple faces via holding shift
-	- select all seen faces via dragging box
-		- triangles how hold value of if they are selected or not
-		- overlay will just draw selected if the current triangle on the pixel is selected
-		- then we can easily add to this and update this by sending commands to gpu that can do it in O(1) time
-		- for modifying we can then send a modify commmand to gpu that does it and then updates cpu host buffer based on gpu 
-	- prism wiki and info buttons that open links to relevant pages about options
-
-BUGS:
-    - slecting faces happens regardless of if the mouse is over a popup or in another panel
-    - the async renderer isn't exactly working, need to verify and reimplement probably
-	- outputted tid flickers sometimes, only when reflections is turned on
-		- actually when anything is turned on, but when turning refelctions off it stops some of the flickering sometimes?
-
-SMALL STUFF:
-    - ambient occlusion distance should scale with average triangle max length
-
-OPTIMIZATION:
-	- when updating resources just update the resources that need to be updated
-	- cache optimization 
-	- textures
-	- condense everything to one buffer
-	- window dimension changes
-	- accelerated sdfs via octtree
-	- paintable textures with physically accurate blending
-    - compress fields and unpack them using bitwise to reduce PCIE bandwidth and wasted space
-
-GENERAL:
-    - rework how frameless should work with pathtracing
-    - would like a way to deselect the current face
-    - reimlement lights to be generalizable for spotlights, pointlights, and directional lights
-    - dropdown menu for selecting model when editing or adding a material
-	- implement delete buttons on edit panel
-	- make triangles double sided
-	- rotate triangles
-	- use mouse to move vertices
-	- extrude triangles
-    - represent triangles via vertices and indices
-
-RENDERING:
-	- offline iterative rendering pipeline
-	- light attenuation
-	- soft shadows
-	- dynamically sized dispatch groups between shader stages 
-	- different types of lights
-	- depth of field
-	- real motion blur
-	- textures
-	- mipmapping and bilinear and trilinear filtering
-	- refraction
-	- convert triangles to indices representations 
-	- structure of arrays
-	- auto resolution
-	- direction assisted raymarching
-	- seperate compositor panel
-	- backface culling so can ignore tri hits
-	- sdf construction pipeline with building blocks
-	- texture units
-	- barycentric mapped coordinates for meshes into sdfs or primitives
-
-NOTES:
-    - to address the whole exponential splitting diffraction - we DON'T have to do this, just make sure to transform the spectrum wavelength choose when hitting a fluorescent material
-    - for dielectric materials, we should only be choosing one path, either bounce or refract based on pdf right?
-    - samplibg lambertian should be 2pi[0-1] for theta and r = sqrt[0-1]
-    - lambertian pdf should always be 1/2pi?
-
-1. touch up "default" shading
-1a1a1. for tracing make a function that takes in a max dist and use that to optimize tracing
-1a1a. screen space normals implement curvature ao
-1a1. accumulating ao has the same issue frameless used to have
-1a. grid should fade away in distance
-2. switch to full pathtracing no raytracing
-3. for real time pathtracing - do just each frame is one bounce, accumulate frames
-    3a. for real time, sync after every frame (don't start new path frame until done with the current one or else result may diverge) (idk if this is needed, we can try both ways)
-    3b. for non real time, don't bother syncing just start next path until all are done
-4. hdr curve, like aseprite color curve add points and smooth it out
-5. importance sample the light on termination, not every bounce!, or not maybe this instrouces bias
+-1. Saving to scene with specific resolution/samples
+0. XML parsing
+1. Clean up and prune UBO
+2. Expose white point and gamma
+3. Direct light sampling
+4. BUG - selecting faces happens regardless if in/out viewport or not
+5. BUG - async rendering is suspiciously not working
+6. Get rid of ambient occlusion
+7. Deselect current face
+8. Select model dropdown menu for material adding/editing
+9. Make triangles double sided (I think we can just compare costheta and invert the normal when needed)
+10. Refraction
+11. Backface culling

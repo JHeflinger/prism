@@ -170,7 +170,7 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     if (hit.distance <= EPS) return false;
     hit.material = tri.material;
     hit.position = ray.position + (ray.direction * hit.distance);
-    if (tri.a != vec3(0)) {
+    if (tri.an != vec3(0)) {
         hit.normal = normalize((1.0 - u - v)*tri.an + u*tri.bn + v*tri.cn);
     } else {
         hit.normal = normalize(cross(e1, e2));
