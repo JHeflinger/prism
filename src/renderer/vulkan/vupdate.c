@@ -167,9 +167,9 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     }
 
     // persistant vars
-    static uint32_t ao_samples = 1;
-    ao_samples++;
-    if (cam_reset) ao_samples = 1;
+    static uint32_t samples = 0;
+    samples++;
+    if (cam_reset) samples = 1;
 
     // core uniform buffer
     {
@@ -217,7 +217,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.mouse_x = mx;
         ubo.mouse_y = my;
         ubo.reset = cam_reset;
-        ubo.ao_samples = ao_samples;
+        ubo.samples = samples;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

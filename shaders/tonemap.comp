@@ -1,12 +1,5 @@
 #version 450
 
-struct RayGenerator {
-    vec3 normal;
-	float time;
-    uint tid;
-    uint occlusions;
-};
-
 layout(binding = 0) uniform UniformBufferObject {
 	vec3 look;
 	vec3 position;
@@ -41,26 +34,17 @@ layout(binding = 0) uniform UniformBufferObject {
     uint reset;
 } ubo;
 
-layout(binding = 1) readonly buffer RayGeneratorSSBOIn {
-   RayGenerator raygenIn[ ];
-};
+layout(binding = 1, rgba8) uniform image2D outputImage;
 
-layout(binding = 2, rgba8) uniform image2D outputImage;
+layout(binding = 2, rgba16f) uniform image2D hdrImage;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 void main() {
-    RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
-
-	vec3 color = vec3(imageLoad(outputImage, ivec2(rx, ry)));
-    float ao = 1.0f;
-    if (length(rgIn.normal) > 0) {
-        ao = 1.0f - float(rgIn.occlusions) / float(ubo.samples);
-        // TODO: curvature AO
-    }
-    float ao_power_pct = clamp(float(ubo.samples) / 64.0, 0, 1.0) * 0.4;
-    ao = (1.0f - ao_power_pct) + (ao_power_pct * ao);
-    imageStore(outputImage, ivec2(rx, ry), vec4(color * ao, 1.0));
+	vec3 hdr_color = vec3(imageLoad(hdrImage, ivec2(rx, ry)) / (float(ubo.samples) / 2.0)); // TODO: fix because 2.0 needs to correspond to the cpu target pipeline length
+    hdr_color = (hdr_color * ((hdr_color/400) + vec3(1.0)))/(vec3(1.0) + hdr_color); // TODO: bind to ubo defined white point
+    hdr_color = pow(hdr_color, vec3(1.0 / 2.2)); // TODO: 2.2 is gamma correction, extend to ubo settings
+	imageStore(outputImage, ivec2(rx, ry), vec4(hdr_color, 1.0));
 }

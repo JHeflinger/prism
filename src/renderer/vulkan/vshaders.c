@@ -69,6 +69,15 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(RayGenerator)
 			}
 		};
+	} else if (strcmp(name, "hdrImage") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_IMAGE,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.hdr[i].view)
+			},
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0 }
+		};
 	} else if (strcmp(name, "outputImage") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_IMAGE,

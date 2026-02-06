@@ -32,7 +32,7 @@ void highlight_triangle(uint htid) {
 	int rx = int(gl_GlobalInvocationID.x%ubo.image_width);
     int ry = int(gl_GlobalInvocationID.x/ubo.image_width);
     if (htid != -1 && rgIn.tid == htid) {
-		int radius = 4;
+		int radius = 2;
 		int minx = 0;
 		int miny = 0;
 		int maxx = rx;

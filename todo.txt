@@ -27,6 +27,8 @@ OPTIMIZATION:
     - compress fields and unpack them using bitwise to reduce PCIE bandwidth and wasted space
 
 GENERAL:
+    - rework how frameless should work with pathtracing
+    - would like a way to deselect the current face
     - reimlement lights to be generalizable for spotlights, pointlights, and directional lights
     - dropdown menu for selecting model when editing or adding a material
 	- implement delete buttons on edit panel

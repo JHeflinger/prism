@@ -47,7 +47,7 @@ typedef struct {
     alignas(4) uint32_t grid;
     alignas(4) uint32_t mouse_x;
     alignas(4) uint32_t mouse_y;
-    alignas(4) uint32_t ao_samples;
+    alignas(4) uint32_t samples;
     alignas(4) uint32_t reset;
 } UniformBufferObject;
 
@@ -115,6 +115,7 @@ typedef struct {
 typedef struct {
     VulkanPipeline pipeline;
     VulkanRenderData renderdata;
+    VulkanImage hdr[CPUSWAP_LENGTH];
     VulkanImage targets[CPUSWAP_LENGTH];
 } VulkanRenderContext;
 

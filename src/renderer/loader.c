@@ -364,11 +364,11 @@ BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
 }
 
 BOOL ParseOBJ_vt(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
-    if (numargs != 3) {
-        EZ_ERROR("Cannot parse a vertex texture field without exactly 2 arguments - detected %d instead", (int)numargs - 1);
+    if (numargs != 3 && numargs != 4) {
+        EZ_ERROR("Cannot parse a vertex texture field without 2-3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
-    float u, v;
+    float u, v; // ignoring w
     if (!(ParseFloat(lineargs[1], &u) && ParseFloat(lineargs[2], &v))) {
         EZ_ERROR("Invalid vertex texture fields - expected 2 floats and got \"%s %s\" instead", lineargs[1], lineargs[2]);
         return FALSE;

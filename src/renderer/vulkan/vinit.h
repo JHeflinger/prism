@@ -39,6 +39,8 @@ BOOL VINIT_Materials(VulkanDataBuffer* materials);
 
 BOOL VINIT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh);
 
+BOOL VINIT_TargetsHDR(VulkanImage* hdr_arr);
+
 BOOL VINIT_Targets(VulkanImage* targets_arr);
 
 BOOL VINIT_General(VulkanGeneral* general);

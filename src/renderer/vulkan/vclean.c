@@ -78,6 +78,9 @@ void VCLEAN_RenderContext(VulkanRenderContext* context) {
         vkDestroyImageView(g_vclean_renderer_ref->vulkan.core.general.interface, context->targets[i].view, NULL);
         vkDestroyImage(g_vclean_renderer_ref->vulkan.core.general.interface, context->targets[i].image, NULL);
         vkFreeMemory(g_vclean_renderer_ref->vulkan.core.general.interface, context->targets[i].memory, NULL);
+        vkDestroyImageView(g_vclean_renderer_ref->vulkan.core.general.interface, context->hdr[i].view, NULL);
+        vkDestroyImage(g_vclean_renderer_ref->vulkan.core.general.interface, context->hdr[i].image, NULL);
+        vkFreeMemory(g_vclean_renderer_ref->vulkan.core.general.interface, context->hdr[i].memory, NULL);
     }
 
     VCLEAN_RenderData(&(context->renderdata));

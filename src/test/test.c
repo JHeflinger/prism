@@ -148,6 +148,7 @@ void CleanScene() {
     ClearLights();
     ClearTriangles();
     SimpleCamera c;
+    printf("hello??");
     c.position = (Vector3){ 2.11f, 0.0f, 2.133f };
     c.look = (Vector3){ 0.0f, 0.0f, 0.0f };
     c.up = (Vector3){ 0.0f, 0.0f, 1.0f };

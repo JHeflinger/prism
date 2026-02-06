@@ -9,15 +9,20 @@ Renderer* g_vinit_renderer_ref = NULL;
 
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        TRUE,
+        FALSE,
         g_vinit_renderer_ref,
         "shaders/default.comp",
         "build/shaders/default.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        FALSE,
+        TRUE,
         g_vinit_renderer_ref,
-        "shaders/render.comp",
-        "build/shaders/render.comp.spv"));
+        "shaders/path.comp",
+        "build/shaders/path.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        TRUE,
+        g_vinit_renderer_ref,
+        "shaders/tonemap.comp",
+        "build/shaders/tonemap.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         TRUE,
         g_vinit_renderer_ref,
@@ -313,6 +318,7 @@ BOOL VINIT_Bridge(VulkanDataBuffer* bridge) {
 }
 
 BOOL VINIT_RenderContext(VulkanRenderContext* context) {
+    if (!VINIT_TargetsHDR(context->hdr)) return FALSE;
 	if (!VINIT_Targets(context->targets)) return FALSE;
 	if (!VINIT_RenderData(&(context->renderdata))) return FALSE;
 	if (!VINIT_Pipeline(&(context->pipeline))) return FALSE;
@@ -364,6 +370,29 @@ BOOL VINIT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         bvh);
     VUPDT_BoundingVolumeHierarchy(bvh);
+    return TRUE;
+}
+
+BOOL VINIT_TargetsHDR(VulkanImage* hdr_arr) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUTIL_CreateImage(
+            g_vinit_renderer_ref->dimensions.x,
+            g_vinit_renderer_ref->dimensions.y,
+            1,
+            VK_SAMPLE_COUNT_1_BIT,
+            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            &(hdr_arr[i]));
+        VUTIL_TransitionImageLayout(
+            hdr_arr[i].image,
+            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_GENERAL,
+            1);
+    }
     return TRUE;
 }
 

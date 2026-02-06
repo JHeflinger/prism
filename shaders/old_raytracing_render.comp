@@ -101,7 +101,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint grid;
 	uint mouse_x;
 	uint mouse_y;
-    uint ao_samples;
+    uint samples;
     uint reset;
 } ubo;
 

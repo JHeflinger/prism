@@ -1,8 +1,10 @@
 #version 450
 
-#define MAX_RECURSIVE_DEPTH 500
-#define AO_DIST 0.5
+#define MAX_RECURSIVE_DEPTH 2000
+#define MAX_BOUNCES 100
 #define EPS 0.0001
+
+#define LAMBERTIAN_MODEL 2
 
 struct RayGenerator {
     vec3 normal;
@@ -18,6 +20,7 @@ struct Ray {
 
 struct Hit {
     float distance;
+    uint material;
     vec3 normal;
     vec3 position;
 };
@@ -27,6 +30,16 @@ struct Triangle {
     vec3 b;
     vec3 c;
     uint material;
+};
+
+struct Material {
+    vec3 emission;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float rindex;
+    float shiny;
+    uint model;
 };
 
 struct NodeBVH {
@@ -56,7 +69,7 @@ layout(binding = 0) uniform UniformBufferObject {
 	uint shadows;
 	uint reflections;
 	uint lighting;
-    uint raytrace;
+    uint trace;
     uint sdf;
     uint sdfsize;
     float sdfsmooth;
@@ -75,53 +88,43 @@ layout(binding = 1) buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
 
-layout(binding = 2, rgba8) uniform image2D outputImage;
+layout(binding = 2, rgba16f) uniform image2D hdrImage;
 
 layout(binding = 3) readonly buffer TriangleSSBOIn {
     Triangle triangleIn[ ];
 };
 
-layout(binding = 4) readonly buffer BVHSSBOIn {
+layout(binding = 4) readonly buffer MaterialSSBOIn {
+    Material materialIn[ ];
+};
+
+layout(binding = 5) readonly buffer BVHSSBOIn {
     NodeBVH bvhIn[ ];
 };
 
-layout(binding = 5) buffer OverlaySSBO {
+layout(binding = 6) buffer OverlaySSBO {
 	uint hovered_tid;
 };
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
+const float PI = 3.14159265358979323846;
 bool stack_failure = false;
-vec3 key_light = vec3(0.408248, 0.408248, 0.816497);
-vec3 fill_light = vec3(-0.440225, 0.17609, 0.880451);
-vec3 back_light = vec3(0, -0.447214, 0.894427);
-vec3 background_color = vec3(0.12);
+float random_seed = 0;
 
-float random(float n) { // from https://iquilezles.org/articles/morenoise/
+vec3 background_color(Ray ray) {
+    return vec3(0.0);
+}
+
+float noise(float n) {
 	return fract(n*17.0*fract(n*0.3183099));
 }
 
-void tangent_frame(vec3 n, inout vec3 t, inout vec3 b) {
-    if (abs(n.z) < 0.999) {
-        t = normalize(cross(vec3(0, 0, 1), n));
-    } else {
-        t = normalize(cross(vec3(0, 1, 0), n));
-    }
-    b = cross(n, t);
+float random() {
+    random_seed = (random_seed + 1.23456789) * 0.61803398875;
+    return noise(random_seed);
 }
 
-vec3 sample_hemisphere_cosine(vec3 n, float rand) {
-    float r1 = random(n.x * n.y + n.z + rand);
-    float r2 = random(n.x + n.y * n.z + rand);
-    float phi = 2.0 * 3.1415926535 * r1;
-    float r = sqrt(r2);
-    float x = r * cos(phi);
-    float y = r * sin(phi);
-    float z = sqrt(1.0f - r2);
-    vec3 t, b;
-    tangent_frame(n, t, b);
-    return normalize(x*t + y*b + z*n);
-}
 bool cut_viewport(int rx, int ry) {
     if (ubo.viewport.x != 0 &&
         (rx < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
@@ -162,6 +165,7 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     if (v < 0.0 || u + v > 1.0) return false;
     hit.distance = f * dot(e2, q);
     if (hit.distance <= EPS) return false;
+    hit.material = tri.material;
     hit.position = ray.position + (ray.direction * hit.distance);
     hit.normal = normalize(cross(e1, e2));
     return true;
@@ -211,97 +215,114 @@ Hit trace(Ray ray, inout uint hit_id) {
     return hit;
 }
 
-float lambert(vec3 n, vec3 l) {
-    return max(dot(n, l), 0.0);
+float russian_roulette(vec3 throughput) {
+    return clamp(max(max(throughput.x, throughput.y), throughput.z), 0.05, 1.0);
 }
 
-void ambient_occlusion(vec3 p, vec3 n) {
-    vec3 d = sample_hemisphere_cosine(n, p.x*p.y*p.z*ubo.seed);
-    Ray r = { p + n * EPS, d };
-    uint hid;
-    Hit h = trace(r, hid);
-    if (h.distance > 0 && h.distance <= AO_DIST)
-        raygenIn[gl_GlobalInvocationID.x].occlusions++;
+vec3 onb(vec3 normal, vec3 local) {
+	vec3 w = normal;
+	vec3 a = (abs(w.x) > 0.9) ? vec3(0, 1, 0) : vec3(1, 0, 0);
+	vec3 v = normalize(cross(w, a));
+	vec3 u = normalize(cross(w, v));
+	return normalize(local.x*u + local.y*v + local.z*w);
 }
 
-vec3 shade(Ray ray, Hit hit) {
-    float ambient = 0.08;
-    float rim = 1.0 - lambert(hit.normal, normalize(ubo.position - hit.position));
-    rim = pow(rim, 2.0) * 0.15;
-    float lighting = 0.5*lambert(hit.normal, key_light) +
-                     0.3*lambert(hit.normal, fill_light) +
-                     0.1*lambert(hit.normal, back_light);
-    // ambient_occlusion(hit.position, hit.normal);
-    return clamp((lighting + rim + ambient) * vec3(0.8), vec3(0), vec3(1));
+vec3 uniform_sample_hemisphere() {
+    float r1 = random();
+    float r2 = random();
+    float sqr2 = sqrt(r2);
+    float phi = 2.0 * PI * r1;
+    return vec3(cos(phi)*sqr2, sin(phi)*sqr2, sqrt(1.0 - r2));
 }
 
-float plane_intersect(Ray ray, vec3 planepoint, vec3 normal) {
-    return dot(planepoint - ray.position, normal) / dot(ray.direction, normal);
-}
-
-vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout vec3 normal) {
-	// create ray
-    Ray ray = create_ray(ray_coordinate);
-
-    // background color
-    vec3 color = background_color;
-
-    // trace
-    Hit hit;
-    hit.distance = -1.0;
-    float grid_plane_distance = plane_intersect(ray, vec3(0, 0, 0), vec3(0, 0, 1.0));
-    vec3 grid_plane_point = ray.position + (ray.direction * grid_plane_distance);
-    float grid_plane_tolerance = grid_plane_distance / 100.0;
-    float grid_x_tolerance = 0.0;//0.05 * (dot(normalize(ubo.look), vec3(0.0, 1.0, 0.0)) + 1.0);
-    float grid_y_tolerance = 0.0;//0.05 * (dot(normalize(ubo.look), vec3(1.0, 0.0, 0.0)) + 1.0);
-    float xfract = fract(grid_plane_point.x);
-    float yfract = fract(grid_plane_point.y);
-    hit = trace(ray, hit_id);
-    if (ubo.grid != 0 && grid_plane_distance > 0.0 &&
-        (hit.distance <= 0.0 || hit.distance > grid_plane_distance) &&
-        (xfract < grid_plane_tolerance + grid_x_tolerance ||
-        yfract < grid_plane_tolerance + grid_y_tolerance)) {
-        float divfract = 2.0 * abs((xfract < yfract ? xfract : yfract) - (grid_plane_tolerance / 2.0));
-        divfract = min(divfract, 2.0 * abs((xfract > yfract ? xfract : yfract) - (grid_plane_tolerance / 2.0)));
-        float alias = 1.0 - (divfract / grid_plane_tolerance);
-        color = mix(background_color, vec3(1.0), alias / grid_plane_distance);
-    } else if (hit.distance > 0.0) {
-        color = shade(ray, hit);
-        normal = hit.normal;
+void brdf(in Hit h, in Material material, inout vec3 incoming, inout float pdf, inout vec3 throughput) {
+    switch (material.model) {
+        case LAMBERTIAN_MODEL:
+            incoming = onb(h.normal, uniform_sample_hemisphere());
+            pdf = max(0.0, dot(h.normal, incoming)) / PI;
+            throughput = material.diffuse / PI;
+        default: break;
     }
-	
-	return color;
+}
+
+vec3 pathtrace(Ray ray, inout uint hit_id) {
+    vec3 throughput = vec3(1.0);
+    bool firsthit = true;
+    uint hid = -1;
+    for (uint i = 0; i < MAX_BOUNCES; i++) {
+        Hit h = trace(ray, hid);
+        if (h.distance > 0) {
+            if (firsthit) {
+                firsthit = false;
+                hit_id = hid;
+            }
+            Material material = materialIn[h.material];
+            if (material.emission != vec3(0.0)) {
+                return material.emission * throughput;
+            } else {
+                vec3 incoming;
+                vec3 color;
+                float pdf;
+                brdf(h, material, incoming, pdf, color);
+                ray.position = h.position + (incoming * EPS);
+                ray.direction = incoming;
+                throughput *= color * (max(0.0f, dot(incoming, h.normal)) / pdf);
+                float p = russian_roulette(throughput);
+                if (random() < p) {
+                    throughput /= p;
+                } else {
+                    return vec3(0.0); // TODO: early terminate
+                }
+            }
+        } else {
+            return vec3(0.0); // TODO: miss terminate
+        }
+    }
+    return vec3(0.0); // TODO: max bounces terminate
 }
 
 void main() {
+	// update ray history
+	raygenIn[gl_GlobalInvocationID.x].time += ubo.frametime;
+
+	// get ray generator
+    RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
+
 	// create ray generator coordinates	
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
 
-    // reset on camera movement
-    if (ubo.reset != 0) {
-        raygenIn[gl_GlobalInvocationID.x].occlusions = 0;
+	// calculate frame chance
+	float chance = 1.0 - pow(1.0 - ubo.frameless, rgIn.time);
+    if (ubo.frameless >= 1.0) chance = 1.0;
+	float rnum = noise((rx * ry) / (123.456789 + (ubo.seed % 100)));
+	bool update_signal = rnum <= chance;
+	if (!update_signal) {
+        imageStore(hdrImage, ivec2(rx, ry), vec4(0.0));
+        return;
     }
+
+	// clear ray history
+	raygenIn[gl_GlobalInvocationID.x].time = 0.0;
 
 	// reject any rays outside of the viewport
     if (cut_viewport(rx, ry)) return;
 
 	// calculate ray color
-	vec3 color = vec3(0);
-    vec3 normal_out = vec3(0);
+    random_seed = (rx * ry) / (123.4567890123456789 + (ubo.seed % 100));
     uint hit_id = -1;
-	color = getcolor(vec2(rx, ry), hit_id, normal_out);
+    vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;
-    raygenIn[gl_GlobalInvocationID.x].normal = normal_out;
-
+    
     // failures
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);
-    
+
     // write to image
-    if (ubo.frameless < 1.0) {
-	    imageStore(outputImage, ivec2(rx, ry), vec4(color, 0.1));
+    if (ubo.reset != 0) {
+	    imageStore(hdrImage, ivec2(rx, ry), vec4(color, 1.0));
     } else {
-	    imageStore(outputImage, ivec2(rx, ry), vec4(color, 1.0));
+        vec4 accum = imageLoad(hdrImage, ivec2(rx, ry));
+        imageStore(hdrImage, ivec2(rx, ry), vec4(color, 0.0) + accum);
     }
 	
 	// set mouse hovered id

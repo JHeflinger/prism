@@ -3,6 +3,7 @@
 #include "renderer/overlay.h"
 #include "data/input.h"
 #include "ui/panels/edit.h"
+#include "renderer/loader.h"
 #include <easylogger.h>
 #include <rlgl.h>
 
@@ -52,10 +53,15 @@ void UpdateViewportPanel(float width, float height) {
             camera.look.z += movement[2];
         }
         if (InputKeyPressed(IK_RESET_CAMERA)) {
-            radius = 3.0f;
-            theta = 0.0f;
-            phi = 0.78f;
-            camera.look = (Vector3){ 0, 0, 0 };
+            //radius = 3.0f;
+            //theta = 0.0f;
+            //phi = 0.78f;
+            radius = 2.750;
+            theta = 4.715;
+            phi = 0.001;
+            //camera.look = (Vector3){ 0, 0, 0 };
+            camera.look = (Vector3){ 0, 1, 0 };
+            LoadOBJ("/home/jason/Dev/ADVGRAPHICS/example-scenes/models/CornellBox/CornellBox-Sphere.obj"); 
         }
         camera.position.x = camera.look.x + (radius * sin(phi) * cos(theta));
         camera.position.y = camera.look.y + (radius * sin(phi) * sin(theta));
