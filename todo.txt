@@ -39,3 +39,4 @@ NEXT:
 9. Make triangles double sided (I think we can just compare costheta and invert the normal when needed)
 10. Refraction
 11. Backface culling
+12. Fix pipeline flickering issue
