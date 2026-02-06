@@ -266,12 +266,14 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
         SubmitTriangle((Triangle){
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
 
@@ -280,12 +282,14 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
         SubmitTriangle((Triangle){
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
 
@@ -294,12 +298,14 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
         SubmitTriangle((Triangle){
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
 
@@ -308,12 +314,14 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
         SubmitTriangle((Triangle){
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
 
@@ -322,12 +330,14 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
         SubmitTriangle((Triangle){
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
 
@@ -336,12 +346,14 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
         SubmitTriangle((Triangle){
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             0
         });
         return 0;

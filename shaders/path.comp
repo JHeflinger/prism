@@ -29,6 +29,9 @@ struct Triangle {
     vec3 a;
     vec3 b;
     vec3 c;
+    vec3 an;
+    vec3 bn;
+    vec3 cn;
     uint material;
 };
 
@@ -167,7 +170,11 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     if (hit.distance <= EPS) return false;
     hit.material = tri.material;
     hit.position = ray.position + (ray.direction * hit.distance);
-    hit.normal = normalize(cross(e1, e2));
+    if (tri.a != vec3(0)) {
+        hit.normal = normalize((1.0 - u - v)*tri.an + u*tri.bn + v*tri.cn);
+    } else {
+        hit.normal = normalize(cross(e1, e2));
+    }
     return true;
 }
 

@@ -41,6 +41,14 @@ typedef struct {
     size_t a;
     size_t b;
     size_t c;
+    size_t at;
+    size_t bt;
+    size_t ct;
+    size_t an;
+    size_t bn;
+    size_t cn;
+    BOOL textures;
+    BOOL normals;
 } Face;
 
 DECLARE_ARRLIST(Vertex);
@@ -102,15 +110,6 @@ size_t ParseLineArgsOBJ(const char line[MAX_OBJ_LINE_SIZE], char lineargs[MAX_OB
     return numargs;
 }
 
-void PruneFaceOBJ(char* str) {
-    for (int i = 0; i < MAX_OBJ_ARG_SIZE && str[i] != 0; i++) {
-        if (str[i] == '/') {
-            str[i] = 0;
-            return;
-        }
-    }
-}
-
 BOOL ParseFloat(const char* str, float* value) {
     char *end;
     float result;
@@ -148,6 +147,44 @@ BOOL ParseLInt(const char* str, int64_t* value) {
     if (*end != '\0') return FALSE;
     *value = (int64_t)result;
     return TRUE;
+}
+
+BOOL ParseTriplet(const char* str, int64_t* a, int64_t* b, int64_t* c, size_t* count) {
+    char abuff[MAX_OBJ_ARG_SIZE] = { 0 };
+    char bbuff[MAX_OBJ_ARG_SIZE] = { 0 };
+    char cbuff[MAX_OBJ_ARG_SIZE] = { 0 };
+    *count = 0;
+    size_t ptr = 0;
+    for (size_t i = 0; i < strlen(str); i++) {
+        if (str[i] == '/') {
+            if (*count == 0) {
+                memcpy(abuff, str + ptr, i - ptr);
+                ptr = i + 1;
+                *count = 1;
+            } else if (*count == 1) {
+                memcpy(bbuff, str + ptr, i - ptr);
+                ptr = i + 1;
+                *count = 2;
+            } else {
+                return FALSE;
+            }
+        }
+    }
+    memcpy(cbuff, str + ptr, strlen(str) - ptr);
+    *count += 1;
+    BOOL success = ParseLInt(abuff, a);
+    success &= (*a != 0);
+    if (success && strlen(bbuff) > 0) {
+        success &= ParseLInt(bbuff, b) & (*b != 0);
+    } else {
+        b = 0;
+    }
+    if (success && strlen(cbuff) > 0) {
+        success &= ParseLInt(cbuff, c) & (*c != 0);
+    } else {
+        c = 0;
+    }
+    return success;
 }
 
 BOOL ParseMTL_illum(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
@@ -382,36 +419,64 @@ BOOL ParseOBJ_f(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numarg
         EZ_ERROR("Cannot parse a face field without exactly 3 or 4 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
-    PruneFaceOBJ(lineargs[1]);
-    PruneFaceOBJ(lineargs[2]);
-    PruneFaceOBJ(lineargs[3]);
-    PruneFaceOBJ(lineargs[4]);
-    int64_t indices[4] = { 0 };
-    if (!(ParseLInt(lineargs[1], &(indices[0])) &&
-          ParseLInt(lineargs[2], &(indices[1])) &&
-          ParseLInt(lineargs[3], &(indices[2])) &&
-          (numargs == 5 ? ParseLInt(lineargs[4], &(indices[3])) : TRUE))) {
-        if (numargs == 5) {
-            EZ_ERROR("Invalid face fields - expected 4 unsigned ints and got \"%s %s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3], lineargs[4]);
-        } else {
-            EZ_ERROR("Invalid face fields - expected 3 unsigned ints and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+    int64_t values[4][3] = { 0 };
+    int count = -1;
+    for (int i = 0; i < (numargs == 4 ? 3 : 4); i++) {
+        size_t c;
+        if (!ParseTriplet(lineargs[i + 1], &values[i][0], &values[i][1], &values[i][2], &c)) {
+            EZ_ERROR("Unable to parse face field \"%s\" into valid indices", lineargs[i + 1]);
+            return FALSE;
         }
-        return FALSE;
+        if (count < 0) {
+            count = (int)c;
+        } else if (count != (int)c) {
+            EZ_ERROR("Detected a mismatched count in face field indices - expected %d but got %d instead", count, (int)c);
+            return FALSE;
+        }
     }
-    if (numargs == 4) indices[3] = indices[2];
-    for (int i = 0; i < 4; i++) {
-        if (indices[i] == 0) {
+    for (int i = 0; i < 2; i++) {
+        int zeros = 0;
+        for (int j = 0; j < (numargs == 4 ? 3 : 4); j++) {
+            if (values[j][i] == 0) zeros++;
+        }
+        if (zeros != 0 && zeros != (numargs == 4 ? 3 : 4)) {
+            EZ_ERROR("Detected a mismatched format count in face field indices - vertex normals/textures should either be all defined or not at all");
+            return FALSE;
+        }
+    }
+    for (int i = 0; i < (numargs == 4 ? 3 : 4); i++) {
+        if (values[i][0] == 0) {
             EZ_ERROR("Invalid face field detected - there is no vertex 0");
             return FALSE;
         }
-        if (indices[i] < 0) {
-            indices[i] = state->vertices.size + indices[i];
+        if (values[i][0] < 0) {
+            values[i][0] = state->vertices.size + values[i][0];
         } else {
-            indices[i]--;
+            values[i][0]--;
+        }
+        if (values[i][1] < 0) {
+            values[i][1] = state->uvs.size + values[i][1];
+        } else if (values[i][1] > 0) {
+            values[i][1]--;
+        }
+        if (values[i][2] < 0) {
+            values[i][2] = state->normals.size + values[i][2];
+        } else if (values[i][2] > 0) {
+            values[i][2]--;
         }
     }
-    ARRLIST_Face_add(&(state->faces), (Face){indices[0], indices[1], indices[2]});
-    if (numargs == 5) ARRLIST_Face_add(&(state->faces), (Face){indices[0], indices[2], indices[3]});
+    ARRLIST_Face_add(&(state->faces), (Face){
+        values[0][0], values[1][0], values[2][0],
+        values[0][1], values[1][1], values[2][1],
+        values[0][2], values[1][2], values[2][2],
+        values[0][1] != 0, values[0][2] != 0
+    });
+    if (numargs == 5) ARRLIST_Face_add(&(state->faces), (Face){
+        values[0][0], values[2][0], values[3][0],
+        values[0][1], values[2][1], values[3][1],
+        values[0][2], values[2][2], values[3][2],
+        values[0][1] != 0, values[0][2] != 0
+    });
     return TRUE;
 }
 
@@ -451,7 +516,19 @@ BOOL ConstructOBJ(const StateOBJ state) {
             failure = TRUE;
         }
         if (state.faces.data[i].c >= state.vertices.size) {
-            EZ_ERROR("Face %d references an invalid vertex %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].c, (int)state.vertices.size);
+            EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].c, (int)state.vertices.size);
+            failure = TRUE;
+        }
+        if (state.faces.data[i].an >= state.normals.size) {
+            EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].an, (int)state.normals.size);
+            failure = TRUE;
+        }
+        if (state.faces.data[i].bn >= state.normals.size) {
+            EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].bn, (int)state.normals.size);
+            failure = TRUE;
+        }
+        if (state.faces.data[i].cn >= state.normals.size) {
+            EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].cn, (int)state.normals.size);
             failure = TRUE;
         }
     }
@@ -481,6 +558,21 @@ BOOL ConstructOBJ(const StateOBJ state) {
                 state.vertices.data[state.faces.data[i].c].x,
                 state.vertices.data[state.faces.data[i].c].y,
                 state.vertices.data[state.faces.data[i].c].z,
+            },
+            {
+                state.normals.data[state.faces.data[i].an].x,
+                state.normals.data[state.faces.data[i].an].y,
+                state.normals.data[state.faces.data[i].an].z,
+            },
+            {
+                state.normals.data[state.faces.data[i].bn].x,
+                state.normals.data[state.faces.data[i].bn].y,
+                state.normals.data[state.faces.data[i].bn].z,
+            },
+            {
+                state.normals.data[state.faces.data[i].cn].x,
+                state.normals.data[state.faces.data[i].cn].y,
+                state.normals.data[state.faces.data[i].cn].z,
             },
             current_material
         };

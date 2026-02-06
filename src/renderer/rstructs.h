@@ -29,6 +29,9 @@ typedef struct {
     alignas(16) vec3 a;
     alignas(16) vec3 b;
     alignas(16) vec3 c;
+    alignas(16) vec3 an;
+    alignas(16) vec3 bn;
+    alignas(16) vec3 cn;
     alignas(4) MaterialID material;
 } Triangle;
 DECLARE_ARRLIST(Triangle);

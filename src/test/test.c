@@ -102,6 +102,7 @@ void ImportModel(const char* path, MaterialID material) {
                 mesh.vertices[(i * 3 + 2) * 3 + 1],
                 mesh.vertices[(i * 3 + 2) * 3 + 2]
             },
+            { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 },
             material
         };
         SubmitTriangle(triangle);
