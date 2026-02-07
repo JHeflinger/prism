@@ -72,6 +72,10 @@ layout(binding = 0) uniform UniformBufferObject {
 	uint mouse_y;
     uint samples;
     uint reset;
+    float whitepoint;
+    float gamma;
+    float roulette;
+    float swap;
 } ubo;
 
 layout(binding = 1) buffer RayGeneratorSSBOIn {

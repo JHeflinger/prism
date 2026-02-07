@@ -49,6 +49,10 @@ typedef struct {
     alignas(4) uint32_t mouse_y;
     alignas(4) uint32_t samples;
     alignas(4) uint32_t reset;
+    alignas(4) float whitepoint;
+    alignas(4) float gamma;
+    alignas(4) float roulette;
+    alignas(4) float swap;
 } UniformBufferObject;
 
 typedef struct {

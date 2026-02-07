@@ -45,6 +45,7 @@ void InitializeRenderer() {
     g_renderer.config.autoframeless = FALSE;
     g_renderer.config.grid = TRUE;
     g_renderer.config.async = TRUE;
+    g_renderer.config.roulette = -1.0f;
 
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.11f, 0.0f, 2.133f };

@@ -25,10 +25,11 @@ ICEBOX:
 21. Compositing pipeline
 22. SDF construction pipeline using union, intersection, modifiers, etc
 23. Available keybinds tooltop overlay (like monster hunter combo hints)
+24. New test suite
 
 NEXT:
 -1. Saving to scene with specific resolution/samples
-1. Clean up and prune UBO
+1. Clean up and prune and reorder UBO and renderConfig
 2. Expose white point and gamma
 3. Direct light sampling
 4. BUG - selecting faces happens regardless if in/out viewport or not
@@ -44,3 +45,4 @@ NEXT:
 14. Emission needs to be unbounded in material editor
 15. Account for heightAngle in XML
 16. Make executor output more pretty with a progress bar
+17. Expose whitepoint, gamma, roulette to gui

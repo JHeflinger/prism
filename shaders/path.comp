@@ -85,6 +85,10 @@ layout(binding = 0) uniform UniformBufferObject {
 	uint mouse_y;
     uint samples;
     uint reset;
+    float whitepoint;
+    float gamma;
+    float roulette;
+    float swap;
 } ubo;
 
 layout(binding = 1) buffer RayGeneratorSSBOIn {
@@ -223,6 +227,7 @@ Hit trace(Ray ray, inout uint hit_id) {
 }
 
 float russian_roulette(vec3 throughput) {
+    if (ubo.roulette > 0) return ubo.roulette;
     return clamp(max(max(throughput.x, throughput.y), throughput.z), 0.05, 1.0);
 }
 
@@ -278,14 +283,14 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
                 if (random() < p) {
                     throughput /= p;
                 } else {
-                    return vec3(0.0); // TODO: early terminate
+                    return vec3(0.0);
                 }
             }
         } else {
-            return vec3(0.0); // TODO: miss terminate
+            return vec3(0.0);
         }
     }
-    return vec3(0.0); // TODO: max bounces terminate
+    return vec3(0.0);
 }
 
 void main() {

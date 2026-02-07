@@ -165,6 +165,7 @@ typedef struct {
     BOOL autoframeless;
     BOOL grid;
     BOOL async;
+    float roulette;
 } RendererConfig;
 
 #endif

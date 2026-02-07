@@ -32,6 +32,10 @@ layout(binding = 0) uniform UniformBufferObject {
 	uint mouse_y;
     uint samples;
     uint reset;
+    float whitepoint;
+    float gamma;
+    float roulette;
+    float swap;
 } ubo;
 
 layout(binding = 1, rgba8) uniform image2D outputImage;
@@ -43,8 +47,8 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
-	vec3 hdr_color = vec3(imageLoad(hdrImage, ivec2(rx, ry)) / (float(ubo.samples) / 2.0)); // TODO: fix because 2.0 needs to correspond to the cpu target pipeline length
-    hdr_color = (hdr_color * ((hdr_color/400) + vec3(1.0)))/(vec3(1.0) + hdr_color); // TODO: bind to ubo defined white point
-    hdr_color = pow(hdr_color, vec3(1.0 / 2.2)); // TODO: 2.2 is gamma correction, extend to ubo settings
+	vec3 hdr_color = vec3(imageLoad(hdrImage, ivec2(rx, ry)) / (float(ubo.samples) / ubo.swap));
+    hdr_color = (hdr_color * ((hdr_color/ubo.whitepoint) + vec3(1.0)))/(vec3(1.0) + hdr_color);
+    hdr_color = pow(hdr_color, vec3(1.0 / ubo.gamma));
 	imageStore(outputImage, ivec2(rx, ry), vec4(hdr_color, 1.0));
 }

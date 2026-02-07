@@ -218,6 +218,10 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.mouse_y = my;
         ubo.reset = cam_reset;
         ubo.samples = samples;
+        ubo.whitepoint = 20*20; //TODO: expose to gui and renderer config
+        ubo.gamma = 2.2;
+        ubo.roulette = g_vupdt_renderer_ref->config.roulette;
+        ubo.swap = CPUSWAP_LENGTH;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

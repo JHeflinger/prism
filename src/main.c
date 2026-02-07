@@ -12,13 +12,13 @@ int main(int argc, char** argv) {
 		EZ_INFO("Setting resolution to %dx%d", rx, ry);
 		OverrideResolution(rx, ry);
         RunEditor();
-	} else if (argc == 6) {
-        RunExecutor(argv[1], argv[2], atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
+	} else if (argc == 7) {
+        RunExecutor(argv[1], argv[2], atoi(argv[3]), atoi(argv[4]), atoi(argv[5]), atof(argv[6]));
     } else {
         printf("Incorrect program usage detected - please refer to the following ways to use prism:\n");
-        printf("  ./<executable>                                             // Runs editor\n");
-        printf("  ./<executable> <width> <height>                            // Runs editor with custom viewport resolution\n");
-        printf("  ./<executable> <scene> <output> <width> <height> <samples> // Renders a single image\n");
+        printf("  ./<executable>                                                        // Runs editor\n");
+        printf("  ./<executable> <width> <height>                                       // Runs editor with custom viewport resolution\n");
+        printf("  ./<executable> <scene> <output> <width> <height> <samples> <roulette> // Renders a single image\n");
         return 1;
     }
     EZ_INFO("See you, Space Cowboy");

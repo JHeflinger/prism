@@ -44,10 +44,11 @@ void ImportExecuteScene(const char* scenefile) {
     }
 }
 
-void RunExecutor(const char* scenefile, const char* outfile, int width, int height, int samples) {
+void RunExecutor(const char* scenefile, const char* outfile, int width, int height, int samples, float roulette) {
     size_t memcheck = EZ_ALLOCATED();
     EZ_INFO("Initialzing prism execution suite...");
     InitializeExecutor(width, height);
+    RenderConfig()->roulette = roulette;
     EZ_INFO("Importing scene...");
     ImportExecuteScene(scenefile);
     EZ_INFO("Running render...");
