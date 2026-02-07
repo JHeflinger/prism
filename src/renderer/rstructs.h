@@ -79,7 +79,6 @@ typedef struct {
     alignas(16) vec3 normal;
 	alignas(4) float time;
     alignas(4) uint32_t tid;
-    alignas(4) uint32_t occlusions;
 } RayGenerator;
 
 typedef struct {
@@ -152,20 +151,16 @@ typedef struct {
 } Geometry;
 
 typedef struct {
-    float frameless;
-	BOOL shadows;
-	BOOL reflections;
-	BOOL lighting;
-    BOOL raytrace;
-    BOOL sdf;
-    float sdfsmooth;
-    uint32_t maxmarches;
     float time;
-    BOOL antialiasing;
+    float frameless;
+    float smoothen;
+    float roulette;
+    float whitepoint;
+    float gamma;
+    uint32_t marches;
     BOOL autoframeless;
     BOOL grid;
     BOOL async;
-    float roulette;
 } RendererConfig;
 
 #endif

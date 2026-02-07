@@ -189,7 +189,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.triangles = g_vupdt_renderer_ref->geometry.triangles.size;
         ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
         ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
-        ubo.bvhsize = g_vupdt_renderer_ref->geometry.bvh.size;
+        ubo.bvhs = g_vupdt_renderer_ref->geometry.bvh.size;
         ubo.frametime = RenderFrameTime();
         if (g_vupdt_renderer_ref->config.autoframeless) {
             #define TARGET_FRAMETIME 0.016f
@@ -202,24 +202,16 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         }
         ubo.frameless = g_vupdt_renderer_ref->config.frameless;
         ubo.seed = rand();
-        ubo.shadows = (uint32_t)g_vupdt_renderer_ref->config.shadows;
-        ubo.reflections = (uint32_t)g_vupdt_renderer_ref->config.reflections;
-        ubo.lighting = (uint32_t)g_vupdt_renderer_ref->config.lighting;
-        ubo.raytrace = (uint32_t)g_vupdt_renderer_ref->config.raytrace;
-        ubo.sdf = (uint32_t)g_vupdt_renderer_ref->config.sdf;
-        ubo.sdfsize = g_vupdt_renderer_ref->geometry.sdfs.size;
-        ubo.sdfsmooth = g_vupdt_renderer_ref->config.sdfsmooth;
-        ubo.maxmarches = g_vupdt_renderer_ref->config.maxmarches;
+        ubo.sdfs = g_vupdt_renderer_ref->geometry.sdfs.size;
+        ubo.smoothen = g_vupdt_renderer_ref->config.smoothen;
+        ubo.marches = g_vupdt_renderer_ref->config.marches;
         ubo.time = g_vupdt_renderer_ref->config.time;
-        ubo.antialiasing = (uint32_t)g_vupdt_renderer_ref->config.antialiasing;
-        ubo.lightssize = g_vupdt_renderer_ref->geometry.lights.size;
+        ubo.lights = g_vupdt_renderer_ref->geometry.lights.size;
         ubo.grid = (uint32_t)g_vupdt_renderer_ref->config.grid;
-        ubo.mouse_x = mx;
-        ubo.mouse_y = my;
         ubo.reset = cam_reset;
         ubo.samples = samples;
-        ubo.whitepoint = 20*20; //TODO: expose to gui and renderer config
-        ubo.gamma = 2.2;
+        ubo.whitepoint = g_vupdt_renderer_ref->config.whitepoint*g_vupdt_renderer_ref->config.whitepoint;
+        ubo.gamma = g_vupdt_renderer_ref->config.gamma;
         ubo.roulette = g_vupdt_renderer_ref->config.roulette;
         ubo.swap = CPUSWAP_LENGTH;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));

@@ -10,7 +10,6 @@ struct RayGenerator {
     vec3 normal;
 	float time;
     uint tid;
-    uint occlusions;
 };
 
 struct Ray {
@@ -54,41 +53,33 @@ struct NodeBVH {
 };
 
 layout(binding = 0) uniform UniformBufferObject {
-	vec3 look;
-	vec3 position;
-	vec3 up;
+    vec3 look;
+    vec3 position;
+    vec3 up;
     vec3 u;
     vec3 v;
     vec3 w;
+    vec2 viewport;
+    uint triangles;
+    uint bvhs;
+    uint sdfs;
+    uint lights;
+    uint marches;
+    uint samples;
+	uint seed;
+    uint grid;
+    uint reset;
     float fov;
     float width;
     float height;
-    uint triangles;
-    vec2 viewport;
-    uint bvhsize;
+    float swap;
 	float frametime;
-	float frameless;
-	uint seed;
-	uint shadows;
-	uint reflections;
-	uint lighting;
-    uint trace;
-    uint sdf;
-    uint sdfsize;
-    float sdfsmooth;
-    uint maxmarches;
     float time;
-    uint antialiasing;
-    uint lightssize;
-    uint grid;
-	uint mouse_x;
-	uint mouse_y;
-    uint samples;
-    uint reset;
+	float frameless;
+    float smoothen;
     float whitepoint;
     float gamma;
     float roulette;
-    float swap;
 } ubo;
 
 layout(binding = 1) buffer RayGeneratorSSBOIn {
@@ -107,10 +98,6 @@ layout(binding = 4) readonly buffer MaterialSSBOIn {
 
 layout(binding = 5) readonly buffer BVHSSBOIn {
     NodeBVH bvhIn[ ];
-};
-
-layout(binding = 6) buffer OverlaySSBO {
-	uint hovered_tid;
 };
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
@@ -179,6 +166,9 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     } else {
         hit.normal = normalize(cross(e1, e2));
     }
+    if (dot(hit.normal, -ray.direction) < 0.0) {
+        hit.normal = -hit.normal;
+    }
     return true;
 }
 
@@ -194,7 +184,7 @@ bool aabb_intersect(Ray ray, uint node_ind) {
 Hit trace(Ray ray, inout uint hit_id) {
     Hit hit;
     hit.distance = -1.0;
-    if (ubo.bvhsize == 0) return hit;
+    if (ubo.bvhs == 0) return hit;
     if (!aabb_intersect(ray, 0)) return hit;
     uint stack[MAX_RECURSIVE_DEPTH];
     int stack_ptr = 0;
@@ -296,6 +286,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
 void main() {
 	// update ray history
 	raygenIn[gl_GlobalInvocationID.x].time += ubo.frametime;
+    raygenIn[gl_GlobalInvocationID.x].tid = -1;
 
 	// get ray generator
     RayGenerator rgIn = raygenIn[gl_GlobalInvocationID.x];
@@ -336,14 +327,4 @@ void main() {
         vec4 accum = imageLoad(hdrImage, ivec2(rx, ry));
         imageStore(hdrImage, ivec2(rx, ry), vec4(color, 0.0) + accum);
     }
-	
-	// set mouse hovered id
-    if (rx == ubo.mouse_x && ry == ubo.mouse_y) {
-		hovered_tid = hit_id;
-    }
-
-	// set hovered id to -1 if out of image bounds
-	if (ubo.mouse_x > ubo.width || ubo.mouse_y > ubo.height) {
-		hovered_tid = -1;
-	}
 }

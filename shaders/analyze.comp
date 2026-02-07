@@ -1,0 +1,33 @@
+#version 450
+
+struct RayGenerator {
+    vec3 normal;
+	float time;
+    uint tid;
+};
+
+layout(binding = 0) buffer RayGeneratorSSBOIn {
+   RayGenerator raygenIn[ ];
+};
+
+layout(binding = 1) buffer OverlaySSBO {
+	uint hovered_tid;
+};
+
+layout(binding = 2) uniform OverlayUniformBufferObject {
+	uint mouse_x;
+    uint mouse_y;
+	uint image_width;
+	uint image_height;
+	uint single_selected_tid;
+} ubo;
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+	int rx = int(gl_GlobalInvocationID.x%int(ubo.image_width));
+    int ry = int(gl_GlobalInvocationID.x/int(ubo.image_width));
+    if (rx == ubo.mouse_x && ry == ubo.mouse_y) {
+		hovered_tid = raygenIn[gl_GlobalInvocationID.x].tid;
+    }
+}

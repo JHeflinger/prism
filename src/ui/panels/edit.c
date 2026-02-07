@@ -44,15 +44,15 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor(0, 5);
             UIDrawText("r");
             UIMoveCursor(15, -20);
-            edited |= UIDragFloat(&(matref->emission[0]), 0, 1.0f, 0.05f, component_width);
+            edited |= UIDragFloat(&(matref->emission[0]), 0, 99999999.0f, 0.05f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("g");
             UIMoveCursor(component_width + 40, -20);
-            edited |= UIDragFloat(&(matref->emission[1]), 0, 1.0f, 0.05f, component_width);
+            edited |= UIDragFloat(&(matref->emission[1]), 0, 99999999.0f, 0.05f, component_width);
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("b");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(matref->emission[2]), 0, 1.0f, 0.05f, component_width);
+            edited |= UIDragFloat(&(matref->emission[2]), 0, 99999999.0f, 0.05f, component_width);
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Ambient") / 2) - 10, 0);
             UIDrawText("Ambient");

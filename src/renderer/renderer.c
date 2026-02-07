@@ -34,18 +34,14 @@ void InitializeRenderer() {
 
     // initialize config
     g_renderer.config.frameless = FRAMELESS_CHANCE;
-	g_renderer.config.shadows = TRUE;
-	g_renderer.config.reflections = TRUE;
-	g_renderer.config.lighting = TRUE;
-	g_renderer.config.raytrace = TRUE;
-	g_renderer.config.sdf = !g_renderer.config.raytrace;
-    g_renderer.config.sdfsmooth = 0.0f;
-    g_renderer.config.maxmarches = 100;
-    g_renderer.config.antialiasing = FALSE;
+    g_renderer.config.smoothen = 0.0f;
+    g_renderer.config.marches = 100;
+    g_renderer.config.roulette = -1.0f;
+    g_renderer.config.whitepoint = 20.0f;
+    g_renderer.config.gamma = 2.2f;
     g_renderer.config.autoframeless = FALSE;
     g_renderer.config.grid = TRUE;
     g_renderer.config.async = TRUE;
-    g_renderer.config.roulette = -1.0f;
 
     // initialize camera
     g_renderer.camera.position = (Vector3){ 2.11f, 0.0f, 2.133f };

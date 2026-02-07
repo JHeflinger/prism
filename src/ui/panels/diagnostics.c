@@ -64,6 +64,13 @@ void DrawDevPanel(float width, float height) {
             100.0f*((float)allocated)/((float)budget),
             '%');
     }
+    
+    UIMoveCursor(0, 20.0f);
+    UICheckboxLabeled("Grid:", &(RenderConfig()->grid));
+    
+    UIMoveCursor(0, 20.0f);
+    UIDragFloatLabeled("Whitepoint:", &(RenderConfig()->whitepoint), 0.01f, 999999999.0f, 0.1f, width - 20);
+    UIDragFloatLabeled("Gamma:", &(RenderConfig()->gamma), 0.01f, 999999999.0f, 0.01f, width - 20);
 
     UIMoveCursor(0, 20.0f);
     UIDrawText("Renderer FPS: %d", (int)(1.0f / ((float)RenderTime() / 1000.0f)));
@@ -71,24 +78,19 @@ void DrawDevPanel(float width, float height) {
     UIDrawText("Triangles: %d", (int)NumTriangles());
     UIDrawText("SDF Objects: %d", (int)NumSDFs());
     UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
+    
+    UIMoveCursor(0, 20.0f);
+    UIDragFloatLabeled("Time:", &(RenderConfig()->time), 0.0f, 999999999.0f, 1.00f, width - 20);
 	UICheckboxLabeled("Time Paused:", &g_time_paused);
     if (!g_time_paused) RenderConfig()->time += GetFrameTime();
-    UIDragFloatLabeled("Time:", &(RenderConfig()->time), 0.0f, 999999999.0f, 1.00f, width - 20);
+	
+    UIMoveCursor(0, 20.0f);
 	UICheckboxLabeled("Automatic Frameless:", &(RenderConfig()->autoframeless));
-    UIDragFloatLabeled("Frameless:", &(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 20);
-	UICheckboxLabeled("Anti-Aliasing:", &(RenderConfig()->antialiasing));
-	UICheckboxLabeled("Grid:", &(RenderConfig()->grid));
-
+    UIDragFloatLabeled("Frameless chance:", &(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 20);
+    
     UIMoveCursor(0, 20.0f);
-	UICheckboxLabeled("Raytrace:", &(RenderConfig()->raytrace));
-	UICheckboxLabeled("Shadows:", &(RenderConfig()->shadows));
-	UICheckboxLabeled("Reflections:", &(RenderConfig()->reflections));
-	UICheckboxLabeled("Lighting:", &(RenderConfig()->lighting));
-
-    UIMoveCursor(0, 20.0f);
-	UICheckboxLabeled("SDF:", &(RenderConfig()->sdf));
-    UIDragUIntLabeled("Max Marches:", &(RenderConfig()->maxmarches), 0, 10000000, 1, width - 20);
-    UIDragFloatLabeled("Smooth:", &(RenderConfig()->sdfsmooth), 0.0f, 10000.0f, 0.05f, width - 20);
+    UIDragUIntLabeled("Max SDF Marches:", &(RenderConfig()->marches), 0, 10000000, 1, width - 20);
+    UIDragFloatLabeled("SDF Smooth factor:", &(RenderConfig()->smoothen), 0.0f, 10000.0f, 0.05f, width - 20);
 }
 
 Panel GenerateDiagnosticsPanel() {
