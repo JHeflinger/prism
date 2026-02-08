@@ -61,7 +61,6 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
     // execute shader stages
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
-        //if (!g_vupdt_renderer_ref->vulkan.core.shaders.data[i]->enabled) continue;
         if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
 
         vkCmdBindPipeline(

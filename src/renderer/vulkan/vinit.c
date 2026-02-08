@@ -9,27 +9,22 @@ Renderer* g_vinit_renderer_ref = NULL;
 
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        FALSE,
         g_vinit_renderer_ref,
         "shaders/default.comp",
         "build/shaders/default.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        TRUE,
         g_vinit_renderer_ref,
         "shaders/path.comp",
         "build/shaders/path.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        TRUE,
         g_vinit_renderer_ref,
         "shaders/tonemap.comp",
         "build/shaders/tonemap.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        TRUE,
         g_vinit_renderer_ref,
         "shaders/analyze.comp",
         "build/shaders/analyze.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        TRUE,
         g_vinit_renderer_ref,
         "shaders/overlay.comp",
         "build/shaders/overlay.comp.spv"));

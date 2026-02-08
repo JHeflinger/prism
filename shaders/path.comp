@@ -373,7 +373,7 @@ void main() {
     float s2 = float((ubo.seed & 0xff00) >> 8);
     float s3 = float((ubo.seed & 0xff0000) >> 16);
     float s4 = float((ubo.seed & 0xff000000) >> 24);
-    random_seed = (rx * ry) / (s3*s4*cos(s1*s1) + s1*s2*cos(s4*s3));
+    random_seed = (rx * ry) / (s3*s4*cos(s1*s1) + s1*s2*cos(s4*s3) + (fract(ubo.frametime)));
     uint hit_id = -1;
     vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;

@@ -222,6 +222,8 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id) {
     float xfract = fract(grid_plane_point.x);
     float yfract = fract(grid_plane_point.y);
     hit = trace(ray, hit_id);
+    bool gridhit = false;
+    float gridmix = 0.0;
     if (ubo.grid != 0 && grid_plane_distance > 0.0 &&
         (hit.distance <= 0.0 || hit.distance > grid_plane_distance) &&
         (xfract < grid_plane_tolerance + grid_x_tolerance ||
@@ -229,9 +231,16 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id) {
         float divfract = 2.0 * abs((xfract < yfract ? xfract : yfract) - (grid_plane_tolerance / 2.0));
         divfract = min(divfract, 2.0 * abs((xfract > yfract ? xfract : yfract) - (grid_plane_tolerance / 2.0)));
         float alias = 1.0 - (divfract / grid_plane_tolerance);
-        color = mix(background_color, vec3(1.0), alias / grid_plane_distance);
-    } else if (hit.distance > 0.0) {
+        gridmix = alias / grid_plane_distance;
+        gridhit = true;
+    }
+    if (hit.distance > 0.0) {
         color = shade(ray, hit);
+        if (gridhit) {
+            color = mix(color, vec3(1.0), gridmix);
+        }
+    } else if (gridhit) {
+        color = mix(background_color, vec3(1.0), gridmix);
     }
 	
 	return color;

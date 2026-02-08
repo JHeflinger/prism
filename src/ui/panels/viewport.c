@@ -100,7 +100,6 @@ void UpdateViewportPanel(float width, float height) {
                 SetSelectedTriangle(tid);
             } else {
                 DeselectEditTarget();
-                SetSelectedTriangle((TriangleID)-1);
             }
             moved = TRUE;
         }

@@ -154,7 +154,6 @@ DECLARE_ARRLIST(VulkanBoundVariable);
 
 typedef struct {
 	const char* filename;
-    BOOL enabled;
 	ARRLIST_VulkanBoundVariable variables[CPUSWAP_LENGTH];
 } VulkanShader;
 

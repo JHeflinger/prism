@@ -1,5 +1,6 @@
 #include "edit.h"
 #include "renderer/renderer.h"
+#include "renderer/overlay.h"
 #include <easylogger.h>
 
 typedef enum {
@@ -16,12 +17,14 @@ void SetEditMaterial(size_t index) {
     g_item_selected = TRUE;
     g_edit_item_index = index;
     g_edit_type = EDIT_MATERIAL;
+    SetSelectedTriangle((TriangleID)-1);
 }
 
 void SetEditLight(size_t index) {
     g_item_selected = TRUE;
     g_edit_item_index = index;
     g_edit_type = EDIT_LIGHT;
+    SetSelectedTriangle((TriangleID)-1);
 }
 
 void SetEditTriangle(size_t index) {
@@ -32,6 +35,7 @@ void SetEditTriangle(size_t index) {
 
 void DeselectEditTarget() {
     g_item_selected = FALSE;
+    SetSelectedTriangle((TriangleID)-1);
 }
 
 void DrawEditPanel(float width, float height) {
