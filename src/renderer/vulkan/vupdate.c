@@ -158,13 +158,15 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 
     // check for camera reset
     static SimpleCamera old_camera = { 0 };
-    BOOL cam_reset = FALSE;
+    static int reset_count = 0;
     if (old_camera.fov == 0.0f) old_camera = g_vupdt_renderer_ref->camera;
     if (memcmp(&old_camera, &(g_vupdt_renderer_ref->camera), sizeof(SimpleCamera)) != 0) {
-        cam_reset = TRUE;
+        reset_count = CPUSWAP_LENGTH;
         old_camera = g_vupdt_renderer_ref->camera;
     }
-
+    BOOL cam_reset = reset_count != 0;
+    if (reset_count > 0) reset_count--;
+    
     // persistant vars
     static uint32_t samples = 0;
     samples++;

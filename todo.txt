@@ -38,3 +38,6 @@ NEXT:
 10. Refraction
 12. Fix pipeline flickering issue | dont forget about the fact that the camera reset needs to flush through the entire pipeline AND to take in account for what position in the pipeline is at when merging the targets as to maintain uniformity
 18. Expose use default vs pathtracing mode in pipeline - pipline configurations using flags
+
+
+fix randomness stagnation
