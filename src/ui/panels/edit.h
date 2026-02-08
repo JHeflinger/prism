@@ -10,6 +10,8 @@ void SetEditLight(size_t index);
 
 void SetEditTriangle(size_t index);
 
+void DeselectEditTarget();
+
 Panel GenerateEditPanel();
 
 #endif

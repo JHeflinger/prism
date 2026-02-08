@@ -146,7 +146,6 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
 }
 
 void VUPDT_UniformBuffers(UBOArray* ubos) {
-    #define RAYVEC_TO_GLMVEC(gv, rv) { gv[0] = rv.x; gv[1] = rv.y; gv[2] = rv.z; }
 	// relative mouse coords
     Rectangle viewport_rec = GetViewportRec();
     Vector2 renderer_dimensions = g_vupdt_renderer_ref->dimensions;
@@ -174,10 +173,10 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     // core uniform buffer
     {
         UniformBufferObject ubo = { 0 };
-        RAYVEC_TO_GLMVEC(ubo.position, g_vupdt_renderer_ref->camera.position);
-        RAYVEC_TO_GLMVEC(ubo.look, g_vupdt_renderer_ref->camera.look);
+        SETVEC(ubo.position, g_vupdt_renderer_ref->camera.position);
+        SETVEC(ubo.look, g_vupdt_renderer_ref->camera.look);
         glm_vec3_sub(ubo.look, ubo.position, ubo.look);
-        RAYVEC_TO_GLMVEC(ubo.up, g_vupdt_renderer_ref->camera.up);
+        SETVEC(ubo.up, g_vupdt_renderer_ref->camera.up);
         glm_vec3_normalize(ubo.up);
         glm_vec3_normalize(ubo.look);
         glm_vec3_negate_to(ubo.look, ubo.w);
@@ -227,7 +226,6 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.single_selected_tid = GetSelectedTriangle();
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
-    #undef RAYVEC_TO_GLMVEC
 }
 
 void VUPDT_SetVulkanUpdateContext(Renderer* renderer) {

@@ -10,6 +10,7 @@
 
 IMPL_ARRLIST(Panel);
 
+UI* g_primary_ui = NULL;
 UI* g_divider_instance = NULL;
 BOOL g_divider_active = FALSE;
 Vector2 g_ui_cursor = { 0 };
@@ -21,6 +22,10 @@ PersistantUIData* g_active_ui_element = NULL;
 
 #define LINE_HEIGHT 20
 #define NAMEBAR_HEIGHT 25
+
+void SetPrimaryUI(UI* ui) {
+    g_primary_ui = ui;
+}
 
 UI* GenerateUI() {
     UI* ui = EZ_ALLOC(1, sizeof(UI));
@@ -76,8 +81,10 @@ void UpdateUI(UI* ui) {
     }
 
     // update panel
+    if (g_popup != NULL) BlockInput();
 	for (size_t i = 0; i < ui->panels.size; i++)
 	    if (ui->panels.data[i].update) ui->panels.data[i].update(ui->w, ui->h);
+    UnblockInput();
 }
 
 void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
@@ -212,6 +219,27 @@ void DestroyUI(UI* ui) {
 void DestroyPanel(Panel* panel) {
     if (IsRenderTextureValid(panel->texture)) UnloadRenderTexture(panel->texture);
     if (panel->clean) panel->clean();
+}
+
+const char* HoveredPanelHelper(UI* ui) {
+    if (!ui) return NULL;
+    if (!ui->left && !ui->right) {
+        if (GetMousePosition().x > ui->x &&
+            GetMousePosition().x < ui->x + ui->w &&
+            GetMousePosition().y > ui->y &&
+            GetMousePosition().y < ui->y + ui->h) {
+            return ui->panels.data[ui->selected].name;
+        }
+    } else {
+        const char* l = HoveredPanelHelper((UI*)ui->left);
+        if (l) return l;
+        return HoveredPanelHelper((UI*)ui->right);
+    }
+    return NULL;
+}
+
+const char* HoveredPanel() {
+    return HoveredPanelHelper(g_primary_ui);
 }
 
 void UIDrawText(const char* text, ...) {

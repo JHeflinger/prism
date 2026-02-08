@@ -18,10 +18,13 @@ DECLARE_ARRLIST(TriangleID);
 DECLARE_ARRLIST(SDFID);
 DECLARE_ARRLIST(LightID);
 
+#define SETVEC3(v, x, y, z) {v[0] = x; v[1] = y; v[2] = z;}
+#define SETVEC(v1, v2) {v1[0] = v2[0]; v1[1] = v2[1]; v1[2] = v2[2];}
+
 typedef struct {
-    Vector3 position;
-    Vector3 look;
-    Vector3 up;
+    vec3 position;
+    vec3 look;
+    vec3 up;
 	float fov;
 } SimpleCamera;
 
@@ -137,6 +140,8 @@ typedef struct {
 } PointLight;
 DECLARE_ARRLIST(PointLight);
 
+#define MAX_MATERIAL_NAME_SIZE 256
+
 typedef struct {
     ARRLIST_PointLight lights;
     ARRLIST_LightID lids;
@@ -144,6 +149,7 @@ typedef struct {
     ARRLIST_TriangleID tids;
     ARRLIST_TriangleBB tbbs;
     ARRLIST_SurfaceMaterial materials;
+    ARRLIST_DynamicString materialnames;
     ARRLIST_NodeBVH bvh;
     ARRLIST_SDFPrimitive sdfs;
     ARRLIST_SDFID sdfids;

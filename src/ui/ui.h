@@ -49,6 +49,8 @@ typedef struct {
     BOOL arbitrary_bool;
 } PersistantUIData;
 
+void SetPrimaryUI(UI* ui);
+
 UI* GenerateUI();
 
 void SetupPanel(Panel* panel, const char* name);
@@ -62,6 +64,8 @@ void PreRenderUI(UI* ui);
 void DestroyUI(UI* ui);
 
 void DestroyPanel(Panel* panel);
+
+const char* HoveredPanel();
 
 void UIDrawText(const char* text, ...);
 

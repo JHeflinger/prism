@@ -44,10 +44,12 @@ void InitializeRenderer() {
     g_renderer.config.async = TRUE;
 
     // initialize camera
-    g_renderer.camera.position = (Vector3){ 2.11f, 0.0f, 2.133f };
-    g_renderer.camera.look = (Vector3){ 0.0f, 0.0f, 0.0f };
-    g_renderer.camera.up = (Vector3){ 0.0f, 0.0f, 1.0f };
-    g_renderer.camera.fov = 90.0f;
+    g_renderer.camera = (SimpleCamera){
+        { 2.11f, 0.0f, 2.133f },
+        { 0.0f, 0.0f, 0.0f },
+        { 0.0f, 0.0f, 1.0f },
+        90.0f
+    };
 
     // set up dimensions
     g_renderer.dimensions = (Vector2){ 
@@ -74,13 +76,13 @@ void InitializeRenderer() {
     PollGPUCache(TRUE);
 
     // default material
-    SubmitMaterial((SurfaceMaterial){
+    SubmitNamedMaterial((SurfaceMaterial){
         {0.0f, 0.0f, 0.0f},
         {1.0f, 1.0f, 1.0f},
         {1.0f, 1.0f, 1.0f},
         {0.0f, 0.0f, 0.0f},
         0, 0, 2
-    });
+    }, "Default");
 
     // set overlay context
     SetOverlayContext(&g_renderer);
@@ -107,6 +109,15 @@ SimpleCamera GetCamera() {
 
 void MoveCamera(SimpleCamera camera) {
     g_renderer.camera = camera;
+}
+
+void ReorientCamera() {
+    for (int i = 0; i < 3; i++) {
+        float sign = g_renderer.camera.up[i] > 0 ? 1.0f : (g_renderer.camera.up[i] < 0 ? -1.0f : 0.0f);
+        g_renderer.camera.look[i] += sign*1e-6f;
+    }
+    vec3 desired = { 0, 0, 1 };
+    SETVEC(g_renderer.camera.up, desired);
 }
 
 TriangleID SubmitTriangle(Triangle triangle) {
@@ -240,13 +251,35 @@ void ClearLights() {
 }
 
 MaterialID SubmitMaterial(SurfaceMaterial material) {
+    char buf[MAX_MATERIAL_NAME_SIZE] = { 0 };
+    sprintf(buf, "Material #%d", (int)g_renderer.geometry.materials.size);
+    return SubmitNamedMaterial(material, buf);
+}
+
+MaterialID SubmitNamedMaterial(SurfaceMaterial material, const char* name) {
     ARRLIST_SurfaceMaterial_add(&(g_renderer.geometry.materials), material);
+    char* b = EZ_ALLOC(MAX_MATERIAL_NAME_SIZE + 1, sizeof(char));
+    strncpy(b, name, MAX_MATERIAL_NAME_SIZE);
+    ARRLIST_DynamicString_add(&(g_renderer.geometry.materialnames), b);
     g_renderer.geometry.changes.update_materials = TRUE;
     return g_renderer.geometry.materials.size - 1;
 }
 
+char* MaterialName(MaterialID mid) {
+    EZ_ASSERT(mid < g_renderer.geometry.materials.size, "Invalid material ID detected");
+    return g_renderer.geometry.materialnames.data[mid];
+}
+
+char** MaterialNameReference(MaterialID mid) {
+    EZ_ASSERT(mid < g_renderer.geometry.materials.size, "Invalid material ID detected");
+    return &(g_renderer.geometry.materialnames.data[mid]);
+}
+
 void ClearMaterials() {
     ARRLIST_SurfaceMaterial_clear(&(g_renderer.geometry.materials));
+    for (size_t i = 0; i < g_renderer.geometry.materialnames.size; i++)
+        EZ_FREE(g_renderer.geometry.materialnames.data[i]);
+    ARRLIST_DynamicString_clear(&(g_renderer.geometry.materialnames));
     g_renderer.geometry.changes.update_materials = TRUE;
 }
 

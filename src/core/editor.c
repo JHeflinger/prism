@@ -43,6 +43,7 @@ void InitEditor() {
     ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->left)->right))->panels), GenerateViewportPanel());
 	ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->left)->left))->panels), GenerateEditPanel());
     g_ui->divide = (3 * GetScreenWidth())/4;
+    SetPrimaryUI(g_ui);
 }
 
 void UpdateEditor() {

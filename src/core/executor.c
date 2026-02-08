@@ -51,10 +51,28 @@ void RunExecutor(const char* scenefile, const char* outfile, int width, int heig
     RenderConfig()->roulette = roulette;
     EZ_INFO("Importing scene...");
     ImportExecuteScene(scenefile);
-    EZ_INFO("Running render...");
+    EZ_INFO("Running render...\n");
     float time = GetTime();
     for (int i = 0; i < samples; i++) {
         Render();
+        float pct = 100.0f * (((float)i + 1) / ((float)samples));
+        char backspace_buffer[128] = { 0 };
+        char eq_buffer[64] = { 0 };
+        char sp_buffer[64] = { 0 };
+        char pct_buffer[12] = { 0 };
+        char sp2_buffer[12] = { 0 };
+        memset(eq_buffer, '=', 64);
+        memset(sp_buffer, ' ', 64);
+        sprintf(pct_buffer, "%.3f", pct);
+        memset(sp2_buffer, ' ', 12);
+        memset(backspace_buffer, '\b', 72);
+        int b = pct/2;
+        eq_buffer[b + 1] = '\0';
+        sp_buffer[50 - b] = '\0';
+        sp2_buffer[7 - strlen(pct_buffer)] = '\0';
+        printf("Progress: [%s%s] %s%%%s", eq_buffer, sp_buffer, pct_buffer, sp2_buffer);
+        if (i == samples - 1) printf("\n\n");
+        else printf("%s", backspace_buffer);
     }
     time = GetTime() - time;
     EZ_INFO("Successfully rendered image in %.3f seconds", time);

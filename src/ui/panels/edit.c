@@ -30,6 +30,10 @@ void SetEditTriangle(size_t index) {
     g_edit_type = EDIT_SINGLE_TRIANGLE;
 }
 
+void DeselectEditTarget() {
+    g_item_selected = FALSE;
+}
+
 void DrawEditPanel(float width, float height) {
     if (g_item_selected) {
         if (g_edit_type == EDIT_MATERIAL) {

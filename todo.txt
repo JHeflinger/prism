@@ -27,17 +27,14 @@ ICEBOX:
 23. Available keybinds tooltop overlay (like monster hunter combo hints)
 24. New test suite
 25. Get rid of roulette config
+26. Edit Material name
+27. Light names
+28. Edit light name
+29. Select model dropdown menu for material adding/editing
 
 NEXT:
 3. Direct light sampling
-4. BUG - selecting faces happens while popup is on
 5. BUG - async rendering is suspiciously not working
-7. Deselect current face - to do this need a get hovered panel name function
-8. Select model dropdown menu for material adding/editing
 10. Refraction
-12. Fix pipeline flickering issue
-13. Material names
-16. Make executor output more pretty with a progress bar
-18. Expose use default vs pathtracing mode in pipeline
-19. That stratified sampling technique you did in spectral rendering
-21. BUG - camera is weird on load xml when camera gets overridden
+12. Fix pipeline flickering issue | dont forget about the fact that the camera reset needs to flush through the entire pipeline AND to take in account for what position in the pipeline is at when merging the targets as to maintain uniformity
+18. Expose use default vs pathtracing mode in pipeline - pipline configurations using flags

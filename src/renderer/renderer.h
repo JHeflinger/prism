@@ -15,6 +15,8 @@ SimpleCamera GetCamera();
 
 void MoveCamera(SimpleCamera camera);
 
+void ReorientCamera();
+
 TriangleID SubmitTriangle(Triangle triangle);
 
 void RemoveTriangle(TriangleID id);
@@ -34,6 +36,12 @@ void RemoveLight(LightID id);
 void ClearLights();
 
 MaterialID SubmitMaterial(SurfaceMaterial material);
+
+MaterialID SubmitNamedMaterial(SurfaceMaterial material, const char* name);
+
+char* MaterialName(MaterialID mid);
+
+char** MaterialNameReference(MaterialID mid);
 
 void ClearMaterials();
 

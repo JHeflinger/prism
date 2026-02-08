@@ -38,28 +38,25 @@ void UpdateViewportPanel(float width, float height) {
     {
         SimpleCamera camera = GetCamera();
         vec3 offset;
-        glm_vec3_sub((vec3){ camera.position.x, camera.position.y, camera.position.z }, (vec3){ camera.look.x, camera.look.y, camera.look.z }, offset);
+        glm_vec3_sub(camera.position, camera.look, offset);
         float radius = glm_vec3_norm(offset);
         if (radius < 1e-6f) radius = 1e-6f;
-        float phi   = acosf(offset[2] / radius);
+        float phi = acosf(offset[2] / radius);
         float theta = atan2f(offset[1], offset[0]);
         if (InputButtonDown(IK_MOUSERIGHT)) {
             phi -= GetMouseDelta().y / 225.0;
             theta -= GetMouseDelta().x / 400.0f;
-            if (phi < 0.001f) phi = 0.001f;
-            if (phi > M_PI - 0.001f) phi = M_PI - 0.001f;
         }
+        if (phi < 0.001f) phi = 0.001f;
+        if (phi > M_PI - 0.001f) phi = M_PI - 0.001f;
         if (InputKeyDown(IK_PAN_CAMERA) && InputButtonDown(IK_MOUSELEFT)) {
             float distance_correction = radius / 600.0f;
-            vec3 lookat_pos = { camera.look.x, camera.look.y, camera.look.z };
-            vec3 camera_pos = { camera.position.x, camera.position.y, camera.position.z };
             vec2 mouse_delta = { GetMouseDelta().x * distance_correction, GetMouseDelta().y * distance_correction };
             vec3 forward;
-            glm_vec3_sub(lookat_pos, camera_pos, forward);
+            glm_vec3_sub(camera.look, camera.position, forward);
             glm_vec3_normalize(forward);
             vec3 right, up;
-            vec3 camera_up = { camera.up.x, camera.up.y, camera.up.z };
-            glm_vec3_cross(camera_up, forward, right);
+            glm_vec3_cross(camera.up, forward, right);
             glm_vec3_normalize(right);
             glm_vec3_cross(forward, right, up);
             glm_vec3_normalize(up);
@@ -67,14 +64,12 @@ void UpdateViewportPanel(float width, float height) {
             glm_vec3_scale(right, mouse_delta[0], right);
             glm_vec3_scale(up, mouse_delta[1], up);
             glm_vec3_add(right, up, movement);
-            camera.look.x += movement[0];
-            camera.look.y += movement[1];
-            camera.look.z += movement[2];
+            glm_vec3_add(camera.look, movement, camera.look);
         }
         radius -= GetMouseWheelMove() / 4.0f;
-        camera.position.x = camera.look.x + (radius * sin(phi) * cos(theta));
-        camera.position.y = camera.look.y + (radius * sin(phi) * sin(theta));
-        camera.position.z = camera.look.z + (radius * cos(phi));
+        camera.position[0] = camera.look[0] + (radius * sin(phi) * cos(theta));
+        camera.position[1] = camera.look[1] + (radius * sin(phi) * sin(theta));
+        camera.position[2] = camera.look[2] + (radius * cos(phi));
         camera.fov = 90.0f;
         SetViewportSlice(width, height);
         MoveCamera(camera);
@@ -82,11 +77,17 @@ void UpdateViewportPanel(float width, float height) {
 
     // selection controls
     {
-        if (InputButtonReleased(IK_MOUSELEFT)) {
-            TriangleID tid = HoveredTriangle();
-            if (tid != (TriangleID)-1) {
-                SetEditTriangle(HoveredTriangleIndex(tid));
-                SetSelectedTriangle(tid);
+        if (InputButtonPressed(IK_MOUSELEFT)) {
+            const char* panel = HoveredPanel();
+            if (panel && strcmp(panel, "Viewport") == 0) {
+                TriangleID tid = HoveredTriangle();
+                if (tid != (TriangleID)-1) {
+                    SetEditTriangle(HoveredTriangleIndex(tid));
+                    SetSelectedTriangle(tid);
+                } else {
+                    DeselectEditTarget();
+                    SetSelectedTriangle((TriangleID)-1);
+                }
             }
         }
     }

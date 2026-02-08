@@ -546,7 +546,7 @@ BOOL ConstructOBJ(const StateOBJ state) {
     if (failure) return FALSE;
     ARRLIST_MaterialID ids = { 0 }; 
     for (size_t i = 0; i < state.materials.size; i++)
-        ARRLIST_MaterialID_add(&ids, SubmitMaterial(state.materials.data[i]));
+        ARRLIST_MaterialID_add(&ids, SubmitNamedMaterial(state.materials.data[i], state.material_names.data[i]));
     size_t current_marker = 0;
     MaterialID current_material = 0;
     for (size_t i = 0; i < state.faces.size; i++) {
@@ -639,9 +639,9 @@ BOOL LoadXML(const char* filepath) { // TODO: marked for removal
     char line[MAX_XML_LINE_SIZE] = { 0 };
     char obj[MAX_XML_LINE_SIZE] = { 0 };
     int camera_params_collected = 0;
-    Vector3 pos;
-    Vector3 up;
-    Vector3 look;
+    vec3 pos;
+    vec3 up;
+    vec3 look;
     float heightangle;
     while (NextLine(&parser, line, MAX_XML_LINE_SIZE)) {
         char lineargs[MAX_XML_NUM_ARGS][MAX_XML_ARG_SIZE] = { 0 };
@@ -661,7 +661,7 @@ BOOL LoadXML(const char* filepath) { // TODO: marked for removal
                 memcpy(y, lineargs[2] + 3, strlen(lineargs[2]) - 4);
                 memcpy(z, lineargs[3] + 3, strlen(lineargs[3]) - 6);
                 if (ParseFloat(x, &xf) && ParseFloat(y, &yf) && ParseFloat(z, &zf)) {
-                    pos = (Vector3){ xf, yf, zf };
+                    SETVEC3(pos, xf, yf, zf);
                 } else {
                     EZ_ERROR("Unable to parse camera position arguments \"%s %s %s\"", x, y, z);
                 }
@@ -675,7 +675,7 @@ BOOL LoadXML(const char* filepath) { // TODO: marked for removal
                 memcpy(y, lineargs[2] + 3, strlen(lineargs[2]) - 4);
                 memcpy(z, lineargs[3] + 3, strlen(lineargs[3]) - 6);
                 if (ParseFloat(x, &xf) && ParseFloat(y, &yf) && ParseFloat(z, &zf)) {
-                    up = (Vector3){ xf, yf, zf };
+                    SETVEC3(up, xf, yf, zf);
                 } else {
                     EZ_ERROR("Unable to parse camera up arguments \"%s %s %s\"", x, y, z);
                 }
@@ -689,7 +689,7 @@ BOOL LoadXML(const char* filepath) { // TODO: marked for removal
                 memcpy(y, lineargs[2] + 3, strlen(lineargs[2]) - 4);
                 memcpy(z, lineargs[3] + 3, strlen(lineargs[3]) - 6);
                 if (ParseFloat(x, &xf) && ParseFloat(y, &yf) && ParseFloat(z, &zf)) {
-                    look = (Vector3){ xf, yf, zf };
+                    SETVEC3(look, xf, yf, zf);
                 } else {
                     EZ_ERROR("Unable to parse camera focus arguments \"%s %s %s\"", x, y, z);
                 }
@@ -712,11 +712,12 @@ BOOL LoadXML(const char* filepath) { // TODO: marked for removal
         EZ_WARN("Unable to find all required camera parameters - default camera settings will be used");
     } else {
         SimpleCamera camera = GetCamera();
-        camera.position = pos;
-        camera.look = look;
-        camera.up = up;
+        SETVEC(camera.position, pos);
+        SETVEC(camera.look, look);
+        SETVEC(camera.up, up);
         camera.fov = heightangle;
         MoveCamera(camera);
+        ReorientCamera();
     }
     FreeFile(file);
     if (obj[0] == 0) {
