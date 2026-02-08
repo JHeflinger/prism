@@ -5,7 +5,6 @@
 #define EPS 0.0001
 
 struct RayGenerator {
-    vec3 normal;
 	float time;
     uint tid;
 };
@@ -90,10 +89,6 @@ vec3 key_light = vec3(0.408248, 0.408248, 0.816497);
 vec3 fill_light = vec3(-0.440225, 0.17609, 0.880451);
 vec3 back_light = vec3(0, -0.447214, 0.894427);
 vec3 background_color = vec3(0.12);
-
-float random(float n) { // from https://iquilezles.org/articles/morenoise/
-	return fract(n*17.0*fract(n*0.3183099));
-}
 
 bool cut_viewport(int rx, int ry) {
     if (ubo.viewport.x != 0 &&
@@ -209,7 +204,7 @@ float plane_intersect(Ray ray, vec3 planepoint, vec3 normal) {
     return dot(planepoint - ray.position, normal) / dot(ray.direction, normal);
 }
 
-vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout vec3 normal) {
+vec3 getcolor(vec2 ray_coordinate, inout uint hit_id) {
 	// create ray
     Ray ray = create_ray(ray_coordinate);
 
@@ -237,7 +232,6 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout vec3 normal) {
         color = mix(background_color, vec3(1.0), alias / grid_plane_distance);
     } else if (hit.distance > 0.0) {
         color = shade(ray, hit);
-        normal = hit.normal;
     }
 	
 	return color;
@@ -253,11 +247,9 @@ void main() {
 
 	// calculate ray color
 	vec3 color = vec3(0);
-    vec3 normal_out = vec3(0);
     uint hit_id = -1;
-	color = getcolor(vec2(rx, ry), hit_id, normal_out);
+	color = getcolor(vec2(rx, ry), hit_id);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;
-    raygenIn[gl_GlobalInvocationID.x].normal = normal_out;
 
     // failures
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);

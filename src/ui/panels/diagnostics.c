@@ -15,7 +15,7 @@ const char* mem_size_descriptor(size_t count) {
         return "GB";
     } else if (count > 1000000) {
         return "MB";
-    } else if (count > 1000) {
+    } else if (count >1000) {
         return "KB";
     } else {
         return "bytes";
@@ -67,6 +67,9 @@ void DrawDevPanel(float width, float height) {
     
     UIMoveCursor(0, 20.0f);
     UICheckboxLabeled("Grid:", &(RenderConfig()->grid));
+    BOOL preview = !(RenderConfig()->flags & PATHTRACE_SHADER_FLAG);
+    UICheckboxLabeled("Preview:", &preview);
+    SetPipelineFlags(preview ? PREVIEW_PIPELINE_FLAGS : PATHTRACE_PIPELINE_FLAGS);
     
     UIMoveCursor(0, 20.0f);
     UIDragFloatLabeled("Whitepoint:", &(RenderConfig()->whitepoint), 0.01f, 999999999.0f, 0.1f, width - 20);

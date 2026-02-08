@@ -1,7 +1,6 @@
 #version 450
 
 struct RayGenerator {
-    vec3 normal;
 	float time;
     uint tid;
 };
@@ -20,6 +19,7 @@ layout(binding = 2) uniform OverlayUniformBufferObject {
 	uint image_width;
 	uint image_height;
 	uint single_selected_tid;
+    uint divisor;
 } ubo;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;

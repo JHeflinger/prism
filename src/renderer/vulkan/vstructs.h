@@ -53,6 +53,7 @@ typedef struct {
 	alignas(4) uint32_t image_width;
 	alignas(4) uint32_t image_height;
 	alignas(4) uint32_t single_selected_tid;
+	alignas(4) uint32_t divisor;
 } OverlayUniformBufferObject;
 
 typedef struct {

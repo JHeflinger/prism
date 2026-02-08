@@ -34,10 +34,7 @@ ICEBOX:
 
 NEXT:
 3. Direct light sampling
-5. BUG - async rendering is suspiciously not working
+5. BUG - async rendering is suspiciously not reporting accurate numbers or working well
 10. Refraction
-12. Fix pipeline flickering issue | dont forget about the fact that the camera reset needs to flush through the entire pipeline AND to take in account for what position in the pipeline is at when merging the targets as to maintain uniformity
-18. Expose use default vs pathtracing mode in pipeline - pipline configurations using flags
 
-
-fix randomness stagnation
+remove bool from shader fields and make a better system for defining flags

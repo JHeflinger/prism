@@ -3,6 +3,10 @@
 
 #include "renderer/rstructs.h"
 
+PipelineFlags GetPipelineFlags();
+
+void SetPipelineFlags(PipelineFlags flags);
+
 void SetViewportSlice(size_t w, size_t h);
 
 void OverrideResolution(size_t x, size_t y);

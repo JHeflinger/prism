@@ -61,7 +61,8 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
     // execute shader stages
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
-        if (!g_vupdt_renderer_ref->vulkan.core.shaders.data[i]->enabled) continue;
+        //if (!g_vupdt_renderer_ref->vulkan.core.shaders.data[i]->enabled) continue;
+        if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
 
         vkCmdBindPipeline(
             command,
@@ -158,15 +159,18 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 
     // check for camera reset
     static SimpleCamera old_camera = { 0 };
+    static PipelineFlags old_flags = 0;
     static int reset_count = 0;
     if (old_camera.fov == 0.0f) old_camera = g_vupdt_renderer_ref->camera;
-    if (memcmp(&old_camera, &(g_vupdt_renderer_ref->camera), sizeof(SimpleCamera)) != 0) {
+    if (old_flags == 0) old_flags = g_vupdt_renderer_ref->config.flags;
+    if (old_flags != g_vupdt_renderer_ref->config.flags ||
+        memcmp(&old_camera, &(g_vupdt_renderer_ref->camera), sizeof(SimpleCamera)) != 0) 
         reset_count = CPUSWAP_LENGTH;
-        old_camera = g_vupdt_renderer_ref->camera;
-    }
+    old_camera = g_vupdt_renderer_ref->camera;
+    old_flags = g_vupdt_renderer_ref->config.flags;
     BOOL cam_reset = reset_count != 0;
     if (reset_count > 0) reset_count--;
-    
+
     // persistant vars
     static uint32_t samples = 0;
     samples++;
@@ -226,6 +230,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 		ubo.image_width = g_vupdt_renderer_ref->dimensions.x;
 		ubo.image_height = g_vupdt_renderer_ref->dimensions.y;
         ubo.single_selected_tid = GetSelectedTriangle();
+        ubo.divisor = g_vupdt_renderer_ref->config.flags & PATHTRACE_SHADER_FLAG ? CPUSWAP_LENGTH : 1;
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
 }

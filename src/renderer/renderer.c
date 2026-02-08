@@ -18,6 +18,14 @@ LightID g_light_id = 0;
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
 
+PipelineFlags GetPipelineFlags() {
+    return g_renderer.config.flags;
+}
+
+void SetPipelineFlags(PipelineFlags flags) {
+    g_renderer.config.flags = flags;
+}
+
 void SetViewportSlice(size_t w, size_t h) {
 	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
 	float psuedo_h = h * (g_renderer.dimensions.y / (float)GetScreenHeight());
@@ -33,7 +41,7 @@ void InitializeRenderer() {
 	srand(time(NULL));
 
     // initialize config
-    g_renderer.config.frameless = FRAMELESS_CHANCE;
+    g_renderer.config.frameless = 1.0;
     g_renderer.config.smoothen = 0.0f;
     g_renderer.config.marches = 100;
     g_renderer.config.roulette = -1.0f;
@@ -42,6 +50,7 @@ void InitializeRenderer() {
     g_renderer.config.autoframeless = FALSE;
     g_renderer.config.grid = TRUE;
     g_renderer.config.async = TRUE;
+    g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
 
     // initialize camera
     g_renderer.camera = (SimpleCamera){
@@ -65,8 +74,10 @@ void InitializeRenderer() {
 	EZ_ASSERT(result, "Failed to initialize vulkan");
 
     // set up cpu swap
-	g_renderer.swapchain.target = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
-	EZ_ASSERT(IsRenderTextureValid(g_renderer.swapchain.target), "Unable to load target texture");
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+	    g_renderer.swapchain.target[i] = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
+	    EZ_ASSERT(IsRenderTextureValid(g_renderer.swapchain.target[i]), "Unable to load target texture");
+    }
 
     // configure stat profiler
     ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 10);
@@ -100,7 +111,8 @@ void DestroyRenderer() {
     VCLEAN_Vulkan(&(g_renderer.vulkan));
 
     // unload cpu swap textures
-	UnloadRenderTexture(g_renderer.swapchain.target);
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++)
+	    UnloadRenderTexture(g_renderer.swapchain.target[i]);
 }
 
 SimpleCamera GetCamera() {
@@ -403,7 +415,7 @@ void Render() {
         async_update = TRUE;
 
         // update render target
-        glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.target.texture.id);
+        glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.target[new_ind].texture.id);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_renderer.dimensions.x, g_renderer.dimensions.y, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
         glBindTexture(GL_TEXTURE_2D, 0);
         
@@ -414,20 +426,43 @@ void Render() {
     }
 }
 
+void DrawHelper(float x, float y, float w, float h, float maxw, float maxh) {
+    ClearBackground(BLACK);
+    BeginBlendMode(BLEND_ADDITIVE);
+	float psuedo_w = w * (g_renderer.dimensions.x / maxw);
+	float psuedo_h = h * (g_renderer.dimensions.y / maxh);
+    if (g_renderer.config.flags & PATHTRACE_SHADER_FLAG) {
+        for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+            DrawTexturePro(
+                g_renderer.swapchain.target[i].texture,
+                (Rectangle){
+                    (g_renderer.swapchain.target[i].texture.width / 2.0f) - (psuedo_w/2.0f),
+                    (g_renderer.swapchain.target[i].texture.height / 2.0f) - (psuedo_h/2.0f),
+                    psuedo_w,
+                    psuedo_h },
+                (Rectangle){ x, y, w, h},
+                (Vector2){ 0, 0 },
+                0.0f,
+                WHITE);
+        }
+    } else {
+        DrawTexturePro(
+            g_renderer.swapchain.target[g_renderer.swapchain.index].texture,
+            (Rectangle){
+                (g_renderer.swapchain.target[g_renderer.swapchain.index].texture.width / 2.0f) - (psuedo_w/2.0f),
+                (g_renderer.swapchain.target[g_renderer.swapchain.index].texture.height / 2.0f) - (psuedo_h/2.0f),
+                psuedo_w,
+                psuedo_h },
+            (Rectangle){ x, y, w, h},
+            (Vector2){ 0, 0 },
+            0.0f,
+            WHITE);
+    }
+    EndBlendMode();
+}
+
 void Draw(float x, float y, float w, float h) {
-	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
-	float psuedo_h = h * (g_renderer.dimensions.y / (float)GetScreenHeight());
-    DrawTexturePro(
-        g_renderer.swapchain.target.texture,
-        (Rectangle){
-            (g_renderer.swapchain.target.texture.width / 2.0f) - (psuedo_w/2.0f),
-            (g_renderer.swapchain.target.texture.height / 2.0f) - (psuedo_h/2.0f),
-            psuedo_w,
-            psuedo_h },
-        (Rectangle){ x, y, w, h},
-        (Vector2){ 0, 0 },
-        0.0f,
-        WHITE);
+    DrawHelper(x, y, w, h, (float)GetScreenWidth(), (float)GetScreenHeight());
 }
 
 float RenderTime() {
@@ -524,9 +559,14 @@ void UpdateTriangles() {
 }
 
 void SaveRender(const char* filepath) {
-    Image image = LoadImageFromTexture(g_renderer.swapchain.target.texture);
+	RenderTexture rt = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
+    BeginTextureMode(rt);
+    DrawHelper(0, 0, g_renderer.dimensions.x, -g_renderer.dimensions.y, g_renderer.dimensions.x, g_renderer.dimensions.y);
+    EndTextureMode();
+    Image image = LoadImageFromTexture(rt.texture);
     ExportImage(image, filepath);
     UnloadImage(image);
+    UnloadRenderTexture(rt);
 }
 
 char* GPUModel() {

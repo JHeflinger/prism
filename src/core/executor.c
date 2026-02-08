@@ -20,6 +20,7 @@ void InitializeExecutor(int w, int h) {
     SetConfigFlags(FLAG_WINDOW_HIDDEN);
 	InitWindow(1, 1, "Prism Headless Executor");
 	InitializeRenderer();
+    SetPipelineFlags(HEADLESS_PIPELINE_FLAGS);
     RenderConfig()->async = FALSE;
     printf("\nEnvironment configuration:\n\tGPU: %s\n\tResolution: %dx%d\n\tOperating System: %s\n\n", GPUModel(), w, h, OPSYS);
 }

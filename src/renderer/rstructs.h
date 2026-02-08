@@ -21,6 +21,17 @@ DECLARE_ARRLIST(LightID);
 #define SETVEC3(v, x, y, z) {v[0] = x; v[1] = y; v[2] = z;}
 #define SETVEC(v1, v2) {v1[0] = v2[0]; v1[1] = v2[1]; v1[2] = v2[2];}
 
+#define PREVIEW_PIPELINE_FLAGS 0b11001
+#define PATHTRACE_PIPELINE_FLAGS 0b11110
+#define HEADLESS_PIPELINE_FLAGS 0b00110
+#define DEFAULT_SHADER_FLAG 0b1
+#define PATHTRACE_SHADER_FLAG 0b10
+#define TONEMAP_SHADER_FLAG 0b100
+#define ANALYZE_SHADER_FLAG 0b1000
+#define OVERLAY_SHADER_FLAG 0b10000
+
+typedef uint32_t PipelineFlags;
+
 typedef struct {
     vec3 position;
     vec3 look;
@@ -79,7 +90,6 @@ DECLARE_ARRLIST(SurfaceMaterial);
 #define BVH_BOTH 3
 
 typedef struct {
-    alignas(16) vec3 normal;
 	alignas(4) float time;
     alignas(4) uint32_t tid;
 } RayGenerator;
@@ -102,7 +112,7 @@ typedef struct {
 DECLARE_ARRLIST(NodeBVH);
 
 typedef struct {
-	RenderTexture2D target;
+	RenderTexture2D target[CPUSWAP_LENGTH];
 	size_t index;
     void* reference;
 } CPUSwap;
@@ -167,6 +177,7 @@ typedef struct {
     BOOL autoframeless;
     BOOL grid;
     BOOL async;
+    PipelineFlags flags;
 } RendererConfig;
 
 #endif
