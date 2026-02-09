@@ -237,10 +237,10 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id) {
     if (hit.distance > 0.0) {
         color = shade(ray, hit);
         if (gridhit) {
-            color = mix(color, vec3(1.0), gridmix);
+            color = mix(color, vec3(0.7), gridmix);
         }
     } else if (gridhit) {
-        color = mix(background_color, vec3(1.0), gridmix);
+        color = mix(background_color, vec3(0.7), gridmix);
     }
 	
 	return color;

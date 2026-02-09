@@ -7,6 +7,7 @@ ICEBOX:
 3. Wiki + Info buttons
 4. Outputted TID flickers at certain angles - this could be fixed with perhaps a barrier and readonly for the tids on the overlay pipeline?
     4a. the tid flickering is somewhat pixel coordinate dependent??
+    4b. maybe try using an image buffer to store it instead of a SSBO
 5. Reimplement SDFs properly, represent in scene as boxes if marching isn't enabled, otherwise march instead of trace
 6. Volumetrics
 7. Diffraction
