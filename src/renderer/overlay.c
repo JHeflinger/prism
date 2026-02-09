@@ -3,7 +3,7 @@
 
 Renderer* g_overlay_renderer_ref = NULL;
 Rectangle g_viewport_dims = { 0 };
-OverlaySSBO g_exposed_overlay_ssbo = { 0 };
+OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (uint32_t)-1 };
 TriangleID g_single_selected_triangle = -1;
 
 void SetOverlayContext(Renderer* renderer) {

@@ -199,6 +199,7 @@ BOOL VINIT_ShaderStorageBuffers(VulkanDataBuffer* ssbo_array) {
     uint32_t imgw = (uint32_t)g_vinit_renderer_ref->dimensions.x;
     uint32_t imgh = (uint32_t)g_vinit_renderer_ref->dimensions.y;
     RayGenerator* raygens = EZ_ALLOC(imgw * imgh, sizeof(RayGenerator));
+    for (size_t i = 0; i < imgw * imgh; i++) raygens[i].tid = (uint32_t)-1;
 
     VkDeviceSize bufferSize = sizeof(RayGenerator) * imgw * imgh;
     VulkanDataBuffer stagingBuffer;
