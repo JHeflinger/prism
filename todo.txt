@@ -8,6 +8,7 @@ ICEBOX:
 4. Outputted TID flickers at certain angles - this could be fixed with perhaps a barrier and readonly for the tids on the overlay pipeline?
     4a. the tid flickering is somewhat pixel coordinate dependent??
     4b. maybe try using an image buffer to store it instead of a SSBO
+    4c. only seems to happen on my desktop device (discrete NVIDIA gpu)
 5. Reimplement SDFs properly, represent in scene as boxes if marching isn't enabled, otherwise march instead of trace
 6. Volumetrics
 7. Diffraction
@@ -34,6 +35,7 @@ ICEBOX:
 28. Edit light name
 29. Select model dropdown menu for material adding/editing
 30. antialiasing
+31. no need to trace initial hit every single time when accumulating paths? restir?
 
 NEXT:
 3. Direct light sampling

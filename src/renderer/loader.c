@@ -463,24 +463,28 @@ BOOL ParseOBJ_f(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numarg
             values[i][1] = state->uvs.size + values[i][1];
         } else if (values[i][1] > 0) {
             values[i][1]--;
+        } else {
+            values[i][1] = (size_t)-1;
         }
         if (values[i][2] < 0) {
             values[i][2] = state->normals.size + values[i][2];
         } else if (values[i][2] > 0) {
             values[i][2]--;
+        } else {
+            values[i][2] = (size_t)-1;
         }
     }
     ARRLIST_Face_add(&(state->faces), (Face){
         values[0][0], values[1][0], values[2][0],
         values[0][1], values[1][1], values[2][1],
         values[0][2], values[1][2], values[2][2],
-        values[0][1] != 0, values[0][2] != 0
+        values[0][1] != -1, values[0][2] != -1
     });
     if (numargs == 5) ARRLIST_Face_add(&(state->faces), (Face){
         values[0][0], values[2][0], values[3][0],
         values[0][1], values[2][1], values[3][1],
         values[0][2], values[2][2], values[3][2],
-        values[0][1] != 0, values[0][2] != 0
+        values[0][1] != -1, values[0][2] != -1
     });
     return TRUE;
 }
@@ -530,15 +534,15 @@ BOOL ConstructOBJ(const StateOBJ state) {
             EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].c, (int)state.vertices.size);
             failure = TRUE;
         }
-        if (state.faces.data[i].an >= state.normals.size && state.faces.data[i].an != 0) {
+        if (state.faces.data[i].normals && state.faces.data[i].an >= state.normals.size) {
             EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].an, (int)state.normals.size);
             failure = TRUE;
         }
-        if (state.faces.data[i].bn >= state.normals.size && state.faces.data[i].bn != 0) {
+        if (state.faces.data[i].normals && state.faces.data[i].bn >= state.normals.size) {
             EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].bn, (int)state.normals.size);
             failure = TRUE;
         }
-        if (state.faces.data[i].cn >= state.normals.size && state.faces.data[i].cn != 0) {
+        if (state.faces.data[i].normals && state.faces.data[i].cn >= state.normals.size) {
             EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].cn, (int)state.normals.size);
             failure = TRUE;
         }
@@ -571,19 +575,19 @@ BOOL ConstructOBJ(const StateOBJ state) {
                 state.vertices.data[state.faces.data[i].c].z,
             },
             {
-                state.normals.size > 0 ? state.normals.data[state.faces.data[i].an].x : 0,
-                state.normals.size > 0 ? state.normals.data[state.faces.data[i].an].y : 0,
-                state.normals.size > 0 ? state.normals.data[state.faces.data[i].an].z : 0,
+                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].an].x : 0,
+                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].an].y : 0,
+                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].an].z : 0,
             },
             {
-                state.normals.size > 0 ? state.normals.data[state.faces.data[i].bn].x : 0,
-                state.normals.size > 0 ? state.normals.data[state.faces.data[i].bn].y : 0,
-                state.normals.size > 0 ? state.normals.data[state.faces.data[i].bn].z : 0,
+                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].bn].x : 0,
+                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].bn].y : 0,
+                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].bn].z : 0,
             },
             {
-                state.normals.size > 0 ? state.normals.data[state.faces.data[i].cn].x : 0,
-                state.normals.size > 0 ? state.normals.data[state.faces.data[i].cn].y : 0,
-                state.normals.size > 0 ? state.normals.data[state.faces.data[i].cn].z : 0,
+                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].cn].x : 0,
+                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].cn].y : 0,
+                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].cn].z : 0,
             },
             current_material
         };

@@ -27,8 +27,8 @@ void UpdateViewportPanel(float width, float height) {
 
     // reset camera
     if (InputKeyPressed(IK_RESET_CAMERA)) {
-        //LoadOBJ("/home/jason/Dev/ADVGRAPHICS/example-scenes/models/CornellBox/CornellBox-Sphere.obj");
-        LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
+        //LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
+        LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox.xml");
 
         /* 
         SimpleCamera camera = GetCamera();

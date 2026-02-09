@@ -278,7 +278,7 @@ Hit trace(Ray ray, inout uint hit_id) {
 
 float russian_roulette(vec3 throughput) {
     if (ubo.roulette > 0) return ubo.roulette;
-    return clamp(max(max(throughput.x, throughput.y), throughput.z), 0.05, 1.0);
+    return clamp(max(max(throughput.x, throughput.y), throughput.z), 0.05, 0.999);
 }
 
 vec3 onb(vec3 normal, vec3 local) {
