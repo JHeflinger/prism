@@ -101,6 +101,7 @@ layout(binding = 5) readonly buffer BVHSSBOIn {
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
+const float max_contribution = 10;
 const float PI = 3.14159265358979323846;
 bool stack_failure = false;
 float random_seed = 0;
@@ -175,6 +176,10 @@ float noise(float n) {
 float random() {
     random_seed *= 0.5 + noise(random_seed);
     return noise(random_seed);
+}
+
+float luminance(vec3 c) {
+    return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
 }
 
 bool cut_viewport(int rx, int ry) {
@@ -289,7 +294,7 @@ vec3 onb(vec3 normal, vec3 local) {
 	return normalize(local.x*u + local.y*v + local.z*w);
 }
 
-vec3 uniform_sample_hemisphere() {
+vec3 sample_cosine_weighted_lobe() {
     float r1 = random();
     float r2 = random();
     float sqr2 = sqrt(r2);
@@ -297,12 +302,36 @@ vec3 uniform_sample_hemisphere() {
     return vec3(cos(phi)*sqr2, sin(phi)*sqr2, sqrt(1.0 - r2));
 }
 
-void brdf(in Hit h, in Material material, inout vec3 incoming, inout float pdf, inout vec3 throughput) {
+vec3 sample_specular_phong_lobe(float shiny) {
+    float r1 = random();
+    float r2 = random();
+    float phi = 2.0 * PI * r1;
+    float costheta = pow(r2, 1.0 / (shiny + 1.0));
+    float sintheta = sqrt(1.0 - costheta * costheta);
+    return vec3(cos(phi) * sintheta, sin(phi) * sintheta, costheta);
+}
+
+float diffuse_pdf(vec3 normal, vec3 incoming) {
+    return max(0.0, dot(normal, incoming)) / PI;
+}
+
+float specular_pdf(vec3 incoming, vec3 R, float shiny) {
+    float cosalpha = max(dot(R, incoming), 0.0);
+    return (shiny + 1.0) * pow(cosalpha, shiny) / (2.0 * PI);
+}
+
+void brdf(in vec3 outgoing, in Hit h, in Material material, inout vec3 incoming, inout float pdf, inout vec3 throughput) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
-            incoming = onb(h.normal, uniform_sample_hemisphere());
-            pdf = max(0.0, dot(h.normal, incoming)) / PI;
-            throughput = material.diffuse / PI;
+            float ks = luminance(material.specular);
+            float kd = luminance(material.diffuse);
+            float kskd = ks + kd;
+            float pd = kd/kskd;
+            float ps = ks/kskd;
+            vec3 R = reflect(-outgoing, h.normal);
+            incoming = random() < pd ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
+            throughput = (material.diffuse / PI) + (material.specular * (material.shiny + 2.0) / (2.0 * PI) * pow(max(dot(R, incoming), 0.0), material.shiny));
+            pdf = pd * diffuse_pdf(h.normal, incoming) + ps * specular_pdf(incoming, R, material.shiny);
         default: break;
     }
 }
@@ -325,10 +354,11 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
                 vec3 incoming;
                 vec3 color;
                 float pdf;
-                brdf(h, material, incoming, pdf, color);
+                brdf(-ray.direction, h, material, incoming, pdf, color);
                 ray.position = h.position + (incoming * EPS);
                 ray.direction = incoming;
                 throughput *= color * (max(0.0f, dot(incoming, h.normal)) / pdf);
+                throughput = min(throughput, max_contribution);
                 float p = russian_roulette(throughput);
                 if (random() < p) {
                     throughput /= p;

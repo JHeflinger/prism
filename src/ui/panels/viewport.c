@@ -27,17 +27,12 @@ void UpdateViewportPanel(float width, float height) {
 
     // reset camera
     if (InputKeyPressed(IK_RESET_CAMERA)) {
-        //LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
-        LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox.xml");
-
-        /* 
         SimpleCamera camera = GetCamera();
-        camera.position = (Vector3){ 2.11f, 0.0f, 2.133f };
-        camera.look = (Vector3){ 0.0f, 0.0f, 0.0f };
-        camera.up = (Vector3){ 0.0f, 0.0f, 1.0f };
+        SETVEC3(camera.position, 2.11f, 0.0f, 2.133f);
+        SETVEC3(camera.look, 0.0f, 0.0f, 0.0f);
+        SETVEC3(camera.up, 0.0f, 0.0f, 1.0f);
         camera.fov = 90.0f;
         MoveCamera(camera);
-        */
         moved = TRUE;
     }
 

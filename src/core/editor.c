@@ -3,7 +3,6 @@
 #include "data/input.h"
 #include "data/colors.h"
 #include "data/assets.h"
-#include <easylogger.h>
 #include "ui/ui.h"
 #include "ui/panels/diagnostics.h"
 #include "ui/panels/viewport.h"
@@ -11,8 +10,10 @@
 #include "ui/panels/edit.h"
 #include "ui/panels/actions.h"
 #include "renderer/renderer.h"
+#include "core/dev.h"
 #include <raylib.h>
 #include <easymemory.h>
+#include <easylogger.h>
 
 UI* g_ui = NULL;
 
@@ -77,6 +78,9 @@ void RunEditor() {
 
     // Run editor
     while(!WindowShouldClose()) {
+        // dev overrides
+        DevUpdate();
+
         // update editor
         UpdateEditor();
 
