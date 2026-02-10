@@ -108,9 +108,9 @@ void DrawEditPanel(float width, float height) {
             edited |= UIDragFloat(&(matref->specular[2]), 0, 1.0f, 0.05f, component_width);
             UIMoveCursor(0, 35);
             float sboxwidth = width - 20 - 140;
-            UIDrawText("Refraction Index");
+            UIDrawText("Index of Refraction");
             UIMoveCursor(140, -20);
-            edited |= UIDragFloat(&(matref->ior), 0, 1.0f, 0.01f, sboxwidth);
+            edited |= UIDragFloat(&(matref->ior), 0, 999999.0f, 0.01f, sboxwidth);
             UIMoveCursor(0, 5);
             UIDrawText("Shininess");
             UIMoveCursor(140, -20);

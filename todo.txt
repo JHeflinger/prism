@@ -37,8 +37,12 @@ ICEBOX:
 29. Select model dropdown menu for material adding/editing
 30. antialiasing
 31. no need to trace initial hit every single time when accumulating paths? restir?
+32. optimization - caclulation struct! pre calculate everything possible and just pass the struct around as to reduce redundant calculations
 
 NEXT:
+2. depth of field
 3. Direct light sampling
+4. volume attenuation
 5. BUG - async rendering is suspiciously not reporting accurate numbers or working well
-10. Refraction
+6. fixed function denoising
+11. add transmissision proprety to material edit ui

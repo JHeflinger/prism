@@ -8,7 +8,7 @@
 
 void DevUpdate() {
     if (InputKeyPressed(IK_DEV)) {
-        LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Glossy.xml");
+        LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
         SimpleCamera c = GetCamera();
         c.fov = 90.0f;
         MoveCamera(c);

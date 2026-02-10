@@ -5,6 +5,8 @@
 #define EPS 0.0001
 
 #define LAMBERTIAN_MODEL 2
+#define MIRROR_MODEL 5
+#define DIELECTRIC_MODEL 7
 
 struct RayGenerator {
 	float time;
@@ -38,7 +40,7 @@ struct Material {
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
-    float rindex;
+    float ior;
     float shiny;
     uint model;
 };
@@ -163,6 +165,23 @@ float sobol_owen(uint index, int dimension, uint seed) {
     uint v = sobol(index, dimension);
     v = owen_scramble(v, seed + uint(dimension) * 0xA511E9B3u);
     return float(v) * (1.0 / 4294967296.0);
+}
+
+float fresnel_dielectric(float cosi, float ior_i, float ior_t) {
+    cosi = clamp(cosi, -1.0, 1.0);
+    bool entering = cosi > 0.0;
+    if (!entering) {
+        float tmp = ior_i;
+        ior_i = ior_t;
+        ior_t = tmp;
+        cosi != -1.0;
+    }
+    float sint = ior_i / ior_t * sqrt(max(0.0, 1.0 - cosi * cosi));
+    if (sint >= 1.0) return 1.0; // total internal reflection
+    float cost = sqrt(max(0.0, 1.0 - sint * sint));
+    float Rs = (ior_t * cosi - ior_i * cost) / (ior_t * cosi + ior_i * cost);
+    float Rp = (ior_i * cosi - ior_t * cost) / (ior_i * cosi + ior_t * cost);
+    return 0.5 * (Rs * Rs + Rp * Rp);
 }
 
 vec3 background_color(Ray ray) {
@@ -320,7 +339,16 @@ float specular_pdf(vec3 incoming, vec3 R, float shiny) {
     return (shiny + 1.0) * pow(cosalpha, shiny) / (2.0 * PI);
 }
 
-void brdf(in vec3 outgoing, in Hit h, in Material material, inout vec3 incoming, inout float pdf, inout vec3 throughput) {
+bool refract_ray(vec3 outgoing, vec3 normal, float eta, out vec3 incoming) {
+    float cosi = clamp(dot(-outgoing, normal), -1, 1);
+    float k = 1.0 - (eta * eta * (1.0 - cosi * cosi));
+    if (k < 0.0) return false;
+    float cost = sqrt(k);
+    incoming = normalize(eta * (outgoing) + ((eta * cosi - cost) * normal));
+    return true;
+}
+
+void brdf(in vec3 outgoing, in Hit h, in Material material, inout vec3 incoming, inout float pdf, inout vec3 throughput, inout float ior, inout uint medium) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             float ks = luminance(material.specular);
@@ -330,8 +358,47 @@ void brdf(in vec3 outgoing, in Hit h, in Material material, inout vec3 incoming,
             float ps = ks/kskd;
             vec3 R = reflect(-outgoing, h.normal);
             incoming = random() < pd ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
-            throughput = (material.diffuse / PI) + (material.specular * (material.shiny + 2.0) / (2.0 * PI) * pow(max(dot(R, incoming), 0.0), material.shiny));
-            pdf = pd * diffuse_pdf(h.normal, incoming) + ps * specular_pdf(incoming, R, material.shiny);
+            throughput = 
+                ((material.diffuse / PI) +
+                (material.specular * (material.shiny + 2.0) /
+                (2.0 * PI) * pow(max(dot(R, incoming), 0.0), material.shiny))) *
+                max(0.0, dot(incoming, h.normal));
+            pdf = (pd * diffuse_pdf(h.normal, incoming) + ps * specular_pdf(incoming, R, material.shiny));
+            break;
+        case MIRROR_MODEL:
+            incoming = reflect(-outgoing, h.normal);
+            throughput = material.specular;
+            pdf = 1.0;
+            break;
+        case DIELECTRIC_MODEL:
+            float cosi = dot(outgoing, h.normal);
+            float eta_i = ior;
+            float eta_t = material.ior;
+            uint mat_t = h.material;
+            if (medium == mat_t) {
+                eta_t = 1.0;
+                mat_t = -1;
+            }
+            float F = fresnel_dielectric(cosi, eta_i, eta_t);
+            if (random() < F) {
+                incoming = reflect(-outgoing, h.normal);
+                throughput = vec3(F);
+                pdf = F;
+            } else {
+                float eta = (cosi > 0.0) ? eta_i / eta_t : eta_t / eta_i;
+                vec3 Nt = (cosi > 0.0) ? h.normal : -h.normal;
+                if (!refract_ray(-outgoing, Nt, eta, incoming)) {
+                    incoming = reflect(-outgoing, h.normal);
+                    throughput = vec3(1.0);
+                    pdf = F;
+                    return;
+                }
+                throughput = vec3(1.0 - F);
+                pdf = 1.0 - F;
+                ior = eta_t;
+                medium = mat_t;
+            }
+            break;
         default: break;
     }
 }
@@ -340,6 +407,8 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
     vec3 throughput = vec3(1.0);
     bool firsthit = true;
     uint hid = -1;
+    float ior = 1.0;
+    uint medium = -1;
     for (uint i = 0; i < MAX_BOUNCES; i++) {
         Hit h = trace(ray, hid);
         if (h.distance > 0) {
@@ -354,10 +423,10 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
                 vec3 incoming;
                 vec3 color;
                 float pdf;
-                brdf(-ray.direction, h, material, incoming, pdf, color);
+                brdf(-ray.direction, h, material, incoming, pdf, color, ior, medium);
                 ray.position = h.position + (incoming * EPS);
                 ray.direction = incoming;
-                throughput *= color * (max(0.0f, dot(incoming, h.normal)) / pdf);
+                throughput *= color / pdf;
                 throughput = min(throughput, max_contribution);
                 float p = russian_roulette(throughput);
                 if (random() < p) {
