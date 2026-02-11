@@ -25,11 +25,11 @@ layout(binding = 0) uniform UniformBufferObject {
     float swap;
 	float frametime;
     float time;
-	float frameless;
     float smoothen;
     float whitepoint;
     float gamma;
     float roulette;
+    float lightarea;
 } ubo;
 
 layout(binding = 1, rgba8) uniform image2D outputImage;

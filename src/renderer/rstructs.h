@@ -4,10 +4,9 @@
 #include "data/profile.h"
 #include "data/strings.h"
 #include "renderer/vulkan/vconfig.h"
+#include "renderer/rmath.h"
 #include <raylib.h>
 #include <vulkan/vulkan.h>
-#define CGLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <cglm/cglm.h>
 
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
@@ -17,9 +16,6 @@ DECLARE_ARRLIST(MaterialID);
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARRLIST(SDFID);
 DECLARE_ARRLIST(LightID);
-
-#define SETVEC3(v, x, y, z) {v[0] = x; v[1] = y; v[2] = z;}
-#define SETVEC(v1, v2) {v1[0] = v2[0]; v1[1] = v2[1]; v1[2] = v2[2];}
 
 #define PREVIEW_PIPELINE_FLAGS 0b11001
 #define PATHTRACE_PIPELINE_FLAGS 0b11110
@@ -165,19 +161,18 @@ typedef struct {
     ARRLIST_NodeBVH bvh;
     ARRLIST_SDFPrimitive sdfs;
     ARRLIST_SDFID sdfids;
+    float lightarea;
     ChangeSet changes;
 } Geometry;
 
 typedef struct {
     float time;
-    float frameless;
     float smoothen;
     float roulette;
     float whitepoint;
     float gamma;
     uint32_t marches;
     BOOL direct;
-    BOOL autoframeless;
     BOOL grid;
     BOOL async;
     PipelineFlags flags;

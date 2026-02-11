@@ -63,11 +63,11 @@ layout(binding = 0) uniform UniformBufferObject {
     float swap;
 	float frametime;
     float time;
-	float frameless;
     float smoothen;
     float whitepoint;
     float gamma;
     float roulette;
+    float lightarea;
 } ubo;
 
 layout(binding = 1) buffer RayGeneratorSSBOIn {
@@ -266,9 +266,5 @@ void main() {
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);
     
     // write to image
-    if (ubo.frameless < 1.0) {
-	    imageStore(outputImage, ivec2(rx, ry), vec4(color, 0.1));
-    } else {
-	    imageStore(outputImage, ivec2(rx, ry), vec4(color, 1.0));
-    }
+	imageStore(outputImage, ivec2(rx, ry), vec4(color, 1.0));
 }

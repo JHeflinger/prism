@@ -41,14 +41,12 @@ void InitializeRenderer() {
 	srand(time(NULL));
 
     // initialize config
-    g_renderer.config.frameless = 1.0;
     g_renderer.config.smoothen = 0.0f;
     g_renderer.config.marches = 100;
     g_renderer.config.roulette = -1.0f;
     g_renderer.config.whitepoint = 20.0f;
     g_renderer.config.gamma = 2.2f;
     g_renderer.config.direct = FALSE;
-    g_renderer.config.autoframeless = FALSE;
     g_renderer.config.grid = TRUE;
     g_renderer.config.async = TRUE;
     g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
@@ -164,8 +162,10 @@ TriangleID SubmitTriangle(Triangle triangle) {
     bb.centroid[1] = ((bb.max[1] - bb.min[1]) / 2.0f) + bb.min[1];
     bb.centroid[2] = ((bb.max[2] - bb.min[2]) / 2.0f) + bb.min[2]; 
     vec3 emission; SETVEC(emission, g_renderer.geometry.materials.data[triangle.material].emission);
-    if (emission[0] != 0 || emission[1] != 0 || emission[2] != 0)
+    if (emission[0] != 0 || emission[1] != 0 || emission[2] != 0) {
         ARRLIST_TriangleID_add(&(g_renderer.geometry.emissives), g_renderer.geometry.triangles.size);
+        g_renderer.geometry.lightarea += TriangleArea(triangle.a, triangle.b, triangle.c);
+    }
     ARRLIST_TriangleID_add(&(g_renderer.geometry.tids), g_triangle_id);
     ARRLIST_TriangleBB_add(&(g_renderer.geometry.tbbs), bb);
     ARRLIST_Triangle_add(&(g_renderer.geometry.triangles), triangle);
@@ -184,9 +184,11 @@ void RemoveTriangle(TriangleID id) {
         }
     }
     if (found) {
+        Triangle tri = g_renderer.geometry.triangles.data[ind];
         for (size_t i = 0; i < g_renderer.geometry.emissives.size; i++) {
             if (g_renderer.geometry.emissives.data[i] == ind) {
                 ARRLIST_TriangleID_remove(&(g_renderer.geometry.emissives), i);
+                g_renderer.geometry.lightarea -= TriangleArea(tri.a, tri.b, tri.c);
                 break;
             }
         }
@@ -436,7 +438,7 @@ void Render() {
         glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.target[new_ind].texture.id);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_renderer.dimensions.x, g_renderer.dimensions.y, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
         glBindTexture(GL_TEXTURE_2D, 0);
-        
+
         // end profiling
         EndProfile(&(g_renderer.stats.profile));
     } else {

@@ -78,11 +78,11 @@ layout(binding = 0) uniform UniformBufferObject {
     float swap;
 	float frametime;
     float time;
-	float frameless;
     float smoothen;
     float whitepoint;
     float gamma;
     float roulette;
+    float lightarea;
 } ubo;
 
 layout(binding = 1) buffer RayGeneratorSSBOIn {
@@ -251,14 +251,9 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     if (hit.distance <= EPS) return false;
     hit.material = tri.material;
     hit.position = ray.position + (ray.direction * hit.distance);
-    if (tri.an != vec3(0)) {
-        hit.normal = normalize((1.0 - u - v)*tri.an + u*tri.bn + v*tri.cn);
-    } else {
-        hit.normal = normalize(cross(e1, e2));
-    }
-    if (dot(hit.normal, -ray.direction) < 0.0) {
-        hit.normal = -hit.normal;
-    }
+    if (tri.an != vec3(0)) hit.normal = normalize((1.0 - u - v)*tri.an + u*tri.bn + v*tri.cn);
+    else hit.normal = normalize(cross(e1, e2));
+    if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
     return true;
 }
 
@@ -336,8 +331,9 @@ vec3 sample_specular_phong_lobe(float shiny) {
     return vec3(cos(phi) * sintheta, sin(phi) * sintheta, costheta);
 }
 
-vec3 sample_direct_light_point(inout Triangle tri, inout float area) {
-    tri = triangleIn[emissiveIn[uint(random()*float(ubo.emissives))]];
+vec3 sample_direct_light_point(inout uint tid, inout float area) {
+    tid = emissiveIn[uint(random()*float(ubo.emissives))];
+    Triangle tri = triangleIn[tid];
     area = length(cross(tri.b - tri.a, tri.c - tri.a)) * 0.5;
     float r1 = sqrt(random());
     float r2 = random();
@@ -365,18 +361,19 @@ bool refract_ray(vec3 outgoing, vec3 normal, float eta, out vec3 incoming) {
 }
 
 vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
-    Triangle tri;
+    uint eid;
     float area;
-    vec3 pos = sample_direct_light_point(tri, area);
+    vec3 pos = sample_direct_light_point(eid, area);
     vec3 to_light = pos - h.position;
     float dist = length(to_light);
     to_light = normalize(to_light);
     Ray sray = { h.position + to_light * EPS, to_light };
-    uint tmp = 0;
-    Hit shit = trace(sray, tmp);
-    if (shit.distance <= 0.0 || shit.distance < dist - EPS*2.0) return vec3(0.0); //TODO: make sure that the hit triangle is also the sampled triangle, not another emissive in between the two
+    uint tid = 0;
+    Hit shit = trace(sray, tid);
+    if (eid != tid || shit.distance <= 0.0) return vec3(0.0);
     vec3 emission = materialIn[shit.material].emission;
-    float p_area = 1.0 / (area * float(ubo.emissives)); // TODO: use total area of all emissives, not just assume equal area
+    float p_triangle = 1.0 / float(ubo.emissives); // TODO: weight this according to triangle weight, not just unform chance from each triangle (do this after implementing sampling a point based on uniform area)
+    float p_area = p_triangle / area;
     float cos_light = max(dot(shit.normal, -to_light), 0.0);
     float p_omega = p_area * dist * dist / cos_light;
     float ks = luminance(material.specular);
@@ -391,10 +388,9 @@ vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
         (2.0 * PI) * pow(max(dot(R, to_light), 0.0), material.shiny))) *
         max(0.0, dot(to_light, h.normal));
     return emission * throughput / (p_omega);
-
 }
 
-void brdf(in vec3 outgoing, in Hit h, in Material material, inout vec3 incoming, inout float pdf, inout vec3 throughput, inout float ior, inout uint medium) {
+void brdf(in vec3 outgoing, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             float ks = luminance(material.specular);
@@ -499,16 +495,6 @@ void main() {
 	// create ray generator coordinates	
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
-
-	// calculate frame chance
-	float chance = 1.0 - pow(1.0 - ubo.frameless, raygenIn[gl_GlobalInvocationID.x].time);
-    if (ubo.frameless >= 1.0) chance = 1.0;
-	float rnum = noise((rx * ry) / (123.456789 + (ubo.seed % 100)));
-	bool update_signal = rnum <= chance;
-	if (!update_signal) {
-        imageStore(hdrImage, ivec2(rx, ry), vec4(0.0));
-        return;
-    }
 
 	// clear ray history
 	raygenIn[gl_GlobalInvocationID.x].time = 0.0;

@@ -205,16 +205,6 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.bvhs = g_vupdt_renderer_ref->geometry.bvh.size;
         ubo.emissives = g_vupdt_renderer_ref->geometry.emissives.size;
         ubo.frametime = RenderFrameTime();
-        if (g_vupdt_renderer_ref->config.autoframeless) {
-            #define TARGET_FRAMETIME 0.016f
-            if (RenderFrameTime() > 0) {
-                g_vupdt_renderer_ref->config.frameless *= (TARGET_FRAMETIME / RenderFrameTime());
-                if (g_vupdt_renderer_ref->config.frameless > 1.0f)
-                    g_vupdt_renderer_ref->config.frameless = 1.0f;
-            }
-            #undef TARGET_FRAMETIME
-        }
-        ubo.frameless = g_vupdt_renderer_ref->config.frameless;
         ubo.seed = rand();
         ubo.sdfs = g_vupdt_renderer_ref->geometry.sdfs.size;
         ubo.smoothen = g_vupdt_renderer_ref->config.smoothen;
@@ -225,6 +215,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.reset = cam_reset;
         ubo.samples = samples;
         ubo.direct = g_vupdt_renderer_ref->config.direct;
+        ubo.lightarea = g_vupdt_renderer_ref->geometry.lightarea;
         ubo.whitepoint = g_vupdt_renderer_ref->config.whitepoint*g_vupdt_renderer_ref->config.whitepoint;
         ubo.gamma = g_vupdt_renderer_ref->config.gamma;
         ubo.roulette = g_vupdt_renderer_ref->config.roulette;

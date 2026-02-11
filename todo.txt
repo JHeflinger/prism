@@ -14,7 +14,6 @@ ICEBOX:
 6. Volumetrics
 7. Diffraction
 9. Spectral
-10. Frameless
 11. Point/Spot/Directional lights
 12. Delete buttons on edit panel
 12. Rotate triangles

@@ -42,11 +42,11 @@ typedef struct {
     alignas(4) float swap;
 	alignas(4) float frametime;
     alignas(4) float time;
-	alignas(4) float frameless;
     alignas(4) float smoothen;
     alignas(4) float whitepoint;
     alignas(4) float gamma;
     alignas(4) float roulette;
+    alignas(4) float lightarea;
 } UniformBufferObject;
 
 typedef struct {

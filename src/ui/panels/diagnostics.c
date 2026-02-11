@@ -90,10 +90,6 @@ void DrawDevPanel(float width, float height) {
     if (!g_time_paused) RenderConfig()->time += GetFrameTime();
 	
     UIMoveCursor(0, 20.0f);
-	UICheckboxLabeled("Automatic Frameless:", &(RenderConfig()->autoframeless));
-    UIDragFloatLabeled("Frameless chance:", &(RenderConfig()->frameless), 0.0f, 1.0f, 0.001f, width - 20);
-    
-    UIMoveCursor(0, 20.0f);
     UIDragUIntLabeled("Max SDF Marches:", &(RenderConfig()->marches), 0, 10000000, 1, width - 20);
     UIDragFloatLabeled("SDF Smooth factor:", &(RenderConfig()->smoothen), 0.0f, 10000.0f, 0.05f, width - 20);
 }
