@@ -9,6 +9,7 @@ layout(binding = 0) uniform UniformBufferObject {
     vec3 w;
     vec2 viewport;
     uint triangles;
+    uint emissives;
     uint bvhs;
     uint sdfs;
     uint lights;

@@ -26,6 +26,7 @@ typedef struct {
     alignas(16) vec3 w;
     alignas(8) vec2 viewport;
     alignas(4) uint32_t triangles;
+    alignas(4) uint32_t emissives;
     alignas(4) uint32_t bvhs;
     alignas(4) uint32_t sdfs;
     alignas(4) uint32_t lights;
@@ -118,6 +119,7 @@ typedef struct {
 
 typedef struct {
     VulkanDataBuffer triangles;
+    VulkanDataBuffer emissives;
     VulkanDataBuffer materials;
     VulkanDataBuffer bvh;
     VulkanDataBuffer sdfs;

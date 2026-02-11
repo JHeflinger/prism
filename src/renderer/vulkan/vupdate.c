@@ -35,6 +35,15 @@ void VUPDT_Triangles(VulkanDataBuffer* triangles) {
         triangles->buffer);
 }
 
+void VUPDT_Emissives(VulkanDataBuffer* emissives) {
+    if (sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.maxsize == 0) return;
+    VUTIL_CopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.emissives.data,
+        sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.size,
+        sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.maxsize,
+        emissives->buffer);
+}
+
 void VUPDT_SDFs(VulkanDataBuffer* sdfs) {
     if (sizeof(SDFPrimitive) * g_vupdt_renderer_ref->geometry.sdfs.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
@@ -194,6 +203,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
         ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
         ubo.bvhs = g_vupdt_renderer_ref->geometry.bvh.size;
+        ubo.emissives = g_vupdt_renderer_ref->geometry.emissives.size;
         ubo.frametime = RenderFrameTime();
         if (g_vupdt_renderer_ref->config.autoframeless) {
             #define TARGET_FRAMETIME 0.016f

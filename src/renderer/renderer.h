@@ -61,6 +61,8 @@ size_t NumSDFs();
 
 size_t NumMaterials();
 
+size_t NumEmissives();
+
 SurfaceMaterial* MaterialReference(size_t index);
 
 void UpdateMaterials();

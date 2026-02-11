@@ -333,6 +333,18 @@ BOOL VINIT_Triangles(VulkanDataBuffer* triangles) {
     return TRUE;
 }
 
+BOOL VINIT_Emissives(VulkanDataBuffer* emissives) {
+    size_t arrsize = sizeof(TriangleID) * g_vinit_renderer_ref->geometry.emissives.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        emissives);
+    VUPDT_Emissives(emissives);
+    return TRUE;
+}
+
 BOOL VINIT_SDFs(VulkanDataBuffer* sdfs) {
     size_t arrsize = sizeof(SDFPrimitive) * g_vinit_renderer_ref->geometry.sdfs.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
@@ -551,6 +563,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
 
 BOOL VINIT_Geometry(VulkanGeometry* geometry) {
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;
+	if (!VINIT_Emissives(&(geometry->emissives))) return FALSE;
 	if (!VINIT_Materials(&(geometry->materials))) return FALSE;
 	if (!VINIT_BoundingVolumeHierarchy(&(geometry->bvh))) return FALSE;
 	if (!VINIT_SDFs(&(geometry->sdfs))) return FALSE;

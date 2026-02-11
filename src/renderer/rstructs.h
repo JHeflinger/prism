@@ -119,6 +119,7 @@ typedef struct {
 
 typedef struct {
     size_t max_triangles;
+    size_t max_emissives;
     size_t max_bvh;
     size_t max_materials;
     size_t max_sdfs;
@@ -158,6 +159,7 @@ typedef struct {
     ARRLIST_Triangle triangles;
     ARRLIST_TriangleID tids;
     ARRLIST_TriangleBB tbbs;
+    ARRLIST_TriangleID emissives;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;
     ARRLIST_NodeBVH bvh;

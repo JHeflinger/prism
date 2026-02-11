@@ -102,6 +102,21 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(Triangle)
 			}
 		};
+	} else if (strcmp(name, "EmissiveSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.emissives.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.emissives.size)
+				},
+				sizeof(TriangleID)
+			}
+		};
 	} else if (strcmp(name, "MaterialSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,

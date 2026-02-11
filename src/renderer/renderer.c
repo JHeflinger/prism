@@ -162,6 +162,9 @@ TriangleID SubmitTriangle(Triangle triangle) {
     bb.centroid[0] = ((bb.max[0] - bb.min[0]) / 2.0f) + bb.min[0];
     bb.centroid[1] = ((bb.max[1] - bb.min[1]) / 2.0f) + bb.min[1];
     bb.centroid[2] = ((bb.max[2] - bb.min[2]) / 2.0f) + bb.min[2]; 
+    vec3 emission; SETVEC(emission, g_renderer.geometry.materials.data[triangle.material].emission);
+    if (emission[0] != 0 || emission[1] != 0 || emission[2] != 0)
+        ARRLIST_TriangleID_add(&(g_renderer.geometry.emissives), g_renderer.geometry.triangles.size);
     ARRLIST_TriangleID_add(&(g_renderer.geometry.tids), g_triangle_id);
     ARRLIST_TriangleBB_add(&(g_renderer.geometry.tbbs), bb);
     ARRLIST_Triangle_add(&(g_renderer.geometry.triangles), triangle);
@@ -180,6 +183,12 @@ void RemoveTriangle(TriangleID id) {
         }
     }
     if (found) {
+        for (size_t i = 0; i < g_renderer.geometry.emissives.size; i++) {
+            if (g_renderer.geometry.emissives.data[i] == ind) {
+                ARRLIST_TriangleID_remove(&(g_renderer.geometry.emissives), i);
+                break;
+            }
+        }
         ARRLIST_Triangle_remove(&(g_renderer.geometry.triangles), ind);
         ARRLIST_TriangleID_remove(&(g_renderer.geometry.tids), ind);
         ARRLIST_TriangleBB_remove(&(g_renderer.geometry.tbbs), ind);
@@ -193,6 +202,7 @@ void ClearTriangles() {
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.tids));
     ARRLIST_TriangleBB_clear(&(g_renderer.geometry.tbbs));
     ARRLIST_Triangle_clear(&(g_renderer.geometry.triangles));
+    ARRLIST_TriangleID_clear(&(g_renderer.geometry.emissives));
     g_renderer.geometry.changes.update_triangles = TRUE;
 }
 
@@ -322,6 +332,13 @@ void Render() {
                 VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             } else {
                 VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
+            }
+            if (g_renderer.geometry.changes.max_emissives != g_renderer.geometry.emissives.maxsize) {
+                g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize;
+                VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
+                VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
+            } else {
+                VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
             }
             // update bvh
             RUTIL_BoundingVolumeHierarchy(&g_renderer.geometry.bvh, &g_renderer.geometry.tbbs);
@@ -479,6 +496,10 @@ size_t NumSDFs() {
 
 size_t NumMaterials() {
     return g_renderer.geometry.materials.size;
+}
+
+size_t NumEmissives() {
+    return g_renderer.geometry.emissives.size;
 }
 
 SurfaceMaterial* MaterialReference(size_t index) {

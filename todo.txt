@@ -38,6 +38,7 @@ ICEBOX:
 30. antialiasing
 31. no need to trace initial hit every single time when accumulating paths? restir?
 32. optimization - caclulation struct! pre calculate everything possible and just pass the struct around as to reduce redundant calculations
+33. for sampling a direct light uniformly, weight each emissive material by area. Then make a mapping array that maps the random index you get to the weighted index of the emissive array
 
 NEXT:
 2. depth of field

@@ -25,6 +25,10 @@ void VCLEAN_Triangles(VulkanDataBuffer* triangles) {
     VUTIL_DestroyBuffer(*triangles);
 }
 
+void VCLEAN_Emissives(VulkanDataBuffer* emissives) {
+    VUTIL_DestroyBuffer(*emissives);
+}
+
 void VCLEAN_SDFs(VulkanDataBuffer* sdfs) {
     VUTIL_DestroyBuffer(*sdfs);
 }
@@ -35,6 +39,7 @@ void VCLEAN_Materials(VulkanDataBuffer* materials) {
 
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Triangles(&(geometry->triangles));
+    VCLEAN_Emissives(&(geometry->emissives));
     VCLEAN_Materials(&(geometry->materials));
     VCLEAN_BoundingVolumeHierarchy(&(geometry->bvh));
     VCLEAN_SDFs(&(geometry->sdfs));
