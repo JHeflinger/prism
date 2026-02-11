@@ -224,6 +224,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.grid = (uint32_t)g_vupdt_renderer_ref->config.grid;
         ubo.reset = cam_reset;
         ubo.samples = samples;
+        ubo.direct = g_vupdt_renderer_ref->config.direct;
         ubo.whitepoint = g_vupdt_renderer_ref->config.whitepoint*g_vupdt_renderer_ref->config.whitepoint;
         ubo.gamma = g_vupdt_renderer_ref->config.gamma;
         ubo.roulette = g_vupdt_renderer_ref->config.roulette;

@@ -47,6 +47,7 @@ void InitializeRenderer() {
     g_renderer.config.roulette = -1.0f;
     g_renderer.config.whitepoint = 20.0f;
     g_renderer.config.gamma = 2.2f;
+    g_renderer.config.direct = FALSE;
     g_renderer.config.autoframeless = FALSE;
     g_renderer.config.grid = TRUE;
     g_renderer.config.async = TRUE;

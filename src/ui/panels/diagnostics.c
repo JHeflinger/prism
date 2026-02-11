@@ -70,6 +70,7 @@ void DrawDevPanel(float width, float height) {
     BOOL preview = !(RenderConfig()->flags & PATHTRACE_SHADER_FLAG);
     UICheckboxLabeled("Preview:", &preview);
     SetPipelineFlags(preview ? PREVIEW_PIPELINE_FLAGS : PATHTRACE_PIPELINE_FLAGS);
+    UICheckboxLabeled("Direct Light Sampling:", &(RenderConfig()->direct));
     
     UIMoveCursor(0, 20.0f);
     UIDragFloatLabeled("Whitepoint:", &(RenderConfig()->whitepoint), 0.01f, 999999999.0f, 0.1f, width - 20);

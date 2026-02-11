@@ -39,10 +39,10 @@ ICEBOX:
 31. no need to trace initial hit every single time when accumulating paths? restir?
 32. optimization - caclulation struct! pre calculate everything possible and just pass the struct around as to reduce redundant calculations
 33. for sampling a direct light uniformly, weight each emissive material by area. Then make a mapping array that maps the random index you get to the weighted index of the emissive array
+34. Changing emission in material editor needs to re compute emissive materials (maybe we just do this on preview change)
 
 NEXT:
 2. depth of field
-3. Direct light sampling
 4. volume attenuation
 5. BUG - async rendering is suspiciously not reporting accurate numbers or working well
 6. fixed function denoising

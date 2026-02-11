@@ -18,6 +18,7 @@ layout(binding = 0) uniform UniformBufferObject {
 	uint seed;
     uint grid;
     uint reset;
+    uint direct;
     float fov;
     float width;
     float height;

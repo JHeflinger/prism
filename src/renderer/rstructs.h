@@ -176,6 +176,7 @@ typedef struct {
     float whitepoint;
     float gamma;
     uint32_t marches;
+    BOOL direct;
     BOOL autoframeless;
     BOOL grid;
     BOOL async;
