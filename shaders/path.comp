@@ -118,7 +118,7 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 const float max_contribution = 10;
 const float PI = 3.14159265358979323846;
 bool stack_failure = false;
-float random_seed = 0;
+uvec4 seed = uvec4(0);
 
 const uint SOBOL_DIRS[2][32] = uint[2][32](
     // Dimension 0
@@ -204,9 +204,26 @@ float noise(float n) {
 	return fract(n*17.0*fract(n*0.3183099));
 }
 
+void init_random(int x, int y) {
+    seed = uvec4(x, y, ubo.seed, x + y);
+}
+
+void pcg4d(inout uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v.w += v.y * v.z;
+    v = v ^ (v >> 16u);
+    v.x += v.y * v.w;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v.w += v.y * v.z;
+}
+
 float random() {
-    random_seed *= 0.5 + noise(random_seed);
-    return noise(random_seed);
+    pcg4d(seed);
+    return float(seed.x) / float(0xffffffffu);
 }
 
 float luminance(vec3 c) {
@@ -520,6 +537,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
 }
 
 void main() {
+
 	// update ray history
 	raygenIn[gl_GlobalInvocationID.x].time += ubo.frametime;
     raygenIn[gl_GlobalInvocationID.x].tid = -1;
@@ -534,12 +552,10 @@ void main() {
 	// reject any rays outside of the viewport
     if (cut_viewport(rx, ry)) return;
 
+    // init random
+    init_random(rx, ry);
+
 	// calculate ray color
-    float s1 = float(ubo.seed & 0xff);
-    float s2 = float((ubo.seed & 0xff00) >> 8);
-    float s3 = float((ubo.seed & 0xff0000) >> 16);
-    float s4 = float((ubo.seed & 0xff000000) >> 24);
-    random_seed = (rx * ry) / (s3*s4*cos(s1*s1) + s1*s2*cos(s4*s3) + (fract(ubo.frametime)));
     uint hit_id = -1;
     vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;
