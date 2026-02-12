@@ -94,6 +94,25 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
     // Copy image to staging
     {
+        VkImageMemoryBarrier imgBarrier = {0};
+        imgBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        imgBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        imgBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        imgBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        imgBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        imgBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imgBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imgBarrier.image = g_vupdt_renderer_ref->vulkan.core.context.targets[g_vupdt_renderer_ref->swapchain.index].image;
+        imgBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imgBarrier.subresourceRange.baseMipLevel = 0;
+        imgBarrier.subresourceRange.levelCount = 1;
+        imgBarrier.subresourceRange.baseArrayLayer = 0;
+        imgBarrier.subresourceRange.layerCount = 1;
+        vkCmdPipelineBarrier(
+            command,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0, 0, NULL, 0, NULL, 1, &imgBarrier);
         VkBufferImageCopy region = { 0 };
         region.bufferOffset = 0;
         region.bufferRowLength = 0; // Tightly packed
@@ -108,6 +127,32 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             command,
             g_vupdt_renderer_ref->vulkan.core.context.targets[g_vupdt_renderer_ref->swapchain.index].image,
             VK_IMAGE_LAYOUT_GENERAL, g_vupdt_renderer_ref->vulkan.core.bridge.buffer, 1, &region);
+    }
+
+    // Copy overlay ssbo back over
+    {
+        VkBufferMemoryBarrier bufferBarrier = {0};
+        bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        bufferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        bufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        bufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        bufferBarrier.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_ssbos[g_vupdt_renderer_ref->swapchain.index].buffer;
+        bufferBarrier.offset = 0;
+        bufferBarrier.size = sizeof(OverlaySSBO);
+        vkCmdPipelineBarrier(
+            command,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0, 0, NULL, 1, &bufferBarrier, 0, NULL);
+        VkBufferCopy copyRegion = {0};
+        copyRegion.srcOffset = 0;
+        copyRegion.dstOffset = 0;
+        copyRegion.size = sizeof(OverlaySSBO);
+        vkCmdCopyBuffer(
+            command,
+            g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_ssbos[g_vupdt_renderer_ref->swapchain.index].buffer,
+            g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_bridge.buffer, 1, &copyRegion);
     }
 
     // End command

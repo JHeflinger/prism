@@ -29,6 +29,8 @@ void VCLEAN_RenderContext(VulkanRenderContext* context);
 
 void VCLEAN_Bridge(VulkanDataBuffer* bridge);
 
+void VCLEAN_OverlayBridge(VulkanDataBuffer* bridge);
+
 void VCLEAN_Scheduler(VulkanScheduler* scheduler);
 
 void VCLEAN_Core(VulkanCore* core);

@@ -5,7 +5,7 @@
 
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders);
 
-BOOL VINIT_OverlaySSBO(VulkanDataBuffer* ssbo);
+BOOL VINIT_OverlaySSBOs(VulkanDataBuffer* ssbo_array);
 
 BOOL VINIT_Lights(VulkanDataBuffer* lights);
 
@@ -28,6 +28,8 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline);
 BOOL VINIT_Scheduler(VulkanScheduler* scheduler);
 
 BOOL VINIT_Bridge(VulkanDataBuffer* bridge);
+
+BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridge);
 
 BOOL VINIT_RenderContext(VulkanRenderContext* context);
 

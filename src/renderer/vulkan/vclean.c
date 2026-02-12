@@ -65,6 +65,7 @@ void VCLEAN_General(VulkanGeneral* general) {
 void VCLEAN_RenderData(VulkanRenderData* renderdata) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VUTIL_DestroyBuffer(renderdata->ssbos[i]);
+	    VUTIL_DestroyBuffer(renderdata->overlay_ssbos[i]);
     }
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VUTIL_DestroyBuffer(renderdata->ubos.objects[i]);
@@ -74,7 +75,7 @@ void VCLEAN_RenderData(VulkanRenderData* renderdata) {
         vkDestroyDescriptorPool(g_vclean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].pool, NULL);
         vkDestroyDescriptorSetLayout(g_vclean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].layout, NULL);
     }
-	VUTIL_DestroyBuffer(renderdata->overlay_ssbo);
+    VCLEAN_OverlayBridge(&(renderdata->overlay_bridge));
     EZ_FREE(renderdata->descriptors);
 }
 
@@ -99,6 +100,11 @@ void VCLEAN_RenderContext(VulkanRenderContext* context) {
 }
 
 void VCLEAN_Bridge(VulkanDataBuffer* bridge) {
+    vkUnmapMemory(g_vclean_renderer_ref->vulkan.core.general.interface, bridge->memory);
+    VUTIL_DestroyBuffer(*bridge);
+}
+
+void VCLEAN_OverlayBridge(VulkanDataBuffer* bridge) {
     vkUnmapMemory(g_vclean_renderer_ref->vulkan.core.general.interface, bridge->memory);
     VUTIL_DestroyBuffer(*bridge);
 }

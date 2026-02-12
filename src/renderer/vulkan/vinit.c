@@ -31,12 +31,14 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	return TRUE;
 }
 
-BOOL VINIT_OverlaySSBO(VulkanDataBuffer* ssbo) {
-	VUTIL_CreateBuffer(
-		sizeof(OverlaySSBO),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		ssbo);
+BOOL VINIT_OverlaySSBOs(VulkanDataBuffer* ssbo_array) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+	    VUTIL_CreateBuffer(
+		    sizeof(OverlaySSBO),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		    &(ssbo_array[i]));
+    }
 	return TRUE;
 }
 
@@ -232,7 +234,8 @@ BOOL VINIT_RenderData(VulkanRenderData* renderdata) {
     renderdata->descriptors = EZ_ALLOC(g_vinit_renderer_ref->vulkan.core.shaders.size, sizeof(VulkanDescriptors));
 	if (!VINIT_ShaderStorageBuffers(renderdata->ssbos)) return FALSE;
 	if (!VINIT_UniformBuffers(&(renderdata->ubos))) return FALSE;
-	if (!VINIT_OverlaySSBO(&(renderdata->overlay_ssbo))) return FALSE;
+	if (!VINIT_OverlaySSBOs(renderdata->overlay_ssbos)) return FALSE;
+	if (!VINIT_OverlayBridge(&(renderdata->overlay_bridge))) return FALSE;
 	if (!VINIT_Descriptors(renderdata->descriptors)) return FALSE;
     return TRUE;
 }
@@ -310,6 +313,19 @@ BOOL VINIT_Bridge(VulkanDataBuffer* bridge) {
 
     // map memory to buffer
     vkMapMemory(g_vinit_renderer_ref->vulkan.core.general.interface, bridge->memory, 0, VK_WHOLE_SIZE, 0, &(g_vinit_renderer_ref->swapchain.reference));
+    return TRUE;
+}
+
+BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridge) {
+    // create cross buffer
+    VUTIL_CreateBuffer(
+        sizeof(OverlaySSBO),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
+        bridge);
+
+    // map memory to buffer
+    vkMapMemory(g_vinit_renderer_ref->vulkan.core.general.interface, bridge->memory, 0, VK_WHOLE_SIZE, 0, &(g_vinit_renderer_ref->vulkan.core.context.renderdata.overlay_mapped));
     return TRUE;
 }
 

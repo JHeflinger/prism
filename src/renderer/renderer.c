@@ -423,11 +423,7 @@ void Render() {
         vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]), VK_TRUE, UINT64_MAX);
     if (vkGetFenceStatus(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]) == VK_SUCCESS) {
         // copy overlay results to host
-        VUTIL_CopyBufferToHost(
-            (void*)(ExposedOverlaySSBO()),
-            sizeof(OverlaySSBO),
-            sizeof(OverlaySSBO),
-            g_renderer.vulkan.core.context.renderdata.overlay_ssbo.buffer);
+        memcpy((void*)ExposedOverlaySSBO(), g_renderer.vulkan.core.context.renderdata.overlay_mapped, sizeof(OverlaySSBO));
 
         // reset fences and update swapchain index
         vkResetFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]));

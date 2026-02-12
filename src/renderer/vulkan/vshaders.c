@@ -182,7 +182,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.context.renderdata.overlay_ssbo.buffer)
+				&(renderer->vulkan.core.context.renderdata.overlay_ssbos[i].buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {

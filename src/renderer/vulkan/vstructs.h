@@ -108,7 +108,9 @@ typedef struct {
     VulkanDescriptors* descriptors;
     UBOArray ubos;
     VulkanDataBuffer ssbos[CPUSWAP_LENGTH];
-	VulkanDataBuffer overlay_ssbo;
+	VulkanDataBuffer overlay_ssbos[CPUSWAP_LENGTH];
+    VulkanDataBuffer overlay_bridge;
+    void* overlay_mapped;
 } VulkanRenderData;
 
 typedef struct {
