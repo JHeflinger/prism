@@ -41,4 +41,5 @@ ICEBOX:
 34. Changing emission in material editor needs to re compute emissive materials (maybe we just do this on preview change)
 35. Direct light sampling doesn't work for transmissive materials, as shadows that get occluded by transparent materials don't see the light even if the light transmisses perfectly. This causes shadows to be a bit grainy
 36. Executor should be bounce-per-frame as well
-37. Blue noise implementation?
+
+1. direct lighting only

@@ -181,6 +181,7 @@ typedef struct {
     BOOL grid;
     BOOL async;
     BOOL showdof;
+    BOOL directonly;
     PipelineFlags flags;
 } RendererConfig;
 

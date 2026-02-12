@@ -50,6 +50,7 @@ void InitializeRenderer() {
     g_renderer.config.grid = TRUE;
     g_renderer.config.async = TRUE;
     g_renderer.config.showdof = TRUE;
+    g_renderer.config.directonly = FALSE;
     g_renderer.config.normals = TRUE;
     g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
 

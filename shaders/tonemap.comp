@@ -19,6 +19,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint grid;
     uint reset;
     uint direct;
+    uint directonly;
     uint showdof;
     uint normals;
     float fov;

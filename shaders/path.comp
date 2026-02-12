@@ -74,6 +74,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint grid;
     uint reset;
     uint direct;
+    uint directonly;
     uint showdof;
     uint normals;
     float fov;
@@ -517,6 +518,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
         if (ubo.direct != 0 && material.model == LAMBERTIAN_MODEL && ubo.emissives > 0) {
             vec3 direct = sample_direct_light(-ray.direction, h, material);
             radiance += min(throughput * direct, max_contribution);
+            if (ubo.directonly != 0) break;
         }
         vec3 incoming;
         vec3 color;

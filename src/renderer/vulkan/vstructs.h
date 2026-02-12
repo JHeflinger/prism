@@ -36,6 +36,7 @@ typedef struct {
     alignas(4) uint32_t grid;
     alignas(4) uint32_t reset;
     alignas(4) uint32_t direct;
+    alignas(4) uint32_t directonly;
     alignas(4) uint32_t showdof;
     alignas(4) uint32_t normals;
     alignas(4) float fov;
