@@ -19,6 +19,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint grid;
     uint reset;
     uint direct;
+    uint showdof;
     float fov;
     float width;
     float height;
@@ -30,6 +31,8 @@ layout(binding = 0) uniform UniformBufferObject {
     float gamma;
     float roulette;
     float lightarea;
+    float aperature;
+    float focus;
 } ubo;
 
 layout(binding = 1, rgba8) uniform image2D outputImage;

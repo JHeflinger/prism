@@ -13,8 +13,9 @@
 #define MAX_LINE_WIDTH 2048
 
 #define PERSISTANT_UI(func, ...) \
-    ({static PersistantUIData s_ui_data_##__COUNTER__ = { 0 }; \
-    func(&s_ui_data_##__COUNTER__, __VA_ARGS__);})
+    ({ClearJustUsedUI(); \
+      static PersistantUIData s_ui_data_##__COUNTER__ = { 0 }; \
+      func(&s_ui_data_##__COUNTER__, __VA_ARGS__);})
 
 typedef void (*PanelFunction)(float width, float height);
 typedef void (*CleanFunction)(void);
@@ -66,6 +67,10 @@ void DestroyUI(UI* ui);
 void DestroyPanel(Panel* panel);
 
 const char* HoveredPanel();
+
+void ClearJustUsedUI();
+
+BOOL UIWasJustUsed();
 
 void UIDrawText(const char* text, ...);
 

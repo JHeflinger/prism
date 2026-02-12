@@ -88,7 +88,18 @@ void DrawDevPanel(float width, float height) {
     UIDragFloatLabeled("Time:", &(RenderConfig()->time), 0.0f, 999999999.0f, 1.00f, width - 20);
 	UICheckboxLabeled("Time Paused:", &g_time_paused);
     if (!g_time_paused) RenderConfig()->time += GetFrameTime();
-	
+
+    SimpleCamera c = GetCamera();
+    SimpleCamera oldc = GetCamera();
+    BOOL used = FALSE;
+    UIMoveCursor(0, 20.0f);
+    UIDragFloatLabeled("Aperature:", &(c.aperature), 0.0f, 999999999.0f, 0.01f, width - 20);
+    used |= UIWasJustUsed();
+    UIDragFloatLabeled("Focus:", &(c.focus), 0.0f, 999999999.0f, 0.01f, width - 20);
+    used |= UIWasJustUsed();
+	if (memcmp(&c, &oldc, sizeof(SimpleCamera))) MoveCamera(c);
+    RenderConfig()->showdof = used;
+
     UIMoveCursor(0, 20.0f);
     UIDragUIntLabeled("Max SDF Marches:", &(RenderConfig()->marches), 0, 10000000, 1, width - 20);
     UIDragFloatLabeled("SDF Smooth factor:", &(RenderConfig()->smoothen), 0.0f, 10000.0f, 0.05f, width - 20);

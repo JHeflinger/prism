@@ -56,7 +56,7 @@ void InitializeRenderer() {
         { 2.11f, 0.0f, 2.133f },
         { 0.0f, 0.0f, 0.0f },
         { 0.0f, 0.0f, 1.0f },
-        90.0f
+        90.0f, 0.0f, 0.0f
     };
 
     // set up dimensions

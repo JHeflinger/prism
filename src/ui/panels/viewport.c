@@ -32,6 +32,8 @@ void UpdateViewportPanel(float width, float height) {
         SETVEC3(camera.look, 0.0f, 0.0f, 0.0f);
         SETVEC3(camera.up, 0.0f, 0.0f, 1.0f);
         camera.fov = 90.0f;
+        camera.aperature = 0.0f;
+        camera.focus = 0.0f;
         MoveCamera(camera);
         moved = TRUE;
     }

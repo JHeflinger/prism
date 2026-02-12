@@ -41,5 +41,4 @@ ICEBOX:
 34. Changing emission in material editor needs to re compute emissive materials (maybe we just do this on preview change)
 
 NEXT:
-2. depth of field
-6. fixed function denoising
+1. dispersion

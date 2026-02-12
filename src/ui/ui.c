@@ -19,6 +19,7 @@ char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
 Popup* g_popup = NULL;
 Popup* g_popup_origin = NULL;
 PersistantUIData* g_active_ui_element = NULL;
+BOOL g_was_ui_element_just_used = FALSE;
 
 #define LINE_HEIGHT 20
 #define NAMEBAR_HEIGHT 25
@@ -242,6 +243,14 @@ const char* HoveredPanel() {
     return HoveredPanelHelper(g_primary_ui);
 }
 
+void ClearJustUsedUI() {
+    g_was_ui_element_just_used = FALSE;
+}
+
+BOOL UIWasJustUsed() {
+    return g_was_ui_element_just_used;
+}
+
 void UIDrawText(const char* text, ...) {
     va_list args;
     va_start(args, text);
@@ -265,6 +274,7 @@ BOOL UIDragFloat_(PersistantUIData* data, float* value, float min, float max, fl
         if (*value < min) *value = min;
         if (*value > max) *value = max;
         if (prev != *value) ret = TRUE;
+        g_was_ui_element_just_used = TRUE;
     }
     char buffer[32] = { 0 };
     snprintf(buffer, 32, "%.3f", *value);
@@ -308,6 +318,7 @@ void UICheckbox(BOOL* value) {
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x + 2, g_ui_cursor.y + g_ui_position.y + 2, LINE_HEIGHT - 4, LINE_HEIGHT - 4})) {
         *value = !(*value);
+        g_was_ui_element_just_used = TRUE;
     }
 	DrawRectangle(g_ui_cursor.x + 2, g_ui_cursor.y + 2, LINE_HEIGHT - 4, LINE_HEIGHT - 4, MappedColor(UI_CHECKBOX_COLOR));
 	if (*value) {
@@ -344,6 +355,7 @@ BOOL UIDragUInt_(PersistantUIData* data, uint32_t* value, uint32_t min, uint32_t
         if (*value < min) *value = min;
         if (*value > max) *value = max;
         if (prev != *value) ret = TRUE;
+        g_was_ui_element_just_used = TRUE;
     }
     char buffer[32] = { 0 };
     snprintf(buffer, 32, "%llu", (long long unsigned int)(*value));
@@ -374,6 +386,7 @@ BOOL UIButton(const char* label, size_t w) {
         if (InputButtonDown(IK_MOUSELEFT)) color = MappedColor(PANEL_BTN_PRS_COLOR);
         clicked = InputButtonPressed(IK_MOUSELEFT);
     }
+    if (clicked) g_was_ui_element_just_used = TRUE;
     DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 1, button_width, LINE_HEIGHT - 2, color);
     Vector2 texpos = g_ui_cursor;
     texpos.x += (button_width - text_size.x) / 2.0f;
@@ -437,7 +450,10 @@ void UIDropList_(PersistantUIData* data, const char* label, size_t width, size_t
                 DrawRectangle(
                     g_ui_cursor.x, g_ui_cursor.y + 2, clickwidth - 30, LINE_HEIGHT - 4,
                     InputButtonDown(IK_MOUSELEFT) ? MappedColor(PANEL_BTN_PRS_COLOR) : MappedColor(PANEL_BTN_HVR_COLOR));
-                if (InputButtonPressed(IK_MOUSELEFT)) func(i);
+                if (InputButtonPressed(IK_MOUSELEFT)) {
+                    func(i);
+                    g_was_ui_element_just_used = TRUE;
+                }
             }
             UIDrawText(items[i]);
         }

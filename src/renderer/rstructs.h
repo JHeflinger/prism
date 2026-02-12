@@ -33,6 +33,8 @@ typedef struct {
     vec3 look;
     vec3 up;
 	float fov;
+    float aperature;
+    float focus;
 } SimpleCamera;
 
 typedef struct {
@@ -176,6 +178,7 @@ typedef struct {
     BOOL direct;
     BOOL grid;
     BOOL async;
+    BOOL showdof;
     PipelineFlags flags;
 } RendererConfig;
 

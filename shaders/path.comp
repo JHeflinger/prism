@@ -73,6 +73,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint grid;
     uint reset;
     uint direct;
+    uint showdof;
     float fov;
     float width;
     float height;
@@ -84,6 +85,8 @@ layout(binding = 0) uniform UniformBufferObject {
     float gamma;
     float roulette;
     float lightarea;
+    float aperature;
+    float focus;
 } ubo;
 
 layout(binding = 1) buffer RayGeneratorSSBOIn {
@@ -233,8 +236,19 @@ Ray create_ray(vec2 rg) {
     float v = b + ((t - b) * (float(rg.y) + jitter.y)) / ubo.height;
 	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
     Ray ray;
-    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
-    ray.position = ubo.position;
+    if (ubo.focus != 0) {
+        vec3 pinhole_dir = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+        vec3 focal_point = ubo.position + pinhole_dir * ubo.focus;
+        float r_lens = sqrt(random());
+        float theta = 2.0 * 3.14159265 * random();
+        vec2 disk = 0.1 * ubo.aperature * vec2(r_lens * cos(theta), r_lens * sin(theta));
+        vec3 lens_offset = (ubo.u * disk.x) + (ubo.v * disk.y);
+        ray.position = ubo.position + lens_offset;
+        ray.direction = normalize(focal_point - ray.position);
+    } else {
+        ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+        ray.position = ubo.position;
+    }
     return ray;
 }
 

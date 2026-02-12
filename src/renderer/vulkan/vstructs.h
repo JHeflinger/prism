@@ -36,6 +36,7 @@ typedef struct {
     alignas(4) uint32_t grid;
     alignas(4) uint32_t reset;
     alignas(4) uint32_t direct;
+    alignas(4) uint32_t showdof;
     alignas(4) float fov;
     alignas(4) float width;
     alignas(4) float height;
@@ -47,6 +48,8 @@ typedef struct {
     alignas(4) float gamma;
     alignas(4) float roulette;
     alignas(4) float lightarea;
+    alignas(4) float aperature;
+    alignas(4) float focus;
 } UniformBufferObject;
 
 typedef struct {

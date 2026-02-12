@@ -57,6 +57,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint grid;
     uint reset;
     uint direct;
+    uint showdof;
     float fov;
     float width;
     float height;
@@ -68,6 +69,8 @@ layout(binding = 0) uniform UniformBufferObject {
     float gamma;
     float roulette;
     float lightarea;
+    float aperature;
+    float focus;
 } ubo;
 
 layout(binding = 1) buffer RayGeneratorSSBOIn {
@@ -238,6 +241,10 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id) {
     }
     if (hit.distance > 0.0) {
         color = shade(ray, hit);
+        if (ubo.showdof != 0) {
+            float distance_to_focal_plane = abs(dot(hit.position - ubo.position, normalize(ubo.look)) - ubo.focus);
+            color = mix(color, vec3(1.0), 1.0 / ((ubo.aperature * distance_to_focal_plane) + EPS));
+        }
         if (gridhit) {
             color = mix(color, vec3(0.7), gridmix);
         }
