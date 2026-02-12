@@ -308,6 +308,20 @@ BOOL ParseMTL_Tf(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
+BOOL ParseMTL_Rd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+    if (numargs != 4) {
+        EZ_ERROR("Cannot parse a dispersion field (Rd) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
+        return FALSE;
+    }
+    float x, y, z;
+    if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
+        EZ_ERROR("Invalid dispersion (Rd) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+        return FALSE;
+    }
+    SET_MTL_VEC3_FIELD(dispersion, x, y, z);
+    return TRUE;
+}
+
 BOOL ParseMTL_newmtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
         EZ_ERROR("Invalid format for newmtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
@@ -331,6 +345,7 @@ ParseFuncMTL GetParserFromArgMTL(const char* header) {
     GETPARSER(Ns);
     GETPARSER(Ni);
     GETPARSER(Tf);
+    GETPARSER(Rd);
     #undef GETPARSER
     return NULL;
 }

@@ -77,6 +77,7 @@ typedef struct {
     alignas(16) vec3 diffuse;
     alignas(16) vec3 specular;
     alignas(16) vec3 absorbtion;
+    alignas(16) vec3 dispersion;
     alignas(4) float ior;
     alignas(4) float shiny;
     alignas(4) uint32_t model;
@@ -175,6 +176,7 @@ typedef struct {
     float whitepoint;
     float gamma;
     uint32_t marches;
+    BOOL normals;
     BOOL direct;
     BOOL grid;
     BOOL async;

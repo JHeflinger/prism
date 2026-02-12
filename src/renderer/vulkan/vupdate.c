@@ -268,6 +268,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.showdof = g_vupdt_renderer_ref->config.showdof;
         ubo.aperature = g_vupdt_renderer_ref->camera.aperature;
         ubo.focus = g_vupdt_renderer_ref->camera.focus;
+        ubo.normals = g_vupdt_renderer_ref->config.normals;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

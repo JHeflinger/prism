@@ -41,6 +41,7 @@ struct Material {
     vec3 diffuse;
     vec3 specular;
     vec3 absorbtion;
+    vec3 dispersion;
     float ior;
     float shiny;
     uint model;
@@ -74,6 +75,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint reset;
     uint direct;
     uint showdof;
+    uint normals;
     float fov;
     float width;
     float height;
@@ -270,7 +272,7 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     if (hit.distance <= EPS) return false;
     hit.material = tri.material;
     hit.position = ray.position + (ray.direction * hit.distance);
-    if (tri.an != vec3(0)) hit.normal = normalize((1.0 - u - v)*tri.an + u*tri.bn + v*tri.cn);
+    if (ubo.normals != 0 && tri.an != vec3(0)) hit.normal = normalize((1.0 - u - v)*tri.an + u*tri.bn + v*tri.cn);
     else hit.normal = normalize(cross(e1, e2));
     if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
     return true;
@@ -409,7 +411,7 @@ vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     return emission * throughput / (p_omega);
 }
 
-void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium) {
+void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout int wavelength) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             float ks = luminance(material.specular);
@@ -435,8 +437,17 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
             float cosi = dot(outgoing, h.normal);
             float eta_i = ior;
             float eta_t = material.ior;
+            float pdf_mod = 1.0;
             uint mat_t = h.material;
             vec3 absorb = beer_lambert(medium, length(previous - h.position));
+            vec3 dmask = vec3(1.0);
+            if (wavelength < 0 && material.dispersion != vec3(0)) {
+                pdf_mod = 0.33333333; // 1/3 chance to choose wavelength
+                wavelength = int(max(0, (random() - EPS))*3);
+                dmask = vec3(0.0);
+                dmask[wavelength] = 1.0;
+            }
+            if (wavelength >= 0 && material.dispersion != vec3(0)) eta_t *= material.dispersion[wavelength];
             if (medium == mat_t) {
                 eta_t = 1.0;
                 mat_t = -1;
@@ -444,19 +455,19 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
             float F = fresnel_dielectric(cosi, eta_i, eta_t);
             if (random() < F) {
                 incoming = reflect(-outgoing, h.normal);
-                throughput = vec3(F) * absorb;
-                pdf = F;
+                throughput = vec3(F) * absorb * dmask;
+                pdf = F * pdf_mod;
             } else {
                 float eta = (cosi > 0.0) ? eta_i / eta_t : eta_t / eta_i;
                 vec3 Nt = (cosi > 0.0) ? h.normal : -h.normal;
                 if (!refract_ray(-outgoing, Nt, eta, incoming)) {
                     incoming = reflect(-outgoing, h.normal);
-                    throughput = vec3(1.0) * absorb;
-                    pdf = F;
+                    throughput = vec3(1.0) * absorb * dmask;
+                    pdf = F * pdf_mod;
                     return;
                 }
-                throughput = vec3(1.0 - F) * absorb;
-                pdf = 1.0 - F;
+                throughput = vec3(1.0 - F) * absorb * dmask;
+                pdf = (1.0 - F) * pdf_mod;
                 ior = eta_t;
                 medium = mat_t;
             }
@@ -473,6 +484,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
     float ior = 1.0;
     uint medium = -1;
     bool count_emission = true;
+    int wavelength = -1;
     for (uint i = 0; i < MAX_BOUNCES; i++) {
         Hit h = trace(ray, hid);
         if (firsthit) {
@@ -492,7 +504,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
         vec3 incoming;
         vec3 color;
         float pdf;
-        brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, ior, medium);
+        brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, ior, medium, wavelength);
         if (pdf <= 0) break;
         throughput *= color / pdf;
         throughput = min(throughput, max_contribution);

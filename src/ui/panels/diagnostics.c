@@ -67,6 +67,7 @@ void DrawDevPanel(float width, float height) {
     
     UIMoveCursor(0, 20.0f);
     UICheckboxLabeled("Grid:", &(RenderConfig()->grid));
+    UICheckboxLabeled("Smooth Normals:", &(RenderConfig()->normals));
     BOOL preview = !(RenderConfig()->flags & PATHTRACE_SHADER_FLAG);
     UICheckboxLabeled("Preview:", &preview);
     SetPipelineFlags(preview ? PREVIEW_PIPELINE_FLAGS : PATHTRACE_PIPELINE_FLAGS);

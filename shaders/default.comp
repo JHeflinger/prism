@@ -58,6 +58,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint reset;
     uint direct;
     uint showdof;
+    uint normals;
     float fov;
     float width;
     float height;
@@ -136,14 +137,9 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     hit.distance = f * dot(e2, q);
     if (hit.distance <= EPS) return false;
     hit.position = ray.position + (ray.direction * hit.distance);
-    if (tri.an != vec3(0)) {
-        hit.normal = normalize((1.0 - u - v)*tri.an + u*tri.bn + v*tri.cn);
-    } else {
-        hit.normal = normalize(cross(e1, e2));
-    }
-    if (dot(hit.normal, -ray.direction) < 0.0) {
-        hit.normal = -hit.normal;
-    }
+    if (ubo.normals != 0 && tri.an != vec3(0)) hit.normal = normalize((1.0 - u - v)*tri.an + u*tri.bn + v*tri.cn);
+    else hit.normal = normalize(cross(e1, e2));
+    if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
     return true;
 }
 
