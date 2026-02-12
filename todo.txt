@@ -42,6 +42,4 @@ ICEBOX:
 
 NEXT:
 2. depth of field
-4. volume attenuation
 6. fixed function denoising
-11. add transmissision proprety to material edit ui

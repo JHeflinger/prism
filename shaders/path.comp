@@ -40,6 +40,7 @@ struct Material {
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
+    vec3 absorbtion;
     float ior;
     float shiny;
     uint model;
@@ -205,6 +206,10 @@ float random() {
 
 float luminance(vec3 c) {
     return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
+}
+
+vec3 beer_lambert(uint material, float dist) {
+    return exp(-materialIn[material].absorbtion * dist);
 }
 
 bool cut_viewport(int rx, int ry) {
@@ -390,7 +395,7 @@ vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     return emission * throughput / (p_omega);
 }
 
-void brdf(in vec3 outgoing, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium) {
+void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             float ks = luminance(material.specular);
@@ -417,6 +422,7 @@ void brdf(in vec3 outgoing, in Hit h, in Material material, out vec3 incoming, o
             float eta_i = ior;
             float eta_t = material.ior;
             uint mat_t = h.material;
+            vec3 absorb = beer_lambert(medium, length(previous - h.position));
             if (medium == mat_t) {
                 eta_t = 1.0;
                 mat_t = -1;
@@ -424,18 +430,18 @@ void brdf(in vec3 outgoing, in Hit h, in Material material, out vec3 incoming, o
             float F = fresnel_dielectric(cosi, eta_i, eta_t);
             if (random() < F) {
                 incoming = reflect(-outgoing, h.normal);
-                throughput = vec3(F);
+                throughput = vec3(F) * absorb;
                 pdf = F;
             } else {
                 float eta = (cosi > 0.0) ? eta_i / eta_t : eta_t / eta_i;
                 vec3 Nt = (cosi > 0.0) ? h.normal : -h.normal;
                 if (!refract_ray(-outgoing, Nt, eta, incoming)) {
                     incoming = reflect(-outgoing, h.normal);
-                    throughput = vec3(1.0);
+                    throughput = vec3(1.0) * absorb;
                     pdf = F;
                     return;
                 }
-                throughput = vec3(1.0 - F);
+                throughput = vec3(1.0 - F) * absorb;
                 pdf = 1.0 - F;
                 ior = eta_t;
                 medium = mat_t;
@@ -472,7 +478,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
         vec3 incoming;
         vec3 color;
         float pdf;
-        brdf(-ray.direction, h, material, incoming, pdf, color, ior, medium);
+        brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, ior, medium);
         if (pdf <= 0) break;
         throughput *= color / pdf;
         throughput = min(throughput, max_contribution);

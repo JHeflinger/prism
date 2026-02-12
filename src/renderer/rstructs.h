@@ -74,6 +74,7 @@ typedef struct {
     alignas(16) vec3 ambient;
     alignas(16) vec3 diffuse;
     alignas(16) vec3 specular;
+    alignas(16) vec3 absorbtion;
     alignas(4) float ior;
     alignas(4) float shiny;
     alignas(4) uint32_t model;
