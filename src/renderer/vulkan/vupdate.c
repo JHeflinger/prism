@@ -72,6 +72,23 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
 
+        if ((1u << i) & ANALYZE_SHADER_FLAG) {
+            VkBufferMemoryBarrier bufferBarrier = {0};
+            bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            bufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            bufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            bufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            bufferBarrier.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ssbos[g_vupdt_renderer_ref->swapchain.index].buffer;
+            bufferBarrier.offset = 0;
+            bufferBarrier.size = VK_WHOLE_SIZE;
+            vkCmdPipelineBarrier(
+                command,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,   // src stage
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,  // dst stage
+                0, 0, NULL, 1, &bufferBarrier, 0, NULL);
+        }
+
         vkCmdBindPipeline(
             command,
             VK_PIPELINE_BIND_POINT_COMPUTE,
