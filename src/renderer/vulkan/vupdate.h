@@ -11,8 +11,6 @@ void VUPDT_Triangles(VulkanDataBuffer* triangles);
 
 void VUPDT_Emissives(VulkanDataBuffer* emissives);
 
-void VUPDT_SDFs(VulkanDataBuffer* sdfs);
-
 void VUPDT_Materials(VulkanDataBuffer* materials);
 
 void VUPDT_RecordCommand(VkCommandBuffer command);

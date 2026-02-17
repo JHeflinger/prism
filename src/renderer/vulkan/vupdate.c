@@ -44,15 +44,6 @@ void VUPDT_Emissives(VulkanDataBuffer* emissives) {
         emissives->buffer);
 }
 
-void VUPDT_SDFs(VulkanDataBuffer* sdfs) {
-    if (sizeof(SDFPrimitive) * g_vupdt_renderer_ref->geometry.sdfs.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
-        g_vupdt_renderer_ref->geometry.sdfs.data,
-        sizeof(SDFPrimitive) * g_vupdt_renderer_ref->geometry.sdfs.size,
-        sizeof(SDFPrimitive) * g_vupdt_renderer_ref->geometry.sdfs.maxsize,
-        sdfs->buffer);
-}
-
 void VUPDT_Materials(VulkanDataBuffer* materials) {
     if (sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
@@ -268,10 +259,6 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.emissives = g_vupdt_renderer_ref->geometry.emissives.size;
         ubo.frametime = RenderFrameTime();
         ubo.seed = rand();
-        ubo.sdfs = g_vupdt_renderer_ref->geometry.sdfs.size;
-        ubo.smoothen = g_vupdt_renderer_ref->config.smoothen;
-        ubo.marches = g_vupdt_renderer_ref->config.marches;
-        ubo.time = g_vupdt_renderer_ref->config.time;
         ubo.lights = g_vupdt_renderer_ref->geometry.lights.size;
         ubo.grid = (uint32_t)g_vupdt_renderer_ref->config.grid;
         ubo.reset = cam_reset;
@@ -280,7 +267,6 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.lightarea = g_vupdt_renderer_ref->geometry.lightarea;
         ubo.whitepoint = g_vupdt_renderer_ref->config.whitepoint*g_vupdt_renderer_ref->config.whitepoint;
         ubo.gamma = g_vupdt_renderer_ref->config.gamma;
-        ubo.roulette = g_vupdt_renderer_ref->config.roulette;
         ubo.swap = CPUSWAP_LENGTH;
         ubo.showdof = g_vupdt_renderer_ref->config.showdof;
         ubo.aperature = g_vupdt_renderer_ref->camera.aperature;

@@ -9,7 +9,6 @@
 #define DIELECTRIC_MODEL 7
 
 struct RayGenerator {
-	float time;
     uint tid;
 };
 
@@ -66,9 +65,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint triangles;
     uint emissives;
     uint bvhs;
-    uint sdfs;
     uint lights;
-    uint marches;
     uint samples;
 	uint seed;
     uint grid;
@@ -82,11 +79,8 @@ layout(binding = 0) uniform UniformBufferObject {
     float height;
     float swap;
 	float frametime;
-    float time;
-    float smoothen;
     float whitepoint;
     float gamma;
-    float roulette;
     float lightarea;
     float aperature;
     float focus;
@@ -341,7 +335,6 @@ Hit trace(Ray ray, inout uint hit_id) {
 }
 
 float russian_roulette(vec3 throughput) {
-    if (ubo.roulette > 0) return ubo.roulette;
     return clamp(max(max(throughput.x, throughput.y), throughput.z), 0.05, 0.999);
 }
 
@@ -540,16 +533,12 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
 
 void main() {
 
-	// update ray history
-	raygenIn[gl_GlobalInvocationID.x].time += ubo.frametime;
+	// update ray info
     raygenIn[gl_GlobalInvocationID.x].tid = -1;
 
 	// create ray generator coordinates	
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
-
-	// clear ray history
-	raygenIn[gl_GlobalInvocationID.x].time = 0.0;
 
 	// reject any rays outside of the viewport
     if (cut_viewport(rx, ry)) return;

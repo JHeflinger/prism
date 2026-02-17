@@ -5,7 +5,6 @@
 #define EPS 0.0001
 
 struct RayGenerator {
-	float time;
     uint tid;
 };
 
@@ -49,9 +48,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint triangles;
     uint emissives;
     uint bvhs;
-    uint sdfs;
     uint lights;
-    uint marches;
     uint samples;
 	uint seed;
     uint grid;
@@ -65,11 +62,8 @@ layout(binding = 0) uniform UniformBufferObject {
     float height;
     float swap;
 	float frametime;
-    float time;
-    float smoothen;
     float whitepoint;
     float gamma;
-    float roulette;
     float lightarea;
     float aperature;
     float focus;

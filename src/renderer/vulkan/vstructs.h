@@ -28,9 +28,7 @@ typedef struct {
     alignas(4) uint32_t triangles;
     alignas(4) uint32_t emissives;
     alignas(4) uint32_t bvhs;
-    alignas(4) uint32_t sdfs;
     alignas(4) uint32_t lights;
-    alignas(4) uint32_t marches;
     alignas(4) uint32_t samples;
 	alignas(4) uint32_t seed;
     alignas(4) uint32_t grid;
@@ -44,11 +42,8 @@ typedef struct {
     alignas(4) float height;
     alignas(4) float swap;
 	alignas(4) float frametime;
-    alignas(4) float time;
-    alignas(4) float smoothen;
     alignas(4) float whitepoint;
     alignas(4) float gamma;
-    alignas(4) float roulette;
     alignas(4) float lightarea;
     alignas(4) float aperature;
     alignas(4) float focus;
@@ -130,7 +125,6 @@ typedef struct {
     VulkanDataBuffer emissives;
     VulkanDataBuffer materials;
     VulkanDataBuffer bvh;
-    VulkanDataBuffer sdfs;
     VulkanDataBuffer lights;
 } VulkanGeometry;
 

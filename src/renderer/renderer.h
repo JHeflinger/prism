@@ -27,12 +27,6 @@ void RemoveTriangle(TriangleID id);
 
 void ClearTriangles();
 
-SDFID SubmitSDF(SDFPrimitive sdf);
-
-void RemoveSDF(SDFID id);
-
-void ClearSDFs();
-
 LightID SubmitLight(PointLight light);
 
 void RemoveLight(LightID id);
@@ -56,8 +50,6 @@ void Draw(float x, float y, float w, float h);
 float RenderTime();
 
 size_t NumTriangles();
-
-size_t NumSDFs();
 
 size_t NumMaterials();
 

@@ -5,11 +5,6 @@ ICEBOX:
 1. Select multiple faces via holding shift
 2. Select all seen faces via dragging box
 3. Wiki + Info buttons
-4. Outputted TID flickers at certain angles - this could be fixed with perhaps a barrier and readonly for the tids on the overlay pipeline?
-    4a. the tid flickering is somewhat pixel coordinate dependent??
-    4b. maybe try using an image buffer to store it instead of a SSBO
-    4c. only seems to happen on my desktop device (discrete NVIDIA gpu)
-    4d. is it "z-fighting"? is there a shared resource between frames?
 5. Reimplement SDFs properly, represent in scene as boxes if marching isn't enabled, otherwise march instead of trace
 6. Volumetrics
 7. Diffraction
@@ -29,7 +24,6 @@ ICEBOX:
 22. SDF construction pipeline using union, intersection, modifiers, etc
 23. Available keybinds tooltop overlay (like monster hunter combo hints)
 24. New test suite
-25. Get rid of roulette config
 26. Edit Material name
 27. Light names
 28. Edit light name

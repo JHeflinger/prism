@@ -10,12 +10,11 @@
 
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
-typedef uint32_t SDFID;
 typedef uint32_t LightID;
 DECLARE_ARRLIST(MaterialID);
 DECLARE_ARRLIST(TriangleID);
-DECLARE_ARRLIST(SDFID);
 DECLARE_ARRLIST(LightID);
+DECLARE_ARRLIST(Vector3);
 
 #define PREVIEW_PIPELINE_FLAGS 0b11001
 #define PATHTRACE_PIPELINE_FLAGS 0b11110
@@ -48,22 +47,6 @@ typedef struct {
 } Triangle;
 DECLARE_ARRLIST(Triangle);
 
-typedef enum {
-    SDF_SPHERE = 0,
-    SDF_JULIA = 1,
-    SDF_MANDELBULB = 2,
-	SDF_BOX = 3,
-	SDF_CLOUD = 4
-} SDFType;
-
-typedef struct {
-    alignas(4) uint32_t type;
-    alignas(16) vec3 origin;
-    alignas(4) float scale;
-	alignas(16) vec3 dim;
-} SDFPrimitive;
-DECLARE_ARRLIST(SDFPrimitive);
-
 typedef struct {
     vec3 min;
     vec3 max;
@@ -90,7 +73,6 @@ DECLARE_ARRLIST(SurfaceMaterial);
 #define BVH_BOTH 3
 
 typedef struct {
-	alignas(4) float time;
     alignas(4) uint32_t tid;
 } RayGenerator;
 
@@ -122,11 +104,9 @@ typedef struct {
     size_t max_emissives;
     size_t max_bvh;
     size_t max_materials;
-    size_t max_sdfs;
     size_t max_lights;
     BOOL update_triangles;
     BOOL update_materials;
-    BOOL update_sdfs;
     BOOL update_lights;
 } ChangeSet;
 
@@ -163,19 +143,13 @@ typedef struct {
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;
     ARRLIST_NodeBVH bvh;
-    ARRLIST_SDFPrimitive sdfs;
-    ARRLIST_SDFID sdfids;
     float lightarea;
     ChangeSet changes;
 } Geometry;
 
 typedef struct {
-    float time;
-    float smoothen;
-    float roulette;
     float whitepoint;
     float gamma;
-    uint32_t marches;
     BOOL normals;
     BOOL direct;
     BOOL grid;

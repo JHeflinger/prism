@@ -6,7 +6,6 @@
 #include <easymemory.h>
 
 BOOL g_vsync_enabled = TRUE;
-BOOL g_time_paused = TRUE;
 
 float poop = 0.0f;
 
@@ -83,13 +82,7 @@ void DrawDevPanel(float width, float height) {
     UIDrawText("Render time: %.6f ms", (float)RenderTime());
     UIDrawText("Triangles: %d", (int)NumTriangles());
     UIDrawText("Emissives: %d", (int)NumEmissives());
-    UIDrawText("SDF Objects: %d", (int)NumSDFs());
     UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
-    
-    UIMoveCursor(0, 20.0f);
-    UIDragFloatLabeled("Time:", &(RenderConfig()->time), 0.0f, 999999999.0f, 1.00f, width - 20);
-	UICheckboxLabeled("Time Paused:", &g_time_paused);
-    if (!g_time_paused) RenderConfig()->time += GetFrameTime();
 
     SimpleCamera c = GetCamera();
     SimpleCamera oldc = GetCamera();
@@ -101,10 +94,6 @@ void DrawDevPanel(float width, float height) {
     used |= UIWasJustUsed();
 	if (memcmp(&c, &oldc, sizeof(SimpleCamera))) MoveCamera(c);
     RenderConfig()->showdof = used;
-
-    UIMoveCursor(0, 20.0f);
-    UIDragUIntLabeled("Max SDF Marches:", &(RenderConfig()->marches), 0, 10000000, 1, width - 20);
-    UIDragFloatLabeled("SDF Smooth factor:", &(RenderConfig()->smoothen), 0.0f, 10000.0f, 0.05f, width - 20);
 }
 
 Panel GenerateDiagnosticsPanel() {

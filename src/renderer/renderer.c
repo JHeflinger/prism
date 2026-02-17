@@ -13,7 +13,6 @@
 
 Renderer g_renderer = { 0 };
 TriangleID g_triangle_id = 0;
-SDFID g_sdf_id = 0;
 LightID g_light_id = 0;
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
@@ -41,9 +40,6 @@ void InitializeRenderer() {
 	srand(time(NULL));
 
     // initialize config
-    g_renderer.config.smoothen = 0.0f;
-    g_renderer.config.marches = 100;
-    g_renderer.config.roulette = -1.0f;
     g_renderer.config.whitepoint = 20.0f;
     g_renderer.config.gamma = 2.2f;
     g_renderer.config.direct = FALSE;
@@ -107,7 +103,6 @@ void DestroyRenderer() {
     // clean geometry
     ClearTriangles();
     ClearMaterials();
-    ClearSDFs();
     ClearLights();
     ARRLIST_NodeBVH_clear(&(g_renderer.geometry.bvh));
 
@@ -214,39 +209,6 @@ void ClearTriangles() {
     g_renderer.geometry.changes.update_triangles = TRUE;
 }
 
-SDFID SubmitSDF(SDFPrimitive sdf) {
-    g_renderer.geometry.changes.update_sdfs = TRUE;
-    ARRLIST_SDFID_add(&(g_renderer.geometry.sdfids), g_sdf_id);
-    ARRLIST_SDFPrimitive_add(&(g_renderer.geometry.sdfs), sdf);
-    g_sdf_id++;
-    return g_sdf_id - 1;
-}
-
-void RemoveSDF(SDFID id) {
-    size_t ind = 0;
-    BOOL found = false;
-    for (size_t i = 0; i < g_renderer.geometry.sdfids.size; i++) {
-        if (g_renderer.geometry.sdfids.data[i] == id) {
-            ind = i;
-            found = TRUE;
-            break;
-        }
-    }
-    if (found) {
-        ARRLIST_SDFPrimitive_remove(&(g_renderer.geometry.sdfs), ind);
-        ARRLIST_SDFID_remove(&(g_renderer.geometry.sdfids), ind);
-        g_renderer.geometry.changes.update_sdfs = TRUE;
-    } else {
-        EZ_FATAL("Unable to remove nonexistant sdf");
-    }
-}
-
-void ClearSDFs() {
-    ARRLIST_SDFID_clear(&(g_renderer.geometry.sdfids));
-    ARRLIST_SDFPrimitive_clear(&(g_renderer.geometry.sdfs));
-    g_renderer.geometry.changes.update_sdfs = TRUE;
-}
-
 LightID SubmitLight(PointLight light) {
     g_renderer.geometry.changes.update_lights = TRUE;
     ARRLIST_LightID_add(&(g_renderer.geometry.lids), g_light_id);
@@ -327,7 +289,6 @@ void Render() {
         BOOL descriptor_changes = 
             g_renderer.geometry.changes.update_triangles |
             g_renderer.geometry.changes.update_materials |
-            g_renderer.geometry.changes.update_sdfs |
             g_renderer.geometry.changes.update_lights;
 
         // update triangles if needed
@@ -356,19 +317,6 @@ void Render() {
                 VINIT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
             } else {
                 VUPDT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
-            }
-        }
-
-        // update sdfs if needed
-        if (g_renderer.geometry.changes.update_sdfs) {
-            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
-            g_renderer.geometry.changes.update_sdfs = FALSE;
-            if (g_renderer.geometry.changes.max_sdfs != g_renderer.geometry.sdfs.maxsize) {
-                g_renderer.geometry.changes.max_sdfs = g_renderer.geometry.sdfs.maxsize;
-                VCLEAN_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
-                VINIT_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
-            } else {
-                VUPDT_SDFs(&(g_renderer.vulkan.core.geometry.sdfs));
             }
         }
 
@@ -492,10 +440,6 @@ float RenderTime() {
 
 size_t NumTriangles() {
     return g_renderer.geometry.triangles.size;
-}
-
-size_t NumSDFs() {
-    return g_renderer.geometry.sdfs.size;
 }
 
 size_t NumMaterials() {

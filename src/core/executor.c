@@ -45,11 +45,10 @@ void ImportExecuteScene(const char* scenefile) {
     }
 }
 
-void RunExecutor(const char* scenefile, const char* outfile, int width, int height, int samples, float roulette, BOOL direct_lighting, BOOL direct_only) {
+void RunExecutor(const char* scenefile, const char* outfile, int width, int height, int samples, BOOL direct_lighting, BOOL direct_only) {
     size_t memcheck = EZ_ALLOCATED();
     EZ_INFO("Initialzing prism execution suite...");
     InitializeExecutor(width, height);
-    RenderConfig()->roulette = roulette;
     RenderConfig()->direct = direct_lighting;
     RenderConfig()->directonly = direct_only;
     EZ_INFO("Importing scene...");

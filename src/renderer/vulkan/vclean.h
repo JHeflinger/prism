@@ -13,8 +13,6 @@ void VCLEAN_Triangles(VulkanDataBuffer* triangles);
 
 void VCLEAN_Emissives(VulkanDataBuffer* emissives);
 
-void VCLEAN_SDFs(VulkanDataBuffer* sdfs);
-
 void VCLEAN_Materials(VulkanDataBuffer* materials);
 
 void VCLEAN_Geometry(VulkanGeometry* geometry);

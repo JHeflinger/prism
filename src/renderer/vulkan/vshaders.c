@@ -147,21 +147,6 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(NodeBVH)
 			}
 		};
-	} else if (strcmp(name, "SDFSSBOIn") == 0) {
-		return (VulkanBoundVariable) {
-			STORAGE_BUFFER,
-			(SchrodingRef) {
-				TRUE,
-				&(renderer->vulkan.core.geometry.sdfs.buffer)
-			},
-			(SchrodingSize) {
-				(SchrodingRef) {
-					TRUE,
-					&(renderer->geometry.sdfs.size)
-				},
-				sizeof(SDFPrimitive)
-			}
-		};
 	} else if (strcmp(name, "LightSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,
