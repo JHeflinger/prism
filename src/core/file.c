@@ -5,17 +5,17 @@
 #include <string.h>
 #include <easymemory.h>
 
-char* FileExtension(const char* path) {
-    char* dot = strrchr(path, '.');
-    char* slash1 = strrchr(path, '/');
-    char* slash2 = strrchr(path, '\\');
-    char* slash = slash1 > slash2 ? slash1 : slash2;
+const char* FileExtension(const char* path) {
+    const char* dot = strrchr(path, '.');
+    const char* slash1 = strrchr(path, '/');
+    const char* slash2 = strrchr(path, '\\');
+    const char* slash = slash1 > slash2 ? slash1 : slash2;
     if (!dot || (slash && dot < slash)) return NULL;
     return dot + 1;
 }
 
 FileType GetFileType(const char* path) {
-    char* extension = FileExtension(path);
+    const char* extension = FileExtension(path);
     if (strcmp(extension, "obj") == 0 || strcmp(extension, "OBJ") == 0) {
         return DOTOBJ;
     } else if (strcmp(extension, "prism") == 0 || strcmp(extension, "PRISM") == 0) {
