@@ -33,6 +33,8 @@ BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridge);
 
 BOOL VINIT_RenderContext(VulkanRenderContext* context);
 
+BOOL VINIT_Normals(VulkanDataBuffer* normals);
+
 BOOL VINIT_Vertices(VulkanDataBuffer* vertices);
 
 BOOL VINIT_Triangles(VulkanDataBuffer* triangles);

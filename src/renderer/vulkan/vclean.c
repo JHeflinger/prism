@@ -21,6 +21,10 @@ void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
     VUTIL_DestroyBuffer(*bvh);
 }
 
+void VCLEAN_Normals(VulkanDataBuffer* normals) {
+    VUTIL_DestroyBuffer(*normals);
+}
+
 void VCLEAN_Vertices(VulkanDataBuffer* vertices) {
     VUTIL_DestroyBuffer(*vertices);
 }
@@ -38,6 +42,7 @@ void VCLEAN_Materials(VulkanDataBuffer* materials) {
 }
 
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
+    VCLEAN_Normals(&(geometry->normals));
     VCLEAN_Vertices(&(geometry->vertices));
     VCLEAN_Triangles(&(geometry->triangles));
     VCLEAN_Emissives(&(geometry->emissives));

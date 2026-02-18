@@ -37,15 +37,12 @@ typedef struct {
 } SimpleCamera;
 
 typedef struct {
-    alignas(4) uint32_t x;
-    alignas(4) uint32_t y;
-    alignas(4) uint32_t z;
-    alignas(16) vec3 a;
-    alignas(16) vec3 b;
-    alignas(16) vec3 c;
-    alignas(16) vec3 an;
-    alignas(16) vec3 bn;
-    alignas(16) vec3 cn;
+    alignas(4) uint32_t a;
+    alignas(4) uint32_t b;
+    alignas(4) uint32_t c;
+    alignas(4) uint32_t an;
+    alignas(4) uint32_t bn;
+    alignas(4) uint32_t cn;
     alignas(4) MaterialID material;
 } Triangle;
 DECLARE_ARRLIST(Triangle);
@@ -103,12 +100,14 @@ typedef struct {
 } CPUSwap;
 
 typedef struct {
+    size_t max_normals;
     size_t max_vertices;
     size_t max_triangles;
     size_t max_emissives;
     size_t max_bvh;
     size_t max_materials;
     size_t max_lights;
+    BOOL update_normals;
     BOOL update_vertices;
     BOOL update_triangles;
     BOOL update_materials;
@@ -140,6 +139,7 @@ DECLARE_ARRLIST(PointLight);
 
 typedef struct {
     ARRLIST_Vector3 vertices;
+    ARRLIST_Vector3 normals;
     ARRLIST_PointLight lights;
     ARRLIST_LightID lids;
     ARRLIST_Triangle triangles;

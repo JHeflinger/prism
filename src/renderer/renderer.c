@@ -101,6 +101,7 @@ void InitializeRenderer() {
 
 void DestroyRenderer() {
     // clean geometry
+    ClearNormals();
     ClearVertices();
     ClearTriangles();
     ClearMaterials();
@@ -132,6 +133,16 @@ void ReorientCamera() {
     SETVEC(g_renderer.camera.up, desired);
 }
 
+Vector3 GetVertex(size_t index) {
+    EZ_ASSERT(index < g_renderer.geometry.vertices.size, "Vertex does not exist for requested index");
+    return g_renderer.geometry.vertices.data[index];
+}
+
+Vector3* VertexReference(size_t index) {
+    EZ_ASSERT(index < g_renderer.geometry.vertices.size, "Vertex reference does not exist for requested index");
+    return &(g_renderer.geometry.vertices.data[index]);
+}
+
 void SubmitVertex(Vector3 vertex) {
     g_renderer.geometry.changes.update_vertices = TRUE;
     ARRLIST_Vector3_add(&(g_renderer.geometry.vertices), vertex);
@@ -142,30 +153,47 @@ void ClearVertices() {
     g_renderer.geometry.changes.update_vertices = TRUE;
 }
 
+void SubmitNormal(Vector3 normal) {
+    g_renderer.geometry.changes.update_normals = TRUE;
+    ARRLIST_Vector3_add(&(g_renderer.geometry.normals), normal);
+}
+
+void ClearNormals() {
+    ARRLIST_Vector3_clear(&(g_renderer.geometry.normals));
+    g_renderer.geometry.changes.update_normals = TRUE;
+
+}
+
 TriangleID SubmitTriangle(Triangle triangle) {
     g_renderer.geometry.changes.update_triangles = TRUE;
+    EZ_ASSERT(triangle.a < g_renderer.geometry.vertices.size &&
+              triangle.b < g_renderer.geometry.vertices.size &&
+              triangle.c < g_renderer.geometry.vertices.size, "Triangle vertex does not exist");
+    Vector3 a = g_renderer.geometry.vertices.data[triangle.a];
+    Vector3 b = g_renderer.geometry.vertices.data[triangle.b];
+    Vector3 c = g_renderer.geometry.vertices.data[triangle.c];
     TriangleBB bb = {
         {
-            triangle.a[0] < triangle.b[0] ?
-                (triangle.a[0] < triangle.c[0] ? triangle.a[0] : triangle.c[0]) :
-                (triangle.b[0] < triangle.c[0] ? triangle.b[0] : triangle.c[0]),
-            triangle.a[1] < triangle.b[1] ?
-                (triangle.a[1] < triangle.c[1] ? triangle.a[1] : triangle.c[1]) :
-                (triangle.b[1] < triangle.c[1] ? triangle.b[1] : triangle.c[1]),
-            triangle.a[2] < triangle.b[2] ?
-                (triangle.a[2] < triangle.c[2] ? triangle.a[2] : triangle.c[2]) :
-                (triangle.b[2] < triangle.c[2] ? triangle.b[2] : triangle.c[2])
+            a.x < b.x ?
+                (a.x < c.x ? a.x : c.x) :
+                (b.x < c.x ? b.x : c.x),
+            a.y < b.y ?
+                (a.y < c.y ? a.y : c.y) :
+                (b.y < c.y ? b.y : c.y),
+            a.z < b.z ?
+                (a.z < c.z ? a.z : c.z) :
+                (b.z < c.z ? b.z : c.z)
         },
         {
-            triangle.a[0] > triangle.b[0] ?
-                (triangle.a[0] > triangle.c[0] ? triangle.a[0] : triangle.c[0]) :
-                (triangle.b[0] > triangle.c[0] ? triangle.b[0] : triangle.c[0]),
-            triangle.a[1] > triangle.b[1] ?
-                (triangle.a[1] > triangle.c[1] ? triangle.a[1] : triangle.c[1]) :
-                (triangle.b[1] > triangle.c[1] ? triangle.b[1] : triangle.c[1]),
-            triangle.a[2] > triangle.b[2] ?
-                (triangle.a[2] > triangle.c[2] ? triangle.a[2] : triangle.c[2]) :
-                (triangle.b[2] > triangle.c[2] ? triangle.b[2] : triangle.c[2])
+            a.x > b.x ?
+                (a.x > c.x ? a.x : c.x) :
+                (b.x > c.x ? b.x : c.x),
+            a.y > b.y ?
+                (a.y > c.y ? a.y : c.y) :
+                (b.y > c.y ? b.y : c.y),
+            a.z > b.z ?
+                (a.z > c.z ? a.z : c.z) :
+                (b.z > c.z ? b.z : c.z)
         },
         { 0, 0, 0 }
     };
@@ -175,7 +203,10 @@ TriangleID SubmitTriangle(Triangle triangle) {
     vec3 emission; SETVEC(emission, g_renderer.geometry.materials.data[triangle.material].emission);
     if (emission[0] != 0 || emission[1] != 0 || emission[2] != 0) {
         ARRLIST_TriangleID_add(&(g_renderer.geometry.emissives), g_renderer.geometry.triangles.size);
-        g_renderer.geometry.lightarea += TriangleArea(triangle.a, triangle.b, triangle.c);
+        vec3 va = {a.x, a.y, a.z};
+        vec3 vb = {b.x, b.y, b.z};
+        vec3 vc = {c.x, c.y, c.z};
+        g_renderer.geometry.lightarea += TriangleArea(va, vb, vc);
     }
     ARRLIST_TriangleID_add(&(g_renderer.geometry.tids), g_triangle_id);
     ARRLIST_TriangleBB_add(&(g_renderer.geometry.tbbs), bb);
@@ -254,7 +285,21 @@ void Render() {
             g_renderer.geometry.changes.update_triangles |
             g_renderer.geometry.changes.update_materials |
             g_renderer.geometry.changes.update_lights |
-            g_renderer.geometry.changes.update_vertices;
+            g_renderer.geometry.changes.update_vertices |
+            g_renderer.geometry.changes.update_normals;
+
+        // update normals if needed
+        if (g_renderer.geometry.changes.update_normals) {
+            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
+            g_renderer.geometry.changes.update_normals = FALSE;
+            if (g_renderer.geometry.changes.max_normals != g_renderer.geometry.normals.maxsize) {
+                g_renderer.geometry.changes.max_normals = g_renderer.geometry.normals.maxsize;
+                VCLEAN_Normals(&(g_renderer.vulkan.core.geometry.normals));
+                VINIT_Normals(&(g_renderer.vulkan.core.geometry.normals));
+            } else {
+                VUPDT_Normals(&(g_renderer.vulkan.core.geometry.normals));
+            }
+        }
 
         // update vertices if needed
         if (g_renderer.geometry.changes.update_vertices) {
@@ -425,6 +470,10 @@ float RenderTime() {
     return ProfileResult(&(g_renderer.stats.profile));
 }
 
+size_t NumNormals() {
+    return g_renderer.geometry.normals.size;
+}
+
 size_t NumVertices() {
     return g_renderer.geometry.vertices.size;
 }
@@ -439,6 +488,10 @@ size_t NumMaterials() {
 
 size_t NumEmissives() {
     return g_renderer.geometry.emissives.size;
+}
+
+void UpdateNormals() {
+    g_renderer.geometry.changes.update_normals = TRUE;
 }
 
 void UpdateVertices() {
@@ -487,28 +540,31 @@ Triangle* TriangleReference(size_t index) {
 void RecalculateTriangleBB(size_t index) {
     EZ_ASSERT(index < g_renderer.geometry.triangles.size, "Invalid triangle index requested");
     Triangle triangle = g_renderer.geometry.triangles.data[index];
+    Vector3 a = g_renderer.geometry.vertices.data[triangle.a];
+    Vector3 b = g_renderer.geometry.vertices.data[triangle.b];
+    Vector3 c = g_renderer.geometry.vertices.data[triangle.c];
     TriangleBB bb = {
         {
-            triangle.a[0] < triangle.b[0] ?
-                (triangle.a[0] < triangle.c[0] ? triangle.a[0] : triangle.c[0]) :
-                (triangle.b[0] < triangle.c[0] ? triangle.b[0] : triangle.c[0]),
-            triangle.a[1] < triangle.b[1] ?
-                (triangle.a[1] < triangle.c[1] ? triangle.a[1] : triangle.c[1]) :
-                (triangle.b[1] < triangle.c[1] ? triangle.b[1] : triangle.c[1]),
-            triangle.a[2] < triangle.b[2] ?
-                (triangle.a[2] < triangle.c[2] ? triangle.a[2] : triangle.c[2]) :
-                (triangle.b[2] < triangle.c[2] ? triangle.b[2] : triangle.c[2])
+            a.x < b.x ?
+                (a.x < c.x ? a.x : c.x) :
+                (b.x < c.x ? b.x : c.x),
+            a.y < b.y ?
+                (a.y < c.y ? a.y : c.y) :
+                (b.y < c.y ? b.y : c.y),
+            a.z < b.z ?
+                (a.z < c.z ? a.z : c.z) :
+                (b.z < c.z ? b.z : c.z)
         },
         {
-            triangle.a[0] > triangle.b[0] ?
-                (triangle.a[0] > triangle.c[0] ? triangle.a[0] : triangle.c[0]) :
-                (triangle.b[0] > triangle.c[0] ? triangle.b[0] : triangle.c[0]),
-            triangle.a[1] > triangle.b[1] ?
-                (triangle.a[1] > triangle.c[1] ? triangle.a[1] : triangle.c[1]) :
-                (triangle.b[1] > triangle.c[1] ? triangle.b[1] : triangle.c[1]),
-            triangle.a[2] > triangle.b[2] ?
-                (triangle.a[2] > triangle.c[2] ? triangle.a[2] : triangle.c[2]) :
-                (triangle.b[2] > triangle.c[2] ? triangle.b[2] : triangle.c[2])
+            a.x > b.x ?
+                (a.x > c.x ? a.x : c.x) :
+                (b.x > c.x ? b.x : c.x),
+            a.y > b.y ?
+                (a.y > c.y ? a.y : c.y) :
+                (b.y > c.y ? b.y : c.y),
+            a.z > b.z ?
+                (a.z > c.z ? a.z : c.z) :
+                (b.z > c.z ? b.z : c.z)
         },
         { 0, 0, 0 }
     };

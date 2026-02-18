@@ -26,6 +26,15 @@ void VUPDT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
         bvh->buffer);
 }
 
+void VUPDT_Normals(VulkanDataBuffer* normals) {
+    if (sizeof(Vector3) * g_vupdt_renderer_ref->geometry.normals.maxsize == 0) return;
+    VUTIL_CopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.normals.data,
+        sizeof(Vector3) * g_vupdt_renderer_ref->geometry.normals.size,
+        sizeof(Vector3) * g_vupdt_renderer_ref->geometry.normals.maxsize,
+        normals->buffer);
+}
+
 void VUPDT_Vertices(VulkanDataBuffer* vertices) {
     if (sizeof(Vector3) * g_vupdt_renderer_ref->geometry.vertices.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(

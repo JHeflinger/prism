@@ -162,6 +162,21 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(Vector3)
 			}
 		};
+	} else if (strcmp(name, "NormalSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.normals.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.normals.size)
+				},
+				sizeof(Vector3)
+			}
+		};
 	} else if (strcmp(name, "LightSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,

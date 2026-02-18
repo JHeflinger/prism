@@ -572,10 +572,13 @@ BOOL ConstructOBJ(const StateOBJ state) {
     if (failure) return FALSE;
     ARRLIST_MaterialID ids = { 0 };
     size_t vertices_start = NumVertices();
+    size_t normals_start = NumNormals();
     for (size_t i = 0; i < state.materials.size; i++)
         ARRLIST_MaterialID_add(&ids, SubmitNamedMaterial(state.materials.data[i], state.material_names.data[i]));
     for (size_t i = 0; i < state.vertices.size; i++)
         SubmitVertex(state.vertices.data[i]);
+    for (size_t i = 0; i < state.normals.size; i++)
+        SubmitNormal(state.normals.data[i]);
     size_t current_marker = 0;
     MaterialID current_material = 0;
     for (size_t i = 0; i < state.faces.size; i++) {
@@ -587,36 +590,9 @@ BOOL ConstructOBJ(const StateOBJ state) {
             vertices_start + state.faces.data[i].a,
             vertices_start + state.faces.data[i].b,
             vertices_start + state.faces.data[i].c,
-            {
-                state.vertices.data[state.faces.data[i].a].x,
-                state.vertices.data[state.faces.data[i].a].y,
-                state.vertices.data[state.faces.data[i].a].z,
-            },
-            {
-                state.vertices.data[state.faces.data[i].b].x,
-                state.vertices.data[state.faces.data[i].b].y,
-                state.vertices.data[state.faces.data[i].b].z,
-            },
-            {
-                state.vertices.data[state.faces.data[i].c].x,
-                state.vertices.data[state.faces.data[i].c].y,
-                state.vertices.data[state.faces.data[i].c].z,
-            },
-            {
-                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].an].x : 0,
-                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].an].y : 0,
-                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].an].z : 0,
-            },
-            {
-                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].bn].x : 0,
-                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].bn].y : 0,
-                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].bn].z : 0,
-            },
-            {
-                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].cn].x : 0,
-                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].cn].y : 0,
-                state.normals.size > 0 && state.faces.data[i].normals ? state.normals.data[state.faces.data[i].cn].z : 0,
-            },
+            state.normals.size > 0 && state.faces.data[i].normals ? normals_start + state.faces.data[i].an : (uint32_t)-1,
+            state.normals.size > 0 && state.faces.data[i].normals ? normals_start + state.faces.data[i].bn : (uint32_t)-1,
+            state.normals.size > 0 && state.faces.data[i].normals ? normals_start + state.faces.data[i].cn : (uint32_t)-1,
             current_material
         };
         SubmitTriangle(triangle);

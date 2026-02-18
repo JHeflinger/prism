@@ -2,6 +2,7 @@
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
 #include <easylogger.h>
+#include <raymath.h>
 
 typedef enum {
     EDIT_MATERIAL,
@@ -238,61 +239,62 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor(0, 5);
             UIDrawText("x");
             UIMoveCursor(15, -20);
-            edited |= UIDragFloat(&(tref->a[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->a)->x), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("y");
             UIMoveCursor(component_width + 40, -20);
-            edited |= UIDragFloat(&(tref->a[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->a)->y), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("z");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(tref->a[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->a)->z), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(0, 5);
             UIDrawText("x");
             UIMoveCursor(15, -20);
-            edited |= UIDragFloat(&(tref->b[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->b)->x), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("y");
             UIMoveCursor(component_width + 40, -20);
-            edited |= UIDragFloat(&(tref->b[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->b)->y), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("z");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(tref->b[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->b)->z), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(0, 5);
             UIDrawText("x");
             UIMoveCursor(15, -20);
-            edited |= UIDragFloat(&(tref->c[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->c)->x), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("y");
             UIMoveCursor(component_width + 40, -20);
-            edited |= UIDragFloat(&(tref->c[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->c)->y), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("z");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(tref->c[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->c)->z), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Move Face") / 2) - 10, 0);
             UIDrawText("Move Face");
             UIMoveCursor(0, 5);
             UIDrawText("x");
             UIMoveCursor(15, -20);
-            vec3 old_a = {tref->a[0], tref->a[1], tref->a[2]};
-            edited |= UIDragFloat(&(tref->a[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            Vector3 old_a = GetVertex(tref->a);
+            edited |= UIDragFloat(&(VertexReference(tref->a)->x), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("y");
             UIMoveCursor(component_width + 40, -20);
-            edited |= UIDragFloat(&(tref->a[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            edited |= UIDragFloat(&(VertexReference(tref->a)->y), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("z");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(tref->a[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
-            glm_vec3_sub(tref->a, old_a, old_a);
-            glm_vec3_add(tref->b, old_a, tref->b);
-            glm_vec3_add(tref->c, old_a, tref->c);
+            edited |= UIDragFloat(&(VertexReference(tref->a)->z), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            Vector3 adiff = Vector3Subtract(GetVertex(tref->a), old_a);
+            *(VertexReference(tref->b)) = Vector3Add(GetVertex(tref->b), adiff);
+            *(VertexReference(tref->c)) = Vector3Add(GetVertex(tref->c), adiff);
             if (edited) {
                 RecalculateTriangleBB(g_edit_item_index);
                 UpdateTriangles();
+                UpdateVertices();
             }
             if (UIGetCursor().y + 60 < height) {
                 UISetCursor(UIGetCursor().x, height - 60);

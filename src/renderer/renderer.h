@@ -21,9 +21,17 @@ void MoveCamera(SimpleCamera camera);
 
 void ReorientCamera();
 
+Vector3 GetVertex(size_t index);
+
+Vector3* VertexReference(size_t index);
+
 void SubmitVertex(Vector3 vertex);
 
 void ClearVertices();
+
+void SubmitNormal(Vector3 normal);
+
+void ClearNormals();
 
 TriangleID SubmitTriangle(Triangle triangle);
 
@@ -49,6 +57,8 @@ void Draw(float x, float y, float w, float h);
 
 float RenderTime();
 
+size_t NumNormals();
+
 size_t NumVertices();
 
 size_t NumTriangles();
@@ -56,6 +66,8 @@ size_t NumTriangles();
 size_t NumMaterials();
 
 size_t NumEmissives();
+
+void UpdateNormals();
 
 void UpdateVertices();
 
