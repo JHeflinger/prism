@@ -58,8 +58,8 @@ IMPL_ARRLIST(UV);
 IMPL_ARRLIST(UseMaterialMarker);
 
 typedef struct {
-    ARRLIST_GPUVec3 vertices;
-    ARRLIST_GPUVec3 normals; // NOTE: per-primitive normals are not implemented yet! This field doesn't have any effect yet!
+    ARRLIST_Vector3 vertices;
+    ARRLIST_Vector3 normals; // NOTE: per-primitive normals are not implemented yet! This field doesn't have any effect yet!
     ARRLIST_UV uvs; // NOTE: textures are not implemented yet! This field doesn't have any effect yet!
     ARRLIST_Face faces;
     ARRLIST_DynamicString material_names;
@@ -72,8 +72,8 @@ typedef BOOL (*ParseFuncOBJ)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], 
 typedef BOOL (*ParseFuncMTL)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
 
 void CleanStateOBJ(StateOBJ* state) {
-    ARRLIST_GPUVec3_clear(&(state->vertices));
-    ARRLIST_GPUVec3_clear(&(state->normals));
+    ARRLIST_Vector3_clear(&(state->vertices));
+    ARRLIST_Vector3_clear(&(state->normals));
     ARRLIST_UV_clear(&(state->uvs));
     ARRLIST_Face_clear(&(state->faces));
     for (size_t i = 0; i < state->material_names.size; i++)
@@ -409,7 +409,7 @@ BOOL ParseOBJ_v(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numarg
         EZ_ERROR("Invalid vertex fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
-    ARRLIST_GPUVec3_add(&(state->vertices), (GPUVec3){x, y, z});
+    ARRLIST_Vector3_add(&(state->vertices), (Vector3){x, y, z});
     return TRUE;
 }
 
@@ -423,7 +423,7 @@ BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
         EZ_ERROR("Invalid vertex normal fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
-    ARRLIST_GPUVec3_add(&(state->normals), (GPUVec3){x, y, z});
+    ARRLIST_Vector3_add(&(state->normals), (Vector3){x, y, z});
     return TRUE;
 }
 

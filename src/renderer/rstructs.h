@@ -8,15 +8,13 @@
 #include <raylib.h>
 #include <vulkan/vulkan.h>
 
-typedef struct { alignas(4) float x; alignas(4) float y; alignas(4) float z; } GPUVec3;
-
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
 typedef uint32_t LightID;
 DECLARE_ARRLIST(MaterialID);
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARRLIST(LightID);
-DECLARE_ARRLIST(GPUVec3);
+DECLARE_ARRLIST(Vector3);
 
 #define PREVIEW_PIPELINE_FLAGS 0b11001
 #define PATHTRACE_PIPELINE_FLAGS 0b11110
@@ -141,7 +139,7 @@ DECLARE_ARRLIST(PointLight);
 #define MAX_MATERIAL_NAME_SIZE 256
 
 typedef struct {
-    ARRLIST_GPUVec3 vertices;
+    ARRLIST_Vector3 vertices;
     ARRLIST_PointLight lights;
     ARRLIST_LightID lids;
     ARRLIST_Triangle triangles;

@@ -8,6 +8,12 @@
 #define MIRROR_MODEL 5
 #define DIELECTRIC_MODEL 7
 
+struct Vector3 {
+    float x;
+    float y;
+    float z;
+};
+
 struct RayGenerator {
     uint tid;
 };
@@ -112,7 +118,7 @@ layout(binding = 6) readonly buffer EmissiveSSBOIn {
 };
 
 layout(binding = 7) readonly buffer VertexSSBOIn {
-    vec3 vertexIn[ ];
+    Vector3 vertexIn[ ];
 };
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
@@ -275,13 +281,16 @@ Ray create_ray(vec2 rg) {
 
 bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     Triangle tri = triangleIn[triangle_ind];
-    vec3 e1 = tri.b - tri.a;
-    vec3 e2 = tri.c - tri.a;
+    vec3 _a = vec3(vertexIn[tri.x].x, vertexIn[tri.x].y, vertexIn[tri.x].z);
+    vec3 _b = vec3(vertexIn[tri.y].x, vertexIn[tri.y].y, vertexIn[tri.y].z);
+    vec3 _c = vec3(vertexIn[tri.z].x, vertexIn[tri.z].y, vertexIn[tri.z].z);
+    vec3 e1 = _b - _a;
+    vec3 e2 = _c - _a;
     vec3 h = cross(ray.direction, e2);
     float a = dot(e1, h);
     if (abs(a) < EPS) return false;
     float f = 1.0 / a;
-    vec3 s = ray.position - tri.a;
+    vec3 s = ray.position - _a;
     float u = f*dot(s, h);
     if (u < 0.0 || u > 1.0) return false;
     vec3 q = cross(s, e1);
@@ -373,12 +382,15 @@ vec3 sample_specular_phong_lobe(float shiny) {
 vec3 sample_direct_light_point(inout uint tid, inout float area) {
     tid = emissiveIn[uint(random()*float(ubo.emissives))];
     Triangle tri = triangleIn[tid];
-    area = length(cross(tri.b - tri.a, tri.c - tri.a)) * 0.5;
+    vec3 _a = vec3(vertexIn[tri.x].x, vertexIn[tri.x].y, vertexIn[tri.x].z);
+    vec3 _b = vec3(vertexIn[tri.y].x, vertexIn[tri.y].y, vertexIn[tri.y].z);
+    vec3 _c = vec3(vertexIn[tri.z].x, vertexIn[tri.z].y, vertexIn[tri.z].z);
+    area = length(cross(_b - _a, _c - _a)) * 0.5;
     float r1 = sqrt(random());
     float r2 = random();
     float u = 1.0 - r1;
     float v = r2 * r1;
-    return tri.a * (1.0 - u - v) + tri.b * u + tri.c * v;
+    return _a * (1.0 - u - v) + _b * u + _c * v;
 }
 
 float diffuse_pdf(vec3 normal, vec3 incoming) {

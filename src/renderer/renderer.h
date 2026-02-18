@@ -21,7 +21,7 @@ void MoveCamera(SimpleCamera camera);
 
 void ReorientCamera();
 
-void SubmitVertex(GPUVec3 vertex);
+void SubmitVertex(Vector3 vertex);
 
 void ClearVertices();
 

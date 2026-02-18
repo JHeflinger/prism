@@ -132,13 +132,13 @@ void ReorientCamera() {
     SETVEC(g_renderer.camera.up, desired);
 }
 
-void SubmitVertex(GPUVec3 vertex) {
+void SubmitVertex(Vector3 vertex) {
     g_renderer.geometry.changes.update_vertices = TRUE;
-    ARRLIST_GPUVec3_add(&(g_renderer.geometry.vertices), vertex);
+    ARRLIST_Vector3_add(&(g_renderer.geometry.vertices), vertex);
 }
 
 void ClearVertices() {
-    ARRLIST_GPUVec3_clear(&(g_renderer.geometry.vertices));
+    ARRLIST_Vector3_clear(&(g_renderer.geometry.vertices));
     g_renderer.geometry.changes.update_vertices = TRUE;
 }
 
