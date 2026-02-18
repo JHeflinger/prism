@@ -1,0 +1,53 @@
+#version 450
+
+layout(binding = 0) buffer MortonSSBOIn {
+    uint mortonIn[ ];
+};
+
+layout(binding = 1) buffer TriangleIndexSSBOIn {
+    uint triIn[];
+};
+
+layout(binding = 2) buffer MortonSSBOOut {
+    uint mortonOut[];
+};
+
+layout(binding = 3) buffer TriangleIndexSSBOOut {
+    uint triOut[];
+};
+
+layout(binding = 4) buffer WorkGroupHistorySSBOIn {
+    uint workgroupHist[][16];
+};
+
+layout(binding = 5) buffer WorkGroupOffsetSSBOIn {
+    uint globalOffset[][16];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint elements;
+    uint bitstart;
+} pc;
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+shared uint localScan[256];
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if(idx >= pc.elements) return;
+    uint tid = gl_LocalInvocationID.x;
+    uint wgID = gl_WorkGroupID.x;
+    uint bucket = (mortonIn[idx] >> pc.bitstart) & 0xFu;
+    uint local_count = 0;
+    for(uint i = 0; i < tid; i++) {
+        uint other_idx = wgID*gl_WorkGroupSize.x + i;
+        if(other_idx < pc.elements){
+            uint other_bucket = (mortonIn[other_idx] >> pc.bitstart) & 0xFu;
+            if(other_bucket == bucket) local_count++;
+        }
+    }
+    uint out_index = globalOffset[wgID][bucket] + local_count;
+    mortonOut[out_index] = mortonIn[idx];
+    triOut[out_index] = triIn[idx];
+}

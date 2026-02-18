@@ -1,0 +1,34 @@
+#version 450
+
+layout(binding = 0) buffer MortonSSBOIn {
+   uint mortonIn[ ];
+};
+
+layout(binding = 1) buffer WorkGroupHistorySSBOIn {
+    uint wgHist[][16];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint bitstart;
+    uint elements;
+} pc;
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+shared uint local_history[16];
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    uint tid = gl_LocalInvocationID.x;
+    uint wgID = gl_WorkGroupID.x;
+    if (tid < 16) local_history[tid] = 0;
+    barrier();
+    if (idx < pc.elements) {
+        uint bucket = (mortonIn[idx] >> pc.bitstart) & 0xFu;
+        atomicAdd(local_history[bucket], 1);
+    }
+    barrier();
+    if (tid < 16) {
+        wgHist[wgID][tid] = local_history[tid];
+    }
+}
