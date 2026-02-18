@@ -72,6 +72,11 @@ typedef struct {
 } OverlaySSBO;
 
 typedef struct {
+    alignas(4) uint32_t elements;
+    alignas(4) uint32_t bitstart;
+} VulkanPushConstants;
+
+typedef struct {
     VkBuffer buffer;
     VkDeviceMemory memory;
 } VulkanDataBuffer;
@@ -134,6 +139,7 @@ typedef struct {
 typedef struct {
     VulkanDataBuffer centroids;
     VulkanDataBuffer mortons;
+    //VulkanDataBuffer workhistory;
     //VulkanDataBuffer tree;
 
 

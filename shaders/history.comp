@@ -1,22 +1,23 @@
 #version 450
 
 layout(binding = 0) buffer WorkGroupHistorySSBOIn {
-    uint wgHist[][16];
+    uint wgHist[ ][16];
 };
 
 layout(binding = 1) buffer WorkGroupOffsetSSBOIn {
-    uint offsets[];
+    uint globalOffset[ ][16];
 };
 
 layout(push_constant) uniform PushConstants {
-    uint workgroups;
+    uint elements; // workgroups, not number of triangles
+    uint bitstart;
 } pc;
 
-layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in; // why is this 64?
 
 void main() {
     uint globalID = gl_GlobalInvocationID.x;
-    uint totalEntries = pc.workgroups * 16u;
+    uint totalEntries = pc.elements * 16u;
     if (globalID >= totalEntries)
         return;
     uint bucket = globalID % 16u;
@@ -25,6 +26,5 @@ void main() {
     for (uint i = 0; i < wgID; i++) {
         sum += wgHist[i][bucket];
     }
-    uint idx = wgID * 16u + bucket;
-    offsets[idx] = sum;
+    globalOffset[wgID][bucket] = sum;
 }

@@ -270,10 +270,17 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
         createInfo.module = shadermodules[i];
         createInfo.pName = "main";
 
+        VkPushConstantRange pushRange = { 0 };
+        pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        pushRange.offset = 0;
+        pushRange.size = sizeof(VulkanPushConstants);
+
         VkPipelineLayoutCreateInfo layoutInfo = { 0 };
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         layoutInfo.setLayoutCount = 1;
         layoutInfo.pSetLayouts = &(g_vinit_renderer_ref->vulkan.core.context.renderdata.descriptors[i].layout);
+        layoutInfo.pushConstantRangeCount = 1;
+        layoutInfo.pPushConstantRanges = &pushRange;
         
         VkResult result = vkCreatePipelineLayout(
             g_vinit_renderer_ref->vulkan.core.general.interface,

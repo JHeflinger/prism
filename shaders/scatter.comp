@@ -5,23 +5,23 @@ layout(binding = 0) buffer MortonSSBOIn {
 };
 
 layout(binding = 1) buffer TriangleIndexSSBOIn {
-    uint triIn[];
+    uint triIn[ ];
 };
 
 layout(binding = 2) buffer MortonSSBOOut {
-    uint mortonOut[];
+    uint mortonOut[ ];
 };
 
 layout(binding = 3) buffer TriangleIndexSSBOOut {
-    uint triOut[];
+    uint triOut[ ];
 };
 
 layout(binding = 4) buffer WorkGroupHistorySSBOIn {
-    uint workgroupHist[][16];
+    uint workgroupHist[ ][16];
 };
 
 layout(binding = 5) buffer WorkGroupOffsetSSBOIn {
-    uint globalOffset[][16];
+    uint globalOffset[ ][16];
 };
 
 layout(push_constant) uniform PushConstants {

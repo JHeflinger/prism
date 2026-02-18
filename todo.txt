@@ -41,6 +41,9 @@ Next:
 4. Implement remove functions
 5. In edit.c when recalculating triangle bounding box use half edge to recalculate bounding box for all connected triangles as well
 6. verify and reimplement all popup funcs as needed
+7. switch to y up instead of z up
+8. make triangles via compute shader pass
+9. Move all bvh-related geometry vulkadatabuffers to a seperate struct
 
 Scratch:
 

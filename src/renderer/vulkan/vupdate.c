@@ -81,6 +81,20 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
 
+        float imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
+        float imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
+        uint32_t invocations = imgw * imgh;
+        
+        if ((1u << i) & CENTROID_SHADER_FLAG) {
+            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
+            VulkanPushConstants cpc = { g_vupdt_renderer_ref->geometry.triangles.size, 0 };
+            vkCmdPushConstants(
+                command,
+                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                0, sizeof(VulkanPushConstants), &cpc);
+        }
+
         if ((1u << i) & ANALYZE_SHADER_FLAG) {
             VkBufferMemoryBarrier bufferBarrier = {0};
             bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -113,10 +127,6 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             0,
             NULL);
 
-        float imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
-        float imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
-        uint32_t invocations = imgw * imgh;
-        if ((1u << i) & CENTROID_SHADER_FLAG) invocations = g_vupdt_renderer_ref->geometry.triangles.size;
         vkCmdDispatch(command, ceil((invocations) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
     }
 
