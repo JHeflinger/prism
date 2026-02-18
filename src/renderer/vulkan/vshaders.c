@@ -35,7 +35,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					FALSE,
 					(void*)1
-				},
+				}, 0.0f,
 				sizeof(OverlayUniformBufferObject)
 			},
 		};
@@ -50,7 +50,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					FALSE,
 					(void*)1
-				},
+				}, 0.0f,
 				sizeof(UniformBufferObject)
 			},
 		};
@@ -65,7 +65,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					FALSE,
 					(void*)1
-				},
+				}, 0.0f,
 				sizeof(GeometryUniformBufferObject)
 			},
 		};
@@ -80,7 +80,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					FALSE,
 					(void*)(((size_t)renderer->dimensions.x) * ((size_t)renderer->dimensions.y))
-				},
+				}, 0.0f,
 				sizeof(RayGenerator)
 			}
 		};
@@ -91,7 +91,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				TRUE,
 				&(renderer->vulkan.core.context.hdr[i].view)
 			},
-			(SchrodingSize) { (SchrodingRef) { 0 }, 0 }
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
 		};
 	} else if (strcmp(name, "outputImage") == 0) {
 		return (VulkanBoundVariable) {
@@ -100,7 +100,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				TRUE,
 				&(renderer->vulkan.core.context.targets[i].view)
 			},
-			(SchrodingSize) { (SchrodingRef) { 0 }, 0 }
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
 		};
 	} else if (strcmp(name, "TriangleSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
@@ -113,7 +113,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					TRUE,
 					&(renderer->geometry.triangles.size)
-				},
+				}, 0.0f,
 				sizeof(Triangle)
 			}
 		};
@@ -128,7 +128,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					TRUE,
 					&(renderer->geometry.emissives.size)
-				},
+				}, 0.0f,
 				sizeof(TriangleID)
 			}
 		};
@@ -143,7 +143,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					TRUE,
 					&(renderer->geometry.materials.size)
-				},
+				}, 0.0f,
 				sizeof(SurfaceMaterial)
 			}
 		};
@@ -158,7 +158,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					TRUE,
 					&(renderer->geometry.bvh.size)
-				},
+				}, 0.0f,
 				sizeof(NodeBVH)
 			}
 		};
@@ -173,8 +173,23 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					TRUE,
 					&(renderer->geometry.vertices.size)
-				},
+				}, 0.0f,
 				sizeof(Vector3)
+			}
+		};
+	} else if (strcmp(name, "WorkGroupHistorySSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.workhistory.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				}, INVOCATION_GROUP_SIZE,
+				sizeof(uint32_t)
 			}
 		};
 	} else if (strcmp(name, "CentroidSSBOIn") == 0) {
@@ -188,7 +203,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					TRUE,
 					&(renderer->geometry.triangles.size)
-				},
+				}, 0.0f,
 				sizeof(Vector3)
 			}
 		};
@@ -203,7 +218,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					TRUE,
 					&(renderer->geometry.triangles.size)
-				},
+				}, 0.0f,
 				sizeof(uint32_t)
 			}
 		};
@@ -218,7 +233,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					TRUE,
 					&(renderer->geometry.normals.size)
-				},
+				}, 0.0f,
 				sizeof(Vector3)
 			}
 		};
@@ -233,7 +248,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					TRUE,
 					&(renderer->geometry.lights.size)
-				},
+				}, 0.0f,
 				sizeof(PointLight)
 			}
 		};
@@ -248,7 +263,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				(SchrodingRef) {
 					FALSE,
 					(void*)1
-				},
+				}, 0.0f,
 				sizeof(OverlaySSBO)
 			},
 		};

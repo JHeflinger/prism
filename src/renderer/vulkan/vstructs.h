@@ -139,7 +139,7 @@ typedef struct {
 typedef struct {
     VulkanDataBuffer centroids;
     VulkanDataBuffer mortons;
-    //VulkanDataBuffer workhistory;
+    VulkanDataBuffer workhistory;
     //VulkanDataBuffer tree;
 
 
@@ -169,6 +169,7 @@ typedef struct {
 
 typedef struct {
 	SchrodingRef count;
+    float reduction;
 	size_t size;
 } SchrodingSize;
 

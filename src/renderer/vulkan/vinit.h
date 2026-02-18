@@ -33,6 +33,8 @@ BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridge);
 
 BOOL VINIT_RenderContext(VulkanRenderContext* context);
 
+BOOL VINIT_WorkgroupHistory(VulkanDataBuffer* workhistory);
+
 BOOL VINIT_Centroids(VulkanDataBuffer* centroids);
 
 BOOL VINIT_Mortons(VulkanDataBuffer* mortons);

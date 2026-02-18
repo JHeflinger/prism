@@ -78,16 +78,27 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     EZ_ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
 
     // execute shader stages
+    uint32_t radix_bits = 0;
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
 
         float imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
         float imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
         uint32_t invocations = imgw * imgh;
-        
+
         if ((1u << i) & CENTROID_SHADER_FLAG) {
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
             VulkanPushConstants cpc = { g_vupdt_renderer_ref->geometry.triangles.size, 0 };
+            vkCmdPushConstants(
+                command,
+                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                0, sizeof(VulkanPushConstants), &cpc);
+        }
+
+        if ((1u << i) & HISTOGRAM_SHADER_FLAG) {
+            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
+            VulkanPushConstants cpc = { g_vupdt_renderer_ref->geometry.triangles.size, radix_bits };
             vkCmdPushConstants(
                 command,
                 g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
@@ -224,7 +235,9 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
                 } else {
                     bufferInfos[k].buffer = var.data.reference ? *((VkBuffer*)var.data.value) : (VkBuffer)var.data.value;
                     bufferInfos[k].offset = 0;
-                    bufferInfos[k].range = var.size.count.reference ? var.size.size * (*((size_t*)var.size.count.value)) : var.size.size * (size_t)var.size.count.value;
+                    bufferInfos[k].range = var.size.size * ceil((var.size.count.reference ? 
+                        (*((size_t*)var.size.count.value)) :
+                        (size_t)var.size.count.value) / (var.size.reduction > 0.0f ? var.size.reduction : 1.0f));
                     bufferInfos[k].range = bufferInfos[k].range > 0 ? bufferInfos[k].range : 1;
                     descriptorWrites[k].pBufferInfo = &(bufferInfos[k]);
                 }

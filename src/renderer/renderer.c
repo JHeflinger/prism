@@ -345,6 +345,8 @@ void Render() {
                 VINIT_Centroids(&(g_renderer.vulkan.core.geometry.centroids));
                 VCLEAN_Mortons(&(g_renderer.vulkan.core.geometry.mortons));
                 VINIT_Mortons(&(g_renderer.vulkan.core.geometry.mortons));
+                VCLEAN_WorkgroupHistory(&(g_renderer.vulkan.core.geometry.workhistory));
+                VINIT_WorkgroupHistory(&(g_renderer.vulkan.core.geometry.workhistory));
             } else {
                 VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             }
