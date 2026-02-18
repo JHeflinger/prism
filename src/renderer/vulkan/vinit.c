@@ -337,6 +337,18 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context) {
     return TRUE;
 }
 
+BOOL VINIT_Vertices(VulkanDataBuffer* vertices) {
+    size_t arrsize = sizeof(Vector3) * g_vinit_renderer_ref->geometry.vertices.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        vertices);
+    VUPDT_Vertices(vertices);
+    return TRUE;
+}
+
 BOOL VINIT_Triangles(VulkanDataBuffer* triangles) {
     size_t arrsize = sizeof(Triangle) * g_vinit_renderer_ref->geometry.triangles.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
@@ -566,6 +578,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
 }
 
 BOOL VINIT_Geometry(VulkanGeometry* geometry) {
+    if (!VINIT_Vertices(&(geometry->vertices))) return FALSE;
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;
 	if (!VINIT_Emissives(&(geometry->emissives))) return FALSE;
 	if (!VINIT_Materials(&(geometry->materials))) return FALSE;

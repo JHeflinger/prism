@@ -25,6 +25,9 @@ struct Hit {
 };
 
 struct Triangle {
+    uint x;
+    uint y;
+    uint z;
     vec3 a;
     vec3 b;
     vec3 c;
@@ -106,6 +109,10 @@ layout(binding = 5) readonly buffer BVHSSBOIn {
 
 layout(binding = 6) readonly buffer EmissiveSSBOIn {
     uint emissiveIn[ ];
+};
+
+layout(binding = 7) readonly buffer VertexSSBOIn {
+    vec3 vertexIn[ ];
 };
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;

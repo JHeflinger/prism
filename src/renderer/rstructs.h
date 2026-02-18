@@ -8,13 +8,15 @@
 #include <raylib.h>
 #include <vulkan/vulkan.h>
 
+typedef struct { alignas(4) float x; alignas(4) float y; alignas(4) float z; } GPUVec3;
+
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
 typedef uint32_t LightID;
 DECLARE_ARRLIST(MaterialID);
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARRLIST(LightID);
-DECLARE_ARRLIST(Vector3);
+DECLARE_ARRLIST(GPUVec3);
 
 #define PREVIEW_PIPELINE_FLAGS 0b11001
 #define PATHTRACE_PIPELINE_FLAGS 0b11110
@@ -37,6 +39,9 @@ typedef struct {
 } SimpleCamera;
 
 typedef struct {
+    alignas(4) uint32_t x;
+    alignas(4) uint32_t y;
+    alignas(4) uint32_t z;
     alignas(16) vec3 a;
     alignas(16) vec3 b;
     alignas(16) vec3 c;
@@ -100,11 +105,13 @@ typedef struct {
 } CPUSwap;
 
 typedef struct {
+    size_t max_vertices;
     size_t max_triangles;
     size_t max_emissives;
     size_t max_bvh;
     size_t max_materials;
     size_t max_lights;
+    BOOL update_vertices;
     BOOL update_triangles;
     BOOL update_materials;
     BOOL update_lights;
@@ -134,6 +141,7 @@ DECLARE_ARRLIST(PointLight);
 #define MAX_MATERIAL_NAME_SIZE 256
 
 typedef struct {
+    ARRLIST_GPUVec3 vertices;
     ARRLIST_PointLight lights;
     ARRLIST_LightID lids;
     ARRLIST_Triangle triangles;

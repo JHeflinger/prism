@@ -101,6 +101,7 @@ void InitializeRenderer() {
 
 void DestroyRenderer() {
     // clean geometry
+    ClearVertices();
     ClearTriangles();
     ClearMaterials();
     ClearLights();
@@ -129,6 +130,16 @@ void ReorientCamera() {
     }
     vec3 desired = { 0, 0, 1 };
     SETVEC(g_renderer.camera.up, desired);
+}
+
+void SubmitVertex(GPUVec3 vertex) {
+    g_renderer.geometry.changes.update_vertices = TRUE;
+    ARRLIST_GPUVec3_add(&(g_renderer.geometry.vertices), vertex);
+}
+
+void ClearVertices() {
+    ARRLIST_GPUVec3_clear(&(g_renderer.geometry.vertices));
+    g_renderer.geometry.changes.update_vertices = TRUE;
 }
 
 TriangleID SubmitTriangle(Triangle triangle) {
@@ -173,34 +184,6 @@ TriangleID SubmitTriangle(Triangle triangle) {
     return g_triangle_id - 1;
 }
 
-void RemoveTriangle(TriangleID id) {
-    size_t ind = 0;
-    BOOL found = false;
-    for (size_t i = 0; i < g_renderer.geometry.tids.size; i++) {
-        if (g_renderer.geometry.tids.data[i] == id) {
-            ind = i;
-            found = TRUE;
-            break;
-        }
-    }
-    if (found) {
-        Triangle tri = g_renderer.geometry.triangles.data[ind];
-        for (size_t i = 0; i < g_renderer.geometry.emissives.size; i++) {
-            if (g_renderer.geometry.emissives.data[i] == ind) {
-                ARRLIST_TriangleID_remove(&(g_renderer.geometry.emissives), i);
-                g_renderer.geometry.lightarea -= TriangleArea(tri.a, tri.b, tri.c);
-                break;
-            }
-        }
-        ARRLIST_Triangle_remove(&(g_renderer.geometry.triangles), ind);
-        ARRLIST_TriangleID_remove(&(g_renderer.geometry.tids), ind);
-        ARRLIST_TriangleBB_remove(&(g_renderer.geometry.tbbs), ind);
-        g_renderer.geometry.changes.update_triangles = TRUE;
-    } else {
-        EZ_FATAL("Unable to remove nonexistant triangle");
-    }
-}
-
 void ClearTriangles() {
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.tids));
     ARRLIST_TriangleBB_clear(&(g_renderer.geometry.tbbs));
@@ -215,25 +198,6 @@ LightID SubmitLight(PointLight light) {
     ARRLIST_PointLight_add(&(g_renderer.geometry.lights), light);
     g_light_id++;
     return g_light_id - 1;
-}
-
-void RemoveLight(LightID id) {
-    size_t ind = 0;
-    BOOL found = false;
-    for (size_t i = 0; i < g_renderer.geometry.lights.size; i++) {
-        if (g_renderer.geometry.lids.data[i] == id) {
-            ind = i;
-            found = TRUE;
-            break;
-        }
-    }
-    if (found) {
-        ARRLIST_PointLight_remove(&(g_renderer.geometry.lights), ind);
-        ARRLIST_LightID_remove(&(g_renderer.geometry.lids), ind);
-        g_renderer.geometry.changes.update_lights = TRUE;
-    } else {
-        EZ_FATAL("Unable to remove nonexistant light");
-    }
 }
 
 void ClearLights() {
@@ -289,7 +253,30 @@ void Render() {
         BOOL descriptor_changes = 
             g_renderer.geometry.changes.update_triangles |
             g_renderer.geometry.changes.update_materials |
-            g_renderer.geometry.changes.update_lights;
+            g_renderer.geometry.changes.update_lights |
+            g_renderer.geometry.changes.update_vertices;
+
+        // update vertices if needed
+        if (g_renderer.geometry.changes.update_vertices) {
+            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
+            g_renderer.geometry.changes.update_vertices = FALSE;
+            if (g_renderer.geometry.changes.max_vertices != g_renderer.geometry.vertices.maxsize) {
+                g_renderer.geometry.changes.max_vertices = g_renderer.geometry.vertices.maxsize;
+                VCLEAN_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
+                VINIT_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
+            } else {
+                VUPDT_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
+            }
+            // update bvh
+            RUTIL_BoundingVolumeHierarchy(&g_renderer.geometry.bvh, &g_renderer.geometry.tbbs);
+            if (g_renderer.geometry.changes.max_bvh != g_renderer.geometry.bvh.maxsize) {
+                g_renderer.geometry.changes.max_bvh = g_renderer.geometry.bvh.maxsize;
+                VCLEAN_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+                VINIT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+            } else {
+                VUPDT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
+            }
+        }
 
         // update triangles if needed
         if (g_renderer.geometry.changes.update_triangles) {
@@ -438,6 +425,10 @@ float RenderTime() {
     return ProfileResult(&(g_renderer.stats.profile));
 }
 
+size_t NumVertices() {
+    return g_renderer.geometry.vertices.size;
+}
+
 size_t NumTriangles() {
     return g_renderer.geometry.triangles.size;
 }
@@ -448,6 +439,10 @@ size_t NumMaterials() {
 
 size_t NumEmissives() {
     return g_renderer.geometry.emissives.size;
+}
+
+void UpdateVertices() {
+    g_renderer.geometry.changes.update_vertices = TRUE;
 }
 
 SurfaceMaterial* MaterialReference(size_t index) {

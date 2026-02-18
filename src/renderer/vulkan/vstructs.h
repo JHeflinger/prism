@@ -121,6 +121,7 @@ typedef struct {
 } VulkanRenderContext;
 
 typedef struct {
+    VulkanDataBuffer vertices;
     VulkanDataBuffer triangles;
     VulkanDataBuffer emissives;
     VulkanDataBuffer materials;

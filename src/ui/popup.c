@@ -263,6 +263,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     if (UIButton("Submit", button_width)) {
         // bottom face
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
@@ -270,6 +271,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             0
         });
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
@@ -279,6 +281,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
         // top face
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
@@ -286,6 +289,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             0
         });
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
@@ -295,6 +299,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
         // right face
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
@@ -302,6 +307,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             0
         });
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
@@ -311,6 +317,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
         // left face
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
@@ -318,6 +325,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             0
         });
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
@@ -327,6 +335,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
         // front face
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
@@ -334,6 +343,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             0
         });
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
@@ -343,6 +353,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
         // back face
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
@@ -350,6 +361,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             0
         });
         SubmitTriangle((Triangle){
+            0, 0, 0,
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
             {g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},

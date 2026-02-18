@@ -21,15 +21,15 @@ void MoveCamera(SimpleCamera camera);
 
 void ReorientCamera();
 
-TriangleID SubmitTriangle(Triangle triangle);
+void SubmitVertex(GPUVec3 vertex);
 
-void RemoveTriangle(TriangleID id);
+void ClearVertices();
+
+TriangleID SubmitTriangle(Triangle triangle);
 
 void ClearTriangles();
 
 LightID SubmitLight(PointLight light);
-
-void RemoveLight(LightID id);
 
 void ClearLights();
 
@@ -49,11 +49,15 @@ void Draw(float x, float y, float w, float h);
 
 float RenderTime();
 
+size_t NumVertices();
+
 size_t NumTriangles();
 
 size_t NumMaterials();
 
 size_t NumEmissives();
+
+void UpdateVertices();
 
 SurfaceMaterial* MaterialReference(size_t index);
 

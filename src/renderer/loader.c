@@ -32,12 +32,6 @@ typedef struct {
 } UseMaterialMarker;
 
 typedef struct {
-    float x;
-    float y;
-    float z;
-} Vertex;
-
-typedef struct {
     float u;
     float v;
 } UV;
@@ -56,18 +50,16 @@ typedef struct {
     BOOL normals;
 } Face;
 
-DECLARE_ARRLIST(Vertex);
 DECLARE_ARRLIST(Face);
 DECLARE_ARRLIST(UV);
 DECLARE_ARRLIST(UseMaterialMarker);
-IMPL_ARRLIST(Vertex);
 IMPL_ARRLIST(Face);
 IMPL_ARRLIST(UV);
 IMPL_ARRLIST(UseMaterialMarker);
 
 typedef struct {
-    ARRLIST_Vertex vertices;
-    ARRLIST_Vertex normals; // NOTE: per-primitive normals are not implemented yet! This field doesn't have any effect yet!
+    ARRLIST_GPUVec3 vertices;
+    ARRLIST_GPUVec3 normals; // NOTE: per-primitive normals are not implemented yet! This field doesn't have any effect yet!
     ARRLIST_UV uvs; // NOTE: textures are not implemented yet! This field doesn't have any effect yet!
     ARRLIST_Face faces;
     ARRLIST_DynamicString material_names;
@@ -80,8 +72,8 @@ typedef BOOL (*ParseFuncOBJ)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], 
 typedef BOOL (*ParseFuncMTL)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
 
 void CleanStateOBJ(StateOBJ* state) {
-    ARRLIST_Vertex_clear(&(state->vertices));
-    ARRLIST_Vertex_clear(&(state->normals));
+    ARRLIST_GPUVec3_clear(&(state->vertices));
+    ARRLIST_GPUVec3_clear(&(state->normals));
     ARRLIST_UV_clear(&(state->uvs));
     ARRLIST_Face_clear(&(state->faces));
     for (size_t i = 0; i < state->material_names.size; i++)
@@ -417,7 +409,7 @@ BOOL ParseOBJ_v(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numarg
         EZ_ERROR("Invalid vertex fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
-    ARRLIST_Vertex_add(&(state->vertices), (Vertex){x, y, z});
+    ARRLIST_GPUVec3_add(&(state->vertices), (GPUVec3){x, y, z});
     return TRUE;
 }
 
@@ -431,7 +423,7 @@ BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
         EZ_ERROR("Invalid vertex normal fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
-    ARRLIST_Vertex_add(&(state->normals), (Vertex){x, y, z});
+    ARRLIST_GPUVec3_add(&(state->normals), (GPUVec3){x, y, z});
     return TRUE;
 }
 
@@ -578,9 +570,12 @@ BOOL ConstructOBJ(const StateOBJ state) {
         }
     }
     if (failure) return FALSE;
-    ARRLIST_MaterialID ids = { 0 }; 
+    ARRLIST_MaterialID ids = { 0 };
+    size_t vertices_start = NumVertices();
     for (size_t i = 0; i < state.materials.size; i++)
         ARRLIST_MaterialID_add(&ids, SubmitNamedMaterial(state.materials.data[i], state.material_names.data[i]));
+    for (size_t i = 0; i < state.vertices.size; i++)
+        SubmitVertex(state.vertices.data[i]);
     size_t current_marker = 0;
     MaterialID current_material = 0;
     for (size_t i = 0; i < state.faces.size; i++) {
@@ -589,6 +584,9 @@ BOOL ConstructOBJ(const StateOBJ state) {
             current_marker++;
         }
         Triangle triangle = {
+            vertices_start + state.faces.data[i].a,
+            vertices_start + state.faces.data[i].b,
+            vertices_start + state.faces.data[i].c,
             {
                 state.vertices.data[state.faces.data[i].a].x,
                 state.vertices.data[state.faces.data[i].a].y,

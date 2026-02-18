@@ -7,6 +7,8 @@ void VUPDT_Lights(VulkanDataBuffer* lights);
 
 void VUPDT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh);
 
+void VUPDT_Vertices(VulkanDataBuffer* vertices);
+
 void VUPDT_Triangles(VulkanDataBuffer* triangles);
 
 void VUPDT_Emissives(VulkanDataBuffer* emissives);

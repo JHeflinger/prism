@@ -9,6 +9,8 @@ void VCLEAN_Lights(VulkanDataBuffer* lights);
 
 void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh);
 
+void VCLEAN_Vertices(VulkanDataBuffer* vertices);
+
 void VCLEAN_Triangles(VulkanDataBuffer* triangles);
 
 void VCLEAN_Emissives(VulkanDataBuffer* emissives);
