@@ -50,6 +50,15 @@ typedef struct {
 } UniformBufferObject;
 
 typedef struct {
+    alignas(4) float minx;
+    alignas(4) float miny;
+    alignas(4) float minz;
+    alignas(4) float maxx;
+    alignas(4) float maxy;
+    alignas(4) float maxz;
+} GeometryUniformBufferObject;
+
+typedef struct {
     alignas(4) uint32_t mouse_x;
     alignas(4) uint32_t mouse_y;
 	alignas(4) uint32_t image_width;
@@ -70,8 +79,10 @@ typedef struct {
 typedef struct {
     VulkanDataBuffer objects[CPUSWAP_LENGTH];
     VulkanDataBuffer overlay_objects[CPUSWAP_LENGTH];
+    VulkanDataBuffer geometry_objects[CPUSWAP_LENGTH];
     void* mapped[CPUSWAP_LENGTH];
     void* overlay_mapped[CPUSWAP_LENGTH];
+    void* geometry_mapped[CPUSWAP_LENGTH];
 } UBOArray;
 
 typedef struct {
@@ -121,6 +132,11 @@ typedef struct {
 } VulkanRenderContext;
 
 typedef struct {
+    VulkanDataBuffer centroids;
+    VulkanDataBuffer mortons;
+    //VulkanDataBuffer tree;
+
+
     VulkanDataBuffer normals;
     VulkanDataBuffer vertices;
     VulkanDataBuffer triangles;

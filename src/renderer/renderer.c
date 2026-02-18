@@ -50,6 +50,10 @@ void InitializeRenderer() {
     g_renderer.config.normals = TRUE;
     g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
 
+    // initialize min/max BB
+    g_renderer.geometry.minBB = (Vector3){ FLT_MAX, FLT_MAX, FLT_MAX };
+    g_renderer.geometry.maxBB = (Vector3){ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+
     // initialize camera
     g_renderer.camera = (SimpleCamera){
         { 2.11f, 0.0f, 2.133f },
@@ -146,6 +150,12 @@ Vector3* VertexReference(size_t index) {
 void SubmitVertex(Vector3 vertex) {
     g_renderer.geometry.changes.update_vertices = TRUE;
     ARRLIST_Vector3_add(&(g_renderer.geometry.vertices), vertex);
+    if (vertex.x < g_renderer.geometry.minBB.x) g_renderer.geometry.minBB.x = vertex.x;
+    if (vertex.y < g_renderer.geometry.minBB.y) g_renderer.geometry.minBB.y = vertex.y;
+    if (vertex.z < g_renderer.geometry.minBB.z) g_renderer.geometry.minBB.z = vertex.z;
+    if (vertex.x > g_renderer.geometry.maxBB.x) g_renderer.geometry.maxBB.x = vertex.x;
+    if (vertex.y > g_renderer.geometry.maxBB.y) g_renderer.geometry.maxBB.y = vertex.y;
+    if (vertex.z > g_renderer.geometry.maxBB.z) g_renderer.geometry.maxBB.z = vertex.z;
 }
 
 void ClearVertices() {
@@ -331,6 +341,10 @@ void Render() {
                 g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
                 VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
                 VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
+                VCLEAN_Centroids(&(g_renderer.vulkan.core.geometry.centroids));
+                VINIT_Centroids(&(g_renderer.vulkan.core.geometry.centroids));
+                VCLEAN_Mortons(&(g_renderer.vulkan.core.geometry.mortons));
+                VINIT_Mortons(&(g_renderer.vulkan.core.geometry.mortons));
             } else {
                 VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             }

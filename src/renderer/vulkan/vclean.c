@@ -21,6 +21,14 @@ void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
     VUTIL_DestroyBuffer(*bvh);
 }
 
+void VCLEAN_Centroids(VulkanDataBuffer* centroids) {
+    VUTIL_DestroyBuffer(*centroids);
+}
+
+void VCLEAN_Mortons(VulkanDataBuffer* mortons) {
+    VUTIL_DestroyBuffer(*mortons);
+}
+
 void VCLEAN_Normals(VulkanDataBuffer* normals) {
     VUTIL_DestroyBuffer(*normals);
 }
@@ -42,6 +50,8 @@ void VCLEAN_Materials(VulkanDataBuffer* materials) {
 }
 
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
+    VCLEAN_Mortons(&(geometry->mortons));
+    VCLEAN_Centroids(&(geometry->centroids));
     VCLEAN_Normals(&(geometry->normals));
     VCLEAN_Vertices(&(geometry->vertices));
     VCLEAN_Triangles(&(geometry->triangles));
@@ -75,6 +85,7 @@ void VCLEAN_RenderData(VulkanRenderData* renderdata) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VUTIL_DestroyBuffer(renderdata->ubos.objects[i]);
         VUTIL_DestroyBuffer(renderdata->ubos.overlay_objects[i]);
+        VUTIL_DestroyBuffer(renderdata->ubos.geometry_objects[i]);
     }
     for (size_t i = 0; i < g_vclean_renderer_ref->vulkan.core.shaders.size; i++) {
         vkDestroyDescriptorPool(g_vclean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].pool, NULL);

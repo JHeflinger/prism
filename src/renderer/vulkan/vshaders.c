@@ -54,6 +54,21 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(UniformBufferObject)
 			},
 		};
+	} else if (strcmp(name, "GeometryUniformBufferObject") == 0) {
+		return (VulkanBoundVariable) {
+			UNIFORM_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.ubos.geometry_objects[i].buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)1
+				},
+				sizeof(GeometryUniformBufferObject)
+			},
+		};
 	} else if (strcmp(name, "RayGeneratorSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,
@@ -160,6 +175,36 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					&(renderer->geometry.vertices.size)
 				},
 				sizeof(Vector3)
+			}
+		};
+	} else if (strcmp(name, "CentroidSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.centroids.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				},
+				sizeof(Vector3)
+			}
+		};
+	} else if (strcmp(name, "MortonSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.mortons.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				},
+				sizeof(uint32_t)
 			}
 		};
 	} else if (strcmp(name, "NormalSSBOIn") == 0) {

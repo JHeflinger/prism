@@ -10,6 +10,10 @@ Renderer* g_vinit_renderer_ref = NULL;
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
+        "shaders/centroids.comp",
+        "build/shaders/centroids.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
         "shaders/default.comp",
         "build/shaders/default.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
@@ -125,7 +129,11 @@ BOOL VINIT_UniformBuffers(UBOArray* ubos) {
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             &(ubos->overlay_objects[i]));
-
+        VUTIL_CreateBuffer(
+            sizeof(GeometryUniformBufferObject),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &(ubos->geometry_objects[i]));
         vkMapMemory(
             g_vinit_renderer_ref->vulkan.core.general.interface,
             ubos->objects[i].memory,
@@ -134,6 +142,10 @@ BOOL VINIT_UniformBuffers(UBOArray* ubos) {
             g_vinit_renderer_ref->vulkan.core.general.interface,
             ubos->overlay_objects[i].memory,
             0, sizeof(OverlayUniformBufferObject), 0, &(ubos->overlay_mapped[i]));
+        vkMapMemory(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            ubos->geometry_objects[i].memory,
+            0, sizeof(GeometryUniformBufferObject), 0, &(ubos->geometry_mapped[i]));
     }
     return TRUE;
 }
@@ -334,6 +346,28 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context) {
 	if (!VINIT_Targets(context->targets)) return FALSE;
 	if (!VINIT_RenderData(&(context->renderdata))) return FALSE;
 	if (!VINIT_Pipeline(&(context->pipeline))) return FALSE;
+    return TRUE;
+}
+
+BOOL VINIT_Centroids(VulkanDataBuffer* centroids) {
+    size_t arrsize = sizeof(Vector3) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        centroids);
+    return TRUE;
+}
+
+BOOL VINIT_Mortons(VulkanDataBuffer* mortons) {
+    size_t arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        mortons);
     return TRUE;
 }
 
@@ -590,6 +624,8 @@ BOOL VINIT_General(VulkanGeneral* general) {
 }
 
 BOOL VINIT_Geometry(VulkanGeometry* geometry) {
+    if (!VINIT_Centroids(&(geometry->centroids))) return FALSE;
+    if (!VINIT_Mortons(&(geometry->mortons))) return FALSE;
     if (!VINIT_Normals(&(geometry->normals))) return FALSE;
     if (!VINIT_Vertices(&(geometry->vertices))) return FALSE;
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;

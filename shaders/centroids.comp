@@ -1,0 +1,74 @@
+#version 450
+
+struct Vector3 {
+    float x;
+    float y;
+    float z;
+};
+
+struct Triangle {
+    uint a;
+    uint b;
+    uint c;
+    uint an;
+    uint bn;
+    uint cn;
+    uint material;
+};
+
+layout(binding = 0) uniform GeometryUniformBufferObject { 
+    float minx;
+    float miny;
+    float minz;
+    float maxx;
+    float maxy;
+    float maxz;
+} ubo;
+
+layout(binding = 1) buffer CentroidSSBOIn {
+   Vector3 centroidIn[ ];
+};
+
+layout(binding = 2) buffer MortonSSBOIn {
+   uint mortonIn[ ];
+};
+
+layout(binding = 3) readonly buffer TriangleSSBOIn {
+    Triangle triangleIn[ ];
+};
+
+layout(binding = 4) readonly buffer VertexSSBOIn {
+    Vector3 vertexIn[ ];
+};
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+uint expandBits(uint v) {
+    v = (v * 0x00010001u) & 0xFF0000FFu;
+    v = (v * 0x00000101u) & 0x0F00F00Fu;
+    v = (v * 0x00000011u) & 0xC30C30C3u;
+    v = (v * 0x00000005u) & 0x49249249u;
+    return v;
+}
+
+uint interleaveBits(uint x, uint y, uint z) {
+    return (expandBits(x) << 0) | (expandBits(y) << 1) | (expandBits(z) << 2);
+}
+
+void main() {
+    uint triID = gl_GlobalInvocationID.x;
+    Triangle tri = triangleIn[triID];
+    vec3 a = vec3(vertexIn[tri.a].x, vertexIn[tri.a].y, vertexIn[tri.a].z);
+    vec3 b = vec3(vertexIn[tri.b].x, vertexIn[tri.b].y, vertexIn[tri.b].z);
+    vec3 c = vec3(vertexIn[tri.c].x, vertexIn[tri.c].y, vertexIn[tri.c].z);
+    vec3 center = (a + b + c) / 3.0;
+    Vector3 centerv = { center.x, center.y, center.z };
+    centroidIn[triID] = centerv;
+    vec3 scene_min = vec3(ubo.minx, ubo.miny, ubo.minz);
+    vec3 scene_max = vec3(ubo.maxx, ubo.maxy, ubo.maxz);
+    vec3 normalized_center = (center - scene_min) / (scene_max - scene_min);
+    uint x = uint(clamp(normalized_center.x * 1023.0, 0.0, 1023.0));
+    uint y = uint(clamp(normalized_center.y * 1023.0, 0.0, 1023.0));
+    uint z = uint(clamp(normalized_center.z * 1023.0, 0.0, 1023.0));
+    mortonIn[triID] = interleaveBits(x, y, z);
+}

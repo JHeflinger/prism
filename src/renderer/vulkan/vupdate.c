@@ -115,7 +115,9 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
         float imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
         float imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
-        vkCmdDispatch(command, ceil((imgw * imgh) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
+        uint32_t invocations = imgw * imgh;
+        if ((1u << i) & CENTROID_SHADER_FLAG) invocations = g_vupdt_renderer_ref->geometry.triangles.size;
+        vkCmdDispatch(command, ceil((invocations) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
     }
 
     // Copy image to staging
@@ -304,6 +306,18 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.single_selected_tid = GetSelectedTriangle();
         ubo.divisor = g_vupdt_renderer_ref->config.flags & PATHTRACE_SHADER_FLAG ? CPUSWAP_LENGTH : 1;
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
+    }
+
+    // geometry uniform buffer
+    {
+        GeometryUniformBufferObject ubo = { 0 };
+        ubo.minx = g_vupdt_renderer_ref->geometry.minBB.x;
+        ubo.miny = g_vupdt_renderer_ref->geometry.minBB.y;
+        ubo.minz = g_vupdt_renderer_ref->geometry.minBB.z;
+        ubo.maxx = g_vupdt_renderer_ref->geometry.maxBB.x;
+        ubo.maxy = g_vupdt_renderer_ref->geometry.maxBB.y;
+        ubo.maxz = g_vupdt_renderer_ref->geometry.maxBB.z;
+        memcpy(ubos->geometry_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(GeometryUniformBufferObject));
     }
 }
 

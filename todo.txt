@@ -36,9 +36,18 @@ ICEBOX:
 38. update emissives on vertex change too, probably just redo all emissive stuff on bvh change
 
 Next:
-1. Vertex-index model
 2. Parallelize bvh
 3. half-edge geometry processing implementations
 4. Implement remove functions
 5. In edit.c when recalculating triangle bounding box use half edge to recalculate bounding box for all connected triangles as well
 6. verify and reimplement all popup funcs as needed
+
+Scratch:
+
+on update triangle update min/max bbs
+RENAME CENTROID SHADER
+dont forget need to rebuild bvh for each pipeline target
+ - ideally we actually only build once and just copy it next passes
+
+DONT FORGET BARRIERS IN BETWEEN CRITICAL STAGES
+reduce all intermediary updates within Render() to an if update_geometry
