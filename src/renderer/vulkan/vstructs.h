@@ -144,6 +144,8 @@ typedef struct {
     VulkanDataBuffer indices;
     VulkanDataBuffer mortonswap;
     VulkanDataBuffer indexswap;
+    VulkanDataBuffer boundingboxes;
+    VulkanDataBuffer nodes;
 } VulkanBVH;
 
 typedef struct {

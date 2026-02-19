@@ -147,7 +147,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(SurfaceMaterial)
 			}
 		};
-	} else if (strcmp(name, "BVHSSBOIn") == 0) {
+	} else if (strcmp(name, "BVHSSBOIn") == 0) { // TODO: marked for removal
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,
 			(SchrodingRef) {
@@ -280,6 +280,36 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					&(renderer->geometry.triangles.size)
 				}, 0.0f,
 				sizeof(uint32_t)
+			}
+		};
+	} else if (strcmp(name, "BoundingBoxSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry._bvh.boundingboxes.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				}, 0.0f,
+				sizeof(AxisAlignedBoundingBox)
+			}
+		};
+	} else if (strcmp(name, "BVHNodeSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry._bvh.nodes.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				}, 0.0f,
+				sizeof(BVHNode) * 2
 			}
 		};
 	} else if (strcmp(name, "NormalSSBOIn") == 0) {

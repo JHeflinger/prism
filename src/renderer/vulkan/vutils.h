@@ -32,6 +32,8 @@ void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer);
 
 void VUTIL_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
+void VUTIL_RecordGeneralBarrier(VkCommandBuffer command);
+
 void VUTIL_TransitionImageLayout(
     VkImage image,
     VkFormat format,

@@ -29,6 +29,8 @@ void VCLEAN_BVH(VulkanBVH* bvh) {
     VUTIL_DestroyBuffer(bvh->indices);
     VUTIL_DestroyBuffer(bvh->mortonswap);
     VUTIL_DestroyBuffer(bvh->indexswap);
+    VUTIL_DestroyBuffer(bvh->boundingboxes);
+    VUTIL_DestroyBuffer(bvh->nodes);
 }
 
 void VCLEAN_Normals(VulkanDataBuffer* normals) {

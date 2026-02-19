@@ -16,18 +16,22 @@ DECLARE_ARRLIST(TriangleID);
 DECLARE_ARRLIST(LightID);
 DECLARE_ARRLIST(Vector3);
 
-#define PREVIEW_PIPELINE_FLAGS 0b110011111
-#define PATHTRACE_PIPELINE_FLAGS 0b111101111
-#define HEADLESS_PIPELINE_FLAGS 0b001101111
-#define CENTROID_SHADER_FLAG 0b1
-#define HISTOGRAM_SHADER_FLAG 0b10
-#define HISTORY_SHADER_FLAG 0b100
-#define SCATTER_SHADER_FLAG 0b1000
-#define DEFAULT_SHADER_FLAG 0b10000
-#define PATHTRACE_SHADER_FLAG 0b100000
-#define TONEMAP_SHADER_FLAG 0b1000000
-#define ANALYZE_SHADER_FLAG 0b10000000
-#define OVERLAY_SHADER_FLAG 0b100000000
+#define PREVIEW_PIPELINE_FLAGS   0b1100111111111
+#define PATHTRACE_PIPELINE_FLAGS 0b1111011111111
+#define HEADLESS_PIPELINE_FLAGS  0b0011011111111
+#define CENTROID_SHADER_FLAG     0b1
+#define HISTOGRAM_SHADER_FLAG    0b10
+#define HISTORY_SHADER_FLAG      0b100
+#define SCATTER_SHADER_FLAG      0b1000
+#define SWAP_SHADER_FLAG         0b10000
+#define LEAVES_SHADER_FLAG       0b100000
+#define BVH_SHADER_FLAG          0b1000000
+#define REBIND_SHADER_FLAG       0b10000000
+#define DEFAULT_SHADER_FLAG      0b100000000
+#define PATHTRACE_SHADER_FLAG    0b1000000000
+#define TONEMAP_SHADER_FLAG      0b10000000000
+#define ANALYZE_SHADER_FLAG      0b100000000000
+#define OVERLAY_SHADER_FLAG      0b1000000000000
 
 typedef uint32_t PipelineFlags;
 
@@ -51,12 +55,26 @@ typedef struct {
 } Triangle;
 DECLARE_ARRLIST(Triangle);
 
-typedef struct {
+typedef struct { // TODO: marked for removal
     vec3 min;
     vec3 max;
     vec3 centroid;
 } TriangleBB;
 DECLARE_ARRLIST(TriangleBB);
+
+typedef struct {
+    alignas(16) vec3 min;
+    alignas(16) vec3 max;
+} AxisAlignedBoundingBox;
+
+typedef struct {
+    alignas(16) vec3 min;
+    alignas(16) vec3 max;
+    alignas(4) uint32_t left;
+    alignas(4) uint32_t right;
+    alignas(4) uint32_t parent;
+    alignas(4) uint32_t counter;
+} BVHNode;
 
 typedef struct {
     alignas(16) vec3 emission;
@@ -85,7 +103,7 @@ typedef struct {
     BOOL exists;
 } Schrodingnum;
 
-typedef struct {
+typedef struct { // TODO: marked for removal
     alignas(16) vec3 min;
     alignas(16) vec3 max;
     alignas(4) uint32_t branch_config;
@@ -103,7 +121,7 @@ typedef struct {
     void* reference;
 } CPUSwap;
 
-typedef struct {
+typedef struct { // TODO: marked for heavy refactoring/removal
     size_t max_normals;
     size_t max_vertices;
     size_t max_triangles;

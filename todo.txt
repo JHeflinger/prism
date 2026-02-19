@@ -44,6 +44,7 @@ Next:
 7. switch to y up instead of z up
 8. make triangles via compute shader pass
 9. Move all bvh-related geometry vulkadatabuffers to a seperate struct
+10. remove bounding boxes and just compute them in leaves.comp
 
 Scratch:
 

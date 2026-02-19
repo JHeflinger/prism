@@ -79,6 +79,13 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
     // execute shader stages
     uint32_t radix_bits = 0;
+    #define RecordPushConstants(elements, bits) { \
+        VulkanPushConstants pc = { elements, bits }; \
+        vkCmdPushConstants( \
+            command, \
+            g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i], \
+            VK_SHADER_STAGE_COMPUTE_BIT, \
+            0, sizeof(VulkanPushConstants), &pc);}
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
 
@@ -88,65 +95,51 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
         if ((1u << i) & CENTROID_SHADER_FLAG) {
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            VulkanPushConstants pc = { g_vupdt_renderer_ref->geometry.triangles.size, 0 };
-            vkCmdPushConstants(
-                command,
-                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
-                VK_SHADER_STAGE_COMPUTE_BIT,
-                0, sizeof(VulkanPushConstants), &pc);
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
         }
 
         if ((1u << i) & HISTOGRAM_SHADER_FLAG) {
+            VUTIL_RecordGeneralBarrier(command);
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            VulkanPushConstants pc = { g_vupdt_renderer_ref->geometry.triangles.size, radix_bits };
-            vkCmdPushConstants(
-                command,
-                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
-                VK_SHADER_STAGE_COMPUTE_BIT,
-                0, sizeof(VulkanPushConstants), &pc);
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
         }
 
         if ((1u << i) & HISTORY_SHADER_FLAG) {
+            VUTIL_RecordGeneralBarrier(command);
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
             uint32_t wg = ceil(invocations / ((float)INVOCATION_GROUP_SIZE));
-            VulkanPushConstants pc = { wg, radix_bits };
-            vkCmdPushConstants(
-                command,
-                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
-                VK_SHADER_STAGE_COMPUTE_BIT,
-                0, sizeof(VulkanPushConstants), &pc);
+            RecordPushConstants(wg, radix_bits);
         }
 
         if ((1u << i) & SCATTER_SHADER_FLAG) {
+            VUTIL_RecordGeneralBarrier(command);
+            if (radix_bits%8 != 0) i++;
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            VulkanPushConstants pc = { g_vupdt_renderer_ref->geometry.triangles.size, radix_bits };
-            vkCmdPushConstants(
-                command,
-                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
-                VK_SHADER_STAGE_COMPUTE_BIT,
-                0, sizeof(VulkanPushConstants), &pc);
-            radix_bits += 4;
-            if (radix_bits < 32) {
-                i -= 3;
-                // swap buffers
-            }
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
         }
 
-        if ((1u << i) & ANALYZE_SHADER_FLAG) {
-            VkBufferMemoryBarrier bufferBarrier = {0};
-            bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            bufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            bufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            bufferBarrier.buffer = g_vupdt_renderer_ref->vulkan.core.context.renderdata.ssbos[g_vupdt_renderer_ref->swapchain.index].buffer;
-            bufferBarrier.offset = 0;
-            bufferBarrier.size = VK_WHOLE_SIZE;
-            vkCmdPipelineBarrier(
-                command,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,   // src stage
-                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,  // dst stage
-                0, 0, NULL, 1, &bufferBarrier, 0, NULL);
+        if ((1u << i) & LEAVES_SHADER_FLAG) {
+            VUTIL_RecordGeneralBarrier(command);
+            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
+        }
+
+        if ((1u << i) & BVH_SHADER_FLAG) {
+            VUTIL_RecordGeneralBarrier(command);
+            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
+        }
+
+        if ((1u << i) & REBIND_SHADER_FLAG) {
+            VUTIL_RecordGeneralBarrier(command);
+            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
+        }
+
+        if ((1u << i) & DEFAULT_SHADER_FLAG ||
+            (1u << i) & PATHTRACE_SHADER_FLAG ||
+            (1u << i) & ANALYZE_SHADER_FLAG) {
+            VUTIL_RecordGeneralBarrier(command);
         }
 
         vkCmdBindPipeline(
@@ -165,6 +158,17 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             NULL);
 
         vkCmdDispatch(command, ceil((invocations) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
+
+        if ((1u << i) & SCATTER_SHADER_FLAG || (1u << i) & SWAP_SHADER_FLAG) {
+            radix_bits += 4;
+            if (radix_bits < 32) {
+                if ((1u << i) & SCATTER_SHADER_FLAG) {
+                    i -= 3;
+                } else {
+                    i -= 4;
+                }
+            }
+        }
     }
 
     // Copy image to staging
@@ -235,6 +239,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     if (result != VK_SUCCESS) {
         EZ_FATAL("Failed to record command!");
     }
+    #undef RecordPushConstants
 }
 
 void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {

@@ -26,6 +26,22 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
         "build/shaders/scatter.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
+        "shaders/swap.comp",
+        "build/shaders/swap.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
+        "shaders/leaves.comp",
+        "build/shaders/leaves.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
+        "shaders/bvh.comp",
+        "build/shaders/bvh.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
+        "shaders/rebind.comp",
+        "build/shaders/rebind.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
         "shaders/default.comp",
         "build/shaders/default.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
@@ -431,6 +447,24 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &(bvh->indexswap));
+
+    // bounding boxes
+    arrsize = sizeof(AxisAlignedBoundingBox) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(bvh->boundingboxes));
+
+    // nodes
+    arrsize = sizeof(BVHNode) * g_vinit_renderer_ref->geometry.triangles.maxsize * 2;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(bvh->nodes));
 
     return TRUE;
 }

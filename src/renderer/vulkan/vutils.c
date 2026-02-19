@@ -185,6 +185,18 @@ void VUTIL_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
     VUTIL_EndSingleTimeCommands(commandBuffer);
 }
 
+void VUTIL_RecordGeneralBarrier(VkCommandBuffer command) {
+    VkMemoryBarrier memoryBarrier = { 0 };
+    memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    memoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    vkCmdPipelineBarrier(
+        command,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
+}
+
 void VUTIL_TransitionImageLayout(
     VkImage image,
     VkFormat format,
