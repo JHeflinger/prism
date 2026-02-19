@@ -10,12 +10,20 @@ Renderer* g_vinit_renderer_ref = NULL;
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
+        "shaders/centroids.comp",
+        "build/shaders/centroids.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
         "shaders/histogram.comp",
         "build/shaders/histogram.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/centroids.comp",
-        "build/shaders/centroids.comp.spv"));
+        "shaders/history.comp",
+        "build/shaders/history.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
+        "shaders/scatter.comp",
+        "build/shaders/scatter.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
         "shaders/default.comp",
@@ -360,36 +368,70 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context) {
     return TRUE;
 }
 
-BOOL VINIT_WorkgroupHistory(VulkanDataBuffer* workhistory) {
+BOOL VINIT_BVH(VulkanBVH* bvh) {
+    // workgroup history
     size_t arrsize = sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / INVOCATION_GROUP_SIZE);
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        workhistory);
-    return TRUE;
-}
+        &(bvh->workhistory));
 
-BOOL VINIT_Centroids(VulkanDataBuffer* centroids) {
-    size_t arrsize = sizeof(Vector3) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    // workgroup offsets
+    arrsize = sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / INVOCATION_GROUP_SIZE);
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        centroids);
-    return TRUE;
-}
+        &(bvh->workoffsets));
 
-BOOL VINIT_Mortons(VulkanDataBuffer* mortons) {
-    size_t arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    // centroids
+    arrsize = sizeof(Vector3) * g_vinit_renderer_ref->geometry.triangles.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        mortons);
+        &(bvh->centroids));
+
+    // mortons
+    arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(bvh->mortons));
+
+    // indices
+    arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(bvh->indices));
+
+    // morton swap
+    arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(bvh->mortonswap));
+
+    // index swap
+    arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(bvh->indexswap));
+
     return TRUE;
 }
 
@@ -646,9 +688,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
 }
 
 BOOL VINIT_Geometry(VulkanGeometry* geometry) {
-    if (!VINIT_WorkgroupHistory(&(geometry->workhistory))) return FALSE;
-    if (!VINIT_Centroids(&(geometry->centroids))) return FALSE;
-    if (!VINIT_Mortons(&(geometry->mortons))) return FALSE;
+    if (!VINIT_BVH(&(geometry->_bvh))) return FALSE;
     if (!VINIT_Normals(&(geometry->normals))) return FALSE;
     if (!VINIT_Vertices(&(geometry->vertices))) return FALSE;
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;

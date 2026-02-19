@@ -177,12 +177,27 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(Vector3)
 			}
 		};
+	} else if (strcmp(name, "WorkGroupOffsetSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry._bvh.workoffsets.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				}, INVOCATION_GROUP_SIZE,
+				sizeof(uint32_t)
+			}
+		};
 	} else if (strcmp(name, "WorkGroupHistorySSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry.workhistory.buffer)
+				&(renderer->vulkan.core.geometry._bvh.workhistory.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -197,7 +212,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry.centroids.buffer)
+				&(renderer->vulkan.core.geometry._bvh.centroids.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -212,7 +227,52 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry.mortons.buffer)
+				&(renderer->vulkan.core.geometry._bvh.mortons.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				}, 0.0f,
+				sizeof(uint32_t)
+			}
+		};
+	} else if (strcmp(name, "IndexSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry._bvh.indices.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				}, 0.0f,
+				sizeof(uint32_t)
+			}
+		};
+	} else if (strcmp(name, "MortonSwapSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry._bvh.mortonswap.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.triangles.size)
+				}, 0.0f,
+				sizeof(uint32_t)
+			}
+		};
+	} else if (strcmp(name, "IndexSwapSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry._bvh.indexswap.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {

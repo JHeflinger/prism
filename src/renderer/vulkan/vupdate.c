@@ -88,22 +88,48 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
         if ((1u << i) & CENTROID_SHADER_FLAG) {
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            VulkanPushConstants cpc = { g_vupdt_renderer_ref->geometry.triangles.size, 0 };
+            VulkanPushConstants pc = { g_vupdt_renderer_ref->geometry.triangles.size, 0 };
             vkCmdPushConstants(
                 command,
                 g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
                 VK_SHADER_STAGE_COMPUTE_BIT,
-                0, sizeof(VulkanPushConstants), &cpc);
+                0, sizeof(VulkanPushConstants), &pc);
         }
 
         if ((1u << i) & HISTOGRAM_SHADER_FLAG) {
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            VulkanPushConstants cpc = { g_vupdt_renderer_ref->geometry.triangles.size, radix_bits };
+            VulkanPushConstants pc = { g_vupdt_renderer_ref->geometry.triangles.size, radix_bits };
             vkCmdPushConstants(
                 command,
                 g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
                 VK_SHADER_STAGE_COMPUTE_BIT,
-                0, sizeof(VulkanPushConstants), &cpc);
+                0, sizeof(VulkanPushConstants), &pc);
+        }
+
+        if ((1u << i) & HISTORY_SHADER_FLAG) {
+            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
+            uint32_t wg = ceil(invocations / ((float)INVOCATION_GROUP_SIZE));
+            VulkanPushConstants pc = { wg, radix_bits };
+            vkCmdPushConstants(
+                command,
+                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                0, sizeof(VulkanPushConstants), &pc);
+        }
+
+        if ((1u << i) & SCATTER_SHADER_FLAG) {
+            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
+            VulkanPushConstants pc = { g_vupdt_renderer_ref->geometry.triangles.size, radix_bits };
+            vkCmdPushConstants(
+                command,
+                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                0, sizeof(VulkanPushConstants), &pc);
+            radix_bits += 4;
+            if (radix_bits < 32) {
+                i -= 3;
+                // swap buffers
+            }
         }
 
         if ((1u << i) & ANALYZE_SHADER_FLAG) {

@@ -9,11 +9,7 @@ void VCLEAN_Lights(VulkanDataBuffer* lights);
 
 void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh);
 
-void VCLEAN_WorkgroupHistory(VulkanDataBuffer* workhistory);
-
-void VCLEAN_Centroids(VulkanDataBuffer* centroids);
-
-void VCLEAN_Mortons(VulkanDataBuffer* mortons);
+void VCLEAN_BVH(VulkanBVH* bvh);
 
 void VCLEAN_Normals(VulkanDataBuffer* normals);
 

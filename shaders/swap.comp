@@ -1,18 +1,18 @@
 #version 450
 
-layout(binding = 0) buffer MortonSSBOIn {
+layout(binding = 0) buffer MortonSwapSSBOIn {
     uint mortonIn[ ];
 };
 
-layout(binding = 1) buffer IndexSSBOIn {
+layout(binding = 1) buffer IndexSwapSSBOIn {
     uint triIn[ ];
 };
 
-layout(binding = 2) buffer MortonSwapSSBOIn {
+layout(binding = 2) buffer MortonSSBOIn {
     uint mortonOut[ ];
 };
 
-layout(binding = 3) buffer IndexSwapSSBOIn {
+layout(binding = 3) buffer IndexSSBOIn {
     uint triOut[ ];
 };
 

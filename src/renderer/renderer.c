@@ -341,12 +341,8 @@ void Render() {
                 g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
                 VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
                 VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
-                VCLEAN_Centroids(&(g_renderer.vulkan.core.geometry.centroids));
-                VINIT_Centroids(&(g_renderer.vulkan.core.geometry.centroids));
-                VCLEAN_Mortons(&(g_renderer.vulkan.core.geometry.mortons));
-                VINIT_Mortons(&(g_renderer.vulkan.core.geometry.mortons));
-                VCLEAN_WorkgroupHistory(&(g_renderer.vulkan.core.geometry.workhistory));
-                VINIT_WorkgroupHistory(&(g_renderer.vulkan.core.geometry.workhistory));
+                VCLEAN_BVH(&(g_renderer.vulkan.core.geometry._bvh));
+                VINIT_BVH(&(g_renderer.vulkan.core.geometry._bvh));
             } else {
                 VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             }

@@ -9,11 +9,11 @@ layout(binding = 1) buffer WorkGroupOffsetSSBOIn {
 };
 
 layout(push_constant) uniform PushConstants {
-    uint elements; // workgroups, not number of triangles
+    uint elements; // workgroups, not number of triangles btw
     uint bitstart;
 } pc;
 
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in; // why is this 64?
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 void main() {
     uint globalID = gl_GlobalInvocationID.x;

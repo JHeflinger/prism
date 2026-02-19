@@ -140,15 +140,20 @@ typedef struct {
     VulkanDataBuffer centroids;
     VulkanDataBuffer mortons;
     VulkanDataBuffer workhistory;
-    //VulkanDataBuffer tree;
+    VulkanDataBuffer workoffsets;
+    VulkanDataBuffer indices;
+    VulkanDataBuffer mortonswap;
+    VulkanDataBuffer indexswap;
+} VulkanBVH;
 
-
+typedef struct {
+    VulkanBVH _bvh; // TODO: marked for renaming
     VulkanDataBuffer normals;
     VulkanDataBuffer vertices;
     VulkanDataBuffer triangles;
     VulkanDataBuffer emissives;
     VulkanDataBuffer materials;
-    VulkanDataBuffer bvh;
+    VulkanDataBuffer bvh; // TODO: marked for removal
     VulkanDataBuffer lights;
 } VulkanGeometry;
 

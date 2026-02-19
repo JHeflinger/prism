@@ -41,6 +41,10 @@ layout(binding = 4) readonly buffer VertexSSBOIn {
     Vector3 vertexIn[ ];
 };
 
+layout(binding = 5) buffer IndexSSBOIn {
+    uint indexIn[ ];
+};
+
 layout(push_constant) uniform PushConstants {
     uint elements;
     uint bitstart;
@@ -63,6 +67,7 @@ uint interleaveBits(uint x, uint y, uint z) {
 void main() {
     uint triID = gl_GlobalInvocationID.x;
     if (triID >= pc.elements) return;
+    indexIn[triID] = triID;
     Triangle tri = triangleIn[triID];
     vec3 a = vec3(vertexIn[tri.a].x, vertexIn[tri.a].y, vertexIn[tri.a].z);
     vec3 b = vec3(vertexIn[tri.b].x, vertexIn[tri.b].y, vertexIn[tri.b].z);

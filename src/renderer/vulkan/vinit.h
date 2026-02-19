@@ -33,11 +33,7 @@ BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridge);
 
 BOOL VINIT_RenderContext(VulkanRenderContext* context);
 
-BOOL VINIT_WorkgroupHistory(VulkanDataBuffer* workhistory);
-
-BOOL VINIT_Centroids(VulkanDataBuffer* centroids);
-
-BOOL VINIT_Mortons(VulkanDataBuffer* mortons);
+BOOL VINIT_BVH(VulkanBVH* bvh); // TODO: rename to VINIT_BoundingVolumeHierarchy
 
 BOOL VINIT_Normals(VulkanDataBuffer* normals);
 
@@ -49,7 +45,7 @@ BOOL VINIT_Emissives(VulkanDataBuffer* emissives);
 
 BOOL VINIT_Materials(VulkanDataBuffer* materials);
 
-BOOL VINIT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh);
+BOOL VINIT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh); // TODO: marked for removal
 
 BOOL VINIT_TargetsHDR(VulkanImage* hdr_arr);
 

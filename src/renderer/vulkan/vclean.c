@@ -21,16 +21,14 @@ void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
     VUTIL_DestroyBuffer(*bvh);
 }
 
-void VCLEAN_WorkgroupHistory(VulkanDataBuffer* workhistory) {
-    VUTIL_DestroyBuffer(*workhistory);
-}
-
-void VCLEAN_Centroids(VulkanDataBuffer* centroids) {
-    VUTIL_DestroyBuffer(*centroids);
-}
-
-void VCLEAN_Mortons(VulkanDataBuffer* mortons) {
-    VUTIL_DestroyBuffer(*mortons);
+void VCLEAN_BVH(VulkanBVH* bvh) {
+    VUTIL_DestroyBuffer(bvh->workhistory);
+    VUTIL_DestroyBuffer(bvh->workoffsets);
+    VUTIL_DestroyBuffer(bvh->centroids);
+    VUTIL_DestroyBuffer(bvh->mortons);
+    VUTIL_DestroyBuffer(bvh->indices);
+    VUTIL_DestroyBuffer(bvh->mortonswap);
+    VUTIL_DestroyBuffer(bvh->indexswap);
 }
 
 void VCLEAN_Normals(VulkanDataBuffer* normals) {
@@ -54,9 +52,7 @@ void VCLEAN_Materials(VulkanDataBuffer* materials) {
 }
 
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
-    VCLEAN_Mortons(&(geometry->mortons));
-    VCLEAN_Centroids(&(geometry->centroids));
-    VCLEAN_WorkgroupHistory(&(geometry->workhistory));
+    VCLEAN_BVH(&(geometry->_bvh));
     VCLEAN_Normals(&(geometry->normals));
     VCLEAN_Vertices(&(geometry->vertices));
     VCLEAN_Triangles(&(geometry->triangles));
