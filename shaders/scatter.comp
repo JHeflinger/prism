@@ -9,11 +9,11 @@ layout(binding = 1) buffer IndexSSBOIn {
 };
 
 layout(binding = 2) buffer MortonSwapSSBOIn {
-    uint mortonOut[ ];
+    uint mortonSwap[ ];
 };
 
 layout(binding = 3) buffer IndexSwapSSBOIn {
-    uint triOut[ ];
+    uint triSwap[ ];
 };
 
 layout(binding = 4) buffer WorkGroupOffsetSSBOIn {
@@ -36,24 +36,34 @@ void main() {
     if(idx >= pc.elements) return;
     uint tid = gl_LocalInvocationID.x;
     uint wgID = gl_WorkGroupID.x;
-    uint bucket = (mortonIn[idx] >> pc.bitstart) & 0xFu;
     uint local_count = 0;
-    for(uint i = 0; i < tid; i++) {
-        uint other_idx = wgID*gl_WorkGroupSize.x + i;
-        if(other_idx < pc.elements){
-            uint other_bucket = (mortonIn[other_idx] >> pc.bitstart) & 0xFu;
-            if(other_bucket == bucket) local_count++;
+    if (pc.bitstart%8 == 0) {
+        uint bucket = (mortonIn[idx] >> pc.bitstart) & 0xFu;
+        for(uint i = 0; i < tid; i++) {
+            uint other_idx = wgID*gl_WorkGroupSize.x + i;
+            if(other_idx < pc.elements){
+                uint other_bucket = (mortonIn[other_idx] >> pc.bitstart) & 0xFu;
+                if(other_bucket == bucket) local_count++;
+            }
         }
-    }
-    uint base = 0;
-    for (uint i = 0; i < bucket; i++) {
-        base += bucketIn[i];
-    }
-    uint out_index = base + globalOffset[wgID][bucket] + local_count;
-    if (out_index < pc.elements) {
-        mortonOut[out_index] = mortonIn[idx];
-        triOut[out_index] = triIn[idx];
+        uint base = 0;
+        for (uint i = 0; i < bucket; i++) base += bucketIn[i];
+        uint out_index = base + globalOffset[wgID][bucket] + local_count;
+        mortonSwap[out_index] = mortonIn[idx];
+        triSwap[out_index] = triIn[idx];
     } else {
-        //while(true) {};
+        uint bucket = (mortonSwap[idx] >> pc.bitstart) & 0xFu;
+        for(uint i = 0; i < tid; i++) {
+            uint other_idx = wgID*gl_WorkGroupSize.x + i;
+            if(other_idx < pc.elements){
+                uint other_bucket = (mortonSwap[other_idx] >> pc.bitstart) & 0xFu;
+                if(other_bucket == bucket) local_count++;
+            }
+        }
+        uint base = 0;
+        for (uint i = 0; i < bucket; i++) base += bucketIn[i];
+        uint out_index = base + globalOffset[wgID][bucket] + local_count;
+        mortonIn[out_index] = mortonSwap[idx];
+        triIn[out_index] = triSwap[idx];
     }
 }

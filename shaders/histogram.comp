@@ -5,7 +5,7 @@ layout(binding = 0) buffer MortonSSBOIn {
 };
 
 layout(binding = 1) buffer MortonSwapSSBOIn {
-   uint mortonSwapIn[ ];
+   uint mortonSwap[ ];
 };
 
 layout(binding = 2) buffer WorkGroupHistorySSBOIn {
@@ -27,17 +27,7 @@ void main() {
     uint wgID = gl_WorkGroupID.x;
     if (tid < 16) local_history[tid] = 0;
     barrier();
-    if (idx < pc.elements) {
-        uint bucket;
-        if (pc.bitstart%8 != 0) {
-            bucket = (mortonSwapIn[idx] >> pc.bitstart) & 0xFu;
-        } else {
-            bucket = (mortonIn[idx] >> pc.bitstart) & 0xFu;
-        }
-        atomicAdd(local_history[bucket], 1);
-    }
+    if (idx < pc.elements) atomicAdd(local_history[((pc.bitstart%8 != 0 ? mortonSwap[idx] : mortonIn[idx]) >> pc.bitstart) & 0xFu], 1);
     barrier();
-    if (tid < 16) {
-        wgHist[wgID][tid] = local_history[tid];
-    }
+    if (tid < 16) wgHist[wgID][tid] = local_history[tid];
 }

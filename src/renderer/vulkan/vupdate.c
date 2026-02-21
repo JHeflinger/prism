@@ -87,6 +87,26 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             VK_SHADER_STAGE_COMPUTE_BIT, \
             0, sizeof(VulkanPushConstants), &pc);}
 
+    void _dispatch_shader(size_t i, size_t invocations) {
+        vkCmdBindPipeline(
+            command,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline[i]);
+
+        vkCmdBindDescriptorSets(
+            command,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
+            0,
+            1,
+            &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors[i].sets[g_vupdt_renderer_ref->swapchain.index]),
+            0,
+            NULL);
+
+        vkCmdDispatch(command, ceil((invocations) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
+        VUTIL_RecordGeneralBarrier(command);
+    }
+
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
 
@@ -112,15 +132,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             RecordPushConstants(wg);
         }
 
-        if ((1u << i) & BUCKET_SHADER_FLAG) {
-            //VUTIL_RecordGeneralBarrier(command);
-            invocations = 16;
-            uint32_t wg = ceil(g_vupdt_renderer_ref->geometry.triangles.size / ((float)INVOCATION_GROUP_SIZE));
-            RecordPushConstants(wg);
-        }
-
         if ((1u << i) & SCATTER_SHADER_FLAG) {
-            if (radix_bits%8 != 0) i++;
             //VUTIL_RecordGeneralBarrier(command);
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
             RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
@@ -150,33 +162,11 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             //VUTIL_RecordGeneralBarrier(command);
         }
 
-        vkCmdBindPipeline(
-            command,
-            VK_PIPELINE_BIND_POINT_COMPUTE,
-            g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline[i]);
+        _dispatch_shader(i, invocations);
 
-        vkCmdBindDescriptorSets(
-            command,
-            VK_PIPELINE_BIND_POINT_COMPUTE,
-            g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
-            0,
-            1,
-            &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors[i].sets[g_vupdt_renderer_ref->swapchain.index]),
-            0,
-            NULL);
-
-        vkCmdDispatch(command, ceil((invocations) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
-        VUTIL_RecordGeneralBarrier(command);
-
-        if ((1u << i) & SCATTER_SHADER_FLAG || (1u << i) & SWAP_SHADER_FLAG) {
+        if ((1u << i) & SCATTER_SHADER_FLAG) {
             radix_bits += 4;
-            if (radix_bits < 32) {
-                if ((1u << i) & SCATTER_SHADER_FLAG) {
-                    i -= 4;
-                } else {
-                    i -= 5;
-                }
-            }
+            if (radix_bits < 32) i -= 3;
         }
     }
 

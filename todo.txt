@@ -49,6 +49,7 @@ Next:
 12. workgroupoffset and history sizes are wastefully big
 13. in initialization of data buffers especially for the bvh resources are those the right bits we need
 14. clean shaders for ssbos theyre not using
+15. use vec3 for verts instead of Vector3s
 
 Scratch:
 

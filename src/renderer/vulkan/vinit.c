@@ -22,16 +22,8 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
         "build/shaders/history.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/buckets.comp",
-        "build/shaders/buckets.comp.spv"));
-	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        g_vinit_renderer_ref,
         "shaders/scatter.comp",
         "build/shaders/scatter.comp.spv"));
-	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
-        g_vinit_renderer_ref,
-        "shaders/swap.comp",
-        "build/shaders/swap.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
         "shaders/leaves.comp",

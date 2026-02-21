@@ -51,9 +51,8 @@ void main() {
     int lmax = 2;
     while (commonPrefix(int(i), int(i + lmax * d)) > deltaMin) lmax *= 2;
     int l = 0;
-    for (int t = lmax / 2; t >= 1; t /= 2) {
+    for (int t = lmax / 2; t >= 1; t /= 2)
         if (commonPrefix(int(i), int(i + (l + t) * d)) > deltaMin) l += t;
-    }
     int j = int(i) + l * d;
     int first = min(int(i), j);
     int last  = max(int(i), j);
@@ -69,16 +68,8 @@ void main() {
             commonPrefix(first, newSplit) > deltaNode)
             split = newSplit;
     } while (step > 1);
-
-    uint leftChild =
-        (split == first)
-        ? pc.elements - 1 + uint(split)
-        : uint(split);
-
-    uint rightChild =
-        (split + 1 == last)
-        ? pc.elements - 1 + uint(split + 1)
-        : uint(split + 1);
+    uint leftChild = (split == first) ? pc.elements - 1 + uint(split) : uint(split);
+    uint rightChild = (split + 1 == last) ? pc.elements - 1 + uint(split + 1) : uint(split + 1);
 
     nodeIn[i].left = leftChild;
     nodeIn[i].right = rightChild;

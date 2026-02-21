@@ -8,6 +8,15 @@
 #define MIRROR_MODEL 5
 #define DIELECTRIC_MODEL 7
 
+struct BVHNode {
+    vec3 minBB;
+    vec3 maxBB;
+    uint left;
+    uint right; // 0xFFFFFFFF if leaf
+    uint parent;
+    uint counter;
+};
+
 struct Vector3 {
     float x;
     float y;
@@ -106,8 +115,8 @@ layout(binding = 4) readonly buffer MaterialSSBOIn {
     Material materialIn[ ];
 };
 
-layout(binding = 5) readonly buffer BVHSSBOIn {
-    NodeBVH bvhIn[ ];
+layout(binding = 5) buffer BVHNodeSSBOIn {
+    BVHNode nodeIn[ ];
 };
 
 layout(binding = 6) readonly buffer EmissiveSSBOIn {
@@ -128,9 +137,7 @@ const float max_contribution = 10;
 const float PI = 3.14159265358979323846;
 bool stack_failure = false;
 uvec4 seed = uvec4(0);
-
 const uint SOBOL_DIRS[2][32] = uint[2][32](
-    // Dimension 0
     uint[32](
         0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,
         0x08000000u, 0x04000000u, 0x02000000u, 0x01000000u,
@@ -139,9 +146,7 @@ const uint SOBOL_DIRS[2][32] = uint[2][32](
         0x00008000u, 0x00004000u, 0x00002000u, 0x00001000u,
         0x00000800u, 0x00000400u, 0x00000200u, 0x00000100u,
         0x00000080u, 0x00000040u, 0x00000020u, 0x00000010u,
-        0x00000008u, 0x00000004u, 0x00000002u, 0x00000001u
-    ),
-    // Dimension 1
+        0x00000008u, 0x00000004u, 0x00000002u, 0x00000001u),
     uint[32](
         0x80000000u, 0xC0000000u, 0x60000000u, 0x30000000u,
         0x88000000u, 0x44000000u, 0x22000000u, 0x11000000u,
@@ -150,8 +155,7 @@ const uint SOBOL_DIRS[2][32] = uint[2][32](
         0x00808000u, 0x00404000u, 0x00202000u, 0x00101000u,
         0x00080800u, 0x00040400u, 0x00020200u, 0x00010100u,
         0x00008080u, 0x00004040u, 0x00002020u, 0x00001010u,
-        0x00000808u, 0x00000404u, 0x00000202u, 0x00000101u
-    )
+        0x00000808u, 0x00000404u, 0x00000202u, 0x00000101u)
 );
 
 uint sobol(uint index, int dimension) {
@@ -314,8 +318,8 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
 
 bool aabb_intersect(Ray ray, uint node_ind) {
 	vec3 dfrac = 1.0 / ray.direction;
-    vec3 mindif = (bvhIn[node_ind].min - ray.position)*dfrac;
-    vec3 maxdif = (bvhIn[node_ind].max - ray.position)*dfrac;
+    vec3 mindif = (nodeIn[node_ind].minBB - ray.position)*dfrac;
+    vec3 maxdif = (nodeIn[node_ind].maxBB - ray.position)*dfrac;
 	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
 	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
     return tmax >= 0 && tmin <= tmax;
@@ -324,15 +328,16 @@ bool aabb_intersect(Ray ray, uint node_ind) {
 Hit trace(Ray ray, inout uint hit_id) {
     Hit hit;
     hit.distance = -1.0;
-    if (ubo.bvhs == 0) return hit;
-    if (!aabb_intersect(ray, 0)) return hit;
+    if (ubo.triangles == 0) return hit;
     uint stack[MAX_RECURSIVE_DEPTH];
     int stack_ptr = 0;
     stack[stack_ptr++] = 0;
     while (stack_ptr > 0) {
-        NodeBVH node = bvhIn[stack[--stack_ptr]];
+        uint node_index = stack[--stack_ptr];
+        BVHNode node = nodeIn[node_index];
         if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
-        if (node.config == 0) {
+        if (!aabb_intersect(ray, node_index)) continue;
+        if (node.right == 0xFFFFFFFF) {
             Hit trihit;
             if (triangle_intersect(ray, node.left, trihit)) {
                 if (hit.distance == -1.0 || trihit.distance < hit.distance) {
@@ -340,17 +345,11 @@ Hit trace(Ray ray, inout uint hit_id) {
 					hit_id = node.left;
                 }
             }
-        } else if (node.config == 1) {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-        } else if (node.config == 2) {
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
         } else {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
+            uint left = node.left;
+            uint right = node.right;
+            stack[stack_ptr++] = left;
+            stack[stack_ptr++] = right;
         }
     }
     return hit;
@@ -557,7 +556,6 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
 }
 
 void main() {
-
 	// update ray info
     raygenIn[gl_GlobalInvocationID.x].tid = -1;
 
