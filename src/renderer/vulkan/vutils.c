@@ -194,7 +194,7 @@ void VUTIL_RecordGeneralBarrier(VkCommandBuffer command) {
         command,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
+        0, 1, &memoryBarrier, 0, NULL, 0, NULL);
 }
 
 void VUTIL_TransitionImageLayout(

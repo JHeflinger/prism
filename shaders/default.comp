@@ -236,10 +236,10 @@ Hit _trace(Ray ray, inout uint hit_id) {
     if (ubo.triangles == 0) return hit;
     //if (!_aabb_intersect(ray, 0)) return hit;
     //if (!_aabb_intersect(ray, uint(ubo.aperature * 10))) return hit;
-    if (!_aabb_intersect(ray, 1762)) return hit;
+    //if (!_aabb_intersect(ray, 1762)) return hit;
     //if (!_aabb_intersect(ray, nodeIn[1762].left)) return hit;
     //if (!_aabb_intersect(ray, nodeIn[1762].right)) return hit;
-    if (true) {
+    if (false) {
     hit.distance = 1;
     hit.normal = vec3(1, 0, 0);
     hit.position = vec3(0, 0, 0);

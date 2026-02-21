@@ -43,5 +43,5 @@ void main() {
     nodeIn[leaf_index].left = primID;
     nodeIn[leaf_index].right = 0xFFFFFFFF; // mark as leaf
     nodeIn[leaf_index].parent = 0;
-    nodeIn[leaf_index].counter = 0;
+    nodeIn[leaf_index].counter = 3;
 }

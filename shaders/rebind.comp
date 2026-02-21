@@ -27,17 +27,20 @@ void main() {
     while (nodeIndex != 0) {
         uint parent = nodeIn[nodeIndex].parent;
         uint old = atomicAdd(nodeIn[parent].counter, 1);
-        if (old == 0) break; // first child — wait for sibling
+        if (old == 0) return; // first child — wait for sibling
 
         // second child — compute parent bbox
-        uint left  = nodeIn[parent].left;
+        nodeIndex = parent;
+        uint left = nodeIn[parent].left;
         uint right = nodeIn[parent].right;
+        while (nodeIn[left].counter != 3) {}
+        while (nodeIn[right].counter != 3) {}
         vec3 minA = nodeIn[left].minBB;
         vec3 minB = nodeIn[right].minBB;
         vec3 maxA = nodeIn[left].maxBB;
         vec3 maxB = nodeIn[right].maxBB;
         nodeIn[parent].minBB = min(minA, minB);
         nodeIn[parent].maxBB = max(maxA, maxB);
-        nodeIndex = parent; // continue upward
+        atomicExchange(nodeIn[parent].counter, 3);
     }
 }
