@@ -79,13 +79,14 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
     // execute shader stages
     uint32_t radix_bits = 0;
-    #define RecordPushConstants(elements, bits) { \
-        VulkanPushConstants pc = { elements, bits }; \
+    #define RecordPushConstants(elements) { \
+        VulkanPushConstants pc = { elements, radix_bits }; \
         vkCmdPushConstants( \
             command, \
             g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i], \
             VK_SHADER_STAGE_COMPUTE_BIT, \
             0, sizeof(VulkanPushConstants), &pc);}
+
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
 
@@ -95,51 +96,58 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
         if ((1u << i) & CENTROID_SHADER_FLAG) {
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
         }
 
         if ((1u << i) & HISTOGRAM_SHADER_FLAG) {
-            VUTIL_RecordGeneralBarrier(command);
+            //VUTIL_RecordGeneralBarrier(command);
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
         }
 
         if ((1u << i) & HISTORY_SHADER_FLAG) {
-            VUTIL_RecordGeneralBarrier(command);
-            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            uint32_t wg = ceil(invocations / ((float)INVOCATION_GROUP_SIZE));
-            RecordPushConstants(wg, radix_bits);
+            //VUTIL_RecordGeneralBarrier(command);
+            uint32_t wg = ceil(g_vupdt_renderer_ref->geometry.triangles.size / ((float)INVOCATION_GROUP_SIZE));
+            invocations = wg*16;
+            RecordPushConstants(wg);
+        }
+
+        if ((1u << i) & BUCKET_SHADER_FLAG) {
+            //VUTIL_RecordGeneralBarrier(command);
+            invocations = 16;
+            uint32_t wg = ceil(g_vupdt_renderer_ref->geometry.triangles.size / ((float)INVOCATION_GROUP_SIZE));
+            RecordPushConstants(wg);
         }
 
         if ((1u << i) & SCATTER_SHADER_FLAG) {
-            VUTIL_RecordGeneralBarrier(command);
             if (radix_bits%8 != 0) i++;
+            //VUTIL_RecordGeneralBarrier(command);
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
         }
 
         if ((1u << i) & LEAVES_SHADER_FLAG) {
-            VUTIL_RecordGeneralBarrier(command);
+            //VUTIL_RecordGeneralBarrier(command);
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
         }
 
         if ((1u << i) & BVH_SHADER_FLAG) {
-            VUTIL_RecordGeneralBarrier(command);
+            //VUTIL_RecordGeneralBarrier(command);
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
         }
 
         if ((1u << i) & REBIND_SHADER_FLAG) {
-            VUTIL_RecordGeneralBarrier(command);
+            //VUTIL_RecordGeneralBarrier(command);
             invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size, radix_bits);
+            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
         }
 
         if ((1u << i) & DEFAULT_SHADER_FLAG ||
             (1u << i) & PATHTRACE_SHADER_FLAG ||
             (1u << i) & ANALYZE_SHADER_FLAG) {
-            VUTIL_RecordGeneralBarrier(command);
+            //VUTIL_RecordGeneralBarrier(command);
         }
 
         vkCmdBindPipeline(
@@ -158,14 +166,15 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             NULL);
 
         vkCmdDispatch(command, ceil((invocations) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
+        VUTIL_RecordGeneralBarrier(command);
 
         if ((1u << i) & SCATTER_SHADER_FLAG || (1u << i) & SWAP_SHADER_FLAG) {
             radix_bits += 4;
             if (radix_bits < 32) {
                 if ((1u << i) & SCATTER_SHADER_FLAG) {
-                    i -= 3;
-                } else {
                     i -= 4;
+                } else {
+                    i -= 5;
                 }
             }
         }

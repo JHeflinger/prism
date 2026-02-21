@@ -4,6 +4,15 @@
 #define AO_DIST 0.5
 #define EPS 0.0001
 
+struct BVHNode {
+    vec3 minBB;
+    vec3 maxBB;
+    uint left;
+    uint right; // 0xFFFFFFFF if leaf
+    uint parent;
+    uint counter;
+};
+
 struct Vector3 {
     float x;
     float y;
@@ -53,7 +62,7 @@ layout(binding = 0) uniform UniformBufferObject {
     vec2 viewport;
     uint triangles;
     uint emissives;
-    uint bvhs;
+    uint bvhs; // TODO: marked for removal
     uint lights;
     uint samples;
 	uint seed;
@@ -95,6 +104,14 @@ layout(binding = 5) readonly buffer VertexSSBOIn {
 
 layout(binding = 6) readonly buffer NormalSSBOIn {
     Vector3 normalIn[ ];
+};
+
+layout(binding = 7) buffer BVHNodeSSBOIn {
+    BVHNode nodeIn[ ];
+};
+
+layout(binding = 8) buffer MortonSSBOIn {
+   uint mortonIn[ ];
 };
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
@@ -169,6 +186,15 @@ bool aabb_intersect(Ray ray, uint node_ind) {
     return tmax >= 0 && tmin <= tmax;
 }
 
+bool _aabb_intersect(Ray ray, uint node_ind) {
+	vec3 dfrac = 1.0 / ray.direction;
+    vec3 mindif = (nodeIn[node_ind].minBB - ray.position)*dfrac;
+    vec3 maxdif = (nodeIn[node_ind].maxBB - ray.position)*dfrac;
+	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
+	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
+    return tmax >= 0 && tmin <= tmax;
+}
+
 Hit trace(Ray ray, inout uint hit_id) {
     Hit hit;
     hit.distance = -1.0;
@@ -199,6 +225,50 @@ Hit trace(Ray ray, inout uint hit_id) {
                 stack[stack_ptr++] = node.left;
             if (aabb_intersect(ray, node.right))
                 stack[stack_ptr++] = node.right;
+        }
+    }
+    return hit;
+}
+
+Hit _trace(Ray ray, inout uint hit_id) {
+    Hit hit;
+    hit.distance = -1.0;
+    if (ubo.triangles == 0) return hit;
+    //if (!_aabb_intersect(ray, 0)) return hit;
+    //if (!_aabb_intersect(ray, uint(ubo.aperature * 10))) return hit;
+    if (!_aabb_intersect(ray, 1762)) return hit;
+    //if (!_aabb_intersect(ray, nodeIn[1762].left)) return hit;
+    //if (!_aabb_intersect(ray, nodeIn[1762].right)) return hit;
+    if (true) {
+    hit.distance = 1;
+    hit.normal = vec3(1, 0, 0);
+    hit.position = vec3(0, 0, 0);
+    hit_id = 0;
+    return hit;
+    }
+
+
+    uint stack[MAX_RECURSIVE_DEPTH];
+    int stack_ptr = 0;
+    stack[stack_ptr++] = 0;
+    while (stack_ptr > 0) {
+        uint node_index = stack[--stack_ptr];
+        BVHNode node = nodeIn[node_index];
+        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
+        if (!_aabb_intersect(ray, node_index)) continue;
+        if (node.right == 0xFFFFFFFF) {
+            Hit trihit;
+            if (triangle_intersect(ray, node.left, trihit)) {
+                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
+                    hit = trihit;
+					hit_id = node.left;
+                }
+            }
+        } else {
+            uint left = node.left;
+            uint right = node.right;
+            stack[stack_ptr++] = left;
+            stack[stack_ptr++] = right;
         }
     }
     return hit;
@@ -239,7 +309,7 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id) {
     float grid_y_tolerance = 0.0;//0.05 * (dot(normalize(ubo.look), vec3(1.0, 0.0, 0.0)) + 1.0);
     float xfract = fract(grid_plane_point.x);
     float yfract = fract(grid_plane_point.y);
-    hit = trace(ray, hit_id);
+    hit = _trace(ray, hit_id);
     bool gridhit = false;
     float gridmix = 0.0;
     if (ubo.grid != 0 && grid_plane_distance > 0.0 &&

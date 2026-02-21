@@ -189,7 +189,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					TRUE,
 					&(renderer->geometry.triangles.size)
 				}, INVOCATION_GROUP_SIZE,
-				sizeof(uint32_t)
+				sizeof(uint32_t) * 16
 			}
 		};
 	} else if (strcmp(name, "WorkGroupHistorySSBOIn") == 0) {
@@ -204,7 +204,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					TRUE,
 					&(renderer->geometry.triangles.size)
 				}, INVOCATION_GROUP_SIZE,
-				sizeof(uint32_t)
+				sizeof(uint32_t) * 16
 			}
 		};
 	} else if (strcmp(name, "CentroidSSBOIn") == 0) {
@@ -310,6 +310,21 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					&(renderer->geometry.triangles.size)
 				}, 0.0f,
 				sizeof(BVHNode) * 2
+			}
+		};
+	} else if (strcmp(name, "BucketBaseSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry._bvh.buckets.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)16
+				}, 0.0f,
+				sizeof(uint32_t)
 			}
 		};
 	} else if (strcmp(name, "NormalSSBOIn") == 0) {

@@ -22,6 +22,10 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
         "build/shaders/history.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
+        "shaders/buckets.comp",
+        "build/shaders/buckets.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
         "shaders/scatter.comp",
         "build/shaders/scatter.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
@@ -386,7 +390,7 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context) {
 
 BOOL VINIT_BVH(VulkanBVH* bvh) {
     // workgroup history
-    size_t arrsize = sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / INVOCATION_GROUP_SIZE);
+    size_t arrsize = 16 * sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / INVOCATION_GROUP_SIZE);
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -395,7 +399,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         &(bvh->workhistory));
 
     // workgroup offsets
-    arrsize = sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / INVOCATION_GROUP_SIZE);
+    arrsize = 16 * sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / INVOCATION_GROUP_SIZE);
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -465,6 +469,14 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &(bvh->nodes));
+
+    // buckets
+    arrsize = sizeof(uint32_t) * 16;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(bvh->buckets));
 
     return TRUE;
 }

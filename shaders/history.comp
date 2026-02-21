@@ -21,7 +21,7 @@ void main() {
     if (globalID >= totalEntries)
         return;
     uint bucket = globalID % 16u;
-    uint wgID   = globalID / 16u;
+    uint wgID = globalID / 16u;
     uint sum = 0;
     for (uint i = 0; i < wgID; i++) {
         sum += wgHist[i][bucket];

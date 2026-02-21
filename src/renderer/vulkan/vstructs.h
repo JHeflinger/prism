@@ -146,6 +146,7 @@ typedef struct {
     VulkanDataBuffer indexswap;
     VulkanDataBuffer boundingboxes;
     VulkanDataBuffer nodes;
+    VulkanDataBuffer buckets;
 } VulkanBVH;
 
 typedef struct {

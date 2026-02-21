@@ -24,9 +24,8 @@ void main() {
     uint id = gl_GlobalInvocationID.x;
     if (id >= pc.elements) return;
     uint nodeIndex = pc.elements - 1 + id;
-    while (true) {
+    while (nodeIndex != 0) {
         uint parent = nodeIn[nodeIndex].parent;
-        if (nodeIndex == 0) break;
         uint old = atomicAdd(nodeIn[parent].counter, 1);
         if (old == 0) break; // first child — wait for sibling
 

@@ -44,8 +44,7 @@ void main() {
     if (i >= pc.elements - 1) return;
 
     // Determine direction
-    int d = (commonPrefix(int(i), int(i + 1)) -
-             commonPrefix(int(i), int(i - 1))) > 0 ? 1 : -1;
+    int d = (commonPrefix(int(i), int(i + 1)) - commonPrefix(int(i), int(i - 1))) > 0 ? 1 : -1;
     int deltaMin = commonPrefix(int(i), int(i - d));
 
     // Compute range length
@@ -81,9 +80,9 @@ void main() {
         ? pc.elements - 1 + uint(split + 1)
         : uint(split + 1);
 
-    nodeIn[i].left  = leftChild;
+    nodeIn[i].left = leftChild;
     nodeIn[i].right = rightChild;
-    nodeIn[leftChild].parent  = i;
+    nodeIn[leftChild].parent = i;
     nodeIn[rightChild].parent = i;
     nodeIn[i].counter = 0;
 }

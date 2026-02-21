@@ -40,7 +40,7 @@ void main() {
     uint primID = triIn[id];
     nodeIn[leaf_index].minBB = bbIn[primID].minBB;
     nodeIn[leaf_index].maxBB = bbIn[primID].maxBB;
-    nodeIn[leaf_index].left  = primID;
+    nodeIn[leaf_index].left = primID;
     nodeIn[leaf_index].right = 0xFFFFFFFF; // mark as leaf
     nodeIn[leaf_index].parent = 0;
     nodeIn[leaf_index].counter = 0;

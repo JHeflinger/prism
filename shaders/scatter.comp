@@ -16,12 +16,12 @@ layout(binding = 3) buffer IndexSwapSSBOIn {
     uint triOut[ ];
 };
 
-layout(binding = 4) buffer WorkGroupHistorySSBOIn {
-    uint workgroupHist[ ][16];
+layout(binding = 4) buffer WorkGroupOffsetSSBOIn {
+    uint globalOffset[ ][16];
 };
 
-layout(binding = 5) buffer WorkGroupOffsetSSBOIn {
-    uint globalOffset[ ][16];
+layout(binding = 5) buffer BucketBaseSSBOIn {
+    uint bucketIn[16];
 };
 
 layout(push_constant) uniform PushConstants {
@@ -30,8 +30,6 @@ layout(push_constant) uniform PushConstants {
 } pc;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-
-shared uint localScan[256];
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
@@ -47,7 +45,15 @@ void main() {
             if(other_bucket == bucket) local_count++;
         }
     }
-    uint out_index = globalOffset[wgID][bucket] + local_count;
-    mortonOut[out_index] = mortonIn[idx];
-    triOut[out_index] = triIn[idx];
+    uint base = 0;
+    for (uint i = 0; i < bucket; i++) {
+        base += bucketIn[i];
+    }
+    uint out_index = base + globalOffset[wgID][bucket] + local_count;
+    if (out_index < pc.elements) {
+        mortonOut[out_index] = mortonIn[idx];
+        triOut[out_index] = triIn[idx];
+    } else {
+        //while(true) {};
+    }
 }

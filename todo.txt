@@ -45,6 +45,10 @@ Next:
 8. make triangles via compute shader pass
 9. Move all bvh-related geometry vulkadatabuffers to a seperate struct
 10. remove bounding boxes and just compute them in leaves.comp
+11. convert all sorting steps into one shader
+12. workgroupoffset and history sizes are wastefully big
+13. in initialization of data buffers especially for the bvh resources are those the right bits we need
+14. clean shaders for ssbos theyre not using
 
 Scratch:
 
@@ -55,3 +59,20 @@ dont forget need to rebuild bvh for each pipeline target
 
 DONT FORGET BARRIERS IN BETWEEN CRITICAL STAGES
 reduce all intermediary updates within Render() to an if update_geometry
+
+on update triangle update min/max bbs
+RENAME CENTROID SHADER
+dont forget need to rebuild bvh for each pipeline target
+ - ideally we actually only build once and just copy it next passes
+
+reduce all intermediary updates within Render() to an if update_geometry
+
+62.92 - 314?
+1007 slightly too
+
+
+10.610 * 10 = 106
+
+1762
+
+this means either rebind is doing something wrong/undeterministic or there is a entirely seperate issue that has creeped into the memory corruption of this speciic byte

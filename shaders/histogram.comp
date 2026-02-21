@@ -4,7 +4,11 @@ layout(binding = 0) buffer MortonSSBOIn {
    uint mortonIn[ ];
 };
 
-layout(binding = 1) buffer WorkGroupHistorySSBOIn {
+layout(binding = 1) buffer MortonSwapSSBOIn {
+   uint mortonSwapIn[ ];
+};
+
+layout(binding = 2) buffer WorkGroupHistorySSBOIn {
     uint wgHist[ ][16];
 };
 
@@ -24,7 +28,12 @@ void main() {
     if (tid < 16) local_history[tid] = 0;
     barrier();
     if (idx < pc.elements) {
-        uint bucket = (mortonIn[idx] >> pc.bitstart) & 0xFu;
+        uint bucket;
+        if (pc.bitstart%8 != 0) {
+            bucket = (mortonSwapIn[idx] >> pc.bitstart) & 0xFu;
+        } else {
+            bucket = (mortonIn[idx] >> pc.bitstart) & 0xFu;
+        }
         atomicAdd(local_history[bucket], 1);
     }
     barrier();
