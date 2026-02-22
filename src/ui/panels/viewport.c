@@ -106,11 +106,6 @@ void UpdateViewportPanel(float width, float height) {
     BeginTextureMode(g_viewport_target);
     Draw(0, 0, width, height);
     EndTextureMode();
-
-    // TEMPORARY
-    if (IsKeyPressed(KEY_S)) {
-        SaveRender("out.png");
-    }
 }
 
 Panel GenerateViewportPanel() {

@@ -147,21 +147,6 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(SurfaceMaterial)
 			}
 		};
-	} else if (strcmp(name, "BVHSSBOIn") == 0) { // TODO: marked for removal
-		return (VulkanBoundVariable) {
-			STORAGE_BUFFER,
-			(SchrodingRef) {
-				TRUE,
-				&(renderer->vulkan.core.geometry.bvh.buffer)
-			},
-			(SchrodingSize) {
-				(SchrodingRef) {
-					TRUE,
-					&(renderer->geometry.bvh.size)
-				}, 0.0f,
-				sizeof(NodeBVH)
-			}
-		};
 	} else if (strcmp(name, "VertexSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,
@@ -182,7 +167,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.workoffsets.buffer)
+				&(renderer->vulkan.core.geometry.bvh.workoffsets.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -197,7 +182,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.workhistory.buffer)
+				&(renderer->vulkan.core.geometry.bvh.workhistory.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -207,27 +192,12 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(uint32_t) * 16
 			}
 		};
-	} else if (strcmp(name, "CentroidSSBOIn") == 0) {
-		return (VulkanBoundVariable) {
-			STORAGE_BUFFER,
-			(SchrodingRef) {
-				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.centroids.buffer)
-			},
-			(SchrodingSize) {
-				(SchrodingRef) {
-					TRUE,
-					&(renderer->geometry.triangles.size)
-				}, 0.0f,
-				sizeof(Vector3)
-			}
-		};
 	} else if (strcmp(name, "MortonSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.mortons.buffer)
+				&(renderer->vulkan.core.geometry.bvh.mortons.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -242,7 +212,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.indices.buffer)
+				&(renderer->vulkan.core.geometry.bvh.indices.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -257,7 +227,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.mortonswap.buffer)
+				&(renderer->vulkan.core.geometry.bvh.mortonswap.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -272,7 +242,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.indexswap.buffer)
+				&(renderer->vulkan.core.geometry.bvh.indexswap.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -287,7 +257,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.boundingboxes.buffer)
+				&(renderer->vulkan.core.geometry.bvh.boundingboxes.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -302,7 +272,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.nodes.buffer)
+				&(renderer->vulkan.core.geometry.bvh.nodes.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -317,7 +287,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry._bvh.buckets.buffer)
+				&(renderer->vulkan.core.geometry.bvh.buckets.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {

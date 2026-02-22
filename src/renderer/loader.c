@@ -744,5 +744,6 @@ BOOL LoadXML(const char* filepath) { // TODO: marked for removal
 
 BOOL LoadScene(const char* filepath) {
     // TODO:
+    EZ_ERROR("LoadScene has not been implemented yet!");
     return FALSE;
 }

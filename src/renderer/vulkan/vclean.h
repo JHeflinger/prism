@@ -7,8 +7,6 @@ void VCLEAN_Shaders(ARRLIST_VulkanShaderPtr* shaders);
 
 void VCLEAN_Lights(VulkanDataBuffer* lights);
 
-void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh);
-
 void VCLEAN_BVH(VulkanBVH* bvh);
 
 void VCLEAN_Normals(VulkanDataBuffer* normals);

@@ -50,6 +50,7 @@ Next:
 13. in initialization of data buffers especially for the bvh resources are those the right bits we need
 14. clean shaders for ssbos theyre not using
 15. use vec3 for verts instead of Vector3s
+16. turn all changes into just reconstruct geometry with a update flag which turns on triangle construction and bvh construction
 
 Scratch:
 

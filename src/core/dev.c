@@ -7,11 +7,15 @@
 #include "data/input.h"
 
 void DevUpdate() {
-    if (InputKeyPressed(IK_DEV)) {
-        LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
-        SimpleCamera c = GetCamera();
-        c.fov = 90.0f;
-        MoveCamera(c);
+    if (InputKeyDown(IK_DEV)) {
+        if (IsKeyPressed(KEY_L)) {
+            LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
+            SimpleCamera c = GetCamera();
+            c.fov = 90.0f;
+            MoveCamera(c);
+        } else if (IsKeyPressed(KEY_S)) {
+            SaveRender("out.png");
+        }
     }
 }
 

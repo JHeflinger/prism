@@ -5,7 +5,6 @@
 #include "data/strings.h"
 #include "renderer/vulkan/vconfig.h"
 #include "renderer/rmath.h"
-#include <raylib.h>
 #include <vulkan/vulkan.h>
 
 typedef uint32_t MaterialID;
@@ -54,13 +53,6 @@ typedef struct {
 } Triangle;
 DECLARE_ARRLIST(Triangle);
 
-typedef struct { // TODO: marked for removal
-    vec3 min;
-    vec3 max;
-    vec3 centroid;
-} TriangleBB;
-DECLARE_ARRLIST(TriangleBB);
-
 typedef struct {
     alignas(16) vec3 min;
     alignas(16) vec3 max;
@@ -88,11 +80,6 @@ typedef struct {
 } SurfaceMaterial;
 DECLARE_ARRLIST(SurfaceMaterial);
 
-#define BVH_LEAF 0
-#define BVH_LEFT_ONLY 1
-#define BVH_RIGHT_ONLY 2
-#define BVH_BOTH 3
-
 typedef struct {
     alignas(4) uint32_t tid;
 } RayGenerator;
@@ -101,18 +88,6 @@ typedef struct {
     uint32_t value;
     BOOL exists;
 } Schrodingnum;
-
-typedef struct { // TODO: marked for removal
-    alignas(16) vec3 min;
-    alignas(16) vec3 max;
-    alignas(4) uint32_t branch_config;
-    alignas(4) uint32_t left;
-    alignas(4) uint32_t right;
-    // branches[0] describes: 0 = leaf, 1 = left tree, 2 = right tree, 3 = both
-    // branches[1] is left tree ind
-    // branches[2] is right tree ind
-} NodeBVH;
-DECLARE_ARRLIST(NodeBVH);
 
 typedef struct {
 	RenderTexture2D target[CPUSWAP_LENGTH];
@@ -165,11 +140,9 @@ typedef struct {
     ARRLIST_LightID lids;
     ARRLIST_Triangle triangles;
     ARRLIST_TriangleID tids;
-    ARRLIST_TriangleBB tbbs;
     ARRLIST_TriangleID emissives;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;
-    ARRLIST_NodeBVH bvh;
     float lightarea;
     ChangeSet changes;
     Vector3 minBB;

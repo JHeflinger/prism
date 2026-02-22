@@ -292,9 +292,9 @@ void DrawEditPanel(float width, float height) {
             *(VertexReference(tref->b)) = Vector3Add(GetVertex(tref->b), adiff);
             *(VertexReference(tref->c)) = Vector3Add(GetVertex(tref->c), adiff);
             if (edited) {
-                RecalculateTriangleBB(g_edit_item_index);
                 UpdateTriangles();
                 UpdateVertices();
+                // TODO: just add in a reconstruct geometry call or whatever
             }
             if (UIGetCursor().y + 60 < height) {
                 UISetCursor(UIGetCursor().x, height - 60);

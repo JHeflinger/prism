@@ -27,7 +27,6 @@ typedef struct {
     alignas(8) vec2 viewport;
     alignas(4) uint32_t triangles;
     alignas(4) uint32_t emissives;
-    alignas(4) uint32_t bvhs;
     alignas(4) uint32_t lights;
     alignas(4) uint32_t samples;
 	alignas(4) uint32_t seed;
@@ -137,7 +136,6 @@ typedef struct {
 } VulkanRenderContext;
 
 typedef struct {
-    VulkanDataBuffer centroids;
     VulkanDataBuffer mortons;
     VulkanDataBuffer workhistory;
     VulkanDataBuffer workoffsets;
@@ -150,13 +148,12 @@ typedef struct {
 } VulkanBVH;
 
 typedef struct {
-    VulkanBVH _bvh; // TODO: marked for renaming
+    VulkanBVH bvh;
     VulkanDataBuffer normals;
     VulkanDataBuffer vertices;
     VulkanDataBuffer triangles;
     VulkanDataBuffer emissives;
     VulkanDataBuffer materials;
-    VulkanDataBuffer bvh; // TODO: marked for removal
     VulkanDataBuffer lights;
 } VulkanGeometry;
 

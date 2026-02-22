@@ -17,14 +17,9 @@ void VCLEAN_Lights(VulkanDataBuffer* lights) {
     VUTIL_DestroyBuffer(*lights);
 }
 
-void VCLEAN_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
-    VUTIL_DestroyBuffer(*bvh);
-}
-
 void VCLEAN_BVH(VulkanBVH* bvh) {
     VUTIL_DestroyBuffer(bvh->workhistory);
     VUTIL_DestroyBuffer(bvh->workoffsets);
-    VUTIL_DestroyBuffer(bvh->centroids);
     VUTIL_DestroyBuffer(bvh->mortons);
     VUTIL_DestroyBuffer(bvh->indices);
     VUTIL_DestroyBuffer(bvh->mortonswap);
@@ -55,13 +50,12 @@ void VCLEAN_Materials(VulkanDataBuffer* materials) {
 }
 
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
-    VCLEAN_BVH(&(geometry->_bvh));
+    VCLEAN_BVH(&(geometry->bvh));
     VCLEAN_Normals(&(geometry->normals));
     VCLEAN_Vertices(&(geometry->vertices));
     VCLEAN_Triangles(&(geometry->triangles));
     VCLEAN_Emissives(&(geometry->emissives));
     VCLEAN_Materials(&(geometry->materials));
-    VCLEAN_BoundingVolumeHierarchy(&(geometry->bvh));
     VCLEAN_Lights(&(geometry->lights));
 }
 

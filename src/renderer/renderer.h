@@ -89,8 +89,6 @@ float RenderFrameTime();
 
 Triangle* TriangleReference(size_t index);
 
-void RecalculateTriangleBB(size_t index);
-
 void UpdateTriangles();
 
 void SaveRender(const char* filepath);

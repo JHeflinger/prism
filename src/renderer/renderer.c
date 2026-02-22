@@ -4,7 +4,6 @@
 #include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vclean.h"
-#include "renderer/rutils.h"
 #include "renderer/overlay.h"
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
@@ -110,7 +109,6 @@ void DestroyRenderer() {
     ClearTriangles();
     ClearMaterials();
     ClearLights();
-    ARRLIST_NodeBVH_clear(&(g_renderer.geometry.bvh));
 
     // destroy vulkan resources
     VCLEAN_Vulkan(&(g_renderer.vulkan));
@@ -179,47 +177,15 @@ TriangleID SubmitTriangle(Triangle triangle) {
     EZ_ASSERT(triangle.a < g_renderer.geometry.vertices.size &&
               triangle.b < g_renderer.geometry.vertices.size &&
               triangle.c < g_renderer.geometry.vertices.size, "Triangle vertex does not exist");
-    Vector3 a = g_renderer.geometry.vertices.data[triangle.a];
-    Vector3 b = g_renderer.geometry.vertices.data[triangle.b];
-    Vector3 c = g_renderer.geometry.vertices.data[triangle.c];
-    TriangleBB bb = {
-        {
-            a.x < b.x ?
-                (a.x < c.x ? a.x : c.x) :
-                (b.x < c.x ? b.x : c.x),
-            a.y < b.y ?
-                (a.y < c.y ? a.y : c.y) :
-                (b.y < c.y ? b.y : c.y),
-            a.z < b.z ?
-                (a.z < c.z ? a.z : c.z) :
-                (b.z < c.z ? b.z : c.z)
-        },
-        {
-            a.x > b.x ?
-                (a.x > c.x ? a.x : c.x) :
-                (b.x > c.x ? b.x : c.x),
-            a.y > b.y ?
-                (a.y > c.y ? a.y : c.y) :
-                (b.y > c.y ? b.y : c.y),
-            a.z > b.z ?
-                (a.z > c.z ? a.z : c.z) :
-                (b.z > c.z ? b.z : c.z)
-        },
-        { 0, 0, 0 }
-    };
-    bb.centroid[0] = ((bb.max[0] - bb.min[0]) / 2.0f) + bb.min[0];
-    bb.centroid[1] = ((bb.max[1] - bb.min[1]) / 2.0f) + bb.min[1];
-    bb.centroid[2] = ((bb.max[2] - bb.min[2]) / 2.0f) + bb.min[2]; 
     vec3 emission; SETVEC(emission, g_renderer.geometry.materials.data[triangle.material].emission);
     if (emission[0] != 0 || emission[1] != 0 || emission[2] != 0) {
         ARRLIST_TriangleID_add(&(g_renderer.geometry.emissives), g_renderer.geometry.triangles.size);
-        vec3 va = {a.x, a.y, a.z};
-        vec3 vb = {b.x, b.y, b.z};
-        vec3 vc = {c.x, c.y, c.z};
-        g_renderer.geometry.lightarea += TriangleArea(va, vb, vc);
+        g_renderer.geometry.lightarea += TriangleArea(
+            g_renderer.geometry.vertices.data[triangle.a],
+            g_renderer.geometry.vertices.data[triangle.b],
+            g_renderer.geometry.vertices.data[triangle.c]);
     }
     ARRLIST_TriangleID_add(&(g_renderer.geometry.tids), g_triangle_id);
-    ARRLIST_TriangleBB_add(&(g_renderer.geometry.tbbs), bb);
     ARRLIST_Triangle_add(&(g_renderer.geometry.triangles), triangle);
     g_triangle_id++;
     return g_triangle_id - 1;
@@ -227,7 +193,6 @@ TriangleID SubmitTriangle(Triangle triangle) {
 
 void ClearTriangles() {
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.tids));
-    ARRLIST_TriangleBB_clear(&(g_renderer.geometry.tbbs));
     ARRLIST_Triangle_clear(&(g_renderer.geometry.triangles));
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.emissives));
     g_renderer.geometry.changes.update_triangles = TRUE;
@@ -322,15 +287,6 @@ void Render() {
             } else {
                 VUPDT_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
             }
-            // update bvh
-            RUTIL_BoundingVolumeHierarchy(&g_renderer.geometry.bvh, &g_renderer.geometry.tbbs);
-            if (g_renderer.geometry.changes.max_bvh != g_renderer.geometry.bvh.maxsize) {
-                g_renderer.geometry.changes.max_bvh = g_renderer.geometry.bvh.maxsize;
-                VCLEAN_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
-                VINIT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
-            } else {
-                VUPDT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
-            }
         }
 
         // update triangles if needed
@@ -341,8 +297,8 @@ void Render() {
                 g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
                 VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
                 VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
-                VCLEAN_BVH(&(g_renderer.vulkan.core.geometry._bvh));
-                VINIT_BVH(&(g_renderer.vulkan.core.geometry._bvh));
+                VCLEAN_BVH(&(g_renderer.vulkan.core.geometry.bvh));
+                VINIT_BVH(&(g_renderer.vulkan.core.geometry.bvh));
             } else {
                 VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             }
@@ -352,15 +308,6 @@ void Render() {
                 VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
             } else {
                 VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
-            }
-            // update bvh
-            RUTIL_BoundingVolumeHierarchy(&g_renderer.geometry.bvh, &g_renderer.geometry.tbbs);
-            if (g_renderer.geometry.changes.max_bvh != g_renderer.geometry.bvh.maxsize) {
-                g_renderer.geometry.changes.max_bvh = g_renderer.geometry.bvh.maxsize;
-                VCLEAN_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
-                VINIT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
-            } else {
-                VUPDT_BoundingVolumeHierarchy(&(g_renderer.vulkan.core.geometry.bvh));
             }
         }
 
@@ -547,43 +494,6 @@ float RenderFrameTime() {
 Triangle* TriangleReference(size_t index) {
     EZ_ASSERT(index < g_renderer.geometry.triangles.size, "Invalid triangle index requested");
     return &(g_renderer.geometry.triangles.data[index]);
-}
-
-void RecalculateTriangleBB(size_t index) {
-    EZ_ASSERT(index < g_renderer.geometry.triangles.size, "Invalid triangle index requested");
-    Triangle triangle = g_renderer.geometry.triangles.data[index];
-    Vector3 a = g_renderer.geometry.vertices.data[triangle.a];
-    Vector3 b = g_renderer.geometry.vertices.data[triangle.b];
-    Vector3 c = g_renderer.geometry.vertices.data[triangle.c];
-    TriangleBB bb = {
-        {
-            a.x < b.x ?
-                (a.x < c.x ? a.x : c.x) :
-                (b.x < c.x ? b.x : c.x),
-            a.y < b.y ?
-                (a.y < c.y ? a.y : c.y) :
-                (b.y < c.y ? b.y : c.y),
-            a.z < b.z ?
-                (a.z < c.z ? a.z : c.z) :
-                (b.z < c.z ? b.z : c.z)
-        },
-        {
-            a.x > b.x ?
-                (a.x > c.x ? a.x : c.x) :
-                (b.x > c.x ? b.x : c.x),
-            a.y > b.y ?
-                (a.y > c.y ? a.y : c.y) :
-                (b.y > c.y ? b.y : c.y),
-            a.z > b.z ?
-                (a.z > c.z ? a.z : c.z) :
-                (b.z > c.z ? b.z : c.z)
-        },
-        { 0, 0, 0 }
-    };
-    bb.centroid[0] = ((bb.max[0] - bb.min[0]) / 2.0f) + bb.min[0];
-    bb.centroid[1] = ((bb.max[1] - bb.min[1]) / 2.0f) + bb.min[1];
-    bb.centroid[2] = ((bb.max[2] - bb.min[2]) / 2.0f) + bb.min[2];
-    g_renderer.geometry.tbbs.data[index] = bb;
 }
 
 void UpdateTriangles() {

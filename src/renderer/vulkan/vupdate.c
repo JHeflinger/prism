@@ -17,15 +17,6 @@ void VUPDT_Lights(VulkanDataBuffer* lights) {
         lights->buffer);
 }
 
-void VUPDT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
-    if (sizeof(NodeBVH) * g_vupdt_renderer_ref->geometry.bvh.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
-        g_vupdt_renderer_ref->geometry.bvh.data,
-        sizeof(NodeBVH) * g_vupdt_renderer_ref->geometry.bvh.size,
-        sizeof(NodeBVH) * g_vupdt_renderer_ref->geometry.bvh.maxsize,
-        bvh->buffer);
-}
-
 void VUPDT_Normals(VulkanDataBuffer* normals) {
     if (sizeof(Vector3) * g_vupdt_renderer_ref->geometry.normals.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
@@ -79,20 +70,37 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
     // execute shader stages
     uint32_t radix_bits = 0;
-    #define RecordPushConstants(elements) { \
+    #define _record_push_constants(elements) { \
         VulkanPushConstants pc = { elements, radix_bits }; \
         vkCmdPushConstants( \
             command, \
             g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i], \
             VK_SHADER_STAGE_COMPUTE_BIT, \
             0, sizeof(VulkanPushConstants), &pc);}
+    for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
+        if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
+        uint32_t invocations = (uint32_t)g_vupdt_renderer_ref->dimensions.x * (uint32_t)g_vupdt_renderer_ref->dimensions.y;
 
-    void _dispatch_shader(size_t i, size_t invocations) {
+        if (((1u << i) & CENTROID_SHADER_FLAG) ||
+            ((1u << i) & HISTOGRAM_SHADER_FLAG) ||
+            ((1u << i) & SCATTER_SHADER_FLAG) ||
+            ((1u << i) & LEAVES_SHADER_FLAG) ||
+            ((1u << i) & BVH_SHADER_FLAG) ||
+            ((1u << i) & REBIND_SHADER_FLAG)){
+            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
+            _record_push_constants(g_vupdt_renderer_ref->geometry.triangles.size);
+        }
+
+        if ((1u << i) & HISTORY_SHADER_FLAG) {
+            uint32_t wg = ceil(g_vupdt_renderer_ref->geometry.triangles.size / ((float)INVOCATION_GROUP_SIZE));
+            invocations = wg*16;
+            _record_push_constants(wg);
+        }
+
         vkCmdBindPipeline(
             command,
             VK_PIPELINE_BIND_POINT_COMPUTE,
             g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline[i]);
-
         vkCmdBindDescriptorSets(
             command,
             VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -102,67 +110,8 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors[i].sets[g_vupdt_renderer_ref->swapchain.index]),
             0,
             NULL);
-
         vkCmdDispatch(command, ceil((invocations) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
         VUTIL_RecordGeneralBarrier(command);
-    }
-
-    for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
-        if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
-
-        float imgw = (uint32_t)g_vupdt_renderer_ref->dimensions.x;
-        float imgh = (uint32_t)g_vupdt_renderer_ref->dimensions.y;
-        uint32_t invocations = imgw * imgh;
-
-        if ((1u << i) & CENTROID_SHADER_FLAG) {
-            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
-        }
-
-        if ((1u << i) & HISTOGRAM_SHADER_FLAG) {
-            //VUTIL_RecordGeneralBarrier(command);
-            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
-        }
-
-        if ((1u << i) & HISTORY_SHADER_FLAG) {
-            //VUTIL_RecordGeneralBarrier(command);
-            uint32_t wg = ceil(g_vupdt_renderer_ref->geometry.triangles.size / ((float)INVOCATION_GROUP_SIZE));
-            invocations = wg*16;
-            RecordPushConstants(wg);
-        }
-
-        if ((1u << i) & SCATTER_SHADER_FLAG) {
-            //VUTIL_RecordGeneralBarrier(command);
-            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
-        }
-
-        if ((1u << i) & LEAVES_SHADER_FLAG) {
-            //VUTIL_RecordGeneralBarrier(command);
-            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
-        }
-
-        if ((1u << i) & BVH_SHADER_FLAG) {
-            //VUTIL_RecordGeneralBarrier(command);
-            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
-        }
-
-        if ((1u << i) & REBIND_SHADER_FLAG) {
-            //VUTIL_RecordGeneralBarrier(command);
-            invocations = g_vupdt_renderer_ref->geometry.triangles.size;
-            RecordPushConstants(g_vupdt_renderer_ref->geometry.triangles.size);
-        }
-
-        if ((1u << i) & DEFAULT_SHADER_FLAG ||
-            (1u << i) & PATHTRACE_SHADER_FLAG ||
-            (1u << i) & ANALYZE_SHADER_FLAG) {
-            //VUTIL_RecordGeneralBarrier(command);
-        }
-
-        _dispatch_shader(i, invocations);
 
         if ((1u << i) & SCATTER_SHADER_FLAG) {
             radix_bits += 4;
@@ -193,7 +142,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             0, 0, NULL, 0, NULL, 1, &imgBarrier);
         VkBufferImageCopy region = { 0 };
         region.bufferOffset = 0;
-        region.bufferRowLength = 0; // Tightly packed
+        region.bufferRowLength = 0;
         region.bufferImageHeight = 0;
         region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         region.imageSubresource.mipLevel = 0;
@@ -238,7 +187,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     if (result != VK_SUCCESS) {
         EZ_FATAL("Failed to record command!");
     }
-    #undef RecordPushConstants
+    #undef _record_push_constants
 }
 
 void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
@@ -328,7 +277,6 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.triangles = g_vupdt_renderer_ref->geometry.triangles.size;
         ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
         ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
-        ubo.bvhs = g_vupdt_renderer_ref->geometry.bvh.size;
         ubo.emissives = g_vupdt_renderer_ref->geometry.emissives.size;
         ubo.frametime = RenderFrameTime();
         ubo.seed = rand();

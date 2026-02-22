@@ -54,7 +54,6 @@ layout(binding = 0) uniform UniformBufferObject {
     vec2 viewport;
     uint triangles;
     uint emissives;
-    uint bvhs; // TODO: marked for removal
     uint lights;
     uint samples;
 	uint seed;

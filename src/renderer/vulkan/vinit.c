@@ -399,15 +399,6 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &(bvh->workoffsets));
 
-    // centroids
-    arrsize = sizeof(Vector3) * g_vinit_renderer_ref->geometry.triangles.maxsize;
-    arrsize = arrsize > 0 ? arrsize : 1;
-    VUTIL_CreateBuffer(
-        arrsize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &(bvh->centroids));
-
     // mortons
     arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
@@ -530,18 +521,6 @@ BOOL VINIT_Materials(VulkanDataBuffer* materials) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         materials);
     VUPDT_Materials(materials);
-    return TRUE;
-}
-
-BOOL VINIT_BoundingVolumeHierarchy(VulkanDataBuffer* bvh) {
-    size_t arrsize = sizeof(NodeBVH) * g_vinit_renderer_ref->geometry.bvh.maxsize;
-    arrsize = arrsize > 0 ? arrsize : 1;
-    VUTIL_CreateBuffer(
-        arrsize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        bvh);
-    VUPDT_BoundingVolumeHierarchy(bvh);
     return TRUE;
 }
 
@@ -726,13 +705,12 @@ BOOL VINIT_General(VulkanGeneral* general) {
 }
 
 BOOL VINIT_Geometry(VulkanGeometry* geometry) {
-    if (!VINIT_BVH(&(geometry->_bvh))) return FALSE;
+    if (!VINIT_BVH(&(geometry->bvh))) return FALSE;
     if (!VINIT_Normals(&(geometry->normals))) return FALSE;
     if (!VINIT_Vertices(&(geometry->vertices))) return FALSE;
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;
 	if (!VINIT_Emissives(&(geometry->emissives))) return FALSE;
 	if (!VINIT_Materials(&(geometry->materials))) return FALSE;
-	if (!VINIT_BoundingVolumeHierarchy(&(geometry->bvh))) return FALSE;
 	if (!VINIT_Lights(&(geometry->lights))) return FALSE;
     return TRUE;
 }
