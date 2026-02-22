@@ -227,13 +227,13 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id) {
     // trace
     Hit hit;
     hit.distance = -1.0;
-    float grid_plane_distance = plane_intersect(ray, vec3(0, 0, 0), vec3(0, 0, 1.0));
+    float grid_plane_distance = plane_intersect(ray, vec3(0, 0, 0), vec3(0, 1.0, 0));
     vec3 grid_plane_point = ray.position + (ray.direction * grid_plane_distance);
     float grid_plane_tolerance = grid_plane_distance / 100.0;
     float grid_x_tolerance = 0.0;
     float grid_y_tolerance = 0.0;
     float xfract = fract(grid_plane_point.x);
-    float yfract = fract(grid_plane_point.y);
+    float yfract = fract(grid_plane_point.z);
     hit = trace(ray, hit_id);
     bool gridhit = false;
     float gridmix = 0.0;

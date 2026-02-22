@@ -134,27 +134,27 @@ typedef struct {
 DECLARE_ARRLIST(PointLight);
 
 typedef struct {
-    void* halfedge;
-    uint32_t index;
+    alignas(4) uint32_t halfedge;
+    alignas(4) uint32_t index;
 } ManifoldVertex;
 DECLARE_ARRLIST(ManifoldVertex);
 
 typedef struct {
-    void* halfedge;
+    alignas(4) uint32_t halfedge;
 } ManifoldEdge;
 DECLARE_ARRLIST(ManifoldEdge);
 
 typedef struct {
-    void* halfedge;
+    alignas(4) uint32_t halfedge;
 } ManifoldFace;
 DECLARE_ARRLIST(ManifoldFace);
 
 typedef struct {
-    void* twin;
-    void* next;
-    ManifoldVertex* vertex;
-    ManifoldEdge* edge;
-    ManifoldFace* face;
+    alignas(4) uint32_t twin;
+    alignas(4) uint32_t next;
+    alignas(4) uint32_t vertex;
+    alignas(4) uint32_t edge;
+    alignas(4) uint32_t face;
 } ManifoldHalfEdge;
 DECLARE_ARRLIST(ManifoldHalfEdge);
 
@@ -166,6 +166,7 @@ typedef struct {
 } ManifoldMesh;
 
 typedef struct {
+    ManifoldMesh manifold;
     ARRLIST_Vector3 vertices;
     ARRLIST_Vector3 normals;
     ARRLIST_PointLight lights;

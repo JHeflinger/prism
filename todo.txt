@@ -44,3 +44,7 @@ Next:
 11. convert all sorting steps into one shader
 12. workgroupoffset and history sizes are wastefully big
 15. use vec3 for verts instead of Vector3s
+16. mesh validator can definitely be done on gpu i think
+
+ideas:
+never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

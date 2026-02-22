@@ -9,7 +9,7 @@
 void DevUpdate() {
     if (InputKeyDown(IK_DEV)) {
         if (IsKeyPressed(KEY_L)) {
-            LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
+            LoadOBJ("/home/jason/Dev/MESH/meshes/bunny.obj");
             SimpleCamera c = GetCamera();
             c.fov = 90.0f;
             MoveCamera(c);

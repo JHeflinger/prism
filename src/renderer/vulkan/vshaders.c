@@ -1,9 +1,7 @@
 #include "vshaders.h"
 #include <easymemory.h>
 #include <easyobjects.h>
-
-DECLARE_ARRLIST(int);
-IMPL_ARRLIST(int);
+#include <easybasics.h>
 
 char* last_relevant_word(char* str, int len) {
 	for (int i = len - 1; i >= 0; i--) {

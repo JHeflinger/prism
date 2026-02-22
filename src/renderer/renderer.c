@@ -5,6 +5,7 @@
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vclean.h"
 #include "renderer/overlay.h"
+#include "renderer/processor.h"
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
 #include <string.h>
@@ -57,9 +58,9 @@ void InitializeRenderer() {
 
     // initialize camera
     g_renderer.camera = (SimpleCamera){
-        { 2.11f, 0.0f, 2.133f },
+        { 0.0f, 2.133f, 2.11f },
         { 0.0f, 0.0f, 0.0f },
-        { 0.0f, 0.0f, 1.0f },
+        { 0.0f, 1.0f, 0.0f },
         90.0f, 0.0f, 0.0f
     };
 
@@ -111,6 +112,7 @@ void DestroyRenderer() {
     ClearTriangles();
     ClearMaterials();
     ClearLights();
+    CleanManifoldMesh(&(g_renderer.geometry.manifold));
 
     // destroy vulkan resources
     VCLEAN_Vulkan(&(g_renderer.vulkan));
@@ -133,7 +135,7 @@ void ReorientCamera() {
         float sign = g_renderer.camera.up[i] > 0 ? 1.0f : (g_renderer.camera.up[i] < 0 ? -1.0f : 0.0f);
         g_renderer.camera.look[i] += sign*1e-6f;
     }
-    vec3 desired = { 0, 0, 1 };
+    vec3 desired = { 0, 1, 0 };
     SETVEC(g_renderer.camera.up, desired);
 }
 
@@ -315,6 +317,15 @@ void Render() {
                 VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
             } else {
                 VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
+            }
+            // TODO: do not make this automatic if not on GPU and fast
+            CleanManifoldMesh(&(g_renderer.geometry.manifold));
+            g_renderer.geometry.manifold = GenerateManifoldMesh(
+                g_renderer.geometry.vertices,
+                g_renderer.geometry.normals,
+                g_renderer.geometry.triangles);
+            if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
+                EZ_ERROR("Mesh was not detected to be a valid manifold");
             }
         }
 

@@ -28,9 +28,9 @@ void UpdateViewportPanel(float width, float height) {
     // reset camera
     if (InputKeyPressed(IK_RESET_CAMERA)) {
         SimpleCamera camera = GetCamera();
-        SETVEC3(camera.position, 2.11f, 0.0f, 2.133f);
+        SETVEC3(camera.position, 0.0f, 2.133f, 2.11f);
         SETVEC3(camera.look, 0.0f, 0.0f, 0.0f);
-        SETVEC3(camera.up, 0.0f, 0.0f, 1.0f);
+        SETVEC3(camera.up, 0.0f, 1.0f, 0.0f);
         camera.fov = 90.0f;
         camera.aperature = 0.0f;
         camera.focus = 0.0f;
@@ -45,15 +45,15 @@ void UpdateViewportPanel(float width, float height) {
         glm_vec3_sub(camera.position, camera.look, offset);
         float radius = glm_vec3_norm(offset);
         if (radius < 1e-6f) radius = 1e-6f;
-        float phi = acosf(offset[2] / radius);
-        float theta = atan2f(offset[1], offset[0]);
+        float phi = acosf(offset[1] / radius);
+        float theta = atan2f(offset[2], offset[0]);
         if (InputButtonReleased(IK_MOUSERIGHT)) rfocused = FALSE;
         if (InputButtonReleased(IK_MOUSELEFT)) lfocused = FALSE;
         if (InputButtonPressed(IK_MOUSERIGHT) && hovered) rfocused = TRUE;
         if (InputButtonPressed(IK_MOUSELEFT) && hovered) lfocused = TRUE;
         if (InputButtonDown(IK_MOUSERIGHT) && rfocused) {
             phi -= GetMouseDelta().y / 225.0;
-            theta -= GetMouseDelta().x / 400.0f;
+            theta += GetMouseDelta().x / 400.0f;
             moved = TRUE;
         }
         if (phi < 0.001f) phi = 0.001f;
@@ -78,11 +78,12 @@ void UpdateViewportPanel(float width, float height) {
         }
         if (hovered) {
             radius -= GetMouseWheelMove() / 4.0f;
+            if (radius < 1e-6f) radius = 1e-6f;
             if (GetMouseWheelMove() != 0) moved = TRUE;
         }
         camera.position[0] = camera.look[0] + (radius * sin(phi) * cos(theta));
-        camera.position[1] = camera.look[1] + (radius * sin(phi) * sin(theta));
-        camera.position[2] = camera.look[2] + (radius * cos(phi));
+        camera.position[1] = camera.look[1] + (radius * cos(phi));
+        camera.position[2] = camera.look[2] + (radius * sin(phi) * sin(theta));
         camera.fov = 90.0f;
         SetViewportSlice(width, height);
         if (moved) MoveCamera(camera);

@@ -3,6 +3,8 @@
 
 #include "renderer/rstructs.h"
 
+void CleanManifoldMesh(ManifoldMesh* manifold);
+
 ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_Vector3 normals, const ARRLIST_Triangle triangles);
 
 BOOL IsManifoldValid(const ManifoldMesh* manifold);
