@@ -10,6 +10,7 @@
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
 typedef uint32_t LightID;
+
 DECLARE_ARRLIST(MaterialID);
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARRLIST(LightID);
@@ -132,7 +133,37 @@ typedef struct {
 } PointLight;
 DECLARE_ARRLIST(PointLight);
 
-#define MAX_MATERIAL_NAME_SIZE 256
+typedef struct {
+    void* halfedge;
+    uint32_t index;
+} ManifoldVertex;
+DECLARE_ARRLIST(ManifoldVertex);
+
+typedef struct {
+    void* halfedge;
+} ManifoldEdge;
+DECLARE_ARRLIST(ManifoldEdge);
+
+typedef struct {
+    void* halfedge;
+} ManifoldFace;
+DECLARE_ARRLIST(ManifoldFace);
+
+typedef struct {
+    void* twin;
+    void* next;
+    ManifoldVertex* vertex;
+    ManifoldEdge* edge;
+    ManifoldFace* face;
+} ManifoldHalfEdge;
+DECLARE_ARRLIST(ManifoldHalfEdge);
+
+typedef struct {
+    ARRLIST_ManifoldVertex vertices;
+    ARRLIST_ManifoldEdge edges;
+    ARRLIST_ManifoldFace faces;
+    ARRLIST_ManifoldHalfEdge halfedges;
+} ManifoldMesh;
 
 typedef struct {
     ARRLIST_Vector3 vertices;
