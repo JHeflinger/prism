@@ -34,47 +34,13 @@ ICEBOX:
 36. Executor should be bounce-per-frame as well
 37. command-based geometry editing
 38. update emissives on vertex change too, probably just redo all emissive stuff on bvh change
+39. make a much more efficient way to update gpu memory based on host memory (which is definitely possible btw!)
 
 Next:
-2. Parallelize bvh
 3. half-edge geometry processing implementations
 4. Implement remove functions
-5. In edit.c when recalculating triangle bounding box use half edge to recalculate bounding box for all connected triangles as well
 6. verify and reimplement all popup funcs as needed
 7. switch to y up instead of z up
-8. make triangles via compute shader pass
-9. Move all bvh-related geometry vulkadatabuffers to a seperate struct
-10. remove bounding boxes and just compute them in leaves.comp
 11. convert all sorting steps into one shader
 12. workgroupoffset and history sizes are wastefully big
-13. in initialization of data buffers especially for the bvh resources are those the right bits we need
-14. clean shaders for ssbos theyre not using
 15. use vec3 for verts instead of Vector3s
-16. turn all changes into just reconstruct geometry with a update flag which turns on triangle construction and bvh construction
-
-Scratch:
-
-on update triangle update min/max bbs
-RENAME CENTROID SHADER
-dont forget need to rebuild bvh for each pipeline target
- - ideally we actually only build once and just copy it next passes
-
-DONT FORGET BARRIERS IN BETWEEN CRITICAL STAGES
-reduce all intermediary updates within Render() to an if update_geometry
-
-on update triangle update min/max bbs
-RENAME CENTROID SHADER
-dont forget need to rebuild bvh for each pipeline target
- - ideally we actually only build once and just copy it next passes
-
-reduce all intermediary updates within Render() to an if update_geometry
-
-62.92 - 314?
-1007 slightly too
-
-
-10.610 * 10 = 106
-
-1762
-
-this means either rebind is doing something wrong/undeterministic or there is a entirely seperate issue that has creeped into the memory corruption of this speciic byte

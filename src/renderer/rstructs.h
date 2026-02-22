@@ -18,6 +18,7 @@ DECLARE_ARRLIST(Vector3);
 #define PREVIEW_PIPELINE_FLAGS   0b110011111111
 #define PATHTRACE_PIPELINE_FLAGS 0b111101111111
 #define HEADLESS_PIPELINE_FLAGS  0b001101111111
+#define BVH_PIPELINE_FLAGS       0b000001111111
 #define CENTROID_SHADER_FLAG     0b1
 #define HISTOGRAM_SHADER_FLAG    0b10
 #define HISTORY_SHADER_FLAG      0b100
@@ -95,12 +96,11 @@ typedef struct {
     void* reference;
 } CPUSwap;
 
-typedef struct { // TODO: marked for heavy refactoring/removal
+typedef struct {
     size_t max_normals;
     size_t max_vertices;
     size_t max_triangles;
     size_t max_emissives;
-    size_t max_bvh;
     size_t max_materials;
     size_t max_lights;
     BOOL update_normals;
@@ -108,6 +108,7 @@ typedef struct { // TODO: marked for heavy refactoring/removal
     BOOL update_triangles;
     BOOL update_materials;
     BOOL update_lights;
+    size_t update_bvh;
 } ChangeSet;
 
 typedef struct {

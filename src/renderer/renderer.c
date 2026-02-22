@@ -263,11 +263,15 @@ void Render() {
             g_renderer.geometry.changes.update_vertices |
             g_renderer.geometry.changes.update_normals;
 
+        // set bvh reconstruction
+        if (g_renderer.geometry.changes.update_vertices || g_renderer.geometry.changes.update_triangles)
+            g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH;
+
         // update normals if needed
         if (g_renderer.geometry.changes.update_normals) {
-            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
             g_renderer.geometry.changes.update_normals = FALSE;
             if (g_renderer.geometry.changes.max_normals != g_renderer.geometry.normals.maxsize) {
+                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
                 g_renderer.geometry.changes.max_normals = g_renderer.geometry.normals.maxsize;
                 VCLEAN_Normals(&(g_renderer.vulkan.core.geometry.normals));
                 VINIT_Normals(&(g_renderer.vulkan.core.geometry.normals));
@@ -278,9 +282,9 @@ void Render() {
 
         // update vertices if needed
         if (g_renderer.geometry.changes.update_vertices) {
-            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
             g_renderer.geometry.changes.update_vertices = FALSE;
             if (g_renderer.geometry.changes.max_vertices != g_renderer.geometry.vertices.maxsize) {
+                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
                 g_renderer.geometry.changes.max_vertices = g_renderer.geometry.vertices.maxsize;
                 VCLEAN_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
                 VINIT_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
@@ -291,9 +295,9 @@ void Render() {
 
         // update triangles if needed
         if (g_renderer.geometry.changes.update_triangles) {
-            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
             g_renderer.geometry.changes.update_triangles = FALSE;
             if (g_renderer.geometry.changes.max_triangles != g_renderer.geometry.triangles.maxsize) {
+                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
                 g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
                 VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
                 VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
@@ -303,6 +307,7 @@ void Render() {
                 VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             }
             if (g_renderer.geometry.changes.max_emissives != g_renderer.geometry.emissives.maxsize) {
+                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
                 g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize;
                 VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
                 VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
@@ -313,9 +318,9 @@ void Render() {
 
         // update materials if needed
         if (g_renderer.geometry.changes.update_materials) {
-            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
             g_renderer.geometry.changes.update_materials = FALSE;
             if (g_renderer.geometry.changes.max_materials != g_renderer.geometry.materials.maxsize) {
+                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
                 g_renderer.geometry.changes.max_materials = g_renderer.geometry.materials.maxsize;
                 VCLEAN_Materials(&(g_renderer.vulkan.core.geometry.materials));
                 VINIT_Materials(&(g_renderer.vulkan.core.geometry.materials));
@@ -326,9 +331,9 @@ void Render() {
 
         // update lights if needed
         if (g_renderer.geometry.changes.update_lights) {
-            vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: make a buffer for every swap so we don't have to wait
             g_renderer.geometry.changes.update_lights = FALSE;
             if (g_renderer.geometry.changes.max_lights != g_renderer.geometry.lights.maxsize) {
+                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
                 g_renderer.geometry.changes.max_lights = g_renderer.geometry.lights.maxsize;
                 VCLEAN_Lights(&(g_renderer.vulkan.core.geometry.lights));
                 VINIT_Lights(&(g_renderer.vulkan.core.geometry.lights));

@@ -68,6 +68,13 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     VkResult result = vkBeginCommandBuffer(command, &beginInfo);
     EZ_ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
 
+    if (g_vupdt_renderer_ref->geometry.changes.update_bvh) {
+        g_vupdt_renderer_ref->geometry.changes.update_bvh--;
+        g_vupdt_renderer_ref->config.flags |= BVH_PIPELINE_FLAGS;
+    } else {
+        g_vupdt_renderer_ref->config.flags &= ~(BVH_PIPELINE_FLAGS);
+    }
+
     // execute shader stages
     uint32_t radix_bits = 0;
     #define _record_push_constants(elements) { \
