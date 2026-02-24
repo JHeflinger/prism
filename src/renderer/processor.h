@@ -9,4 +9,10 @@ ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_
 
 BOOL IsManifoldValid(const ManifoldMesh* manifold);
 
+void EdgeFlip(ManifoldMesh* manifold, uint32_t edge);
+
+void EdgeSplit(ManifoldMesh* manifold, uint32_t edge);
+
+void EdgeCollapse(ManifoldMesh* manifold, uint32_t edge);
+
 #endif

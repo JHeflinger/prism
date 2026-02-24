@@ -135,7 +135,7 @@ DECLARE_ARRLIST(PointLight);
 
 typedef struct {
     alignas(4) uint32_t halfedge;
-    alignas(4) uint32_t index;
+    alignas(16) vec3 position;
 } ManifoldVertex;
 DECLARE_ARRLIST(ManifoldVertex);
 
