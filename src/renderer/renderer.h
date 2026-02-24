@@ -85,6 +85,8 @@ Vector2 RenderResolution();
 
 RendererConfig* RenderConfig();
 
+Geometry* RendererGeometry();
+
 float RenderFrameTime();
 
 Triangle* TriangleReference(size_t index);

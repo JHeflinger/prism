@@ -15,4 +15,6 @@ void EdgeSplit(ManifoldMesh* manifold, uint32_t edge);
 
 void EdgeCollapse(ManifoldMesh* manifold, uint32_t edge);
 
+void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold);
+
 #endif

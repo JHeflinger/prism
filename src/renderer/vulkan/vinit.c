@@ -382,7 +382,7 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context) {
 
 BOOL VINIT_BVH(VulkanBVH* bvh) {
     // workgroup history
-    size_t arrsize = 16 * sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / INVOCATION_GROUP_SIZE);
+    size_t arrsize = 16 * sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / (float)INVOCATION_GROUP_SIZE);
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -391,7 +391,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         &(bvh->workhistory));
 
     // workgroup offsets
-    arrsize = 16 * sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / INVOCATION_GROUP_SIZE);
+    arrsize = 16 * sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / (float)INVOCATION_GROUP_SIZE);
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,

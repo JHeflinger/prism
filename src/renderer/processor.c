@@ -257,9 +257,9 @@ void EdgeSplit(ManifoldMesh* manifold, uint32_t edge) {
     ManifoldVertex v2s = manifold->vertices.data[v2];
     ManifoldVertex v4s = manifold->vertices.data[v4];
     ARRLIST_ManifoldVertex_add(&(manifold->vertices), (ManifoldVertex) { h4, {
-        ((v2s.position[0] - v4s.position[0])/2.0f) + v2s.position[0],
-        ((v2s.position[1] - v4s.position[1])/2.0f) + v2s.position[1],
-        ((v2s.position[2] - v4s.position[2])/2.0f) + v2s.position[2]
+        ((v2s.position[0] - v4s.position[0])/2.0f) + v4s.position[0],
+        ((v2s.position[1] - v4s.position[1])/2.0f) + v4s.position[1],
+        ((v2s.position[2] - v4s.position[2])/2.0f) + v4s.position[2]
     }});
     ARRLIST_ManifoldFace_add(&(manifold->faces), (ManifoldFace) { h6 });
     ARRLIST_ManifoldFace_add(&(manifold->faces), (ManifoldFace) { h2 });
@@ -328,6 +328,11 @@ void EdgeCollapse(ManifoldMesh* manifold, uint32_t edge) {
         curr = manifold->halfedges.data[twin].next;
         if (curr == walkstart) break;
     }
+    ManifoldVertex v1s = manifold->vertices.data[v1];
+    ManifoldVertex v3s = manifold->vertices.data[v3];
+    manifold->vertices.data[v3].position[0] = ((v3s.position[0] - v1s.position[0])/2.0f) + v1s.position[0];
+    manifold->vertices.data[v3].position[1] = ((v3s.position[1] - v1s.position[1])/2.0f) + v1s.position[1];
+    manifold->vertices.data[v3].position[2] = ((v3s.position[2] - v1s.position[2])/2.0f) + v1s.position[2];
     manifold->halfedges.data[h9].twin = h10;
     manifold->halfedges.data[h10].twin = h9;
     manifold->halfedges.data[h8].twin = h7;
@@ -350,4 +355,27 @@ void EdgeCollapse(ManifoldMesh* manifold, uint32_t edge) {
     manifold->edges.data[e1].halfedge = (uint32_t)-1;
     manifold->edges.data[e2].halfedge = (uint32_t)-1;
     manifold->edges.data[e4].halfedge = (uint32_t)-1;
+}
+
+void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold) {
+    FILE* file = fopen(path, "w");
+    if (file == NULL) {
+        EZ_ERROR("Unable to open file");
+        return;
+    }
+    for (size_t i = 0; i < manifold->vertices.size; i++) {
+        ManifoldVertex v = manifold->vertices.data[i];
+        fprintf(file, "v %.6f %.6f %.6f\n", v.position[0], v.position[1], v.position[2]);
+    }
+    for (size_t i = 0; i < manifold->faces.size; i++) {
+        uint32_t he = manifold->faces.data[i].halfedge;
+        if (he != (uint32_t)-1) {
+            uint32_t v1, v2, v3;
+            v1 = 1 + manifold->halfedges.data[he].vertex;
+            v2 = 1 + manifold->halfedges.data[manifold->halfedges.data[he].next].vertex;
+            v3 = 1 + manifold->halfedges.data[manifold->halfedges.data[manifold->halfedges.data[he].next].next].vertex;
+            fprintf(file, "f %u %u %u\n", (unsigned int)v1, (unsigned int)v2, (unsigned int)v3);
+        }
+    }
+    fclose(file);
 }

@@ -505,6 +505,10 @@ RendererConfig* RenderConfig() {
     return &(g_renderer.config);
 }
 
+Geometry* RendererGeometry() {
+    return &(g_renderer.geometry);
+}
+
 float RenderFrameTime() {
     return g_rft;
 }
