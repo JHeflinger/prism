@@ -384,33 +384,11 @@ void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold) {
 void SerialSubdivide(ManifoldMesh* manifold) {
     size_t original_edges_size = manifold->edges.size;
     size_t original_vertices_size = manifold->vertices.size;
-    ARRLIST_float uvals = { 0 };
-    ARRLIST_float_zero(&uvals, manifold->vertices.size);
     constexpr float one_eighth = (1.0f/8.0f);
     constexpr float three_eighths = (3.0f/8.0f);
     constexpr float one_fourth = 0.25f;
     constexpr float three_sixteenths = (3.0f/16.0f);
     constexpr float five_eights = (5.0f/8.0f);
-
-    // precalculate u values
-    for (size_t i = 0; i < original_vertices_size; i++) {
-        size_t degree = 0;
-        uint32_t start = manifold->vertices.data[i].halfedge;
-        uint32_t curr = start;
-        while (true) {
-            degree++;
-            uint32_t twin = manifold->halfedges.data[curr].twin;
-            curr = manifold->halfedges.data[twin].next;
-            if (curr == start) break;
-        }
-        if (degree == 3) {
-            uvals.data[i] = three_sixteenths;
-        } else {
-            // TODO: check if degrees or radians?
-            float overn = 1.0f / ((float)degree);
-            uvals.data[i] = (five_eights - powf(three_eighths + one_fourth * cos(2.0f*M_PI*overn), 2.0f)) * overn;
-        }
-    }
 
     // subdivide triangles
     for (size_t i = 0; i < original_edges_size; i++) {
@@ -480,14 +458,18 @@ void SerialSubdivide(ManifoldMesh* manifold) {
             medium = manifold->halfedges.data[medium].twin;
             medium = manifold->halfedges.data[medium].vertex;
             EZ_ASSERT(medium < original_vertices_size, "Extended vertex was detected to not be an old vertex");
-            glm_vec3_muladds(manifold->vertices.data[medium].position, uvals.data[i], new_pos);
+            glm_vec3_add(manifold->vertices.data[medium].position, new_pos, new_pos);
             uint32_t twin = manifold->halfedges.data[curr].twin;
             curr = manifold->halfedges.data[twin].next;
             if (curr == start) break;
         }
-        glm_vec3_muladds(manifold->vertices.data[i].position, 1.0f - (((float)degree)*uvals.data[i]), new_pos);
+        float u = three_sixteenths;
+        if (degree != 3) {
+            float overn = 1.0f / ((float)degree);
+            u = (five_eights - powf(three_eighths + one_fourth * cos(2.0f*M_PI*overn), 2.0f)) * overn;
+        }
+        glm_vec3_scale(new_pos, u, new_pos);
+        glm_vec3_muladds(manifold->vertices.data[i].position, 1.0f - (((float)degree)*u), new_pos);
         glm_vec3_copy(new_pos, manifold->vertices.data[i].position);
     }
-
-    ARRLIST_float_clear(&uvals);
 }

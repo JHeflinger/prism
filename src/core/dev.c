@@ -10,7 +10,7 @@
 void DevUpdate() {
     if (InputKeyDown(IK_DEV)) {
         if (IsKeyPressed(KEY_L)) {
-            LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
+            LoadOBJ("/home/jason/Dev/MESH/meshes/icosahedron.obj");
             SimpleCamera c = GetCamera();
             c.fov = 90.0f;
             MoveCamera(c);
