@@ -1,5 +1,6 @@
 #include "processor.h"
 #include <easyhash.h>
+#include <easybasics.h>
 
 typedef struct {
     uint32_t v1;
@@ -205,28 +206,28 @@ void EdgeFlip(ManifoldMesh* manifold, uint32_t edge) {
     uint32_t h4 = manifold->halfedges.data[h1].twin;
     uint32_t h5 = manifold->halfedges.data[h4].next;
     uint32_t h6 = manifold->halfedges.data[h5].next;
-    uint32_t v1 = manifold->halfedges.data[h1].vertex;
-    uint32_t v2 = manifold->halfedges.data[h4].vertex;
-    uint32_t f1 = manifold->halfedges.data[h3].face;
-    uint32_t f2 = manifold->halfedges.data[h5].face;
-    manifold->halfedges.data[h1].next = h3;
-    manifold->halfedges.data[h1].vertex = manifold->halfedges.data[h6].vertex;
-    manifold->halfedges.data[h4].next = h6;
-    manifold->halfedges.data[h4].vertex = manifold->halfedges.data[h3].vertex;
-    manifold->vertices.data[v1].halfedge = h3;
-    manifold->vertices.data[v2].halfedge = h2;
+    uint32_t v1 = manifold->halfedges.data[h4].vertex;
+    uint32_t v2 = manifold->halfedges.data[h1].vertex;
+    uint32_t f1 = manifold->halfedges.data[h1].face;
+    uint32_t f2 = manifold->halfedges.data[h4].face;
+    manifold->halfedges.data[h1].vertex = manifold->halfedges.data[h3].vertex;
+    manifold->halfedges.data[h4].vertex = manifold->halfedges.data[h6].vertex;
+    manifold->vertices.data[v1].halfedge = h2;
+    manifold->vertices.data[v2].halfedge = h5;
+    manifold->faces.data[f1].halfedge = h2;
+    manifold->faces.data[f2].halfedge = h5;
+    manifold->halfedges.data[h1].next = h6;
+    manifold->halfedges.data[h2].next = h1;
     manifold->halfedges.data[h3].next = h5;
-    manifold->halfedges.data[h5].next = h1;
+    manifold->halfedges.data[h4].next = h3;
+    manifold->halfedges.data[h5].next = h4;
     manifold->halfedges.data[h6].next = h2;
-    manifold->halfedges.data[h2].next = h4;
-    manifold->faces.data[f1].halfedge = h1;
-    manifold->faces.data[f2].halfedge = h4;
     manifold->halfedges.data[h1].face = f1;
-    manifold->halfedges.data[h3].face = f1;
-    manifold->halfedges.data[h5].face = f1;
-    manifold->halfedges.data[h2].face = f2;
+    manifold->halfedges.data[h2].face = f1;
+    manifold->halfedges.data[h3].face = f2;
     manifold->halfedges.data[h4].face = f2;
-    manifold->halfedges.data[h6].face = f2;
+    manifold->halfedges.data[h5].face = f2;
+    manifold->halfedges.data[h6].face = f1;
 }
 
 void EdgeSplit(ManifoldMesh* manifold, uint32_t edge) {
@@ -378,4 +379,115 @@ void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold) {
         }
     }
     fclose(file);
+}
+
+void SerialSubdivide(ManifoldMesh* manifold) {
+    size_t original_edges_size = manifold->edges.size;
+    size_t original_vertices_size = manifold->vertices.size;
+    ARRLIST_float uvals = { 0 };
+    ARRLIST_float_zero(&uvals, manifold->vertices.size);
+    constexpr float one_eighth = (1.0f/8.0f);
+    constexpr float three_eighths = (3.0f/8.0f);
+    constexpr float one_fourth = 0.25f;
+    constexpr float three_sixteenths = (3.0f/16.0f);
+    constexpr float five_eights = (5.0f/8.0f);
+
+    // precalculate u values
+    for (size_t i = 0; i < original_vertices_size; i++) {
+        size_t degree = 0;
+        uint32_t start = manifold->vertices.data[i].halfedge;
+        uint32_t curr = start;
+        while (true) {
+            degree++;
+            uint32_t twin = manifold->halfedges.data[curr].twin;
+            curr = manifold->halfedges.data[twin].next;
+            if (curr == start) break;
+        }
+        if (degree == 3) {
+            uvals.data[i] = three_sixteenths;
+        } else {
+            // TODO: check if degrees or radians?
+            float overn = 1.0f / ((float)degree);
+            uvals.data[i] = (five_eights - powf(three_eighths + one_fourth * cos(2.0f*M_PI*overn), 2.0f)) * overn;
+        }
+    }
+
+    // subdivide triangles
+    for (size_t i = 0; i < original_edges_size; i++) {
+        EdgeSplit(manifold, i);
+    }
+    for (size_t i = original_edges_size; i < manifold->edges.size; i++) {
+        if ((i - original_edges_size)%3 == 0) continue;
+        uint32_t he = manifold->edges.data[i].halfedge;
+        uint32_t v1 = manifold->halfedges.data[he].vertex;
+        uint32_t v2 = manifold->halfedges.data[manifold->halfedges.data[he].twin].vertex;
+        if (v1 < original_vertices_size || v2 < original_vertices_size) {
+            EdgeFlip(manifold, i);
+        }
+    }
+
+    // set new vertex positions
+    for (size_t i = original_vertices_size; i < manifold->vertices.size; i++) {
+        uint32_t start = manifold->vertices.data[i].halfedge;
+        uint32_t curr = start;
+        BOOL extend = FALSE;
+        BOOL override = FALSE;
+        vec3 new_pos = { 0 };
+        while (true) {
+            uint32_t twin = manifold->halfedges.data[curr].twin;
+            curr = manifold->halfedges.data[twin].next;
+            if (override) break;
+            if (curr == start) {
+                if (!extend) {
+                    break;
+                } else {
+                    override = TRUE;
+                }
+            }
+            uint32_t vertex = manifold->halfedges.data[twin].vertex;
+            if (vertex < original_vertices_size) {
+                extend = TRUE;
+                glm_vec3_muladds(manifold->vertices.data[vertex].position, three_eighths, new_pos);
+            } else if (extend) {
+                extend = FALSE;
+                uint32_t medium = twin;
+                medium = manifold->halfedges.data[medium].next;
+                medium = manifold->halfedges.data[medium].next;
+                medium = manifold->halfedges.data[medium].twin;
+                medium = manifold->halfedges.data[medium].next;
+                medium = manifold->halfedges.data[medium].next;
+                medium = manifold->halfedges.data[medium].vertex;
+                EZ_ASSERT(medium < original_vertices_size, "Extended vertex was detected to not be an old vertex");
+                glm_vec3_muladds(manifold->vertices.data[medium].position, one_eighth, new_pos);
+            }
+        }
+        glm_vec3_copy(new_pos, manifold->vertices.data[i].position);
+    }
+
+    // set old vertex positions
+    for (size_t i = 0; i < original_vertices_size; i++) {
+        size_t degree = 0;
+        uint32_t start = manifold->vertices.data[i].halfedge;
+        uint32_t curr = start;
+        vec3 new_pos = { 0 };
+        while (true) {
+            degree++;
+            uint32_t medium = manifold->halfedges.data[curr].next;
+            medium = manifold->halfedges.data[medium].twin;
+            medium = manifold->halfedges.data[medium].next;
+            medium = manifold->halfedges.data[medium].twin;
+            medium = manifold->halfedges.data[medium].next;
+            medium = manifold->halfedges.data[medium].twin;
+            medium = manifold->halfedges.data[medium].vertex;
+            EZ_ASSERT(medium < original_vertices_size, "Extended vertex was detected to not be an old vertex");
+            glm_vec3_muladds(manifold->vertices.data[medium].position, uvals.data[i], new_pos);
+            uint32_t twin = manifold->halfedges.data[curr].twin;
+            curr = manifold->halfedges.data[twin].next;
+            if (curr == start) break;
+        }
+        glm_vec3_muladds(manifold->vertices.data[i].position, 1.0f - (((float)degree)*uvals.data[i]), new_pos);
+        glm_vec3_copy(new_pos, manifold->vertices.data[i].position);
+    }
+
+    ARRLIST_float_clear(&uvals);
 }

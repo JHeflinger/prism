@@ -10,7 +10,7 @@
 void DevUpdate() {
     if (InputKeyDown(IK_DEV)) {
         if (IsKeyPressed(KEY_L)) {
-            LoadOBJ("/home/jason/Dev/MESH/meshes/icosahedron.obj");
+            LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
             SimpleCamera c = GetCamera();
             c.fov = 90.0f;
             MoveCamera(c);
@@ -18,10 +18,15 @@ void DevUpdate() {
             SaveRender("out.png");
         } else if (IsKeyPressed(KEY_O)) {
             Geometry* geometry = RendererGeometry();
-            EdgeCollapse(&(geometry->manifold), 0);
+            SerialSubdivide(&(geometry->manifold));
             if (TRUE || IsManifoldValid(&(geometry->manifold))) {
                 SaveManifoldOBJ("out.obj", &(geometry->manifold));
                 EZ_INFO("Saved processor output!");
+                CleanManifoldMesh(&(geometry->manifold));
+                ClearTriangles();
+                ClearNormals();
+                ClearVertices();
+                LoadOBJ("out.obj");
             } else {
                 EZ_ERROR("Manifold output was not valid");
             }

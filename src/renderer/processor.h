@@ -17,4 +17,6 @@ void EdgeCollapse(ManifoldMesh* manifold, uint32_t edge);
 
 void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold);
 
+void SerialSubdivide(ManifoldMesh* manifold);
+
 #endif
