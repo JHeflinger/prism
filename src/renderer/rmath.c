@@ -10,3 +10,9 @@ float TriangleArea(Vector3 av, Vector3 bv, Vector3 cv) {
     glm_vec3_cross(b_a, c_a, tcross);
     return glm_vec3_norm(tcross) * 0.5f;
 }
+
+void Mat4Add(mat4 a, mat4 b, mat4 dest) {
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            dest[i][j] = a[i][j] + b[i][j];
+}

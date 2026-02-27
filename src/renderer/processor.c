@@ -7,12 +7,20 @@ typedef struct {
     uint32_t v2;
 } IndexPair;
 
+typedef struct {
+    mat4 Q;
+} QuadricError;
+
 uint64_t hash_indexpair(IndexPair ip) {
     return ez_hash_uint64_t(((uint64_t)ip.v1 << 32) | ip.v2);
 }
 
 DECLARE_HASHMAP(IndexPair, uint32_t, Edge);
 IMPL_HASHMAP(IndexPair, uint32_t, Edge, hash_indexpair);
+DECLARE_ARRLIST(QuadricError);
+IMPL_ARRLIST(QuadricError);
+DECLARE_ARRLIST(PQPAIR_uint32_t);
+IMPL_ARRLIST(PQPAIR_uint32_t);
 
 void CleanManifoldMesh(ManifoldMesh* manifold) {
     ARRLIST_ManifoldVertex_clear(&(manifold->vertices));
@@ -472,4 +480,52 @@ void SerialSubdivide(ManifoldMesh* manifold) {
         glm_vec3_muladds(manifold->vertices.data[i].position, 1.0f - (((float)degree)*u), new_pos);
         glm_vec3_copy(new_pos, manifold->vertices.data[i].position);
     }
+}
+
+void SerialSimplify(ManifoldMesh* manifold, size_t reduction) {
+    ARRLIST_QuadricError qs = { 0 };
+    ARRLIST_PQPAIR_uint32_t errors = { 0 };
+    ARRLIST_QuadricError_zero(&qs, manifold->vertices.size);
+    ARRLIST_PQPAIR_uint32_t_zero(&errors, manifold->edges.size);
+
+    // initial quadrics
+    for (size_t i = 0; i < manifold->faces.size; i++) {
+        uint32_t he1 = manifold->faces.data[i].halfedge;
+        uint32_t he2 = manifold->halfedges.data[he1].next;
+        uint32_t he3 = manifold->halfedges.data[he2].next;
+        uint32_t v1 = manifold->halfedges.data[he1].vertex;
+        uint32_t v2 = manifold->halfedges.data[he2].vertex;
+        uint32_t v3 = manifold->halfedges.data[he3].vertex;
+        vec3 e1, e2, normal;
+        glm_vec3_sub(manifold->vertices.data[v2].position, manifold->vertices.data[v1].position, e1);
+        glm_vec3_sub(manifold->vertices.data[v3].position, manifold->vertices.data[v1].position, e2);
+        glm_vec3_cross(e1, e2, normal);
+        glm_vec3_normalize(normal);
+        float a = normal[0];
+        float b = normal[1];
+        float c = normal[2];
+        float d = -glm_vec3_dot(normal, manifold->vertices.data[v1].position);
+        vec4 p = { a, b, c, d };
+        mat4 Kp;
+        glm_mat4_zero(Kp);
+        for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++) Kp[i][j] = p[i] * p[j];
+        Mat4Add(qs.data[v1].Q, Kp, qs.data[v1].Q);
+        Mat4Add(qs.data[v2].Q, Kp, qs.data[v2].Q);
+        Mat4Add(qs.data[v3].Q, Kp, qs.data[v3].Q);
+    }
+
+    // build collapses
+    float edge_cost(uint32_t v1, uint32_t v2) {
+        return 0.0f;
+    }
+    for (size_t i = 0; i < manifold->edges.size; i++) {
+        errors.data[i].value = i;
+        uint32_t halfedge = manifold->edges.data[i].halfedge;
+        uint32_t v1 = manifold->halfedges.data[halfedge].vertex;
+        uint32_t v2 = manifold->halfedges.data[manifold->halfedges.data[halfedge].twin].vertex;
+
+    }
+
+    ARRLIST_PQPAIR_uint32_t_clear(&errors);
+    ARRLIST_QuadricError_clear(&qs);
 }

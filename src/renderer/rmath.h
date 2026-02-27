@@ -10,4 +10,6 @@
 
 float TriangleArea(Vector3 av, Vector3 bv, Vector3 cv);
 
+void Mat4Add(mat4 a, mat4 b, mat4 dest);
+
 #endif

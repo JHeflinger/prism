@@ -19,4 +19,6 @@ void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold);
 
 void SerialSubdivide(ManifoldMesh* manifold);
 
+void SerialSimplify(ManifoldMesh* manifold, size_t reduction);
+
 #endif
