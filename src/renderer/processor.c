@@ -11,6 +11,11 @@ typedef struct {
     mat4 Q;
 } QuadricError;
 
+typedef struct {
+    uint32_t edge;
+    vec3 position;
+} CollapseTarget;
+
 uint64_t hash_indexpair(IndexPair ip) {
     return ez_hash_uint64_t(((uint64_t)ip.v1 << 32) | ip.v2);
 }
@@ -19,8 +24,10 @@ DECLARE_HASHMAP(IndexPair, uint32_t, Edge);
 IMPL_HASHMAP(IndexPair, uint32_t, Edge, hash_indexpair);
 DECLARE_ARRLIST(QuadricError);
 IMPL_ARRLIST(QuadricError);
-DECLARE_ARRLIST(PQPAIR_uint32_t);
-IMPL_ARRLIST(PQPAIR_uint32_t);
+DECLARE_PQUEUE(CollapseTarget);
+IMPL_PQUEUE(CollapseTarget);
+DECLARE_ARRLIST(PQPAIR_CollapseTarget);
+IMPL_ARRLIST(PQPAIR_CollapseTarget);
 
 void CleanManifoldMesh(ManifoldMesh* manifold) {
     ARRLIST_ManifoldVertex_clear(&(manifold->vertices));
@@ -89,7 +96,6 @@ ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_
 }
 
 BOOL IsManifoldValid(const ManifoldMesh* manifold) {
-
     // validate half-edges
     for (size_t i = 0; i < manifold->halfedges.size; i++) {
 
@@ -306,6 +312,16 @@ void EdgeSplit(ManifoldMesh* manifold, uint32_t edge) {
 }
 
 void EdgeCollapse(ManifoldMesh* manifold, uint32_t edge) {
+    uint32_t he = manifold->edges.data[edge].halfedge;
+    uint32_t v1 = manifold->halfedges.data[he].vertex;
+    uint32_t v2 = manifold->halfedges.data[manifold->halfedges.data[he].twin].vertex;
+    vec3 midpoint;
+    glm_vec3_add(manifold->vertices.data[v1].position, manifold->vertices.data[v2].position, midpoint);
+    glm_vec3_scale(midpoint, 0.5f, midpoint);
+    DirectedEdgeCollapse(manifold, edge, midpoint);
+}
+
+void DirectedEdgeCollapse(ManifoldMesh* manifold, uint32_t edge, vec3 position) {
     uint32_t h1 = manifold->edges.data[edge].halfedge;
     uint32_t h2 = manifold->halfedges.data[h1].next;
     uint32_t h3 = manifold->halfedges.data[h2].next;
@@ -337,11 +353,7 @@ void EdgeCollapse(ManifoldMesh* manifold, uint32_t edge) {
         curr = manifold->halfedges.data[twin].next;
         if (curr == walkstart) break;
     }
-    ManifoldVertex v1s = manifold->vertices.data[v1];
-    ManifoldVertex v3s = manifold->vertices.data[v3];
-    manifold->vertices.data[v3].position[0] = ((v3s.position[0] - v1s.position[0])/2.0f) + v1s.position[0];
-    manifold->vertices.data[v3].position[1] = ((v3s.position[1] - v1s.position[1])/2.0f) + v1s.position[1];
-    manifold->vertices.data[v3].position[2] = ((v3s.position[2] - v1s.position[2])/2.0f) + v1s.position[2];
+    SETVEC(manifold->vertices.data[v3].position, position);
     manifold->halfedges.data[h9].twin = h10;
     manifold->halfedges.data[h10].twin = h9;
     manifold->halfedges.data[h8].twin = h7;
@@ -483,10 +495,12 @@ void SerialSubdivide(ManifoldMesh* manifold) {
 }
 
 void SerialSimplify(ManifoldMesh* manifold, size_t reduction) {
+    EZ_ASSERT(reduction <= manifold->edges.size, "Unable to simplify a mesh into a negative number of edges");
     ARRLIST_QuadricError qs = { 0 };
-    ARRLIST_PQPAIR_uint32_t errors = { 0 };
+    ARRLIST_PQPAIR_CollapseTarget errors = { 0 };
     ARRLIST_QuadricError_zero(&qs, manifold->vertices.size);
-    ARRLIST_PQPAIR_uint32_t_zero(&errors, manifold->edges.size);
+    ARRLIST_PQPAIR_CollapseTarget_zero(&errors, manifold->edges.size);
+    PQUEUE_CollapseTarget pq = { 0 };
 
     // initial quadrics
     for (size_t i = 0; i < manifold->faces.size; i++) {
@@ -514,18 +528,66 @@ void SerialSimplify(ManifoldMesh* manifold, size_t reduction) {
         Mat4Add(qs.data[v3].Q, Kp, qs.data[v3].Q);
     }
 
-    // build collapses
-    float edge_cost(uint32_t v1, uint32_t v2) {
-        return 0.0f;
+    // build edge costs
+    inline void calculate_edge_cost(uint32_t i, PQPAIR_CollapseTarget* output) {
+        uint32_t halfedge = manifold->edges.data[i].halfedge;
+        EZ_INFO("%d", halfedge);
+        uint32_t v1 = manifold->halfedges.data[halfedge].vertex; // segfault here
+        uint32_t v2 = manifold->halfedges.data[manifold->halfedges.data[halfedge].twin].vertex;
+        mat4 Q;
+        Mat4Add(qs.data[v1].Q, qs.data[v2].Q, Q);
+        vec3 optimal_position;
+        mat3 A;
+        vec3 b;
+        vec3 _b;
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++)
+                A[i][j] = Q[i][j];
+            b[i] = Q[i][3];
+        }
+        glm_vec3_negate_to(b, _b);
+        if (fabs(glm_mat3_det(A)) < 1e-6f) {
+            glm_vec3_add(manifold->vertices.data[v1].position, manifold->vertices.data[v2].position, optimal_position);
+            glm_vec3_scale(optimal_position, 0.5f, optimal_position);
+        } else {
+            mat3 _A;
+            glm_mat3_inv(A, _A);
+            glm_mat3_mulv(_A, _b, optimal_position);
+        }
+        vec4 v = { optimal_position[0], optimal_position[1], optimal_position[2], 1.0f };
+        vec4 tmp;
+        glm_mat4_mulv(Q, v, tmp);
+        output->value.edge = i;
+        SETVEC(output->value.position, optimal_position);
+        output->cost = glm_vec4_dot(v, tmp);
     }
-    for (size_t i = 0; i < manifold->edges.size; i++) {
-        errors.data[i].value = i;
+    for (size_t i = 0; i < manifold->edges.size; i++)
+        calculate_edge_cost(i, &(errors.data[i]));
+    PQUEUE_CollapseTarget_build(&pq, errors.data, errors.size);
+
+    // collapse targets
+    for (size_t i = 0; i < reduction; i++) {
+        CollapseTarget target = PQUEUE_CollapseTarget_pop(&pq);
+        uint32_t edge = target.edge;
         uint32_t halfedge = manifold->edges.data[i].halfedge;
         uint32_t v1 = manifold->halfedges.data[halfedge].vertex;
         uint32_t v2 = manifold->halfedges.data[manifold->halfedges.data[halfedge].twin].vertex;
-
+        DirectedEdgeCollapse(manifold, edge, target.position);
+        Mat4Add(qs.data[v1].Q, qs.data[v2].Q, qs.data[v1].Q);
+        uint32_t curr = manifold->vertices.data[v1].halfedge;
+        EZ_WARN("%d", manifold->vertices.data[v1].halfedge);
+        EZ_WARN("%d", manifold->vertices.data[v2].halfedge);
+        while (true) {
+            uint32_t edge = manifold->halfedges.data[curr].edge;
+            calculate_edge_cost(edge, &(pq.list[edge].pair));
+            PQUEUE_CollapseTarget_update(&pq, edge, pq.list[edge].pair.cost);
+            uint32_t twin = manifold->halfedges.data[curr].twin;
+            curr = manifold->halfedges.data[twin].next;
+            if (curr == manifold->vertices.data[v1].halfedge) break;
+        }
     }
 
-    ARRLIST_PQPAIR_uint32_t_clear(&errors);
+    PQUEUE_CollapseTarget_clear(&pq);
+    ARRLIST_PQPAIR_CollapseTarget_clear(&errors);
     ARRLIST_QuadricError_clear(&qs);
 }

@@ -15,6 +15,8 @@ void EdgeSplit(ManifoldMesh* manifold, uint32_t edge);
 
 void EdgeCollapse(ManifoldMesh* manifold, uint32_t edge);
 
+void DirectedEdgeCollapse(ManifoldMesh* manifold, uint32_t edge, vec3 position);
+
 void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold);
 
 void SerialSubdivide(ManifoldMesh* manifold);

@@ -19,7 +19,9 @@ void DevUpdate() {
             SaveRender("out.png");
         } else if (IsKeyPressed(KEY_O)) {
             Geometry* geometry = RendererGeometry();
-            SerialSimplify(&(geometry->manifold), 5204);
+            //SerialSubdivide(&(geometry->manifold));
+            SerialSimplify(&(geometry->manifold), 1); //5204
+            //EdgeCollapse(&(geometry->manifold), 0);
             if (TRUE || IsManifoldValid(&(geometry->manifold))) {
                 SaveManifoldOBJ("out.obj", &(geometry->manifold));
                 EZ_INFO("Saved processor output!");
