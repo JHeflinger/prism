@@ -20,7 +20,7 @@ void DevUpdate() {
         } else if (IsKeyPressed(KEY_O)) {
             Geometry* geometry = RendererGeometry();
             //SerialSubdivide(&(geometry->manifold));
-            SerialSimplify(&(geometry->manifold), 1); //5204
+            SerialSimplify(&(geometry->manifold), 50); //5204
             //EdgeCollapse(&(geometry->manifold), 0);
             if (TRUE || IsManifoldValid(&(geometry->manifold))) {
                 SaveManifoldOBJ("out.obj", &(geometry->manifold));
