@@ -93,6 +93,10 @@ Triangle* TriangleReference(size_t index);
 
 void UpdateTriangles();
 
+BOOL Subdivide();
+
+BOOL Simplify(size_t faces);
+
 void SaveRender(const char* filepath);
 
 char* GPUModel();

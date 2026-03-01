@@ -318,15 +318,6 @@ void Render() {
             } else {
                 VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
             }
-            // TODO: do not make this automatic if not on GPU and fast
-            CleanManifoldMesh(&(g_renderer.geometry.manifold));
-            g_renderer.geometry.manifold = GenerateManifoldMesh(
-                g_renderer.geometry.vertices,
-                g_renderer.geometry.normals,
-                g_renderer.geometry.triangles);
-            if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
-                EZ_ERROR("Mesh was not detected to be a valid manifold");
-            }
         }
 
         // update materials if needed
@@ -520,6 +511,42 @@ Triangle* TriangleReference(size_t index) {
 
 void UpdateTriangles() {
     g_renderer.geometry.changes.update_triangles = TRUE;
+}
+
+BOOL Subdivide() {
+    CleanManifoldMesh(&(g_renderer.geometry.manifold));
+    g_renderer.geometry.manifold = GenerateManifoldMesh(
+        g_renderer.geometry.vertices,
+        g_renderer.geometry.normals,
+        g_renderer.geometry.triangles);
+    if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
+        EZ_ERROR("Mesh was not detected to be a valid manifold");
+        CleanManifoldMesh(&(g_renderer.geometry.manifold));
+        return FALSE;
+    } else {
+        SerialSubdivide(&(g_renderer.geometry.manifold));
+        ReformatFromManifold(&(g_renderer.geometry));
+        CleanManifoldMesh(&(g_renderer.geometry.manifold));
+        return TRUE;
+    }
+}
+
+BOOL Simplify(size_t faces) {
+    size_t iterations = ceil(((float)faces)/2.0f);
+    g_renderer.geometry.manifold = GenerateManifoldMesh(
+        g_renderer.geometry.vertices,
+        g_renderer.geometry.normals,
+        g_renderer.geometry.triangles);
+    if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
+        EZ_ERROR("Mesh was not detected to be a valid manifold");
+        CleanManifoldMesh(&(g_renderer.geometry.manifold));
+        return FALSE;
+    } else {
+        SerialSimplify(&(g_renderer.geometry.manifold), iterations);
+        ReformatFromManifold(&(g_renderer.geometry));
+        CleanManifoldMesh(&(g_renderer.geometry.manifold));
+        return TRUE;
+    }
 }
 
 void SaveRender(const char* filepath) {

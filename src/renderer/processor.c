@@ -1,4 +1,5 @@
 #include "processor.h"
+#include "renderer/renderer.h"
 #include <easyhash.h>
 #include <easybasics.h>
 
@@ -406,21 +407,62 @@ void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold) {
         EZ_ERROR("Unable to open file");
         return;
     }
+    uint32_t* vertex_remapping = EZ_ALLOC(manifold->vertices.size, sizeof(uint32_t));
+    size_t new_v_ind = 1;
     for (size_t i = 0; i < manifold->vertices.size; i++) {
-        ManifoldVertex v = manifold->vertices.data[i];
-        fprintf(file, "v %.6f %.6f %.6f\n", v.position[0], v.position[1], v.position[2]);
+        if (manifold->vertices.data[i].halfedge == (uint32_t)-1) {
+            vertex_remapping[i] = (uint32_t)-1;
+        } else {
+            vertex_remapping[i] = new_v_ind++;
+            ManifoldVertex v = manifold->vertices.data[i];
+            fprintf(file, "v %.6f %.6f %.6f\n", v.position[0], v.position[1], v.position[2]);
+        }
     }
     for (size_t i = 0; i < manifold->faces.size; i++) {
         uint32_t he = manifold->faces.data[i].halfedge;
         if (he != (uint32_t)-1) {
             uint32_t v1, v2, v3;
-            v1 = 1 + manifold->halfedges.data[he].vertex;
-            v2 = 1 + manifold->halfedges.data[manifold->halfedges.data[he].next].vertex;
-            v3 = 1 + manifold->halfedges.data[manifold->halfedges.data[manifold->halfedges.data[he].next].next].vertex;
+            v1 = vertex_remapping[manifold->halfedges.data[he].vertex];
+            v2 = vertex_remapping[manifold->halfedges.data[manifold->halfedges.data[he].next].vertex];
+            v3 = vertex_remapping[manifold->halfedges.data[manifold->halfedges.data[manifold->halfedges.data[he].next].next].vertex];
             fprintf(file, "f %u %u %u\n", (unsigned int)v1, (unsigned int)v2, (unsigned int)v3);
         }
     }
+    EZ_FREE(vertex_remapping);
     fclose(file);
+}
+
+void ReformatFromManifold(Geometry* geometry) {
+    ARRLIST_Vector3_wipe(&(geometry->vertices));
+    ARRLIST_Vector3_wipe(&(geometry->normals));
+    ARRLIST_Triangle_wipe(&(geometry->triangles));
+    ARRLIST_TriangleID_wipe(&(geometry->tids));
+    ARRLIST_TriangleID_wipe(&(geometry->emissives));
+    uint32_t* vertex_remapping = EZ_ALLOC(geometry->manifold.vertices.size, sizeof(uint32_t));
+    size_t new_v_ind = 0;
+    for (size_t i = 0; i < geometry->manifold.vertices.size; i++) {
+        if (geometry->manifold.vertices.data[i].halfedge == (uint32_t)-1) {
+            vertex_remapping[i] = (uint32_t)-1;
+        } else {
+            vertex_remapping[i] = new_v_ind++;
+            ManifoldVertex v = geometry->manifold.vertices.data[i];
+            SubmitVertex((Vector3){ v.position[0], v.position[1], v.position[2] });
+        }
+    }
+    for (size_t i = 0; i < geometry->manifold.faces.size; i++) {
+        uint32_t he = geometry->manifold.faces.data[i].halfedge;
+        if (he != (uint32_t)-1) {
+            uint32_t v1, v2, v3;
+            v1 = vertex_remapping[geometry->manifold.halfedges.data[he].vertex];
+            v2 = vertex_remapping[geometry->manifold.halfedges.data[geometry->manifold.halfedges.data[he].next].vertex];
+            v3 = vertex_remapping[geometry->manifold.halfedges.data[geometry->manifold.halfedges.data[geometry->manifold.halfedges.data[he].next].next].vertex];
+            SubmitTriangle((Triangle){ v1, v2, v3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 0});
+        }
+    }
+    EZ_FREE(vertex_remapping);
+    UpdateTriangles();
+    UpdateVertices();
+    UpdateNormals();
 }
 
 void SerialSubdivide(ManifoldMesh* manifold) {

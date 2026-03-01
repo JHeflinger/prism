@@ -19,6 +19,8 @@ void DirectedEdgeCollapse(ManifoldMesh* manifold, uint32_t edge, vec3 position);
 
 void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold);
 
+void ReformatFromManifold(Geometry* geometry);
+
 void SerialSubdivide(ManifoldMesh* manifold);
 
 void SerialSimplify(ManifoldMesh* manifold, size_t reduction);
