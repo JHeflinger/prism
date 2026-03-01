@@ -8,6 +8,7 @@
 #include "data/input.h"
 
 void DevUpdate() {
+    static int poop = 0;
     if (InputKeyDown(IK_DEV)) {
         if (IsKeyPressed(KEY_L)) {
             LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
@@ -15,12 +16,14 @@ void DevUpdate() {
             c.fov = 90.0f;
             glm_vec3_scale(c.position, 10.0f, c.position);
             MoveCamera(c);
+            //poop = 2602;
         } else if (IsKeyPressed(KEY_S)) {
             SaveRender("out.png");
-        } else if (IsKeyPressed(KEY_O)) {
+        } else if (IsKeyPressed(KEY_O) || poop > 0) {
+            poop--;
             Geometry* geometry = RendererGeometry();
             //SerialSubdivide(&(geometry->manifold));
-            SerialSimplify(&(geometry->manifold), 50); //5204
+            SerialSimplify(&(geometry->manifold), 2602); //2602
             //EdgeCollapse(&(geometry->manifold), 0);
             if (TRUE || IsManifoldValid(&(geometry->manifold))) {
                 SaveManifoldOBJ("out.obj", &(geometry->manifold));
