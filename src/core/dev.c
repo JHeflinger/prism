@@ -11,16 +11,13 @@ void DevUpdate() {
     if (InputKeyDown(IK_DEV)) {
         if (IsKeyPressed(KEY_L)) {
             LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
+            //LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
             SimpleCamera c = GetCamera();
             c.fov = 90.0f;
-            glm_vec3_scale(c.position, 10.0f, c.position);
             MoveCamera(c);
+            FitCamera();
         } else if (IsKeyPressed(KEY_S)) {
             SaveRender("out.png");
-        } else if (IsKeyPressed(KEY_O)) {
-            Subdivide();
-        } else if (IsKeyPressed(KEY_C)) {
-            Simplify(5204);
         }
     }
 }

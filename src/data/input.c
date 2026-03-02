@@ -7,6 +7,7 @@ void InitializeInput() {
     g_input_map.keymap[IK_DEV] = KEY_D;
     g_input_map.keymap[IK_PAN_CAMERA] = KEY_SPACE;
     g_input_map.keymap[IK_RESET_CAMERA] = KEY_GRAVE;
+    g_input_map.keymap[IK_FIT_CAMERA] = KEY_F;
 
     g_input_map.btnmap[IK_MOUSELEFT] = MOUSE_BUTTON_LEFT;
     g_input_map.btnmap[IK_MOUSERIGHT] = MOUSE_BUTTON_RIGHT;

@@ -279,7 +279,7 @@ BOOL UIDragFloat_(PersistantUIData* data, float* value, float min, float max, fl
     char buffer[32] = { 0 };
     snprintf(buffer, 32, "%.3f", *value);
     Vector2 text_size = MeasureTextEx(FontAsset(), buffer, LINE_HEIGHT, 0);
-    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 2, w, LINE_HEIGHT - 4, MappedColor(UI_DRAG_FLOAT_COLOR));
+    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 1, w, LINE_HEIGHT - 2, MappedColor(UI_DRAG_FLOAT_COLOR));
     DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;

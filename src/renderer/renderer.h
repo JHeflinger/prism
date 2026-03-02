@@ -19,6 +19,8 @@ SimpleCamera GetCamera();
 
 void MoveCamera(SimpleCamera camera);
 
+void FitCamera();
+
 void ReorientCamera();
 
 Vector3 GetVertex(size_t index);
@@ -96,6 +98,8 @@ void UpdateTriangles();
 BOOL Subdivide();
 
 BOOL Simplify(size_t faces);
+
+void Displace(float displacement);
 
 void SaveRender(const char* filepath);
 

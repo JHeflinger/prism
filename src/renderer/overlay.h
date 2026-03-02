@@ -9,9 +9,7 @@ void SetViewportRec(Rectangle rec);
 
 Rectangle GetViewportRec();
 
-TriangleID HoveredTriangle();
-
-size_t HoveredTriangleIndex(TriangleID tid);
+size_t HoveredTriangleIndex();
 
 OverlaySSBO* ExposedOverlaySSBO();
 

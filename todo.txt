@@ -35,14 +35,15 @@ ICEBOX:
 37. command-based geometry editing
 38. update emissives on vertex change too, probably just redo all emissive stuff on bvh change
 39. make a much more efficient way to update gpu memory based on host memory (which is definitely possible btw!)
+40. put as many mesh operations as possible on GPU
 
 Next:
 4. Implement remove functions
 6. verify and reimplement all popup funcs as needed
 15. use vec3 for verts instead of Vector3s
-16. mesh validator can definitely be done on gpu i think
 17. bug - small triangles viewed from a steep angle go out - debug by using very subdivided isocahedron
-18. bug - tids are completely off after subdivision, probably not setting them/ getting them/ interpreting them/ using index vs tid/ properly
+19. for tids have a map that just maps tids to indexes and vice versa so retrieving a triangle isnt O(n)
+20. do we even need ids? like triangleIDs and materialIDs etc?
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

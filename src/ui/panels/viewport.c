@@ -38,6 +38,12 @@ void UpdateViewportPanel(float width, float height) {
         moved = TRUE;
     }
 
+    // fit camera
+    if (InputKeyPressed(IK_FIT_CAMERA)) {
+        FitCamera();
+        moved = TRUE;
+    }
+
     // camera controls
     {
         SimpleCamera camera = GetCamera();
@@ -92,10 +98,10 @@ void UpdateViewportPanel(float width, float height) {
     // selection controls
     {
         if (InputButtonPressed(IK_MOUSELEFT) && lfocused) {
-            TriangleID tid = HoveredTriangle();
-            if (tid != (TriangleID)-1) {
-                SetEditTriangle(HoveredTriangleIndex(tid));
-                SetSelectedTriangle(tid);
+            size_t tindex = HoveredTriangleIndex();
+            if (tindex != (size_t)-1) {
+                SetEditTriangle(tindex);
+                SetSelectedTriangle(tindex);
             } else {
                 DeselectEditTarget();
             }

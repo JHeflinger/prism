@@ -130,6 +130,23 @@ void MoveCamera(SimpleCamera camera) {
     g_renderer.camera = camera;
 }
 
+void FitCamera() {
+    if (g_renderer.geometry.minBB.x >= g_renderer.geometry.maxBB.x) return;
+    vec3 l2p;
+    glm_vec3_sub(g_renderer.camera.position, g_renderer.camera.look, l2p);
+    glm_vec3_normalize(l2p);
+    vec3 extend, minbb, maxbb, min2o, newo;
+    SETVECV(minbb, g_renderer.geometry.minBB);
+    SETVECV(maxbb, g_renderer.geometry.maxBB);
+    glm_vec3_sub(maxbb, minbb, extend);
+    glm_vec3_scale(extend, 0.5f, min2o);
+    glm_vec3_add(min2o, minbb, newo);
+    float width = glm_vec3_norm(extend);
+    SETVEC(g_renderer.camera.look, newo);
+    glm_vec3_scale(l2p, width, l2p);
+    glm_vec3_add(l2p, newo, g_renderer.camera.position);
+}
+
 void ReorientCamera() {
     for (int i = 0; i < 3; i++) {
         float sign = g_renderer.camera.up[i] > 0 ? 1.0f : (g_renderer.camera.up[i] < 0 ? -1.0f : 0.0f);
@@ -547,6 +564,38 @@ BOOL Simplify(size_t faces) {
         CleanManifoldMesh(&(g_renderer.geometry.manifold));
         return TRUE;
     }
+}
+
+void Displace(float displacement) {
+    vec3* normals = EZ_ALLOC(g_renderer.geometry.vertices.size, sizeof(vec3));
+    for (size_t i = 0; i < g_renderer.geometry.triangles.size; i++) {
+        vec3 e1, e2, normal, a, b, c;
+        uint32_t av = g_renderer.geometry.triangles.data[i].a;
+        uint32_t bv = g_renderer.geometry.triangles.data[i].b;
+        uint32_t cv = g_renderer.geometry.triangles.data[i].c;
+        SETVECV(a, g_renderer.geometry.vertices.data[av]);
+        SETVECV(b, g_renderer.geometry.vertices.data[bv]);
+        SETVECV(c, g_renderer.geometry.vertices.data[cv]);
+        glm_vec3_sub(b, a, e1);
+        glm_vec3_sub(c, a, e2);
+        glm_vec3_cross(e1, e2, normal);
+        glm_vec3_normalize(normal);
+        glm_vec3_add(normal, normals[av], normals[av]);
+        glm_vec3_add(normal, normals[bv], normals[bv]);
+        glm_vec3_add(normal, normals[cv], normals[cv]);
+    }
+    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
+        float dval = (((float)rand()) / ((float)RAND_MAX)) * displacement;
+        glm_vec3_scale(normals[i], dval, normals[i]);
+        Vector3 p = g_renderer.geometry.vertices.data[i];
+        g_renderer.geometry.vertices.data[i] = (Vector3) {
+            p.x + normals[i][0],
+            p.y + normals[i][1],
+            p.z + normals[i][2]
+        };
+    }
+    EZ_FREE(normals);
+    UpdateVertices();
 }
 
 void SaveRender(const char* filepath) {

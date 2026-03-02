@@ -16,7 +16,13 @@ void DrawMeshPanel(float width, float height) {
         Simplify(faces_to_reduce_by);
     }
     UIMoveCursor((width - 20.0f)/2.0f, -20);
-    UIDragUInt(&faces_to_reduce_by, 1, NumTriangles() - 4, 1, (width - 20.0f)/2.0f);
+    UIDragUInt(&faces_to_reduce_by, 0, NumTriangles() - 4, 1, (width - 20.0f)/2.0f);
+    static float displacement = 0.0f;
+    if (UIButton("Displace", (width - 20)/2.0f)) {
+        Displace(displacement);
+    }
+    UIMoveCursor((width - 20.0f)/2.0f, -20);
+    UIDragFloat(&displacement, 0, FLT_MAX, 0.001f, (width - 20.0f)/2.0f);
 }
 
 Panel GenerateMeshPanel() {
