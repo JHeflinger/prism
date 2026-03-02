@@ -37,12 +37,11 @@ ICEBOX:
 39. make a much more efficient way to update gpu memory based on host memory (which is definitely possible btw!)
 
 Next:
-3. half-edge geometry processing implementations
 4. Implement remove functions
 6. verify and reimplement all popup funcs as needed
 15. use vec3 for verts instead of Vector3s
 16. mesh validator can definitely be done on gpu i think
-17. bug - small triangles viewed from a steep angle go out - debug by using very subdivided isocahedron - try clicking on a triangle that doesn't exist and it errors out
+17. bug - small triangles viewed from a steep angle go out - debug by using very subdivided isocahedron
 18. bug - tids are completely off after subdivision, probably not setting them/ getting them/ interpreting them/ using index vs tid/ properly
 
 ideas:
