@@ -48,6 +48,7 @@ void InitEditor() {
 	ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->left)->left))->panels), GenerateMeshPanel());
     g_ui->divide = (3 * GetScreenWidth())/4;
     SetPrimaryUI(g_ui);
+    DevInitialize();
 }
 
 void UpdateEditor() {

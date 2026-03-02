@@ -5,13 +5,26 @@
 #include "renderer/renderer.h"
 #include "renderer/loader.h"
 #include "data/input.h"
+#include "core/binds.h"
+
+void LoadCow() {
+    LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
+    FitCamera();
+}
+
+void DevInitialize() {
+    AddBind("load cow", LoadCow,
+        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
+        (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
+        (BindCommand){ IK_C_OVERRIDE, BIND_KEY_PRESSED });
+}
 
 void DevUpdate() {
     if (InputKeyDown(IK_DEV)) {
         if (IsKeyDown(KEY_L)) {
             if (IsKeyPressed(KEY_C)) {
-                LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
-                FitCamera();
+                //LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
+                //FitCamera();
             } else if (IsKeyPressed(KEY_B)) {
                 LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
                 SimpleCamera c = GetCamera();
@@ -32,6 +45,8 @@ void DevUpdate() {
 }
 
 #else
+
+void DevInitialize() {}
 
 void DevUpdate() {}
 

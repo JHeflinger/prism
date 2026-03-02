@@ -9,6 +9,8 @@ void InitializeInput() {
     g_input_map.keymap[IK_RESET_CAMERA] = KEY_GRAVE;
     g_input_map.keymap[IK_FIT_CAMERA] = KEY_F;
     g_input_map.keymap[IK_TOGGLE_HINTS] = KEY_H;
+    g_input_map.keymap[IK_L_OVERRIDE] = KEY_L;
+    g_input_map.keymap[IK_C_OVERRIDE] = KEY_C;
 
     g_input_map.btnmap[IK_MOUSELEFT] = MOUSE_BUTTON_LEFT;
     g_input_map.btnmap[IK_MOUSERIGHT] = MOUSE_BUTTON_RIGHT;
@@ -18,6 +20,8 @@ void InitializeInput() {
     g_input_map.keynames[IK_RESET_CAMERA] = "~";
     g_input_map.keynames[IK_FIT_CAMERA] = "F";
     g_input_map.keynames[IK_TOGGLE_HINTS] = "H";
+    g_input_map.keynames[IK_L_OVERRIDE] = "L";
+    g_input_map.keynames[IK_C_OVERRIDE] = "C";
 
     g_input_map.btnnames[IK_MOUSELEFT] = "LEFT CLICK";
     g_input_map.btnnames[IK_MOUSERIGHT] = "RIGHT CLICK";

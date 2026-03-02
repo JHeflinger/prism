@@ -108,9 +108,26 @@ BindNode* GetBindSet(BindNode* node) {
 void DrawCurrentBinds(float x, float y) {
     UIMoveCursor(x, y);
     BindNode* bindset = GetBindSet(&g_root_bind);
+    BOOL listed = FALSE;
     for (size_t i = 0; i < bindset->nodes.size; i++) {
         BindNode* curr = (BindNode*)(bindset->nodes.data[i]);
-        const char* identifier = IsActionKey(curr->command.action) ? InputKeyRepresentation(curr->command.input) : InputButtonRepresentation(curr->command.input);
-        UIDrawSubtleText("[%s] %s", identifier, curr->name);
+        if (IsActionEndpoint(curr->command.action)) {
+            const char* identifier = IsActionKey(curr->command.action) ? InputKeyRepresentation(curr->command.input) : InputButtonRepresentation(curr->command.input);
+            UIDrawSubtleText("[%s] %s", identifier, curr->name);
+            listed = TRUE;
+        }
+    }
+    BOOL first = TRUE;
+    for (size_t i = 0; i < bindset->nodes.size; i++) {
+        BindNode* curr = (BindNode*)(bindset->nodes.data[i]);
+        if (!IsActionEndpoint(curr->command.action)) {
+            if (first)  {
+                if (listed) UIMoveCursor(0, 20);
+                UIDrawSubtleText("Transition Keybinds:");
+            }
+            const char* identifier = IsActionKey(curr->command.action) ? InputKeyRepresentation(curr->command.input) : InputButtonRepresentation(curr->command.input);
+            UIDrawSubtleText("<%s>", identifier);
+            first = FALSE;
+        }
     }
 }
