@@ -1,0 +1,116 @@
+#include "binds.h"
+#include "ui/ui.h"
+#include <easymemory.h>
+
+BindNode g_root_bind = { 0 };
+
+BOOL IsActionEndpoint(BindAction action) {
+    return !(action == BIND_KEY_DOWN || action == BIND_BUTTON_DOWN);
+}
+
+BOOL IsActionKey(BindAction action) {
+    return (action == BIND_KEY_DOWN || action == BIND_KEY_PRESSED || action == BIND_KEY_RELEASED || action == BIND_KEY_END);
+}
+
+void AddBindPath(BindNode** root, const char* name, BindFunc func, BindCommand command) {
+    for (size_t i = 0; i < (*root)->nodes.size; i++) {
+        BindCommand bc = ((BindNode*)((*root)->nodes.data[i]))->command;
+        if (memcmp(&bc, &command, sizeof(BindCommand)) == 0) {
+            EZ_ASSERT(!IsActionEndpoint(bc.action), "Duplicate bind detected - all binds must be unique");
+            *root = ((BindNode*)((*root)->nodes.data[i]));
+            return;
+        }
+    }
+    BindNode* node = EZ_ALLOC(1, sizeof(BindNode));
+    node->command = command;
+    if (IsActionEndpoint(command.action)) {
+        node->name = name;
+        node->func = func;
+    }
+    ARRLIST_voidPtr_add(&((*root)->nodes), node);
+    *root = node;
+}
+
+void AddBind(const char* name, BindFunc func, ...) {
+    va_list args;
+    va_start(args, func);
+    BindCommand curr;
+    BindNode* node = &g_root_bind;
+    do {
+        curr = va_arg(args, BindCommand);
+        AddBindPath(&node, name, func, curr);
+    } while (!IsActionEndpoint(curr.action));
+    va_end(args);
+}
+
+void ListenBindNode(BindNode* node) {
+    BindCommand bc = node->command;
+    switch (bc.action) {
+        case BIND_BUTTON_PRESSED:
+            if (InputButtonPressed(bc.input)) node->func();
+            return;
+        case BIND_BUTTON_RELEASED:
+            if (InputButtonReleased(bc.input)) node->func();
+            return;
+        case BIND_BUTTON_DOWN:
+            if (!InputButtonDown(bc.input)) return;
+            break;
+        case BIND_BUTTON_END:
+            if (InputButtonDown(bc.input)) node->func();
+            return;
+        case BIND_KEY_PRESSED:
+            if (InputKeyPressed(bc.input)) node->func();
+            return;
+        case BIND_KEY_RELEASED:
+            if (InputKeyReleased(bc.input)) node->func();
+            return;
+        case BIND_KEY_DOWN:
+            if (!InputKeyDown(bc.input)) return;
+            break;
+        case BIND_KEY_END:
+            if (InputKeyDown(bc.input)) node->func();
+            return;
+        default: 
+            EZ_ASSERT(FALSE, "Unhandled bind action detected");
+            return;
+    }
+    for (size_t i = 0; i < node->nodes.size; i++) ListenBindNode((BindNode*)(node->nodes.data[i]));
+}
+
+void ListenBinds() {
+    for (size_t i = 0; i < g_root_bind.nodes.size; i++) ListenBindNode((BindNode*)(g_root_bind.nodes.data[i]));
+}
+
+void CleanBindNode(BindNode* node) {
+    for (size_t i = 0; i < node->nodes.size; i++) {
+        CleanBindNode((BindNode*)node->nodes.data[i]);
+        EZ_FREE(node->nodes.data[i]);
+    }
+    ARRLIST_voidPtr_clear(&(node->nodes));
+}
+
+void CleanBinds() {
+    CleanBindNode(&g_root_bind);
+}
+
+BindNode* GetBindSet(BindNode* node) {
+    for (size_t i = 0; i < node->nodes.size; i++) {
+        BindCommand bc = ((BindNode*)(node->nodes.data[i]))->command;
+        if (!IsActionEndpoint(bc.action) &&
+            ((bc.action == BIND_BUTTON_DOWN && InputButtonDown(bc.input)) ||
+            (bc.action == BIND_KEY_DOWN && InputKeyDown(bc.input)))) {
+            return GetBindSet((BindNode*)node->nodes.data[i]);
+        }
+    }
+    return node;
+}
+
+void DrawCurrentBinds(float x, float y) {
+    UIMoveCursor(x, y);
+    BindNode* bindset = GetBindSet(&g_root_bind);
+    for (size_t i = 0; i < bindset->nodes.size; i++) {
+        BindNode* curr = (BindNode*)(bindset->nodes.data[i]);
+        const char* identifier = IsActionKey(curr->command.action) ? InputKeyRepresentation(curr->command.input) : InputButtonRepresentation(curr->command.input);
+        UIDrawSubtleText("[%s] %s", identifier, curr->name);
+    }
+}

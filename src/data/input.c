@@ -8,9 +8,19 @@ void InitializeInput() {
     g_input_map.keymap[IK_PAN_CAMERA] = KEY_SPACE;
     g_input_map.keymap[IK_RESET_CAMERA] = KEY_GRAVE;
     g_input_map.keymap[IK_FIT_CAMERA] = KEY_F;
+    g_input_map.keymap[IK_TOGGLE_HINTS] = KEY_H;
 
     g_input_map.btnmap[IK_MOUSELEFT] = MOUSE_BUTTON_LEFT;
     g_input_map.btnmap[IK_MOUSERIGHT] = MOUSE_BUTTON_RIGHT;
+
+    g_input_map.keynames[IK_DEV] = "D";
+    g_input_map.keynames[IK_PAN_CAMERA] = "SPCBAR";
+    g_input_map.keynames[IK_RESET_CAMERA] = "~";
+    g_input_map.keynames[IK_FIT_CAMERA] = "F";
+    g_input_map.keynames[IK_TOGGLE_HINTS] = "H";
+
+    g_input_map.btnnames[IK_MOUSELEFT] = "LEFT CLICK";
+    g_input_map.btnnames[IK_MOUSERIGHT] = "RIGHT CLICK";
 
     g_input_map.initialized = TRUE;
 }
@@ -21,6 +31,16 @@ void BlockInput() {
 
 void UnblockInput() {
     g_input_map.blocked = FALSE;
+}
+
+const char* InputKeyRepresentation(InputKey key) {
+    EZ_ASSERT(key < NUMKEYS, "Invalid key code");
+    return g_input_map.keynames[key];
+}
+
+const char* InputButtonRepresentation(InputButton button) {
+    EZ_ASSERT(button < NUMBTNS, "Invalid button code");
+    return g_input_map.btnnames[button];
 }
 
 BOOL InputKeyPressed(InputKey key) {

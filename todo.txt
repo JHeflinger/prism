@@ -39,11 +39,13 @@ ICEBOX:
 
 Next:
 4. Implement remove functions
+5. fun system that displays possible keybinds as you press keys?
 6. verify and reimplement all popup funcs as needed
 15. use vec3 for verts instead of Vector3s
 17. bug - small triangles viewed from a steep angle go out - debug by using very subdivided isocahedron
 19. for tids have a map that just maps tids to indexes and vice versa so retrieving a triangle isnt O(n)
 20. do we even need ids? like triangleIDs and materialIDs etc?
+21. bug: mesh flickers during moving/reconstructing bvh - is this bc of the bvh, or is it the waiting to idle? check by turning on bvh construction all the time, if it still flickers its the bvh construction
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

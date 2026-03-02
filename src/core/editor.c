@@ -12,6 +12,7 @@
 #include "ui/panels/actions.h"
 #include "renderer/renderer.h"
 #include "core/dev.h"
+#include "core/binds.h"
 #include <raylib.h>
 #include <easymemory.h>
 #include <easylogger.h>
@@ -63,6 +64,7 @@ void DrawEditor() {
 }
 
 void CleanEditor() {
+    CleanBinds();
     DestroyUI(g_ui);
     DestroyAssets();
     DestroyRenderer();
@@ -85,6 +87,9 @@ void RunEditor() {
 
         // update editor
         UpdateEditor();
+
+        // poll binds
+        ListenBinds();
 
         // prerender steps
         PreRenderEditor();

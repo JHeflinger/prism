@@ -178,8 +178,11 @@ void SubmitVertex(Vector3 vertex) {
 }
 
 void ClearVertices() {
+    if (g_renderer.geometry.vertices.maxsize == 0) return;
     ARRLIST_Vector3_clear(&(g_renderer.geometry.vertices));
     g_renderer.geometry.changes.update_vertices = TRUE;
+    g_renderer.geometry.minBB = (Vector3){ FLT_MAX, FLT_MAX, FLT_MAX };
+    g_renderer.geometry.maxBB = (Vector3){ -FLT_MAX, -FLT_MAX, -FLT_MAX };
 }
 
 void SubmitNormal(Vector3 normal) {
@@ -188,6 +191,7 @@ void SubmitNormal(Vector3 normal) {
 }
 
 void ClearNormals() {
+    if (g_renderer.geometry.normals.maxsize == 0) return;
     ARRLIST_Vector3_clear(&(g_renderer.geometry.normals));
     g_renderer.geometry.changes.update_normals = TRUE;
 
@@ -213,6 +217,7 @@ TriangleID SubmitTriangle(Triangle triangle) {
 }
 
 void ClearTriangles() {
+    if (g_renderer.geometry.triangles.maxsize == 0) return;
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.tids));
     ARRLIST_Triangle_clear(&(g_renderer.geometry.triangles));
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.emissives));
@@ -228,6 +233,7 @@ LightID SubmitLight(PointLight light) {
 }
 
 void ClearLights() {
+    if (g_renderer.geometry.lids.maxsize == 0) return;
     ARRLIST_LightID_clear(&(g_renderer.geometry.lids));
     ARRLIST_PointLight_clear(&(g_renderer.geometry.lights));
     g_renderer.geometry.changes.update_lights = TRUE;
@@ -259,6 +265,7 @@ char** MaterialNameReference(MaterialID mid) {
 }
 
 void ClearMaterials() {
+    if (g_renderer.geometry.materials.maxsize == 0) return;
     ARRLIST_SurfaceMaterial_clear(&(g_renderer.geometry.materials));
     for (size_t i = 0; i < g_renderer.geometry.materialnames.size; i++)
         EZ_FREE(g_renderer.geometry.materialnames.data[i]);
@@ -585,7 +592,7 @@ void Displace(float displacement) {
         glm_vec3_add(normal, normals[cv], normals[cv]);
     }
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
-        float dval = (((float)rand()) / ((float)RAND_MAX)) * displacement;
+        float dval = ((((float)rand()) / ((float)RAND_MAX)) * displacement) - (displacement/2.0f);
         glm_vec3_scale(normals[i], dval, normals[i]);
         Vector3 p = g_renderer.geometry.vertices.data[i];
         g_renderer.geometry.vertices.data[i] = (Vector3) {

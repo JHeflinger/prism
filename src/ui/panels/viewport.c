@@ -1,14 +1,31 @@
 #include "viewport.h"
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
-#include "data/input.h"
-#include "ui/panels/edit.h"
 #include "renderer/loader.h"
+#include "ui/panels/edit.h"
+#include "data/input.h"
+#include "core/binds.h"
 #include <easylogger.h>
 #include <rlgl.h>
 #include <math.h>
 
 RenderTexture2D g_viewport_target;
+BOOL g_show_hints = FALSE;
+
+void ResetViewportCamera() {
+    SimpleCamera camera = GetCamera();
+    SETVEC3(camera.position, 0.0f, 2.133f, 2.11f);
+    SETVEC3(camera.look, 0.0f, 0.0f, 0.0f);
+    SETVEC3(camera.up, 0.0f, 1.0f, 0.0f);
+    camera.fov = 90.0f;
+    camera.aperature = 0.0f;
+    camera.focus = 0.0f;
+    MoveCamera(camera);
+}
+
+void ToggleHints() {
+    g_show_hints = !g_show_hints;
+}
 
 void DrawViewportPanel(float width, float height) {
     DrawTexturePro(
@@ -16,6 +33,9 @@ void DrawViewportPanel(float width, float height) {
         (Rectangle){ 0, 0, g_viewport_target.texture.width, -g_viewport_target.texture.height },
         (Rectangle){ 0, 0, g_viewport_target.texture.width, g_viewport_target.texture.height },
         (Vector2){ 0, 0 }, 0, WHITE);
+    if (g_show_hints && HoveredPanel() && strcmp(HoveredPanel(), "Viewport") == 0) {
+        DrawCurrentBinds(0, 0);
+    }
 }
 
 void UpdateViewportPanel(float width, float height) {
@@ -24,25 +44,6 @@ void UpdateViewportPanel(float width, float height) {
     BOOL moved = FALSE;
     static BOOL lfocused = FALSE;
     static BOOL rfocused = FALSE;
-
-    // reset camera
-    if (InputKeyPressed(IK_RESET_CAMERA)) {
-        SimpleCamera camera = GetCamera();
-        SETVEC3(camera.position, 0.0f, 2.133f, 2.11f);
-        SETVEC3(camera.look, 0.0f, 0.0f, 0.0f);
-        SETVEC3(camera.up, 0.0f, 1.0f, 0.0f);
-        camera.fov = 90.0f;
-        camera.aperature = 0.0f;
-        camera.focus = 0.0f;
-        MoveCamera(camera);
-        moved = TRUE;
-    }
-
-    // fit camera
-    if (InputKeyPressed(IK_FIT_CAMERA)) {
-        FitCamera();
-        moved = TRUE;
-    }
 
     // camera controls
     {
@@ -105,7 +106,6 @@ void UpdateViewportPanel(float width, float height) {
             } else {
                 DeselectEditTarget();
             }
-            moved = TRUE;
         }
     }
 
@@ -122,5 +122,8 @@ Panel GenerateViewportPanel() {
     p.draw = DrawViewportPanel;
     p.update = UpdateViewportPanel;
     g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
-	return p;
+	AddBind("reset viewport camera", ResetViewportCamera, (BindCommand){ IK_RESET_CAMERA, BIND_KEY_PRESSED });
+	AddBind("fit viewport camera to model", FitCamera, (BindCommand){ IK_FIT_CAMERA, BIND_KEY_PRESSED });
+    AddBind("toggle input hints", ToggleHints, (BindCommand){ IK_TOGGLE_HINTS, BIND_KEY_PRESSED });
+    return p;
 }

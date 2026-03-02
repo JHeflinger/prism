@@ -20,6 +20,7 @@ void InitializeColors() {
     g_color_map.colors[PANEL_BTN_PRS_COLOR] = (Color){ 65, 65, 65, 255 };
     g_color_map.colors[UI_DIVIDER_COLOR] = (Color){ 100, 100, 100, 255 };
     g_color_map.colors[UI_TEXT_COLOR] = (Color){ 255, 255, 255, 255 };
+    g_color_map.colors[UI_SUBTLE_TEXT_COLOR] = (Color){ 255, 255, 255, 155 };
     g_color_map.initialized = TRUE;
 }
 

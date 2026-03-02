@@ -260,6 +260,15 @@ void UIDrawText(const char* text, ...) {
     g_ui_cursor.x = 10;
 }
 
+void UIDrawSubtleText(const char* text, ...) {
+    va_list args;
+    va_start(args, text);
+    vsnprintf(g_ui_text_buffer, MAX_LINE_WIDTH - 1, text, args);
+    DrawTextEx(FontAsset(), g_ui_text_buffer, g_ui_cursor, LINE_HEIGHT, 0, MappedColor(UI_SUBTLE_TEXT_COLOR));
+    g_ui_cursor.y += LINE_HEIGHT;
+    g_ui_cursor.x = 10;
+}
+
 BOOL UIDragFloat_(PersistantUIData* data, float* value, float min, float max, float speed, size_t w) {
     BOOL ret = FALSE;
     if (InputButtonPressed(IK_MOUSELEFT) &&
