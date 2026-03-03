@@ -725,16 +725,15 @@ void SerialFilter(ManifoldMesh* manifold, float smoothing) {
             vec3 d;
             glm_vec3_sub(manifold->vertices.data[vertex].position, manifold->vertices.data[i].position, d);
             float d2 = glm_vec3_norm2(d);
-            float ndiff = 1.0f - glm_vec3_dot(manifold->vertices.data[i].normal, manifold->vertices.data[vertex].normal);
-            float ws = exp(-d2 / (2.0f * manifold->sigma * manifold->sigma));
-            float wr = exp(-(ndiff*ndiff) / (2.0f * smoothing * smoothing));
-            float w = ws * wr;
-            float height = glm_vec3_dot(d, manifold->vertices.data[i].normal);
-            normalizer += w * height;
-            sum += w;
+            float height = glm_vec3_dot(manifold->vertices.data[i].normal, d);
+            float wc = exp(-d2 / (2.0f * manifold->sigma * manifold->sigma));
+            float ws = exp(-(height*height) / (2.0f * smoothing * smoothing));
+            float w = wc * ws;
+            sum += w * height;
+            normalizer += w;
             curr = manifold->halfedges.data[twin].next;
         } while (curr != start);
-        deltas.data[i] = normalizer / sum;
+        deltas.data[i] = sum / normalizer;
     }
     for (size_t i = 0; i < manifold->vertices.size; i++) {
         vec3 n;
