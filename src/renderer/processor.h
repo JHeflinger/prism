@@ -25,4 +25,6 @@ void SerialSubdivide(ManifoldMesh* manifold);
 
 void SerialSimplify(ManifoldMesh* manifold, size_t reduction);
 
+void SerialFilter(ManifoldMesh* manifold, float smoothing);
+
 #endif

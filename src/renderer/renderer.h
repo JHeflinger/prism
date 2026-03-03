@@ -101,6 +101,8 @@ BOOL Simplify(size_t faces);
 
 void Displace(float displacement);
 
+BOOL Smoothen(float smoothening);
+
 void SaveRender(const char* filepath);
 
 char* GPUModel();

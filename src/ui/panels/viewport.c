@@ -139,7 +139,7 @@ void UpdateViewportPanel(float width, float height) {
         glm_vec3_sub(camera.position, camera.look, offset);
         float radius = glm_vec3_norm(offset);
         float rbefore = radius;
-        if (hovered) radius -= GetMouseWheelMove() / 4.0f;
+        if (hovered) radius -= GetMouseWheelMove() * (0.05f * radius);
         if (radius < 1e-6f) radius = 1e-6f;
         glm_vec3_normalize(offset);
         glm_vec3_scale(offset, radius, offset);

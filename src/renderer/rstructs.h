@@ -136,6 +136,7 @@ DECLARE_ARRLIST(PointLight);
 typedef struct {
     alignas(4) uint32_t halfedge;
     alignas(16) vec3 position;
+    alignas(16) vec3 normal;
 } ManifoldVertex;
 DECLARE_ARRLIST(ManifoldVertex);
 
@@ -163,6 +164,7 @@ typedef struct {
     ARRLIST_ManifoldEdge edges;
     ARRLIST_ManifoldFace faces;
     ARRLIST_ManifoldHalfEdge halfedges;
+    float sigma; // used for filtering
 } ManifoldMesh;
 
 typedef struct {

@@ -44,11 +44,8 @@ ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_
     ARRLIST_ManifoldFace_zero(&mesh.faces, triangles.size);
     ARRLIST_ManifoldHalfEdge_zero(&mesh.halfedges, triangles.size*3);
     ARRLIST_ManifoldVertex_zero(&mesh.vertices, vertices.size);
-    for (size_t i = 0; i < vertices.size; i++) {
-        SETVEC3(mesh.vertices.data[i].position, vertices.data[i].x, vertices.data[i].y, vertices.data[i].z);
-    }
 
-    // step 2: create faces and halfedges
+    // step 2: create faces and halfedges and vertices
     for (size_t i = 0; i < triangles.size; i++) {
         uint32_t base = i * 3;
         mesh.faces.data[i].halfedge = base;
@@ -59,15 +56,35 @@ ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_
         mesh.halfedges.data[base + 0].next = base + 1;
         mesh.halfedges.data[base + 1].next = base + 2;
         mesh.halfedges.data[base + 2].next = base + 0;
-        mesh.halfedges.data[base + 0].vertex = triangles.data[i].a;
-        mesh.halfedges.data[base + 1].vertex = triangles.data[i].b;
-        mesh.halfedges.data[base + 2].vertex = triangles.data[i].c;
-        mesh.vertices.data[triangles.data[i].a].halfedge = base + 0;
-        mesh.vertices.data[triangles.data[i].b].halfedge = base + 1;
-        mesh.vertices.data[triangles.data[i].c].halfedge = base + 2;
+        uint32_t av = triangles.data[i].a;
+        uint32_t bv = triangles.data[i].b;
+        uint32_t cv = triangles.data[i].c;
+        mesh.halfedges.data[base + 0].vertex = av;
+        mesh.halfedges.data[base + 1].vertex = bv;
+        mesh.halfedges.data[base + 2].vertex = cv;
+        mesh.vertices.data[av].halfedge = base + 0;
+        mesh.vertices.data[bv].halfedge = base + 1;
+        mesh.vertices.data[cv].halfedge = base + 2;
+        vec3 e1, e2, normal, a, b, c;
+        SETVECV(a, vertices.data[av]);
+        SETVECV(b, vertices.data[bv]);
+        SETVECV(c, vertices.data[cv]);
+        glm_vec3_sub(b, a, e1);
+        glm_vec3_sub(c, a, e2);
+        glm_vec3_cross(e1, e2, normal);
+        glm_vec3_normalize(normal);
+        glm_vec3_add(normal, mesh.vertices.data[av].normal, mesh.vertices.data[av].normal);
+        glm_vec3_add(normal, mesh.vertices.data[bv].normal, mesh.vertices.data[bv].normal);
+        glm_vec3_add(normal, mesh.vertices.data[cv].normal, mesh.vertices.data[cv].normal);
     }
 
-    // step 3: calculate edges and twins
+    // step 3: normalize and set vertex positions
+    for (size_t i = 0; i < vertices.size; i++) {
+        SETVECV(mesh.vertices.data[i].position, vertices.data[i]);
+        glm_vec3_normalize(mesh.vertices.data[i].normal);
+    }
+
+    // step 4: calculate edges and twins
     HASHMAP_Edge map = { 0 };
     for (size_t i = 0; i < triangles.size*3; i++) {
         IndexPair ip = { mesh.halfedges.data[i].vertex, mesh.halfedges.data[mesh.halfedges.data[i].next].vertex };
@@ -91,10 +108,16 @@ ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_
             mesh.edges.data[edgeind].halfedge = he;
             mesh.halfedges.data[he].edge = edgeind;
             mesh.halfedges.data[mesh.halfedges.data[he].twin].edge = edgeind;
+            uint32_t v1 = mesh.halfedges.data[he].vertex;
+            uint32_t v2 = mesh.halfedges.data[mesh.halfedges.data[he].twin].vertex;
+            vec3 dist;
+            glm_vec3_sub(mesh.vertices.data[v1].position, mesh.vertices.data[v2].position, dist);
+            mesh.sigma += glm_vec3_norm(dist);
             edgeind++;
         }
     }
     HASHMAP_Edge_clear(&map);
+    mesh.sigma = (mesh.sigma / ((float)(mesh.edges.size) + 1e-6)) * 2.0f;
 
     return mesh;
 }
@@ -299,7 +322,7 @@ void EdgeSplit(ManifoldMesh* manifold, uint32_t edge) {
         ((v2s.position[0] - v4s.position[0])/2.0f) + v4s.position[0],
         ((v2s.position[1] - v4s.position[1])/2.0f) + v4s.position[1],
         ((v2s.position[2] - v4s.position[2])/2.0f) + v4s.position[2]
-    }});
+    }, {0, 0, 0}}); // note that we are assuming we will not be using normals
     ARRLIST_ManifoldFace_add(&(manifold->faces), (ManifoldFace) { h6 });
     ARRLIST_ManifoldFace_add(&(manifold->faces), (ManifoldFace) { h2 });
     ARRLIST_ManifoldEdge_add(&(manifold->edges), (ManifoldEdge) { h7 });
@@ -686,4 +709,37 @@ void SerialSimplify(ManifoldMesh* manifold, size_t reduction) {
     PQUEUE_CollapseTarget_clear(&pq);
     ARRLIST_PQPAIR_CollapseTarget_clear(&errors);
     ARRLIST_QuadricError_clear(&qs);
+}
+
+void SerialFilter(ManifoldMesh* manifold, float smoothing) {
+    ARRLIST_float deltas = { 0 };
+    ARRLIST_float_zero(&deltas, manifold->vertices.size);
+    for (size_t i = 0; i < manifold->vertices.size; i++) {
+        float normalizer = 0.0f;
+        float sum = 0.0f;
+        uint32_t start = manifold->vertices.data[i].halfedge;
+        uint32_t curr = start;
+        do {
+            uint32_t twin = manifold->halfedges.data[curr].twin;
+            uint32_t vertex = manifold->halfedges.data[twin].vertex;
+            vec3 d;
+            glm_vec3_sub(manifold->vertices.data[vertex].position, manifold->vertices.data[i].position, d);
+            float d2 = glm_vec3_norm2(d);
+            float ndiff = 1.0f - glm_vec3_dot(manifold->vertices.data[i].normal, manifold->vertices.data[vertex].normal);
+            float ws = exp(-d2 / (2.0f * manifold->sigma * manifold->sigma));
+            float wr = exp(-(ndiff*ndiff) / (2.0f * smoothing * smoothing));
+            float w = ws * wr;
+            float height = glm_vec3_dot(d, manifold->vertices.data[i].normal);
+            normalizer += w * height;
+            sum += w;
+            curr = manifold->halfedges.data[twin].next;
+        } while (curr != start);
+        deltas.data[i] = normalizer / sum;
+    }
+    for (size_t i = 0; i < manifold->vertices.size; i++) {
+        vec3 n;
+        glm_vec3_scale(manifold->vertices.data[i].normal, deltas.data[i], n);
+        glm_vec3_add(manifold->vertices.data[i].position, n, manifold->vertices.data[i].position);
+    }
+    ARRLIST_float_clear(&deltas);
 }

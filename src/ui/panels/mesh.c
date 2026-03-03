@@ -23,6 +23,12 @@ void DrawMeshPanel(float width, float height) {
     }
     UIMoveCursor((width - 20.0f)/2.0f, -20);
     UIDragFloat(&displacement, 0, FLT_MAX, 0.001f, (width - 20.0f)/2.0f);
+    static float smoothening = 0.3f;
+    if (UIButton("Smoothen", (width - 20)/2.0f)) {
+        Smoothen(smoothening);
+    }
+    UIMoveCursor((width - 20.0f)/2.0f, -20);
+    UIDragFloat(&smoothening, 0, FLT_MAX, 0.001f, (width - 20.0f)/2.0f);
 }
 
 Panel GenerateMeshPanel() {

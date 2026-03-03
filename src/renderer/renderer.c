@@ -592,6 +592,7 @@ void Displace(float displacement) {
         glm_vec3_add(normal, normals[cv], normals[cv]);
     }
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
+        glm_vec3_normalize(normals[i]);
         float dval = ((((float)rand()) / ((float)RAND_MAX)) * displacement) - (displacement/2.0f);
         glm_vec3_scale(normals[i], dval, normals[i]);
         Vector3 p = g_renderer.geometry.vertices.data[i];
@@ -603,6 +604,24 @@ void Displace(float displacement) {
     }
     EZ_FREE(normals);
     UpdateVertices();
+}
+
+BOOL Smoothen(float smoothening) {
+    CleanManifoldMesh(&(g_renderer.geometry.manifold));
+    g_renderer.geometry.manifold = GenerateManifoldMesh(
+        g_renderer.geometry.vertices,
+        g_renderer.geometry.normals,
+        g_renderer.geometry.triangles);
+    if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
+        EZ_ERROR("Mesh was not detected to be a valid manifold");
+        CleanManifoldMesh(&(g_renderer.geometry.manifold));
+        return FALSE;
+    } else {
+        SerialFilter(&(g_renderer.geometry.manifold), smoothening);
+        ReformatFromManifold(&(g_renderer.geometry));
+        CleanManifoldMesh(&(g_renderer.geometry.manifold));
+        return TRUE;
+    }
 }
 
 void SaveRender(const char* filepath) {
