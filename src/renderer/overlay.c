@@ -3,7 +3,7 @@
 
 Renderer* g_overlay_renderer_ref = NULL;
 Rectangle g_viewport_dims = { 0 };
-OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (uint32_t)-1 };
+OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (TriangleID)-1 };
 TriangleID g_single_selected_triangle = -1;
 
 void SetOverlayContext(Renderer* renderer) {
@@ -18,9 +18,8 @@ Rectangle GetViewportRec() {
     return g_viewport_dims;
 }
 
-size_t HoveredTriangleIndex() {
-    if (g_exposed_overlay_ssbo.hovered_tid == (uint32_t)-1) return (size_t)-1;
-    return (TriangleID)g_exposed_overlay_ssbo.hovered_tid;
+TriangleID HoveredTriangle() {
+    return g_exposed_overlay_ssbo.hovered_tid;
 }
 
 OverlaySSBO* ExposedOverlaySSBO() {

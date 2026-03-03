@@ -56,10 +56,12 @@ DECLARE_ARRLIST(UseMaterialMarker);
 IMPL_ARRLIST(Face);
 IMPL_ARRLIST(UV);
 IMPL_ARRLIST(UseMaterialMarker);
+DECLARE_ARRLIST(MaterialID);
+IMPL_ARRLIST(MaterialID);
 
 typedef struct {
     ARRLIST_Vector3 vertices;
-    ARRLIST_Vector3 normals; // NOTE: per-primitive normals are not implemented yet! This field doesn't have any effect yet!
+    ARRLIST_Vector3 normals;
     ARRLIST_UV uvs; // NOTE: textures are not implemented yet! This field doesn't have any effect yet!
     ARRLIST_Face faces;
     ARRLIST_DynamicString material_names;

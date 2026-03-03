@@ -67,7 +67,7 @@ typedef struct {
 } OverlayUniformBufferObject;
 
 typedef struct {
-	alignas(4) uint32_t hovered_tid;
+	alignas(4) TriangleID hovered_tid;
 } OverlaySSBO;
 
 typedef struct {

@@ -12,8 +12,6 @@
 #include <time.h>
 
 Renderer g_renderer = { 0 };
-TriangleID g_triangle_id = 0;
-LightID g_light_id = 0;
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
 
@@ -210,15 +208,12 @@ TriangleID SubmitTriangle(Triangle triangle) {
             g_renderer.geometry.vertices.data[triangle.b],
             g_renderer.geometry.vertices.data[triangle.c]);
     }
-    ARRLIST_TriangleID_add(&(g_renderer.geometry.tids), g_triangle_id);
     ARRLIST_Triangle_add(&(g_renderer.geometry.triangles), triangle);
-    g_triangle_id++;
-    return g_triangle_id - 1;
+    return g_renderer.geometry.triangles.size - 1;
 }
 
 void ClearTriangles() {
     if (g_renderer.geometry.triangles.maxsize == 0) return;
-    ARRLIST_TriangleID_clear(&(g_renderer.geometry.tids));
     ARRLIST_Triangle_clear(&(g_renderer.geometry.triangles));
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.emissives));
     g_renderer.geometry.changes.update_triangles = TRUE;
@@ -226,15 +221,11 @@ void ClearTriangles() {
 
 LightID SubmitLight(PointLight light) {
     g_renderer.geometry.changes.update_lights = TRUE;
-    ARRLIST_LightID_add(&(g_renderer.geometry.lids), g_light_id);
     ARRLIST_PointLight_add(&(g_renderer.geometry.lights), light);
-    g_light_id++;
-    return g_light_id - 1;
+    return g_renderer.geometry.lights.size - 1;
 }
 
 void ClearLights() {
-    if (g_renderer.geometry.lids.maxsize == 0) return;
-    ARRLIST_LightID_clear(&(g_renderer.geometry.lids));
     ARRLIST_PointLight_clear(&(g_renderer.geometry.lights));
     g_renderer.geometry.changes.update_lights = TRUE;
 }

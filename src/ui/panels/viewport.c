@@ -149,8 +149,8 @@ void UpdateViewportPanel(float width, float height) {
 
     // selection controls
     if (InputButtonPressed(IK_MOUSELEFT) && g_lfocused) {
-        size_t tindex = HoveredTriangleIndex();
-        if (tindex != (size_t)-1) {
+        TriangleID tindex = HoveredTriangle();
+        if (tindex != (TriangleID)-1) {
             SetEditTriangle(tindex);
             SetSelectedTriangle(tindex);
         } else {

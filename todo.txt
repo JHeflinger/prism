@@ -19,30 +19,22 @@ ICEBOX:
 20. Resizeable window
 21. Compositing pipeline
 22. SDF construction pipeline using union, intersection, modifiers, etc
-23. Available keybinds tooltop overlay (like monster hunter combo hints)
 24. New test suite
-26. Edit Material name
+26. Edit Material name and illumination model
 27. Light names
 28. Edit light name
-29. Select model dropdown menu for material adding/editing
-30. antialiasing
 31. no need to trace initial hit every single time when accumulating paths? restir?
 32. optimization - caclulation struct! pre calculate everything possible and just pass the struct around as to reduce redundant calculations
 33. for sampling a direct light uniformly, weight each emissive material by area. Then make a mapping array that maps the random index you get to the weighted index of the emissive array
 34. Changing emission in material editor needs to re compute emissive materials (maybe we just do this on preview change)
-35. Direct light sampling doesn't work for transmissive materials, as shadows that get occluded by transparent materials don't see the light even if the light transmisses perfectly. This causes shadows to be a bit grainy
 36. Executor should be bounce-per-frame as well
 37. command-based geometry editing
 38. update emissives on vertex change too, probably just redo all emissive stuff on bvh change
 39. make a much more efficient way to update gpu memory based on host memory (which is definitely possible btw!)
-40. put as many mesh operations as possible on GPU
 
 Next:
-4. Implement remove functions
 6. verify and reimplement all popup funcs as needed
 15. use vec3 for verts instead of Vector3s
-19. for tids have a map that just maps tids to indexes and vice versa so retrieving a triangle isnt O(n)
-20. do we even need ids? like triangleIDs and materialIDs etc?
 21. bug: mesh flickers during moving/reconstructing bvh - is this bc of the bvh, or is it the waiting to idle? check by turning on bvh construction all the time, if it still flickers its the bvh construction, seems to probably be due to pipeline refreshing
 
 ideas:

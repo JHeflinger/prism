@@ -11,9 +11,7 @@ typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
 typedef uint32_t LightID;
 
-DECLARE_ARRLIST(MaterialID);
 DECLARE_ARRLIST(TriangleID);
-DECLARE_ARRLIST(LightID);
 DECLARE_ARRLIST(Vector3);
 
 #define PREVIEW_PIPELINE_FLAGS   0b110011111111
@@ -172,9 +170,7 @@ typedef struct {
     ARRLIST_Vector3 vertices;
     ARRLIST_Vector3 normals;
     ARRLIST_PointLight lights;
-    ARRLIST_LightID lids;
     ARRLIST_Triangle triangles;
-    ARRLIST_TriangleID tids;
     ARRLIST_TriangleID emissives;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;
