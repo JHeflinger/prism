@@ -31,6 +31,18 @@ void AddBindPath(BindNode** root, const char* name, BindFunc func, BindCommand c
     *root = node;
 }
 
+BindNode* GetBindSet(BindNode* node) {
+    for (size_t i = 0; i < node->nodes.size; i++) {
+        BindCommand bc = ((BindNode*)(node->nodes.data[i]))->command;
+        if (!IsActionEndpoint(bc.action) &&
+            ((bc.action == BIND_BUTTON_DOWN && InputButtonDown(bc.input)) ||
+            (bc.action == BIND_KEY_DOWN && InputKeyDown(bc.input)))) {
+            return GetBindSet((BindNode*)node->nodes.data[i]);
+        }
+    }
+    return node;
+}
+
 void AddBind(const char* name, BindFunc func, ...) {
     va_list args;
     va_start(args, func);
@@ -43,42 +55,36 @@ void AddBind(const char* name, BindFunc func, ...) {
     va_end(args);
 }
 
-void ListenBindNode(BindNode* node) {
-    BindCommand bc = node->command;
-    switch (bc.action) {
-        case BIND_BUTTON_PRESSED:
-            if (InputButtonPressed(bc.input)) node->func();
-            return;
-        case BIND_BUTTON_RELEASED:
-            if (InputButtonReleased(bc.input)) node->func();
-            return;
-        case BIND_BUTTON_DOWN:
-            if (!InputButtonDown(bc.input)) return;
-            break;
-        case BIND_BUTTON_END:
-            if (InputButtonDown(bc.input)) node->func();
-            return;
-        case BIND_KEY_PRESSED:
-            if (InputKeyPressed(bc.input)) node->func();
-            return;
-        case BIND_KEY_RELEASED:
-            if (InputKeyReleased(bc.input)) node->func();
-            return;
-        case BIND_KEY_DOWN:
-            if (!InputKeyDown(bc.input)) return;
-            break;
-        case BIND_KEY_END:
-            if (InputKeyDown(bc.input)) node->func();
-            return;
-        default: 
-            EZ_ASSERT(FALSE, "Unhandled bind action detected");
-            return;
-    }
-    for (size_t i = 0; i < node->nodes.size; i++) ListenBindNode((BindNode*)(node->nodes.data[i]));
-}
-
 void ListenBinds() {
-    for (size_t i = 0; i < g_root_bind.nodes.size; i++) ListenBindNode((BindNode*)(g_root_bind.nodes.data[i]));
+    BindNode* bindset = GetBindSet(&g_root_bind);
+    for (size_t i = 0; i < bindset->nodes.size; i++) {
+        BindNode* curr = (BindNode*)(bindset->nodes.data[i]);
+        if (IsActionEndpoint(curr->command.action)) {
+            switch(curr->command.action) {
+                case BIND_BUTTON_PRESSED:
+                    if (InputButtonPressed(curr->command.input)) curr->func();
+                    break;
+                case BIND_BUTTON_RELEASED:
+                    if (InputButtonReleased(curr->command.input)) curr->func();
+                    break;
+                case BIND_BUTTON_END:
+                    if (InputButtonDown(curr->command.input)) curr->func();
+                    break;
+                case BIND_KEY_PRESSED:
+                    if (InputKeyPressed(curr->command.input)) curr->func();
+                    break;
+                case BIND_KEY_RELEASED:
+                    if (InputKeyReleased(curr->command.input)) curr->func();
+                    break;
+                case BIND_KEY_END:
+                    if (InputKeyDown(curr->command.input)) curr->func();
+                    break;
+                default:
+                    EZ_ASSERT(FALSE, "Unhandled bind action detected");
+                    break;
+            }
+        }
+    }
 }
 
 void CleanBindNode(BindNode* node) {
@@ -91,18 +97,6 @@ void CleanBindNode(BindNode* node) {
 
 void CleanBinds() {
     CleanBindNode(&g_root_bind);
-}
-
-BindNode* GetBindSet(BindNode* node) {
-    for (size_t i = 0; i < node->nodes.size; i++) {
-        BindCommand bc = ((BindNode*)(node->nodes.data[i]))->command;
-        if (!IsActionEndpoint(bc.action) &&
-            ((bc.action == BIND_BUTTON_DOWN && InputButtonDown(bc.input)) ||
-            (bc.action == BIND_KEY_DOWN && InputKeyDown(bc.input)))) {
-            return GetBindSet((BindNode*)node->nodes.data[i]);
-        }
-    }
-    return node;
 }
 
 void DrawCurrentBinds(float x, float y) {

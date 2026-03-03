@@ -14,7 +14,7 @@ typedef enum {
     BIND_KEY_PRESSED,
     BIND_KEY_RELEASED,
     BIND_KEY_DOWN,
-    BIND_KEY_END
+    BIND_KEY_END,
 } BindAction;
 
 typedef struct {
