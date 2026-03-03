@@ -6,6 +6,7 @@
 #include "renderer/loader.h"
 #include "data/input.h"
 #include "core/binds.h"
+#include "ui/panels/edit.h"
 
 void LoadCow() {
     LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
@@ -32,6 +33,7 @@ void ClearScene() {
     ClearTriangles();
     ClearVertices();
     ClearNormals();
+    DeselectEditTarget();
 }
 
 void DevInitialize() {

@@ -2,7 +2,7 @@
 
 #define MAX_RECURSIVE_DEPTH 500
 #define AO_DIST 0.5
-#define EPS 0.0001
+#define EPS 0.000001
 
 struct BVHNode {
     vec3 minBB;

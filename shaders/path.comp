@@ -2,7 +2,7 @@
 
 #define MAX_RECURSIVE_DEPTH 2000
 #define MAX_BOUNCES 100
-#define EPS 0.0001
+#define EPS 0.000001
 
 #define LAMBERTIAN_MODEL 2
 #define MIRROR_MODEL 5
