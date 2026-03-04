@@ -33,7 +33,11 @@ ICEBOX:
 39. make a much more efficient way to update gpu memory based on host memory (which is definitely possible btw!)
 
 Next:
+1. implement spot lights
+2. implement point lights
 6. verify and reimplement all popup funcs as needed
+7. verify and reimplement all edit ui as needed
+8. make it so lights are lebeled on what type they are
 15. use vec3 for verts instead of Vector3s
 21. bug: mesh flickers during moving/reconstructing bvh - is this bc of the bvh, or is it the waiting to idle? check by turning on bvh construction all the time, if it still flickers its the bvh construction, seems to probably be due to pipeline refreshing
 

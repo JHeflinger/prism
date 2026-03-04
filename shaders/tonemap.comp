@@ -19,6 +19,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint directonly;
     uint showdof;
     uint normals;
+    uint scenelighting;
     float fov;
     float width;
     float height;

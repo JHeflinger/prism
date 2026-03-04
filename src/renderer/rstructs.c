@@ -3,7 +3,7 @@
 IMPL_ARRLIST(TriangleID);
 IMPL_ARRLIST(Triangle);
 IMPL_ARRLIST(SurfaceMaterial);
-IMPL_ARRLIST(PointLight);
+IMPL_ARRLIST(SceneLight);
 IMPL_ARRLIST(Vector3);
 IMPL_ARRLIST(ManifoldVertex);
 IMPL_ARRLIST(ManifoldEdge);

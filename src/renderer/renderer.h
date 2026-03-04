@@ -39,7 +39,7 @@ TriangleID SubmitTriangle(Triangle triangle);
 
 void ClearTriangles();
 
-LightID SubmitLight(PointLight light);
+LightID SubmitLight(SceneLight light);
 
 void ClearLights();
 
@@ -79,7 +79,7 @@ void UpdateMaterials();
 
 size_t NumLights();
 
-PointLight* LightReference(size_t index);
+SceneLight* LightReference(size_t index);
 
 void UpdateLights();
 

@@ -63,6 +63,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint directonly;
     uint showdof;
     uint normals;
+    uint scenelighting;
     float fov;
     float width;
     float height;
@@ -207,10 +208,10 @@ vec3 shade(Ray ray, Hit hit) {
     float ambient = 0.08;
     float rim = 1.0 - lambert(hit.normal, normalize(ubo.position - hit.position));
     rim = pow(rim, 2.0) * 0.15;
-    float lighting = 0.5*lambert(hit.normal, key_light) +
-                     0.3*lambert(hit.normal, fill_light) +
-                     0.1*lambert(hit.normal, back_light);
-    return clamp((lighting + rim + ambient) * vec3(0.8), vec3(0), vec3(1));
+    float lighting = 0.4*lambert(hit.normal, key_light) +
+                     0.35*lambert(hit.normal, fill_light) +
+                     0.3*lambert(hit.normal, back_light);
+    return clamp((lighting + rim + ambient) * vec3(0.8), vec3(0.25), vec3(1));
 }
 
 float plane_intersect(Ray ray, vec3 planepoint, vec3 normal) {

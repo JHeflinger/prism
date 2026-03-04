@@ -71,7 +71,7 @@ BOOL VINIT_OverlaySSBOs(VulkanDataBuffer* ssbo_array) {
 }
 
 BOOL VINIT_Lights(VulkanDataBuffer* lights) {
-    size_t arrsize = sizeof(PointLight) * g_vinit_renderer_ref->geometry.lights.maxsize;
+    size_t arrsize = sizeof(SceneLight) * g_vinit_renderer_ref->geometry.lights.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,

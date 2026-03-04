@@ -125,11 +125,12 @@ typedef struct {
 
 typedef struct {
     alignas(16) vec3 position;
-    alignas(16) vec3 ambient;
-    alignas(16) vec3 diffuse;
-    alignas(16) vec3 specular;
-} PointLight;
-DECLARE_ARRLIST(PointLight);
+    alignas(16) vec3 color;
+    alignas(16) vec3 direction;
+    alignas(4) float penumbra;
+    alignas(4) float angle;
+} SceneLight;
+DECLARE_ARRLIST(SceneLight);
 
 typedef struct {
     alignas(4) uint32_t halfedge;
@@ -169,7 +170,7 @@ typedef struct {
     ManifoldMesh manifold;
     ARRLIST_Vector3 vertices;
     ARRLIST_Vector3 normals;
-    ARRLIST_PointLight lights;
+    ARRLIST_SceneLight lights;
     ARRLIST_Triangle triangles;
     ARRLIST_TriangleID emissives;
     ARRLIST_SurfaceMaterial materials;
@@ -189,6 +190,7 @@ typedef struct {
     BOOL async;
     BOOL showdof;
     BOOL directonly;
+    BOOL scenelighting;
     PipelineFlags flags;
 } RendererConfig;
 

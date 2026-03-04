@@ -42,11 +42,12 @@ void InitializeRenderer() {
     // initialize config
     g_renderer.config.whitepoint = 20.0f;
     g_renderer.config.gamma = 2.2f;
-    g_renderer.config.direct = FALSE;
+    g_renderer.config.direct = TRUE;
     g_renderer.config.grid = TRUE;
     g_renderer.config.async = TRUE;
     g_renderer.config.showdof = TRUE;
     g_renderer.config.directonly = FALSE;
+    g_renderer.config.scenelighting = TRUE;
     g_renderer.config.normals = TRUE;
     g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
 
@@ -96,7 +97,7 @@ void InitializeRenderer() {
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
-        0, 0, 2
+        0, 10.0f, 2
     }, "Default");
 
     // set overlay context
@@ -219,14 +220,14 @@ void ClearTriangles() {
     g_renderer.geometry.changes.update_triangles = TRUE;
 }
 
-LightID SubmitLight(PointLight light) {
+LightID SubmitLight(SceneLight light) {
     g_renderer.geometry.changes.update_lights = TRUE;
-    ARRLIST_PointLight_add(&(g_renderer.geometry.lights), light);
+    ARRLIST_SceneLight_add(&(g_renderer.geometry.lights), light);
     return g_renderer.geometry.lights.size - 1;
 }
 
 void ClearLights() {
-    ARRLIST_PointLight_clear(&(g_renderer.geometry.lights));
+    ARRLIST_SceneLight_clear(&(g_renderer.geometry.lights));
     g_renderer.geometry.changes.update_lights = TRUE;
 }
 
@@ -494,7 +495,7 @@ size_t NumLights() {
     return g_renderer.geometry.lights.size;
 }
 
-PointLight* LightReference(size_t index) {
+SceneLight* LightReference(size_t index) {
     EZ_ASSERT(index < g_renderer.geometry.lights.size, "Invalid light index requested");
     return &(g_renderer.geometry.lights.data[index]);
 }

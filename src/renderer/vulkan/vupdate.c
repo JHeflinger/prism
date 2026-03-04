@@ -9,11 +9,11 @@
 Renderer* g_vupdt_renderer_ref = NULL;
 
 void VUPDT_Lights(VulkanDataBuffer* lights) {
-    if (sizeof(PointLight) * g_vupdt_renderer_ref->geometry.lights.maxsize == 0) return;
+    if (sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.lights.data,
-        sizeof(PointLight) * g_vupdt_renderer_ref->geometry.lights.size,
-        sizeof(PointLight) * g_vupdt_renderer_ref->geometry.lights.maxsize,
+        sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.size,
+        sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.maxsize,
         lights->buffer);
 }
 
@@ -301,6 +301,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.focus = g_vupdt_renderer_ref->camera.focus;
         ubo.normals = g_vupdt_renderer_ref->config.normals;
         ubo.directonly = g_vupdt_renderer_ref->config.directonly;
+        ubo.scenelighting = g_vupdt_renderer_ref->config.scenelighting;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

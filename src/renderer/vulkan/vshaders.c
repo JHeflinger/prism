@@ -322,7 +322,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					TRUE,
 					&(renderer->geometry.lights.size)
 				}, 0.0f,
-				sizeof(PointLight)
+				sizeof(SceneLight)
 			}
 		};
 	} else if (strcmp(name, "OverlaySSBO") == 0) {

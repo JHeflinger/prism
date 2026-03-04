@@ -6,7 +6,7 @@
 #include "renderer/renderer.h"
 #include <easymemory.h>
 
-PointLight g_point_light = { 0 };
+SceneLight g_scene_light = { 0 };
 SurfaceMaterial g_material = { 0 };
 vec3 g_cube_position = { 0 };
 vec3 g_cube_scale = { 1.0, 1.0, 1.0 };
@@ -25,7 +25,7 @@ int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 20);
     if (UIButton("Material", button_width)) return 0;
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
-    if (UIButton("Point Light", button_width)) return 1;
+    if (UIButton("Scene Light", button_width)) return 1;
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
     if (UIButton("Cube", button_width)) return 2;
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
@@ -138,8 +138,8 @@ int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UISetPosition(0, 0);
     UISetCursor(0, ypos + 10);
     DrawRectangle(xpos, ypos, width, height, MappedColor(PANEL_BG_COLOR));
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Point Light") / 2), 0);
-    UIDrawText("Add Point Light");
+    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Scene Light") / 2), 0);
+    UIDrawText("Add Scene Light");
 
     UIMoveCursor(0, 15);
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Position") / 2) - 10, 0);
@@ -147,67 +147,61 @@ int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(xpos, 0);
     UIDrawText("x");
     UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_point_light.position[0]), -FLT_MAX, FLT_MAX, 0.1f, 100);
+    UIDragFloat(&(g_scene_light.position[0]), -FLT_MAX, FLT_MAX, 0.1f, 100);
     UIMoveCursor(xpos + 125, -20);
     UIDrawText("y");
     UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_point_light.position[1]), -FLT_MAX, FLT_MAX, 0.1f, 100);
+    UIDragFloat(&(g_scene_light.position[1]), -FLT_MAX, FLT_MAX, 0.1f, 100);
     UIMoveCursor(xpos + 250, -20);
     UIDrawText("z");
     UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_point_light.position[2]), -FLT_MAX, FLT_MAX, 0.1f, 100);
+    UIDragFloat(&(g_scene_light.position[2]), -FLT_MAX, FLT_MAX, 0.1f, 100);
 
     UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Ambient") / 2) - 10, 0);
-    UIDrawText("Ambient");
+    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Intensity") / 2) - 10, 0);
+    UIDrawText("Intensity");
     UIMoveCursor(xpos, 0);
     UIDrawText("r");
     UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_point_light.ambient[0]), 0, 1.0f, 0.05f, 100);
+    UIDragFloat(&(g_scene_light.color[0]), 0, FLT_MAX, 0.05f, 100);
     UIMoveCursor(xpos + 125, -20);
     UIDrawText("g");
     UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_point_light.ambient[1]), 0, 1.0f, 0.05f, 100);
+    UIDragFloat(&(g_scene_light.color[1]), 0, FLT_MAX, 0.05f, 100);
     UIMoveCursor(xpos + 250, -20);
     UIDrawText("b");
     UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_point_light.ambient[2]), 0, 1.0f, 0.05f, 100);
+    UIDragFloat(&(g_scene_light.color[2]), 0, FLT_MAX, 0.05f, 100);
 
     UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Diffuse") / 2) - 10, 0);
-    UIDrawText("Diffuse");
+    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Direction") / 2) - 10, 0);
+    UIDrawText("Direction");
     UIMoveCursor(xpos, 0);
-    UIDrawText("r");
+    UIDrawText("x");
     UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_point_light.diffuse[0]), 0, 1.0f, 0.05f, 100);
+    UIDragFloat(&(g_scene_light.direction[0]), -FLT_MAX, FLT_MAX, 0.05f, 100);
     UIMoveCursor(xpos + 125, -20);
-    UIDrawText("g");
+    UIDrawText("y");
     UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_point_light.diffuse[1]), 0, 1.0f, 0.05f, 100);
+    UIDragFloat(&(g_scene_light.direction[1]), -FLT_MAX, FLT_MAX, 0.05f, 100);
     UIMoveCursor(xpos + 250, -20);
-    UIDrawText("b");
+    UIDrawText("z");
     UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_point_light.diffuse[2]), 0, 1.0f, 0.05f, 100);
+    UIDragFloat(&(g_scene_light.direction[2]), -FLT_MAX, FLT_MAX, 0.05f, 100);
 
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Specular") / 2) - 10, 0);
-    UIDrawText("Specular");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("r");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_point_light.specular[0]), 0, 1.0f, 0.05f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("g");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_point_light.specular[1]), 0, 1.0f, 0.05f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("b");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_point_light.specular[2]), 0, 1.0f, 0.05f, 100);
-
+    UIMoveCursor(xpos, 35);
+    UIDrawText("Penumbra");
+    UIMoveCursor(xpos + 165, -20);
+    UIDragFloat(&(g_scene_light.penumbra), 0, 1.0f, 0.001f, 200);
+    UIMoveCursor(xpos, 5);
+    UIDrawText("Angle");
+    UIMoveCursor(xpos + 165, -20);
+    UIDragFloat(&(g_scene_light.angle), 0, 360.0f, 0.001f, 200);
+    UIMoveCursor(xpos, 5);
+    
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
-        SubmitLight(g_point_light);
+        SubmitLight(g_scene_light);
         return 0;
     }
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
@@ -224,8 +218,8 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UISetPosition(0, 0);
     UISetCursor(0, ypos + 10);
     DrawRectangle(xpos, ypos, width, height, MappedColor(PANEL_BG_COLOR));
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Point Light") / 2), 0);
-    UIDrawText("Add Point Light");
+    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Cube") / 2), 0);
+    UIDrawText("Add Cube");
 
     UIMoveCursor(0, 15);
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Position") / 2) - 10, 0);
@@ -376,7 +370,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
-        SubmitLight(g_point_light);
+        SubmitLight(g_scene_light);
         return 0;
     }
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
