@@ -21,6 +21,9 @@ void InitializeColors() {
     g_color_map.colors[UI_DIVIDER_COLOR] = (Color){ 100, 100, 100, 255 };
     g_color_map.colors[UI_TEXT_COLOR] = (Color){ 255, 255, 255, 255 };
     g_color_map.colors[UI_SUBTLE_TEXT_COLOR] = (Color){ 255, 255, 255, 155 };
+    g_color_map.colors[UI_DROPDOWN_MENU_COLOR] = (Color){ 50, 50, 50, 255 };
+    g_color_map.colors[UI_DROPDOWN_MENU_HVR_COLOR] = (Color){ 60, 60, 60, 255 };
+    g_color_map.colors[UI_DROPDOWN_MENU_PRS_COLOR] = (Color){ 45, 45, 45, 255 };
     g_color_map.initialized = TRUE;
 }
 

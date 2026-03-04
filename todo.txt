@@ -20,7 +20,7 @@ ICEBOX:
 21. Compositing pipeline
 22. SDF construction pipeline using union, intersection, modifiers, etc
 24. New test suite
-26. Edit Material name and illumination model
+26. Edit Material name
 27. Light names
 28. Edit light name
 31. no need to trace initial hit every single time when accumulating paths? restir?
@@ -33,6 +33,7 @@ ICEBOX:
 39. make a much more efficient way to update gpu memory based on host memory (which is definitely possible btw!)
 
 Next:
+2. implement text input ui
 3. visualize lights in editor
 6. verify and reimplement all popup funcs as needed
 7. verify and reimplement all edit ui as needed

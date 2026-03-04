@@ -1,6 +1,7 @@
 #include "edit.h"
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
+#include "ui/shared.h"
 #include <easylogger.h>
 #include <raymath.h>
 
@@ -53,45 +54,45 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor(0, 5);
             UIDrawText("r");
             UIMoveCursor(15, -20);
-            edited |= UIDragFloat(&(matref->emission[0]), 0, 99999999.0f, 0.05f, component_width);
+            edited |= UIDragFloat(&(matref->emission[0]), 0, FLT_MAX, 0.05f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("g");
             UIMoveCursor(component_width + 40, -20);
-            edited |= UIDragFloat(&(matref->emission[1]), 0, 99999999.0f, 0.05f, component_width);
+            edited |= UIDragFloat(&(matref->emission[1]), 0, FLT_MAX, 0.05f, component_width);
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("b");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(matref->emission[2]), 0, 99999999.0f, 0.05f, component_width);
+            edited |= UIDragFloat(&(matref->emission[2]), 0, FLT_MAX, 0.05f, component_width);
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Absorbtion") / 2) - 10, 0);
             UIDrawText("Absorbtion");
             UIMoveCursor(0, 5);
             UIDrawText("r");
             UIMoveCursor(15, -20);
-            edited |= UIDragFloat(&(matref->absorbtion[0]), 0, 99999999.0f, 0.001f, component_width);
+            edited |= UIDragFloat(&(matref->absorbtion[0]), 0, FLT_MAX, 0.001f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("g");
             UIMoveCursor(component_width + 40, -20);
-            edited |= UIDragFloat(&(matref->absorbtion[1]), 0, 99999999.0f, 0.001f, component_width);
+            edited |= UIDragFloat(&(matref->absorbtion[1]), 0, FLT_MAX, 0.001f, component_width);
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("b");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(matref->absorbtion[2]), 0, 99999999.0f, 0.001f, component_width);
+            edited |= UIDragFloat(&(matref->absorbtion[2]), 0, FLT_MAX, 0.001f, component_width);
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Dispersion") / 2) - 10, 0);
             UIDrawText("Dispersion");
             UIMoveCursor(0, 5);
             UIDrawText("r");
             UIMoveCursor(15, -20);
-            edited |= UIDragFloat(&(matref->dispersion[0]), 0, 99999999.0f, 0.001f, component_width);
+            edited |= UIDragFloat(&(matref->dispersion[0]), 0, FLT_MAX, 0.001f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("g");
             UIMoveCursor(component_width + 40, -20);
-            edited |= UIDragFloat(&(matref->dispersion[1]), 0, 99999999.0f, 0.001f, component_width);
+            edited |= UIDragFloat(&(matref->dispersion[1]), 0, FLT_MAX, 0.001f, component_width);
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("b");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(matref->dispersion[2]), 0, 99999999.0f, 0.001f, component_width);
+            edited |= UIDragFloat(&(matref->dispersion[2]), 0, FLT_MAX, 0.001f, component_width);
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Ambient") / 2) - 10, 0);
             UIDrawText("Ambient");
@@ -141,12 +142,15 @@ void DrawEditPanel(float width, float height) {
             float sboxwidth = width - 20 - 140;
             UIDrawText("Index of Refraction");
             UIMoveCursor(140, -20);
-            edited |= UIDragFloat(&(matref->ior), 0, 999999.0f, 0.01f, sboxwidth);
+            edited |= UIDragFloat(&(matref->ior), 0, FLT_MAX, 0.01f, sboxwidth);
             UIMoveCursor(0, 5);
             UIDrawText("Shininess");
             UIMoveCursor(140, -20);
             edited |= UIDragFloat(&(matref->shiny), 0, FLT_MAX, 0.01f, sboxwidth);
-            UIMoveCursor(0, 5);
+            UIMoveCursor(0, 35);
+            UIDrawText("Lighting Model");
+            UIMoveCursor(140, -20);
+            UIDropdownMenu(sboxwidth, 3, LightModelLabels(), DropdownSelectLightModel, matref);
             if (edited) UpdateMaterials();
             if (g_edit_item_index != 0) {
                 if (UIGetCursor().y + 60 < height) {

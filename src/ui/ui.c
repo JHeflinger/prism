@@ -10,6 +10,17 @@
 
 IMPL_ARRLIST(Panel);
 
+typedef struct {
+    PersistantUIData* data;
+    char** items;
+    size_t count;
+    BOOL active;
+    float width;
+    void* funcdata;
+    DropdownSelectFunction func;
+    Vector2 origin;
+} DropdownMenuData;
+
 UI* g_primary_ui = NULL;
 UI* g_divider_instance = NULL;
 BOOL g_divider_active = FALSE;
@@ -19,6 +30,7 @@ char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
 Popup* g_popup = NULL;
 Popup* g_popup_origin = NULL;
 PersistantUIData* g_active_ui_element = NULL;
+DropdownMenuData g_dropdownmenu_data = { 0 };
 BOOL g_was_ui_element_just_used = FALSE;
 
 #define LINE_HEIGHT 20
@@ -46,6 +58,7 @@ void UpdateUI(UI* ui) {
         UpdateUI((UI*)(ui->right));
 
         // handle hovering and active dragging
+        if (g_popup != NULL || g_dropdownmenu_data.active) BlockInput();
         size_t buffer = 5;
         if (!g_divider_active) {
             if (ui->vertical) {
@@ -82,7 +95,7 @@ void UpdateUI(UI* ui) {
     }
 
     // update panel
-    if (g_popup != NULL) BlockInput();
+    if (g_popup != NULL || g_dropdownmenu_data.active) BlockInput();
 	for (size_t i = 0; i < ui->panels.size; i++)
 	    if (ui->panels.data[i].update) ui->panels.data[i].update(ui->w, ui->h);
     UnblockInput();
@@ -177,10 +190,37 @@ void DrawPopup(size_t x, size_t y, size_t w, size_t h) {
     }
 }
 
+void DrawDropdownMenu() {
+    Vector2 cursor = g_dropdownmenu_data.origin;
+    cursor.y += LINE_HEIGHT - 2;
+    for (size_t i = 0; i < g_dropdownmenu_data.count; i++) {
+        if (i == g_dropdownmenu_data.data->arbitrary_counter) continue;
+        Vector2 text_size = MeasureTextEx(FontAsset(), g_dropdownmenu_data.items[i], LINE_HEIGHT, 0);
+        float w = g_dropdownmenu_data.width < text_size.x + 10 ? text_size.x + 10 : g_dropdownmenu_data.width;
+        Color color = MappedColor(UI_DROPDOWN_MENU_COLOR);
+        if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){cursor.x, cursor.y, w, LINE_HEIGHT})) {
+            if (InputButtonDown(IK_MOUSELEFT)) color = MappedColor(UI_DROPDOWN_MENU_PRS_COLOR);
+            else color = MappedColor(UI_DROPDOWN_MENU_HVR_COLOR);
+            if (InputButtonReleased(IK_MOUSELEFT)) g_dropdownmenu_data.data->arbitrary_counter = g_dropdownmenu_data.func(g_dropdownmenu_data.funcdata, i);
+        }
+        DrawRectangle(cursor.x, cursor.y, w, LINE_HEIGHT, color);
+        DrawRectangle(cursor.x + 2, cursor.y + 2, 2, LINE_HEIGHT - 4, MappedColor(UI_DIVIDER_COLOR));
+        DrawTextEx(FontAsset(), g_dropdownmenu_data.items[i], (Vector2){cursor.x + 8, cursor.y + 0}, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+        cursor.y += LINE_HEIGHT;
+    }
+    if (InputButtonReleased(IK_MOUSELEFT) && g_dropdownmenu_data.active == 2) g_dropdownmenu_data.active = FALSE;
+    else if (InputButtonReleased(IK_MOUSELEFT)) g_dropdownmenu_data.active = 2;
+}
+
 void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     if (InputButtonUp(IK_MOUSELEFT)) g_active_ui_element = NULL;
+    if (g_dropdownmenu_data.active) BlockInput();
     DrawUI_helper(ui, x, y, w, h);
     if (g_popup != NULL) DrawPopup(x, y, w, h);
+    if (g_dropdownmenu_data.active) {
+        UnblockInput();
+        DrawDropdownMenu();
+    }
 }
 
 void PreRenderUI_helper(UI* ui) {
@@ -200,7 +240,7 @@ void PreRenderUI_helper(UI* ui) {
 }
 
 void PreRenderUI(UI* ui) {
-    if (g_popup != NULL) BlockInput();
+    if (g_popup != NULL || g_dropdownmenu_data.active) BlockInput();
     PreRenderUI_helper(ui);
     UnblockInput();
 }
@@ -468,4 +508,32 @@ void UIDropList_(PersistantUIData* data, const char* label, size_t width, size_t
         }
         if (num_items > 0) DrawRectangle(g_ui_cursor.x + 20, top + 5, 2, num_items*LINE_HEIGHT - 5, MappedColor(PANEL_BTN_HVR_COLOR));
     }
+}
+
+void UIDropdownMenu_(PersistantUIData* data, size_t width, size_t num_items, char** items, DropdownSelectFunction func, void* param) {
+    data->arbitrary_counter = func(param, (size_t)-1);
+    Vector2 text_size = MeasureTextEx(FontAsset(), items[data->arbitrary_counter], LINE_HEIGHT, 0);
+    float button_width = width < text_size.x + 20 ? text_size.x + 20 : width;
+    Color color = MappedColor(PANEL_BTN_BG_COLOR);
+    BOOL clicked = FALSE;
+    if (CheckCollisionPointRec(
+            GetMousePosition(),
+            (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 1, button_width, LINE_HEIGHT - 2})) {
+        color = MappedColor(PANEL_BTN_HVR_COLOR);
+        if (InputButtonDown(IK_MOUSELEFT)) color = MappedColor(PANEL_BTN_PRS_COLOR);
+        clicked = InputButtonPressed(IK_MOUSELEFT);
+    }
+    if (clicked) g_was_ui_element_just_used = TRUE;
+    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 1, button_width, LINE_HEIGHT - 2, color);
+    Vector2 texpos = g_ui_cursor;
+    texpos.x += (button_width - text_size.x) / 2.0f;
+    DrawTextEx(FontAsset(), items[data->arbitrary_counter], texpos, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+    if (clicked) {
+        g_dropdownmenu_data = (DropdownMenuData) {
+            data, items, num_items, TRUE, button_width, param, func,
+            (Vector2) { g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y }
+        };
+    }
+    g_ui_cursor.y += LINE_HEIGHT;
+    g_ui_cursor.x = 10;
 }

@@ -1,10 +1,11 @@
 #include "popup.h"
-#include "data/input.h"
-#include "data/colors.h"
-#include <easylogger.h>
-#include "ui/ui.h"
 #include "renderer/renderer.h"
+#include "data/colors.h"
+#include "data/input.h"
+#include "ui/shared.h"
+#include "ui/ui.h"
 #include <easymemory.h>
+#include <easylogger.h>
 
 SceneLight g_scene_light = { 0 };
 SurfaceMaterial g_material = { 0 };
@@ -35,7 +36,7 @@ int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
 int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 385;
-    float height = 500;
+    float height = 600;
     float xpos = x + ((w - width) / 2.0f);
     float ypos = y + ((h - height) / 2.0f);
     float button_width = 200;
@@ -51,15 +52,47 @@ int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(xpos, 0);
     UIDrawText("r");
     UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_material.emission[0]), 0, 1.0f, 0.05f, 100);
+    UIDragFloat(&(g_material.emission[0]), 0, FLT_MAX, 0.05f, 100);
     UIMoveCursor(xpos + 125, -20);
     UIDrawText("g");
     UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_material.emission[1]), 0, 1.0f, 0.05f, 100);
+    UIDragFloat(&(g_material.emission[1]), 0, FLT_MAX, 0.05f, 100);
     UIMoveCursor(xpos + 250, -20);
     UIDrawText("b");
     UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_material.emission[2]), 0, 1.0f, 0.05f, 100);
+    UIDragFloat(&(g_material.emission[2]), 0, FLT_MAX, 0.05f, 100);
+
+    UIMoveCursor(0, 15);
+    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Absorbtion") / 2) - 10, 0);
+    UIDrawText("Absorbtion");
+    UIMoveCursor(xpos, 0);
+    UIDrawText("r");
+    UIMoveCursor(xpos + 15, -20);
+    UIDragFloat(&(g_material.absorbtion[0]), 0, FLT_MAX, 0.001f, 100);
+    UIMoveCursor(xpos + 125, -20);
+    UIDrawText("g");
+    UIMoveCursor(xpos + 140, -20);
+    UIDragFloat(&(g_material.absorbtion[1]), 0, FLT_MAX, 0.001f, 100);
+    UIMoveCursor(xpos + 250, -20);
+    UIDrawText("b");
+    UIMoveCursor(xpos + 265, -20);
+    UIDragFloat(&(g_material.absorbtion[2]), 0, FLT_MAX, 0.001f, 100);
+
+    UIMoveCursor(0, 15);
+    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Dispersion") / 2) - 10, 0);
+    UIDrawText("Dispersion");
+    UIMoveCursor(xpos, 0);
+    UIDrawText("r");
+    UIMoveCursor(xpos + 15, -20);
+    UIDragFloat(&(g_material.dispersion[0]), 0, FLT_MAX, 0.001f, 100);
+    UIMoveCursor(xpos + 125, -20);
+    UIDrawText("g");
+    UIMoveCursor(xpos + 140, -20);
+    UIDragFloat(&(g_material.dispersion[1]), 0, FLT_MAX, 0.001f, 100);
+    UIMoveCursor(xpos + 250, -20);
+    UIDrawText("b");
+    UIMoveCursor(xpos + 265, -20);
+    UIDragFloat(&(g_material.dispersion[2]), 0, FLT_MAX, 0.001f, 100);
 
     UIMoveCursor(0, 15);
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Ambient") / 2) - 10, 0);
@@ -112,12 +145,17 @@ int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(xpos, 35);
     UIDrawText("Refraction Index");
     UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_material.ior), 0, 1.0f, 0.01f, 200);
+    UIDragFloat(&(g_material.ior), 0, FLT_MAX, 0.01f, 200);
     UIMoveCursor(xpos, 5);
     UIDrawText("Shininess");
     UIMoveCursor(xpos + 165, -20);
     UIDragFloat(&(g_material.shiny), 0, FLT_MAX, 0.01f, 200);
     UIMoveCursor(xpos, 5);
+    
+    UIMoveCursor(0, 35);
+    UIDrawText("Lighting Model");
+    UIMoveCursor(xpos + 165, -20);
+    UIDropdownMenu(200, 3, LightModelLabels(), DropdownSelectLightModel, &g_material);
 
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
