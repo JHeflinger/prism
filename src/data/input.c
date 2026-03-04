@@ -15,6 +15,13 @@ void InitializeInput() {
     g_input_map.keymap[IK_O_OVERRIDE] = KEY_O;
     g_input_map.keymap[IK_S_OVERRIDE] = KEY_S;
     g_input_map.keymap[IK_ZOOM] = KEY_Z;
+    g_input_map.keymap[IK_ENTER] = KEY_ENTER,
+    g_input_map.keymap[IK_LEFT] = KEY_LEFT,
+    g_input_map.keymap[IK_RIGHT] = KEY_RIGHT,
+    g_input_map.keymap[IK_UP] = KEY_UP,
+    g_input_map.keymap[IK_DOWN] = KEY_DOWN,
+    g_input_map.keymap[IK_BACKSPACE] = KEY_BACKSPACE,
+    g_input_map.keymap[IK_DELETE] = KEY_DELETE,
 
     g_input_map.btnmap[IK_MOUSELEFT] = MOUSE_BUTTON_LEFT;
     g_input_map.btnmap[IK_MOUSERIGHT] = MOUSE_BUTTON_RIGHT;
@@ -30,6 +37,13 @@ void InitializeInput() {
     g_input_map.keynames[IK_O_OVERRIDE] = "O";
     g_input_map.keynames[IK_S_OVERRIDE] = "S";
     g_input_map.keynames[IK_ZOOM] = "Z";
+    g_input_map.keynames[IK_ENTER] = "ENTR",
+    g_input_map.keynames[IK_LEFT] = "LEFT",
+    g_input_map.keynames[IK_RIGHT] = "RIGHT",
+    g_input_map.keynames[IK_UP] = "UP",
+    g_input_map.keynames[IK_DOWN] = "DOWN",
+    g_input_map.keynames[IK_BACKSPACE] = "BACK",
+    g_input_map.keynames[IK_DELETE] = "DELETE",
 
     g_input_map.btnnames[IK_MOUSELEFT] = "LEFT CLICK";
     g_input_map.btnnames[IK_MOUSERIGHT] = "RIGHT CLICK";

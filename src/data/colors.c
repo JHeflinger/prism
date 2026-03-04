@@ -24,6 +24,8 @@ void InitializeColors() {
     g_color_map.colors[UI_DROPDOWN_MENU_COLOR] = (Color){ 50, 50, 50, 255 };
     g_color_map.colors[UI_DROPDOWN_MENU_HVR_COLOR] = (Color){ 60, 60, 60, 255 };
     g_color_map.colors[UI_DROPDOWN_MENU_PRS_COLOR] = (Color){ 45, 45, 45, 255 };
+    g_color_map.colors[UI_TEXT_INPUT_BG_COLOR] = (Color) { 55, 55, 55, 255 },
+    g_color_map.colors[UI_TEXT_INPUT_FOCUS_COLOR] = (Color) { 65, 65, 65, 255 },
     g_color_map.initialized = TRUE;
 }
 

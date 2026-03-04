@@ -57,6 +57,8 @@ UI* GenerateUI();
 
 void SetupPanel(Panel* panel, const char* name);
 
+BOOL UIRequestsBlockInput();
+
 void UpdateUI(UI* ui);
 
 void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h);
@@ -120,5 +122,9 @@ void UIDropList_(PersistantUIData* data, const char* label, size_t width, size_t
 void UIDropdownMenu_(PersistantUIData* data, size_t width, size_t num_items, char** items, DropdownSelectFunction func, void* param);
 #define UIDropdownMenu(width, num_items, items, func, param) \
     PERSISTANT_UI(UIDropdownMenu_, width, num_items, items, func, param)
+
+void UITextInput_(PersistantUIData* data, const char* label, char* buffer, size_t size, size_t width);
+#define UITextInput(label, buffer, size, width) \
+    PERSISTANT_UI(UITextInput_, label, buffer, size, width)
 
 #endif

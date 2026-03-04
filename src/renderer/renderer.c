@@ -15,8 +15,6 @@ Renderer g_renderer = { 0 };
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
 
-#define MAX_MATERIAL_NAME_SIZE 256
-
 PipelineFlags GetPipelineFlags() {
     return g_renderer.config.flags;
 }

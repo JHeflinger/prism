@@ -5,6 +5,7 @@
 #include "data/assets.h"
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
+#include "core/binds.h"
 #include <easymemory.h>
 #include <string.h>
 
@@ -21,6 +22,16 @@ typedef struct {
     Vector2 origin;
 } DropdownMenuData;
 
+typedef struct {
+    char* buffer;
+    size_t size;
+    BOOL active;
+    PersistantUIData* data;
+    size_t cursor;
+    Vector2 origin;
+    float width;
+} TextInputData;
+
 UI* g_primary_ui = NULL;
 UI* g_divider_instance = NULL;
 BOOL g_divider_active = FALSE;
@@ -31,7 +42,11 @@ Popup* g_popup = NULL;
 Popup* g_popup_origin = NULL;
 PersistantUIData* g_active_ui_element = NULL;
 DropdownMenuData g_dropdownmenu_data = { 0 };
+TextInputData g_textinput_data = { 0 };
 BOOL g_was_ui_element_just_used = FALSE;
+RenderTexture2D g_ui_scratch_target = { 0 };
+RenderTexture2D g_current_ui_target = { 0 };
+BOOL g_scratch_target_in_use = FALSE;
 
 #define LINE_HEIGHT 20
 #define NAMEBAR_HEIGHT 25
@@ -50,6 +65,10 @@ void SetupPanel(Panel* panel, const char* name) {
     panel->texture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
 }
 
+BOOL UIRequestsBlockInput() {
+    return g_popup != NULL || g_dropdownmenu_data.active || g_textinput_data.active;
+}
+
 void UpdateUI(UI* ui) {
     EZ_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
     if (ui->left && ui->right) {
@@ -58,7 +77,7 @@ void UpdateUI(UI* ui) {
         UpdateUI((UI*)(ui->right));
 
         // handle hovering and active dragging
-        if (g_popup != NULL || g_dropdownmenu_data.active) BlockInput();
+        if (UIRequestsBlockInput()) BlockInput();
         size_t buffer = 5;
         if (!g_divider_active) {
             if (ui->vertical) {
@@ -95,7 +114,7 @@ void UpdateUI(UI* ui) {
     }
 
     // update panel
-    if (g_popup != NULL || g_dropdownmenu_data.active) BlockInput();
+    if (UIRequestsBlockInput()) BlockInput();
 	for (size_t i = 0; i < ui->panels.size; i++)
 	    if (ui->panels.data[i].update) ui->panels.data[i].update(ui->w, ui->h);
     UnblockInput();
@@ -212,14 +231,54 @@ void DrawDropdownMenu() {
     else if (InputButtonReleased(IK_MOUSELEFT)) g_dropdownmenu_data.active = 2;
 }
 
+void HandleTextInput() {
+    int c; // l/r/u/d and mouse click cursor
+    while ((c = GetCharPressed()) != 0) {
+        if (g_textinput_data.cursor >= g_textinput_data.size - 1) break;
+        if (g_textinput_data.cursor < strlen(g_textinput_data.buffer)) {
+            for (size_t i = strlen(g_textinput_data.buffer); i > g_textinput_data.cursor; i--) {
+                g_textinput_data.buffer[i] = g_textinput_data.buffer[i - 1];
+            }
+        }
+        g_textinput_data.buffer[g_textinput_data.cursor] = (char)c;
+        g_textinput_data.cursor++;
+        g_textinput_data.buffer[g_textinput_data.cursor] = '\0';
+    }
+    if (InputKeyPressed(IK_LEFT) && g_textinput_data.cursor > 0) g_textinput_data.cursor--;
+    if (InputKeyPressed(IK_BACKSPACE) && g_textinput_data.cursor > 0) {
+        g_textinput_data.buffer[g_textinput_data.cursor - 1] = '\0';
+        for (size_t i = g_textinput_data.cursor; i < g_textinput_data.size - 1; i++)
+            g_textinput_data.buffer[i] = g_textinput_data.buffer[i+1];
+        g_textinput_data.cursor--;
+    }
+    if (InputKeyPressed(IK_ENTER) || (InputButtonPressed(IK_MOUSELEFT) && !CheckCollisionPointRec(
+        GetMousePosition(),
+        (Rectangle){ g_textinput_data.origin.x, g_textinput_data.origin.y, g_textinput_data.width, LINE_HEIGHT - 2 }))) {
+        g_textinput_data.active = FALSE;
+        g_textinput_data.data = NULL;
+    }
+    if (InputButtonPressed(IK_MOUSELEFT) && CheckCollisionPointRec(
+        GetMousePosition(),
+        (Rectangle){ g_textinput_data.origin.x, g_textinput_data.origin.y, g_textinput_data.width, LINE_HEIGHT - 2 })) {
+        // position cursor here
+    }
+}
+
 void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     if (InputButtonUp(IK_MOUSELEFT)) g_active_ui_element = NULL;
-    if (g_dropdownmenu_data.active) BlockInput();
+    if (UIRequestsBlockInput()) BlockInput();
     DrawUI_helper(ui, x, y, w, h);
-    if (g_popup != NULL) DrawPopup(x, y, w, h);
+    if (g_popup != NULL) {
+        UnblockInput();
+        DrawPopup(x, y, w, h);
+    }
     if (g_dropdownmenu_data.active) {
         UnblockInput();
         DrawDropdownMenu();
+    }
+    if (g_textinput_data.active) {
+        UnblockInput();
+        HandleTextInput();
     }
 }
 
@@ -233,6 +292,7 @@ void PreRenderUI_helper(UI* ui) {
         g_ui_position = (Vector2){ ui->x , ui->y };
         if (ui->panels.data[ui->selected].name[0] != 0 && !ui->panels.data[ui->selected].flush) g_ui_position.y += NAMEBAR_HEIGHT;
         BeginTextureMode(ui->panels.data[ui->selected].texture);
+        g_current_ui_target = ui->panels.data[ui->selected].texture;
         ClearBackground((Color){0, 0, 0, 0});
         ui->panels.data[ui->selected].draw(ui->w, ui->h);
         EndTextureMode();
@@ -240,12 +300,16 @@ void PreRenderUI_helper(UI* ui) {
 }
 
 void PreRenderUI(UI* ui) {
-    if (g_popup != NULL || g_dropdownmenu_data.active) BlockInput();
+    if (UIRequestsBlockInput()) BlockInput();
     PreRenderUI_helper(ui);
     UnblockInput();
 }
 
 void DestroyUI(UI* ui) {
+    if (g_scratch_target_in_use) {
+        UnloadRenderTexture(g_ui_scratch_target);
+        g_scratch_target_in_use = FALSE;
+    }
     if (g_popup_origin != NULL) {
         CleanPopup(g_popup_origin);
         g_popup_origin = NULL;
@@ -536,4 +600,41 @@ void UIDropdownMenu_(PersistantUIData* data, size_t width, size_t num_items, cha
     }
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
+}
+
+void UITextInput_(PersistantUIData* data, const char* label, char* buffer, size_t size, size_t width) {
+    UIDrawText(label);
+    Vector2 text_size = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0);
+    float box_width = width - text_size.x - 10;
+    if (box_width < 0) return;
+    g_ui_cursor.x += text_size.x + 10;
+    g_ui_cursor.y -= LINE_HEIGHT;
+    if (!g_scratch_target_in_use) {
+        g_ui_scratch_target = LoadRenderTexture(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT);
+        g_scratch_target_in_use = TRUE;
+    }
+    EndTextureMode();
+    BeginTextureMode(g_ui_scratch_target);
+    if (g_textinput_data.data == data) ClearBackground(MappedColor(UI_TEXT_INPUT_FOCUS_COLOR));
+    else ClearBackground(MappedColor(UI_TEXT_INPUT_BG_COLOR));
+    DrawTextEx(FontAsset(), buffer, (Vector2){ 2, 0 }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+    EndTextureMode();
+    BeginTextureMode(g_current_ui_target);
+    DrawTexturePro(
+        g_ui_scratch_target.texture,
+        (Rectangle){ 0, g_current_ui_target.texture.height - LINE_HEIGHT + 2, box_width, -(LINE_HEIGHT - 2) },
+        (Rectangle){ g_ui_cursor.x, g_ui_cursor.y, box_width, LINE_HEIGHT - 2 },
+        (Vector2){ 0, 0 },
+        0.0f,
+        (Color){ 255, 255, 255, 255 });
+    if (CheckCollisionPointRec(
+            GetMousePosition(),
+            (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y, box_width, LINE_HEIGHT - 2})) {
+        if (InputButtonDown(IK_MOUSELEFT)) g_textinput_data = (TextInputData){ 
+            buffer, size, TRUE, data, strlen(buffer), 
+            (Vector2){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y}, box_width
+        };
+    }
+    g_ui_cursor.x -= text_size.x + 10;
+    g_ui_cursor.y += LINE_HEIGHT;
 }

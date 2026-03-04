@@ -49,6 +49,8 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor((width - 20 - UITextWidth("Edit Material")) / 2.0f, 0);
             UIDrawText("Edit Material");
             UIMoveCursor(0, 15);
+            UITextInput("Name", MaterialName(g_edit_item_index), MAX_MATERIAL_NAME_SIZE, width - 20);
+            UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Emission") / 2) - 10, 0);
             UIDrawText("Emission");
             UIMoveCursor(0, 5);

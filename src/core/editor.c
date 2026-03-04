@@ -90,7 +90,7 @@ void RunEditor() {
         UpdateEditor();
 
         // poll binds
-        ListenBinds();
+        if (!UIRequestsBlockInput()) ListenBinds();
 
         // prerender steps
         PreRenderEditor();
