@@ -37,7 +37,7 @@ void CleanManifoldMesh(ManifoldMesh* manifold) {
     ARRLIST_ManifoldHalfEdge_clear(&(manifold->halfedges));
 }
 
-ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_Vector3 normals, const ARRLIST_Triangle triangles) {
+ManifoldMesh GenerateManifoldMesh(const ARRLIST_vec4 vertices, const ARRLIST_vec4 normals, const ARRLIST_Triangle triangles) {
     ManifoldMesh mesh = { 0 };
 
     // step 1: allocate/initialize
@@ -65,12 +65,9 @@ ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_
         mesh.vertices.data[av].halfedge = base + 0;
         mesh.vertices.data[bv].halfedge = base + 1;
         mesh.vertices.data[cv].halfedge = base + 2;
-        vec3 e1, e2, normal, a, b, c;
-        SETVECV(a, vertices.data[av]);
-        SETVECV(b, vertices.data[bv]);
-        SETVECV(c, vertices.data[cv]);
-        glm_vec3_sub(b, a, e1);
-        glm_vec3_sub(c, a, e2);
+        vec3 e1, e2, normal;
+        glm_vec3_sub(vertices.data[bv], vertices.data[av], e1);
+        glm_vec3_sub(vertices.data[cv], vertices.data[av], e2);
         glm_vec3_cross(e1, e2, normal);
         glm_vec3_normalize(normal);
         glm_vec3_add(normal, mesh.vertices.data[av].normal, mesh.vertices.data[av].normal);
@@ -80,7 +77,7 @@ ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_
 
     // step 3: normalize and set vertex positions
     for (size_t i = 0; i < vertices.size; i++) {
-        SETVECV(mesh.vertices.data[i].position, vertices.data[i]);
+        SETVEC(mesh.vertices.data[i].position, vertices.data[i]);
         glm_vec3_normalize(mesh.vertices.data[i].normal);
     }
 
@@ -456,8 +453,8 @@ void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold) {
 }
 
 void ReformatFromManifold(Geometry* geometry) {
-    ARRLIST_Vector3_wipe(&(geometry->vertices));
-    ARRLIST_Vector3_wipe(&(geometry->normals));
+    ARRLIST_vec4_wipe(&(geometry->vertices));
+    ARRLIST_vec4_wipe(&(geometry->normals));
     ARRLIST_Triangle_wipe(&(geometry->triangles));
     ARRLIST_TriangleID_wipe(&(geometry->emissives));
     uint32_t* vertex_remapping = EZ_ALLOC(geometry->manifold.vertices.size, sizeof(uint32_t));
@@ -467,8 +464,7 @@ void ReformatFromManifold(Geometry* geometry) {
             vertex_remapping[i] = (uint32_t)-1;
         } else {
             vertex_remapping[i] = new_v_ind++;
-            ManifoldVertex v = geometry->manifold.vertices.data[i];
-            SubmitVertex((Vector3){ v.position[0], v.position[1], v.position[2] });
+            SubmitVertex(geometry->manifold.vertices.data[i].position);
         }
     }
     for (size_t i = 0; i < geometry->manifold.faces.size; i++) {

@@ -5,7 +5,7 @@
 
 void CleanManifoldMesh(ManifoldMesh* manifold);
 
-ManifoldMesh GenerateManifoldMesh(const ARRLIST_Vector3 vertices, const ARRLIST_Vector3 normals, const ARRLIST_Triangle triangles);
+ManifoldMesh GenerateManifoldMesh(const ARRLIST_vec4 vertices, const ARRLIST_vec4 normals, const ARRLIST_Triangle triangles);
 
 BOOL IsManifoldValid(const ManifoldMesh* manifold);
 

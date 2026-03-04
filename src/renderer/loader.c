@@ -60,8 +60,8 @@ DECLARE_ARRLIST(MaterialID);
 IMPL_ARRLIST(MaterialID);
 
 typedef struct {
-    ARRLIST_Vector3 vertices;
-    ARRLIST_Vector3 normals;
+    ARRLIST_vec3 vertices;
+    ARRLIST_vec3 normals;
     ARRLIST_UV uvs; // NOTE: textures are not implemented yet! This field doesn't have any effect yet!
     ARRLIST_Face faces;
     ARRLIST_DynamicString material_names;
@@ -74,8 +74,8 @@ typedef BOOL (*ParseFuncOBJ)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], 
 typedef BOOL (*ParseFuncMTL)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
 
 void CleanStateOBJ(StateOBJ* state) {
-    ARRLIST_Vector3_clear(&(state->vertices));
-    ARRLIST_Vector3_clear(&(state->normals));
+    ARRLIST_vec3_clear(&(state->vertices));
+    ARRLIST_vec3_clear(&(state->normals));
     ARRLIST_UV_clear(&(state->uvs));
     ARRLIST_Face_clear(&(state->faces));
     for (size_t i = 0; i < state->material_names.size; i++)
@@ -406,12 +406,12 @@ BOOL ParseOBJ_v(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numarg
         EZ_ERROR("Cannot parse a vertex field without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
-    float x, y, z;
-    if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
+    vec3 v;
+    if (!(ParseFloat(lineargs[1], &(v[0])) && ParseFloat(lineargs[2], &(v[1])) && ParseFloat(lineargs[3], &(v[2])))) {
         EZ_ERROR("Invalid vertex fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
-    ARRLIST_Vector3_add(&(state->vertices), (Vector3){x, y, z});
+    ARRLIST_vec3_add(&(state->vertices), v);
     return TRUE;
 }
 
@@ -420,12 +420,12 @@ BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
         EZ_ERROR("Cannot parse a vertex normal field without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
-    float x, y, z;
-    if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
+    vec3 v;
+    if (!(ParseFloat(lineargs[1], &(v[0])) && ParseFloat(lineargs[2], &(v[1])) && ParseFloat(lineargs[3], &(v[2])))) {
         EZ_ERROR("Invalid vertex normal fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
-    ARRLIST_Vector3_add(&(state->normals), (Vector3){x, y, z});
+    ARRLIST_vec3_add(&(state->normals), v);
     return TRUE;
 }
 

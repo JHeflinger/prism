@@ -13,12 +13,6 @@ struct BVHNode {
     uint counter;
 };
 
-struct Vector3 {
-    float x;
-    float y;
-    float z;
-};
-
 struct RayGenerator {
     uint tid;
 };
@@ -87,11 +81,11 @@ layout(binding = 3) readonly buffer TriangleSSBOIn {
 };
 
 layout(binding = 4) readonly buffer VertexSSBOIn {
-    Vector3 vertexIn[ ];
+    vec3 vertexIn[ ];
 };
 
 layout(binding = 5) readonly buffer NormalSSBOIn {
-    Vector3 normalIn[ ];
+    vec3 normalIn[ ];
 };
 
 layout(binding = 6) buffer BVHNodeSSBOIn {
@@ -132,9 +126,9 @@ Ray create_ray(vec2 rg) {
 
 bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     Triangle tri = triangleIn[triangle_ind];
-    vec3 _a = vec3(vertexIn[tri.a].x, vertexIn[tri.a].y, vertexIn[tri.a].z);
-    vec3 _b = vec3(vertexIn[tri.b].x, vertexIn[tri.b].y, vertexIn[tri.b].z);
-    vec3 _c = vec3(vertexIn[tri.c].x, vertexIn[tri.c].y, vertexIn[tri.c].z);
+    vec3 _a = vertexIn[tri.a];
+    vec3 _b = vertexIn[tri.b];
+    vec3 _c = vertexIn[tri.c];
     vec3 e1 = _b - _a;
     vec3 e2 = _c - _a;
     vec3 h = cross(ray.direction, e2);
@@ -150,12 +144,7 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     hit.distance = f * dot(e2, q);
     if (hit.distance <= EPS) return false;
     hit.position = ray.position + (ray.direction * hit.distance);
-    if (ubo.normals != 0 && tri.an != -1) {
-        vec3 _an = vec3(normalIn[tri.an].x, normalIn[tri.an].y, normalIn[tri.an].z);
-        vec3 _bn = vec3(normalIn[tri.bn].x, normalIn[tri.bn].y, normalIn[tri.bn].z);
-        vec3 _cn = vec3(normalIn[tri.cn].x, normalIn[tri.cn].y, normalIn[tri.cn].z);
-        hit.normal = normalize((1.0 - u - v)*_an + u*_bn + v*_cn);
-    }
+    if (ubo.normals != 0 && tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
     else hit.normal = normalize(cross(e1, e2));
     if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
     return true;

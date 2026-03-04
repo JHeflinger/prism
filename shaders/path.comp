@@ -18,12 +18,6 @@ struct BVHNode {
     uint counter;
 };
 
-struct Vector3 {
-    float x;
-    float y;
-    float z;
-};
-
 struct RayGenerator {
     uint tid;
 };
@@ -133,11 +127,11 @@ layout(binding = 6) readonly buffer EmissiveSSBOIn {
 };
 
 layout(binding = 7) readonly buffer VertexSSBOIn {
-    Vector3 vertexIn[ ];
+    vec3 vertexIn[ ];
 };
 
 layout(binding = 8) readonly buffer NormalSSBOIn {
-    Vector3 normalIn[ ];
+    vec3 normalIn[ ];
 };
 
 layout(binding = 9) readonly buffer LightSSBOIn {
@@ -299,9 +293,9 @@ Ray create_ray(vec2 rg) {
 
 bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     Triangle tri = triangleIn[triangle_ind];
-    vec3 _a = vec3(vertexIn[tri.a].x, vertexIn[tri.a].y, vertexIn[tri.a].z);
-    vec3 _b = vec3(vertexIn[tri.b].x, vertexIn[tri.b].y, vertexIn[tri.b].z);
-    vec3 _c = vec3(vertexIn[tri.c].x, vertexIn[tri.c].y, vertexIn[tri.c].z);
+    vec3 _a = vertexIn[tri.a];
+    vec3 _b = vertexIn[tri.b];
+    vec3 _c = vertexIn[tri.c];
     vec3 e1 = _b - _a;
     vec3 e2 = _c - _a;
     vec3 h = cross(ray.direction, e2);
@@ -318,12 +312,7 @@ bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
     if (hit.distance <= EPS) return false;
     hit.material = tri.material;
     hit.position = ray.position + (ray.direction * hit.distance);
-    if (ubo.normals != 0 && tri.an != -1) {
-        vec3 _an = vec3(normalIn[tri.an].x, normalIn[tri.an].y, normalIn[tri.an].z);
-        vec3 _bn = vec3(normalIn[tri.bn].x, normalIn[tri.bn].y, normalIn[tri.bn].z);
-        vec3 _cn = vec3(normalIn[tri.cn].x, normalIn[tri.cn].y, normalIn[tri.cn].z);
-        hit.normal = normalize((1.0 - u - v)*_an + u*_bn + v*_cn);
-    }
+    if (ubo.normals != 0 && tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
     else hit.normal = normalize(cross(e1, e2));
     if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
     return true;
@@ -400,9 +389,9 @@ vec3 sample_specular_phong_lobe(float shiny) {
 vec3 sample_direct_light_point(inout uint tid, inout float area) {
     tid = emissiveIn[uint(random()*float(ubo.emissives))];
     Triangle tri = triangleIn[tid];
-    vec3 _a = vec3(vertexIn[tri.a].x, vertexIn[tri.a].y, vertexIn[tri.a].z);
-    vec3 _b = vec3(vertexIn[tri.b].x, vertexIn[tri.b].y, vertexIn[tri.b].z);
-    vec3 _c = vec3(vertexIn[tri.c].x, vertexIn[tri.c].y, vertexIn[tri.c].z);
+    vec3 _a = vertexIn[tri.a];
+    vec3 _b = vertexIn[tri.b];
+    vec3 _c = vertexIn[tri.c];
     area = length(cross(_b - _a, _c - _a)) * 0.5;
     float r1 = sqrt(random());
     float r2 = random();

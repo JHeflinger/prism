@@ -52,8 +52,8 @@ void InitializeRenderer() {
     g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
 
     // initialize min/max BB
-    g_renderer.geometry.minBB = (Vector3){ FLT_MAX, FLT_MAX, FLT_MAX };
-    g_renderer.geometry.maxBB = (Vector3){ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+    SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
+    SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
 
     // initialize camera
     g_renderer.camera = (SimpleCamera){
@@ -130,16 +130,14 @@ void MoveCamera(SimpleCamera camera) {
 }
 
 void FitCamera() {
-    if (g_renderer.geometry.minBB.x >= g_renderer.geometry.maxBB.x) return;
+    if (g_renderer.geometry.bounds.min[0] >= g_renderer.geometry.bounds.max[0]) return;
     vec3 l2p;
     glm_vec3_sub(g_renderer.camera.position, g_renderer.camera.look, l2p);
     glm_vec3_normalize(l2p);
-    vec3 extend, minbb, maxbb, min2o, newo;
-    SETVECV(minbb, g_renderer.geometry.minBB);
-    SETVECV(maxbb, g_renderer.geometry.maxBB);
-    glm_vec3_sub(maxbb, minbb, extend);
+    vec3 extend, min2o, newo;
+    glm_vec3_sub(g_renderer.geometry.bounds.max, g_renderer.geometry.bounds.min, extend);
     glm_vec3_scale(extend, 0.5f, min2o);
-    glm_vec3_add(min2o, minbb, newo);
+    glm_vec3_add(min2o, g_renderer.geometry.bounds.min, newo);
     float width = glm_vec3_norm(extend);
     SETVEC(g_renderer.camera.look, newo);
     glm_vec3_scale(l2p, width, l2p);
@@ -155,43 +153,47 @@ void ReorientCamera() {
     SETVEC(g_renderer.camera.up, desired);
 }
 
-Vector3 GetVertex(size_t index) {
+void GetVertex(size_t index, vec3 out) {
     EZ_ASSERT(index < g_renderer.geometry.vertices.size, "Vertex does not exist for requested index");
+    SETVEC(out, g_renderer.geometry.vertices.data[index]);
+}
+
+float* VertexReference(size_t index) {
+    EZ_ASSERT(index < g_renderer.geometry.vertices.size, "Vertex reference does not exist for requested index");
     return g_renderer.geometry.vertices.data[index];
 }
 
-Vector3* VertexReference(size_t index) {
-    EZ_ASSERT(index < g_renderer.geometry.vertices.size, "Vertex reference does not exist for requested index");
-    return &(g_renderer.geometry.vertices.data[index]);
-}
-
-void SubmitVertex(Vector3 vertex) {
+void SubmitVertex(vec3 vertex) {
     g_renderer.geometry.changes.update_vertices = TRUE;
-    ARRLIST_Vector3_add(&(g_renderer.geometry.vertices), vertex);
-    if (vertex.x < g_renderer.geometry.minBB.x) g_renderer.geometry.minBB.x = vertex.x;
-    if (vertex.y < g_renderer.geometry.minBB.y) g_renderer.geometry.minBB.y = vertex.y;
-    if (vertex.z < g_renderer.geometry.minBB.z) g_renderer.geometry.minBB.z = vertex.z;
-    if (vertex.x > g_renderer.geometry.maxBB.x) g_renderer.geometry.maxBB.x = vertex.x;
-    if (vertex.y > g_renderer.geometry.maxBB.y) g_renderer.geometry.maxBB.y = vertex.y;
-    if (vertex.z > g_renderer.geometry.maxBB.z) g_renderer.geometry.maxBB.z = vertex.z;
+    vec4 v = { 0 };
+    SETVEC(v, vertex);
+    ARRLIST_vec4_add(&(g_renderer.geometry.vertices), v);
+    if (vertex[0] < g_renderer.geometry.bounds.min[0]) g_renderer.geometry.bounds.min[0] = vertex[0];
+    if (vertex[1] < g_renderer.geometry.bounds.min[1]) g_renderer.geometry.bounds.min[1] = vertex[1];
+    if (vertex[2] < g_renderer.geometry.bounds.min[2]) g_renderer.geometry.bounds.min[2] = vertex[2];
+    if (vertex[0] > g_renderer.geometry.bounds.max[0]) g_renderer.geometry.bounds.max[0] = vertex[0];
+    if (vertex[1] > g_renderer.geometry.bounds.max[1]) g_renderer.geometry.bounds.max[1] = vertex[1];
+    if (vertex[2] > g_renderer.geometry.bounds.max[2]) g_renderer.geometry.bounds.max[2] = vertex[2];
 }
 
 void ClearVertices() {
     if (g_renderer.geometry.vertices.maxsize == 0) return;
-    ARRLIST_Vector3_clear(&(g_renderer.geometry.vertices));
+    ARRLIST_vec4_clear(&(g_renderer.geometry.vertices));
     g_renderer.geometry.changes.update_vertices = TRUE;
-    g_renderer.geometry.minBB = (Vector3){ FLT_MAX, FLT_MAX, FLT_MAX };
-    g_renderer.geometry.maxBB = (Vector3){ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+    SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
+    SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
 }
 
-void SubmitNormal(Vector3 normal) {
+void SubmitNormal(vec3 normal) {
     g_renderer.geometry.changes.update_normals = TRUE;
-    ARRLIST_Vector3_add(&(g_renderer.geometry.normals), normal);
+    vec4 n = { 0 };
+    SETVEC(n, normal);
+    ARRLIST_vec4_add(&(g_renderer.geometry.normals), n);
 }
 
 void ClearNormals() {
     if (g_renderer.geometry.normals.maxsize == 0) return;
-    ARRLIST_Vector3_clear(&(g_renderer.geometry.normals));
+    ARRLIST_vec4_clear(&(g_renderer.geometry.normals));
     g_renderer.geometry.changes.update_normals = TRUE;
 
 }
@@ -568,15 +570,12 @@ BOOL Simplify(size_t faces) {
 void Displace(float displacement) {
     vec3* normals = EZ_ALLOC(g_renderer.geometry.vertices.size, sizeof(vec3));
     for (size_t i = 0; i < g_renderer.geometry.triangles.size; i++) {
-        vec3 e1, e2, normal, a, b, c;
+        vec3 e1, e2, normal;
         uint32_t av = g_renderer.geometry.triangles.data[i].a;
         uint32_t bv = g_renderer.geometry.triangles.data[i].b;
         uint32_t cv = g_renderer.geometry.triangles.data[i].c;
-        SETVECV(a, g_renderer.geometry.vertices.data[av]);
-        SETVECV(b, g_renderer.geometry.vertices.data[bv]);
-        SETVECV(c, g_renderer.geometry.vertices.data[cv]);
-        glm_vec3_sub(b, a, e1);
-        glm_vec3_sub(c, a, e2);
+        glm_vec3_sub(g_renderer.geometry.vertices.data[bv], g_renderer.geometry.vertices.data[av], e1);
+        glm_vec3_sub(g_renderer.geometry.vertices.data[cv], g_renderer.geometry.vertices.data[av], e2);
         glm_vec3_cross(e1, e2, normal);
         glm_vec3_normalize(normal);
         glm_vec3_add(normal, normals[av], normals[av]);
@@ -587,12 +586,7 @@ void Displace(float displacement) {
         glm_vec3_normalize(normals[i]);
         float dval = ((((float)rand()) / ((float)RAND_MAX)) * displacement) - (displacement/2.0f);
         glm_vec3_scale(normals[i], dval, normals[i]);
-        Vector3 p = g_renderer.geometry.vertices.data[i];
-        g_renderer.geometry.vertices.data[i] = (Vector3) {
-            p.x + normals[i][0],
-            p.y + normals[i][1],
-            p.z + normals[i][2]
-        };
+        glm_vec3_add(g_renderer.geometry.vertices.data[i], normals[i], g_renderer.geometry.vertices.data[i]);
     }
     EZ_FREE(normals);
     UpdateVertices();

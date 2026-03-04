@@ -23,15 +23,15 @@ void FitCamera();
 
 void ReorientCamera();
 
-Vector3 GetVertex(size_t index);
+void GetVertex(size_t index, vec3 out);
 
-Vector3* VertexReference(size_t index);
+float* VertexReference(size_t index);
 
-void SubmitVertex(Vector3 vertex);
+void SubmitVertex(vec3 vertex);
 
 void ClearVertices();
 
-void SubmitNormal(Vector3 normal);
+void SubmitNormal(vec3 normal);
 
 void ClearNormals();
 

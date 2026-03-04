@@ -12,7 +12,8 @@ typedef uint32_t TriangleID;
 typedef uint32_t LightID;
 
 DECLARE_ARRLIST(TriangleID);
-DECLARE_ARRLIST(Vector3);
+DECLARE_ARR_ARRLIST(vec4);
+DECLARE_ARR_ARRLIST(vec3);
 
 #define PREVIEW_PIPELINE_FLAGS   0b110011111111
 #define PATHTRACE_PIPELINE_FLAGS 0b111101111111
@@ -168,8 +169,8 @@ typedef struct {
 
 typedef struct {
     ManifoldMesh manifold;
-    ARRLIST_Vector3 vertices;
-    ARRLIST_Vector3 normals;
+    ARRLIST_vec4 vertices;
+    ARRLIST_vec4 normals;
     ARRLIST_SceneLight lights;
     ARRLIST_Triangle triangles;
     ARRLIST_TriangleID emissives;
@@ -177,8 +178,7 @@ typedef struct {
     ARRLIST_DynamicString materialnames;
     float lightarea;
     ChangeSet changes;
-    Vector3 minBB;
-    Vector3 maxBB;
+    AxisAlignedBoundingBox bounds;
 } Geometry;
 
 typedef struct {

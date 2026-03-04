@@ -157,7 +157,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					TRUE,
 					&(renderer->geometry.vertices.size)
 				}, 0.0f,
-				sizeof(Vector3)
+				sizeof(vec4)
 			}
 		};
 	} else if (strcmp(name, "WorkGroupOffsetSSBOIn") == 0) {
@@ -307,7 +307,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					TRUE,
 					&(renderer->geometry.normals.size)
 				}, 0.0f,
-				sizeof(Vector3)
+				sizeof(vec4)
 			}
 		};
 	} else if (strcmp(name, "LightSSBOIn") == 0) {

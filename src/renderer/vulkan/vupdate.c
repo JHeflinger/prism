@@ -18,20 +18,20 @@ void VUPDT_Lights(VulkanDataBuffer* lights) {
 }
 
 void VUPDT_Normals(VulkanDataBuffer* normals) {
-    if (sizeof(Vector3) * g_vupdt_renderer_ref->geometry.normals.maxsize == 0) return;
+    if (sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.normals.data,
-        sizeof(Vector3) * g_vupdt_renderer_ref->geometry.normals.size,
-        sizeof(Vector3) * g_vupdt_renderer_ref->geometry.normals.maxsize,
+        sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.size,
+        sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.maxsize,
         normals->buffer);
 }
 
 void VUPDT_Vertices(VulkanDataBuffer* vertices) {
-    if (sizeof(Vector3) * g_vupdt_renderer_ref->geometry.vertices.maxsize == 0) return;
+    if (sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.vertices.data,
-        sizeof(Vector3) * g_vupdt_renderer_ref->geometry.vertices.size,
-        sizeof(Vector3) * g_vupdt_renderer_ref->geometry.vertices.maxsize,
+        sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.size,
+        sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.maxsize,
         vertices->buffer);
 }
 
@@ -320,12 +320,12 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     // geometry uniform buffer
     {
         GeometryUniformBufferObject ubo = { 0 };
-        ubo.minx = g_vupdt_renderer_ref->geometry.minBB.x;
-        ubo.miny = g_vupdt_renderer_ref->geometry.minBB.y;
-        ubo.minz = g_vupdt_renderer_ref->geometry.minBB.z;
-        ubo.maxx = g_vupdt_renderer_ref->geometry.maxBB.x;
-        ubo.maxy = g_vupdt_renderer_ref->geometry.maxBB.y;
-        ubo.maxz = g_vupdt_renderer_ref->geometry.maxBB.z;
+        ubo.minx = g_vupdt_renderer_ref->geometry.bounds.min[0];
+        ubo.miny = g_vupdt_renderer_ref->geometry.bounds.min[1];
+        ubo.minz = g_vupdt_renderer_ref->geometry.bounds.min[2];
+        ubo.maxx = g_vupdt_renderer_ref->geometry.bounds.max[0];
+        ubo.maxy = g_vupdt_renderer_ref->geometry.bounds.max[1];
+        ubo.maxz = g_vupdt_renderer_ref->geometry.bounds.max[2];
         memcpy(ubos->geometry_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(GeometryUniformBufferObject));
     }
 }

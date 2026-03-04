@@ -465,7 +465,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
 }
 
 BOOL VINIT_Normals(VulkanDataBuffer* normals) {
-    size_t arrsize = sizeof(Vector3) * g_vinit_renderer_ref->geometry.normals.maxsize;
+    size_t arrsize = sizeof(vec4) * g_vinit_renderer_ref->geometry.normals.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -477,7 +477,7 @@ BOOL VINIT_Normals(VulkanDataBuffer* normals) {
 }
 
 BOOL VINIT_Vertices(VulkanDataBuffer* vertices) {
-    size_t arrsize = sizeof(Vector3) * g_vinit_renderer_ref->geometry.vertices.maxsize;
+    size_t arrsize = sizeof(vec4) * g_vinit_renderer_ref->geometry.vertices.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
