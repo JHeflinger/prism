@@ -33,8 +33,7 @@ ICEBOX:
 39. make a much more efficient way to update gpu memory based on host memory (which is definitely possible btw!)
 
 Next:
-1. implement spot lights
-2. implement point lights
+3. visualize lights in editor
 6. verify and reimplement all popup funcs as needed
 7. verify and reimplement all edit ui as needed
 8. make it so lights are lebeled on what type they are

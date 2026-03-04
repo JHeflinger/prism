@@ -196,7 +196,7 @@ int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(xpos, 5);
     UIDrawText("Angle");
     UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_scene_light.angle), 0, 360.0f, 0.001f, 200);
+    UIDragFloat(&(g_scene_light.angle), 0, 360.0f, 0.1f, 200);
     UIMoveCursor(xpos, 5);
     
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);

@@ -3,6 +3,7 @@
 #define MAX_RECURSIVE_DEPTH 2000
 #define MAX_BOUNCES 100
 #define EPS 0.000001
+#define FLTMAX 3.402823466e+38
 
 #define LAMBERTIAN_MODEL 2
 #define MIRROR_MODEL 5
@@ -428,6 +429,13 @@ bool refract_ray(vec3 outgoing, vec3 normal, float eta, out vec3 incoming) {
     return true;
 }
 
+vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
+    return ((material.diffuse / PI) +
+        (material.specular * (material.shiny + 2.0) /
+        (2.0 * PI) * pow(max(dot(reflect(-outgoing, normal), incoming), 0.0), material.shiny))) *
+        max(0.0, dot(incoming, normal));
+}
+
 vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     uint eid;
     float area;
@@ -449,38 +457,37 @@ vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     float kskd = ks + kd;
     float pd = kd/kskd;
     float ps = ks/kskd;
-    vec3 R = reflect(-outgoing, h.normal);
-    vec3 throughput = 
-        ((material.diffuse / PI) +
-        (material.specular * (material.shiny + 2.0) /
-        (2.0 * PI) * pow(max(dot(R, to_light), 0.0), material.shiny))) *
-        max(0.0, dot(to_light, h.normal));
-    return emission * throughput / (p_omega);
+    return emission * lambertian_throughput(outgoing, h.normal, to_light, material) / (p_omega);
 }
 
 vec3 sample_scene_lights(vec3 outgoing, Hit h, Material material) {
     vec3 intensity = vec3(0);
     for (uint i = 0; i < ubo.lights; i++) {
         SceneLight light = lightIn[i];
+        vec3 incoming;
+        vec3 to_light = light.position - h.position;
+        float distance_to_light = length(to_light);
+        float falloff = 1.0;
         if (light.angle == 0 && light.direction == vec3(0)) { // point light
-            return vec3(0, 20, 0);
+            incoming = normalize(to_light);
         } else if (light.angle != 0) { // spot light
-            return vec3(20, 0, 0);
+            if (light.direction == vec3(0)) light.direction = vec3(0, -1, 0);
+            incoming = normalize(to_light);
+            float angle = acos(clamp(dot(-incoming, normalize(light.direction)), -1.0, 1.0));
+            float lightangle = radians(light.angle / 2.0);
+            if (angle > lightangle) continue;
+            if (angle > lightangle * (1.0 - light.penumbra)) falloff -= (angle - lightangle * (1.0 - light.penumbra)) / (light.penumbra * lightangle);
         } else { // directional light
-            vec3 incoming = -normalize(light.direction);
-            float ndotl = max(dot(h.normal, incoming), 0.0f);
-            if (ndotl <= 0) continue;
-            Ray sray = { h.position + h.normal * EPS, incoming };
-            uint tid;
-            Hit shit = trace(sray, tid);
-            if (shit.distance > 0) continue;
-            vec3 R = reflect(-outgoing, h.normal);
-            vec3 throughput = 
-                ((material.diffuse / PI) +
-                (material.specular * (material.shiny + 2.0) /
-                (2.0 * PI) * pow(max(dot(R, incoming), 0.0), material.shiny))) * max(0.0, dot(incoming, h.normal));
-            intensity += throughput * light.color;
+            incoming = -normalize(light.direction);
+            distance_to_light = FLTMAX;
         }
+        float ndotl = max(dot(incoming, h.normal), 0.0);
+        if (ndotl <= 0) continue;
+        Ray sray = { h.position + (incoming * EPS), incoming };
+        uint tid;
+        Hit shit = trace(sray, tid);
+        if (shit.distance > 0 && shit.distance < distance_to_light) continue;
+        intensity += lambertian_throughput(outgoing, h.normal, incoming, material) * light.color * falloff;
     }
     return intensity;
 }
