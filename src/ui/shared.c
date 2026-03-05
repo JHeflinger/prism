@@ -3,6 +3,14 @@
 
 char* g_labels[] = { "lambertian", "mirror", "dielectric" };
 
+size_t DropdownSelectMaterial(void* data, size_t index) {
+    Triangle* triref = (Triangle*)data;
+    if (index == (size_t)-1) return triref->material;
+    triref->material = index;
+    if (NumTriangles() != 0) UpdateTriangles();
+    return index;
+}
+
 size_t DropdownSelectLightModel(void* data, size_t index) {
     SurfaceMaterial* matref = (SurfaceMaterial*)data;
     if (index == (size_t)-1) {

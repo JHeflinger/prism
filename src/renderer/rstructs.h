@@ -172,6 +172,7 @@ typedef struct {
     ARRLIST_vec4 vertices;
     ARRLIST_vec4 normals;
     ARRLIST_SceneLight lights;
+    ARRLIST_DynamicString lightnames;
     ARRLIST_Triangle triangles;
     ARRLIST_TriangleID emissives;
     ARRLIST_SurfaceMaterial materials;

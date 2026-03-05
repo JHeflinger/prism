@@ -11,6 +11,9 @@ SceneLight g_scene_light = { 0 };
 SurfaceMaterial g_material = { 0 };
 vec3 g_cube_position = { 0 };
 vec3 g_cube_scale = { 1.0, 1.0, 1.0 };
+char g_material_name[MAX_MATERIAL_NAME_SIZE] = "Untitled Material";
+char g_light_name[MAX_LIGHT_NAME_SIZE] = "Untitled Light";
+Triangle g_dummy_triangle = { 0 };
 
 int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 250;
@@ -36,7 +39,7 @@ int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
 int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 385;
-    float height = 600;
+    float height = 650;
     float xpos = x + ((w - width) / 2.0f);
     float ypos = y + ((h - height) / 2.0f);
     float button_width = 200;
@@ -45,6 +48,9 @@ int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     DrawRectangle(xpos, ypos, width, height, MappedColor(PANEL_BG_COLOR));
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Material") / 2), 0);
     UIDrawText("Add Material");
+
+    UIMoveCursor(xpos, 15);
+    UITextInput("Material Name", g_material_name, MAX_MATERIAL_NAME_SIZE, width - 20);
 
     UIMoveCursor(0, 15);
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Emission") / 2) - 10, 0);
@@ -159,7 +165,10 @@ int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
-        SubmitMaterial(g_material);
+        SubmitNamedMaterial(g_material, g_material_name);
+        g_material = (SurfaceMaterial){ 0 };
+        memset(g_material_name, 0, MAX_MATERIAL_NAME_SIZE);
+        strcpy(g_material_name, "Untitled Material");
         return 0;
     }
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
@@ -178,6 +187,9 @@ int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     DrawRectangle(xpos, ypos, width, height, MappedColor(PANEL_BG_COLOR));
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Scene Light") / 2), 0);
     UIDrawText("Add Scene Light");
+
+    UIMoveCursor(xpos, 15);
+    UITextInput("Light Name", g_light_name, MAX_LIGHT_NAME_SIZE, width - 20);
 
     UIMoveCursor(0, 15);
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Position") / 2) - 10, 0);
@@ -239,7 +251,10 @@ int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
-        SubmitLight(g_scene_light);
+        SubmitNamedLight(g_scene_light, g_light_name);
+        g_scene_light = (SceneLight){ 0 };
+        memset(g_light_name, 0, MAX_LIGHT_NAME_SIZE);
+        strcpy(g_light_name, "Untitled Light");
         return 0;
     }
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
@@ -290,125 +305,68 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIDrawText("z");
     UIMoveCursor(xpos + 265, -20);
     UIDragFloat(&(g_cube_scale[2]), -FLT_MAX, FLT_MAX, 0.1f, 100);
+    
+    UIMoveCursor(xpos + 2, 30);
+    UIDrawText("Select Material");
+    UIMoveCursor(xpos + 110, -20);
+    UIDropdownMenu(width - 130, NumMaterials(), MaterialNameReference(0), DropdownSelectMaterial, &g_dummy_triangle);
 
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
-        // bottom face
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            0
-        });
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            0
-        });
-
-        // top face
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            0
-        });
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            0
-        });
-
-        // right face
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            0
-        });
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            0
-        });
-
-        // left face
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            0
-        });
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            0
-        });
-
-        // front face
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            0
-        });
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] + g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            0
-        });
-
-        // back face
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            0
-        });
-        SubmitTriangle((Triangle){
-            0, 0, 0,
-            (uint32_t)-1, (uint32_t)-1, (uint32_t)-1,
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] - g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] - g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            //{g_cube_position[0] - g_cube_scale[0]/2.0f, g_cube_position[1] + g_cube_scale[1]/2.0f, g_cube_position[2] + g_cube_scale[2]/2.0f},
-            0
-        });
-        return 0;
-    }
-    UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
-    if (UIButton("Cancel", button_width)) return 0;
-    return -1;
-
-    UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
-    if (UIButton("Submit", button_width)) {
-        SubmitLight(g_scene_light);
+        size_t vertex_base = NumVertices();
+        vec3 v1 = {
+            g_cube_position[0] - g_cube_scale[0]/2.0f,
+            g_cube_position[1] - g_cube_scale[1]/2.0f,
+            g_cube_position[2] - g_cube_scale[2]/2.0f};
+        vec3 v2 = {
+            g_cube_position[0] - g_cube_scale[0]/2.0f,
+            g_cube_position[1] + g_cube_scale[1]/2.0f,
+            g_cube_position[2] - g_cube_scale[2]/2.0f};
+        vec3 v3 = {
+            g_cube_position[0] + g_cube_scale[0]/2.0f,
+            g_cube_position[1] + g_cube_scale[1]/2.0f,
+            g_cube_position[2] - g_cube_scale[2]/2.0f};
+        vec3 v4 = {
+            g_cube_position[0] + g_cube_scale[0]/2.0f,
+            g_cube_position[1] - g_cube_scale[1]/2.0f,
+            g_cube_position[2] - g_cube_scale[2]/2.0f};
+        vec3 v5 = {
+            g_cube_position[0] - g_cube_scale[0]/2.0f,
+            g_cube_position[1] - g_cube_scale[1]/2.0f,
+            g_cube_position[2] + g_cube_scale[2]/2.0f};
+        vec3 v6 = {
+            g_cube_position[0] - g_cube_scale[0]/2.0f,
+            g_cube_position[1] + g_cube_scale[1]/2.0f,
+            g_cube_position[2] + g_cube_scale[2]/2.0f};
+        vec3 v7 = {
+            g_cube_position[0] + g_cube_scale[0]/2.0f,
+            g_cube_position[1] + g_cube_scale[1]/2.0f,
+            g_cube_position[2] + g_cube_scale[2]/2.0f};
+        vec3 v8 = {
+            g_cube_position[0] + g_cube_scale[0]/2.0f,
+            g_cube_position[1] - g_cube_scale[1]/2.0f,
+            g_cube_position[2] + g_cube_scale[2]/2.0f};
+        SubmitVertex(v1);
+        SubmitVertex(v2);
+        SubmitVertex(v3);
+        SubmitVertex(v4);
+        SubmitVertex(v5);
+        SubmitVertex(v6);
+        SubmitVertex(v7);
+        SubmitVertex(v8);
+        SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 1, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 2, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 5, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 6, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 2, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 6, vertex_base + 2, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 0, vertex_base + 4, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 4, vertex_base + 7, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 6, vertex_base + 7, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 4, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 0, vertex_base + 1, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 4, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+        g_dummy_triangle = (Triangle){ 0 };
         return 0;
     }
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);

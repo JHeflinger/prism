@@ -221,13 +221,34 @@ void ClearTriangles() {
 }
 
 LightID SubmitLight(SceneLight light) {
-    g_renderer.geometry.changes.update_lights = TRUE;
+    char buf[MAX_LIGHT_NAME_SIZE] = { 0 };
+    sprintf(buf, "Light #%d", (int)g_renderer.geometry.lights.size);
+    return SubmitNamedLight(light, buf);
+}
+
+LightID SubmitNamedLight(SceneLight light, const char* name) {
     ARRLIST_SceneLight_add(&(g_renderer.geometry.lights), light);
+    char* b = EZ_ALLOC(MAX_LIGHT_NAME_SIZE + 1, sizeof(char));
+    strncpy(b, name, MAX_LIGHT_NAME_SIZE);
+    ARRLIST_DynamicString_add(&(g_renderer.geometry.lightnames), b);
+    g_renderer.geometry.changes.update_lights = TRUE;
     return g_renderer.geometry.lights.size - 1;
+}
+
+char* LightName(LightID lid) {
+    EZ_ASSERT(lid < g_renderer.geometry.lights.size, "Invalid light ID detected");
+    return g_renderer.geometry.lightnames.data[lid];
+}
+
+char** LightNameReference(LightID lid) { 
+    return &(g_renderer.geometry.lightnames.data[lid]);
 }
 
 void ClearLights() {
     ARRLIST_SceneLight_clear(&(g_renderer.geometry.lights));
+    for (size_t i = 0; i < g_renderer.geometry.lightnames.size; i++)
+        EZ_FREE(g_renderer.geometry.lightnames.data[i]);
+    ARRLIST_DynamicString_clear(&(g_renderer.geometry.lightnames));
     g_renderer.geometry.changes.update_lights = TRUE;
 }
 
@@ -252,7 +273,6 @@ char* MaterialName(MaterialID mid) {
 }
 
 char** MaterialNameReference(MaterialID mid) {
-    EZ_ASSERT(mid < g_renderer.geometry.materials.size, "Invalid material ID detected");
     return &(g_renderer.geometry.materialnames.data[mid]);
 }
 

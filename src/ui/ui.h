@@ -48,6 +48,7 @@ typedef struct {
 
 typedef struct {
     size_t arbitrary_counter;
+    float arbitrary_timer;
     BOOL arbitrary_bool;
 } PersistantUIData;
 

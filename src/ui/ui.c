@@ -196,6 +196,7 @@ void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
 
 void DrawPopup(size_t x, size_t y, size_t w, size_t h) {
     EZ_ASSERT(g_popup != NULL, "Cannot draw a null popup!");
+    g_current_ui_target = (RenderTexture2D){ 0 };
     DrawRectangle(x, y, w, h, (Color){ 255, 255, 255, 100 });
     if (g_popup->behavior != NULL) {
         int result = g_popup->behavior(x, y, w, h);
@@ -232,20 +233,28 @@ void DrawDropdownMenu() {
 }
 
 void HandleTextInput() {
-    int c; // l/r/u/d and mouse click cursor
+    int c;
+    size_t pre_cursor = g_textinput_data.cursor;
+    static float backspace_timer = 0.0f;
+    backspace_timer += GetFrameTime();
+    if (!InputKeyDown(IK_BACKSPACE)) backspace_timer = 0.0f;
     while ((c = GetCharPressed()) != 0) {
-        if (g_textinput_data.cursor >= g_textinput_data.size - 1) break;
+        if (g_textinput_data.cursor >= g_textinput_data.size - 1) continue;
         if (g_textinput_data.cursor < strlen(g_textinput_data.buffer)) {
             for (size_t i = strlen(g_textinput_data.buffer); i > g_textinput_data.cursor; i--) {
                 g_textinput_data.buffer[i] = g_textinput_data.buffer[i - 1];
             }
         }
+        char prev = g_textinput_data.buffer[g_textinput_data.cursor];
         g_textinput_data.buffer[g_textinput_data.cursor] = (char)c;
         g_textinput_data.cursor++;
-        g_textinput_data.buffer[g_textinput_data.cursor] = '\0';
+        g_textinput_data.buffer[g_textinput_data.cursor] = prev;
     }
     if (InputKeyPressed(IK_LEFT) && g_textinput_data.cursor > 0) g_textinput_data.cursor--;
-    if (InputKeyPressed(IK_BACKSPACE) && g_textinput_data.cursor > 0) {
+    if (InputKeyPressed(IK_RIGHT) && g_textinput_data.cursor < strlen(g_textinput_data.buffer)) g_textinput_data.cursor++;
+    if (InputKeyPressed(IK_UP)) g_textinput_data.cursor = 0;
+    if (InputKeyPressed(IK_DOWN)) g_textinput_data.cursor = strlen(g_textinput_data.buffer);
+    if ((backspace_timer > 0.5f || InputKeyPressed(IK_BACKSPACE)) && g_textinput_data.cursor > 0) {
         g_textinput_data.buffer[g_textinput_data.cursor - 1] = '\0';
         for (size_t i = g_textinput_data.cursor; i < g_textinput_data.size - 1; i++)
             g_textinput_data.buffer[i] = g_textinput_data.buffer[i+1];
@@ -260,8 +269,22 @@ void HandleTextInput() {
     if (InputButtonPressed(IK_MOUSELEFT) && CheckCollisionPointRec(
         GetMousePosition(),
         (Rectangle){ g_textinput_data.origin.x, g_textinput_data.origin.y, g_textinput_data.width, LINE_HEIGHT - 2 })) {
-        // position cursor here
+        g_textinput_data.cursor = strlen(g_textinput_data.buffer);
+        float text_start_pos = 2.0f;
+        Vector2 text_size = MeasureTextEx(FontAsset(), g_textinput_data.buffer, LINE_HEIGHT, 0);
+        if (text_size.x > g_textinput_data.width) text_start_pos -= (text_size.x - g_textinput_data.width) + 4.0f;
+        for (size_t i = 0; i < g_textinput_data.size; i++) {
+            if (g_textinput_data.buffer[i] == '\0') break;
+            char b[1024] = { 0 };
+            memcpy(b, g_textinput_data.buffer, i + 1);
+            Vector2 tsize = MeasureTextEx(FontAsset(), b, LINE_HEIGHT, 0);
+            if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){ g_textinput_data.origin.x + text_start_pos, g_textinput_data.origin.y, tsize.x, LINE_HEIGHT })) {
+                g_textinput_data.cursor = i;
+                break;
+            }
+        }
     }
+    if (pre_cursor != g_textinput_data.cursor) g_textinput_data.data->arbitrary_timer = 0.0f;
 }
 
 void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
@@ -603,23 +626,34 @@ void UIDropdownMenu_(PersistantUIData* data, size_t width, size_t num_items, cha
 }
 
 void UITextInput_(PersistantUIData* data, const char* label, char* buffer, size_t size, size_t width) {
-    UIDrawText(label);
+    constexpr float s_cursor_limit = 0.5f;
+    DrawTextEx(FontAsset(), label, g_ui_cursor, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
     Vector2 text_size = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0);
     float box_width = width - text_size.x - 10;
     if (box_width < 0) return;
     g_ui_cursor.x += text_size.x + 10;
-    g_ui_cursor.y -= LINE_HEIGHT;
     if (!g_scratch_target_in_use) {
         g_ui_scratch_target = LoadRenderTexture(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT);
         g_scratch_target_in_use = TRUE;
     }
-    EndTextureMode();
+    if (g_current_ui_target.id != 0) EndTextureMode();
     BeginTextureMode(g_ui_scratch_target);
     if (g_textinput_data.data == data) ClearBackground(MappedColor(UI_TEXT_INPUT_FOCUS_COLOR));
     else ClearBackground(MappedColor(UI_TEXT_INPUT_BG_COLOR));
-    DrawTextEx(FontAsset(), buffer, (Vector2){ 2, 0 }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+    Vector2 buffer_text_size = MeasureTextEx(FontAsset(), buffer, LINE_HEIGHT, 0);
+    float xstart = 2.0f;
+    if (g_textinput_data.data == data && buffer_text_size.x > box_width) xstart -= (buffer_text_size.x - box_width) + 4.0f;
+    DrawTextEx(FontAsset(), buffer, (Vector2){ xstart, 0 }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+    if (g_textinput_data.data == data) {
+        data->arbitrary_timer += GetFrameTime();
+        if (data->arbitrary_timer < s_cursor_limit / 2.0f) {
+            char b[1024] = { 0 };
+            memcpy(b, buffer, g_textinput_data.cursor);
+            DrawRectangle(MeasureTextEx(FontAsset(), b, LINE_HEIGHT, 0).x + xstart, 2, 2, LINE_HEIGHT - 5, MappedColor(UI_TEXT_COLOR));
+        } else if (data->arbitrary_timer > s_cursor_limit) data->arbitrary_timer = 0.0f;
+    }
     EndTextureMode();
-    BeginTextureMode(g_current_ui_target);
+    if (g_current_ui_target.id != 0) BeginTextureMode(g_current_ui_target);
     DrawTexturePro(
         g_ui_scratch_target.texture,
         (Rectangle){ 0, g_current_ui_target.texture.height - LINE_HEIGHT + 2, box_width, -(LINE_HEIGHT - 2) },
@@ -630,11 +664,13 @@ void UITextInput_(PersistantUIData* data, const char* label, char* buffer, size_
     if (CheckCollisionPointRec(
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y, box_width, LINE_HEIGHT - 2})) {
-        if (InputButtonDown(IK_MOUSELEFT)) g_textinput_data = (TextInputData){ 
-            buffer, size, TRUE, data, strlen(buffer), 
-            (Vector2){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y}, box_width
-        };
+        if (InputButtonDown(IK_MOUSELEFT)) {
+            g_textinput_data = (TextInputData){
+                buffer, size, TRUE, data, strlen(buffer), 
+                (Vector2){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y}, box_width};
+            data->arbitrary_timer = 0.0f;
+        }
     }
-    g_ui_cursor.x -= text_size.x + 10;
+    g_ui_cursor.x = 10;
     g_ui_cursor.y += LINE_HEIGHT;
 }

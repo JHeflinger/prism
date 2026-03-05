@@ -41,6 +41,12 @@ void ClearTriangles();
 
 LightID SubmitLight(SceneLight light);
 
+LightID SubmitNamedLight(SceneLight light, const char* name);
+
+char* LightName(LightID lid);
+
+char** LightNameReference(LightID lid);
+
 void ClearLights();
 
 MaterialID SubmitMaterial(SurfaceMaterial material);

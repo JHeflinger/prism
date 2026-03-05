@@ -14,6 +14,7 @@ typedef enum {
 size_t g_edit_item_index = 0;
 BOOL g_item_selected = FALSE;
 EditType g_edit_type = EDIT_MATERIAL;
+const char* g_light_types[] = { "Directional", "Spot", "Point" };
 
 void SetEditMaterial(size_t index) {
     g_item_selected = TRUE;
@@ -165,8 +166,16 @@ void DrawEditPanel(float width, float height) {
             BOOL edited = FALSE;
             SceneLight* lref = LightReference(g_edit_item_index);
             float component_width = (width - 20 - (3 * 15) - (2 * 10)) / 3.0f;
-            UIMoveCursor((width - 20 - UITextWidth("Edit Light")) / 2.0f, 0);
-            UIDrawText("Edit Light");
+            int light_type = 0;
+            if (lref->direction[0] == 0 && lref->direction[1] == 0 && lref->direction[2] == 0) {
+                light_type = 2;
+            } else if (lref->angle != 0) {
+                light_type = 1;
+            }
+            UIMoveCursor((width - 20 - UITextWidth("Edit Light (%s)", g_light_types[light_type])) / 2.0f, 0);
+            UIDrawText("Edit Light (%s)", g_light_types[light_type]);
+            UIMoveCursor(0, 15);
+            UITextInput("Name", LightName(g_edit_item_index), MAX_LIGHT_NAME_SIZE, width - 20);
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Position") / 2) - 10, 0);
             UIDrawText("Position");
@@ -196,7 +205,31 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("b");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(lref->color[2]), 0.0f, 1.0f, 0.1f, component_width); 
+            edited |= UIDragFloat(&(lref->color[2]), 0.0f, 1.0f, 0.1f, component_width);
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Direction") / 2) - 10, 0);
+            UIDrawText("Direction");
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(lref->direction[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(lref->direction[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(lref->direction[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(0, 35);
+            float sboxwidth = width - 20 - 140;
+            UIDrawText("Penumbra");
+            UIMoveCursor(140, -20);
+            edited |= UIDragFloat(&(lref->penumbra), 0, 1.0f, 0.01f, sboxwidth);
+            UIMoveCursor(0, 5);
+            UIDrawText("Opening Angle");
+            UIMoveCursor(140, -20);
+            edited |= UIDragFloat(&(lref->angle), 0, FLT_MAX, 0.1f, sboxwidth);
             if (edited) UpdateLights();
             if (UIGetCursor().y + 60 < height) {
                 UISetCursor(UIGetCursor().x, height - 60);
@@ -265,6 +298,11 @@ void DrawEditPanel(float width, float height) {
             UIDrawText("z");
             UIMoveCursor((2*component_width) + 65, -20);
             edited |= UIDragFloat(&(VertexReference(tref->a)[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(0, 35);
+            UIDrawText("Material");
+            float sboxwidth = width - 20 - 140;
+            UIMoveCursor(140, -20);
+            UIDropdownMenu(sboxwidth, NumMaterials(), MaterialNameReference(0), DropdownSelectMaterial, tref);
             vec3 adiff;
             glm_vec3_sub(VertexReference(tref->a), old_a, adiff);
             glm_vec3_add(VertexReference(tref->b), adiff, VertexReference(tref->b));
