@@ -1,4 +1,5 @@
 #include "executor.h"
+#include "renderer/processor.h"
 #include "renderer/renderer.h"
 #include "renderer/loader.h"
 #include "core/file.h"
@@ -45,7 +46,37 @@ void ImportExecuteScene(const char* scenefile) {
     }
 }
 
-void RunExecutor(const char* scenefile, const char* outfile, int width, int height, int samples, BOOL direct_lighting, BOOL direct_only) {
+void RunGeometryExecutor(const char* scenefile, const char* outfile, int method, int arg) {
+    size_t memcheck = EZ_ALLOCATED();
+    EZ_INFO("Initializing prism execution suite (geometry processing version)...");
+    InitializeExecutor(1, 1);
+    ImportExecuteScene(scenefile);
+    EZ_INFO("Executing execution suite...");
+    Geometry* geometry = RendererGeometry();
+    geometry->manifold = GenerateManifoldMesh(geometry->vertices, geometry->normals, geometry->triangles);
+    switch (method) {
+        case 0:
+            for (int i = 0; i < arg; i++) SerialSubdivide(&(geometry->manifold));
+            break;
+        case 1:
+            size_t iterations = ceil(((float)arg)/2.0f);
+            SerialSimplify(&(geometry->manifold), iterations);
+            break;
+        case 2:
+            SerialFilter(&(geometry->manifold), 0.3f);
+            break;
+        default:
+            EZ_ERROR("Unknown geometry processing method detected");
+            exit(1);
+    }
+    EZ_INFO("Saving results...");
+    SaveManifoldOBJ(outfile, &(geometry->manifold));
+    EZ_INFO("Cleaning up and exiting prism execution suite...");
+    CleanExecutor();
+    EZ_ASSERT(memcheck == EZ_ALLOCATED(), "Memory cleanup revealed a leak of %d bytes", (int)(EZ_ALLOCATED() - memcheck));
+}
+
+void RunRenderExecutor(const char* scenefile, const char* outfile, int width, int height, int samples, BOOL direct_lighting, BOOL direct_only) {
     size_t memcheck = EZ_ALLOCATED();
     EZ_INFO("Initialzing prism execution suite...");
     InitializeExecutor(width, height);

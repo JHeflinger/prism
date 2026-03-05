@@ -25,6 +25,11 @@ void LoadDice() {
     FitCamera();
 }
 
+void LoadOut() {
+    LoadOBJ("out.obj");
+    FitCamera();
+}
+
 void Screenshot() {
     SaveRender("out.png");
 }
@@ -44,11 +49,15 @@ void DevInitialize() {
     AddBind("load icosahedron", LoadDice,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
-        (BindCommand){ IK_O_OVERRIDE, BIND_KEY_PRESSED });
+        (BindCommand){ IK_I_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("load cornell box", LoadBox,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_B_OVERRIDE, BIND_KEY_PRESSED });
+    AddBind("load out.obj", LoadOut,
+        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
+        (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
+        (BindCommand){ IK_O_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("clear scene", ClearScene,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_C_OVERRIDE, BIND_KEY_PRESSED });
