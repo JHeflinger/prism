@@ -38,6 +38,7 @@ int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 }
 
 int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+    if (g_material.model == 0) g_material.model = 2;
     float width = 385;
     float height = 650;
     float xpos = x + ((w - width) / 2.0f);
