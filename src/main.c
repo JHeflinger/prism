@@ -57,9 +57,17 @@ int load_config(const char *filepath, Config *cfg) {
             if (strcmp(value, "subdivide") == 0) cfg->method = 0;
             else if (strcmp(value, "simplify") == 0) cfg->method = 1;
             else if (strcmp(value, "filter") == 0) cfg->method = 2;
+            else if (strcmp(value, "remesh") == 0) cfg->method = 3;
         }
         else if (strcmp(key, "args1") == 0) {
-            cfg->args1 = atoi(value);
+            if (cfg->method > 1) {
+                int arg1;
+                float argf = atof(value);
+                memcpy(&arg1, &argf, sizeof(int));
+                cfg->args1 = arg1;
+            } else {
+                cfg->args1 = atoi(value);
+            }
         }
     }
     fclose(f);
@@ -85,8 +93,16 @@ int main(int argc, char** argv) {
         if (strcmp(argv[3], "subdivide") == 0) method = 0;
         else if (strcmp(argv[3], "simplify") == 0) method = 1;
         else if (strcmp(argv[3], "filter") == 0) method = 2;
+        else if (strcmp(argv[3], "remesh") == 0) method = 3;
         else { printf("Unknown geometry processing method detected - \"%s\"\n", argv[3]); return 1; }
-        RunGeometryExecutor(argv[1], argv[2], method, argc == 4 ? 0 : atoi(argv[4]));
+        int args1;
+        if (method > 1) {
+            float argf = atof(argv[4]);
+            memcpy(&args1, &argf, sizeof(int));
+        } else {
+            args1 = atoi(argv[4]);
+        }
+        RunGeometryExecutor(argv[1], argv[2], method, args1);
 	} else if (argc == 8) {
         RunRenderExecutor(argv[1], argv[2], atoi(argv[3]), atoi(argv[4]), atoi(argv[5]), strcmp(argv[6], "true") == 0 ? TRUE : FALSE, strcmp(argv[7], "true") == 0 ? TRUE : FALSE);
     } else {

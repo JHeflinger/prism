@@ -63,7 +63,14 @@ void RunGeometryExecutor(const char* scenefile, const char* outfile, int method,
             SerialSimplify(&(geometry->manifold), iterations);
             break;
         case 2:
-            SerialFilter(&(geometry->manifold), 0.3f);
+            float filter_param;
+            memcpy(&filter_param, &arg, sizeof(float));
+            SerialFilter(&(geometry->manifold), filter_param);
+            break;
+        case 3:
+            float remesh_param;
+            memcpy(&remesh_param, &arg, sizeof(float));
+            SerialRemesh(&(geometry->manifold), remesh_param);
             break;
         default:
             EZ_ERROR("Unknown geometry processing method detected");
