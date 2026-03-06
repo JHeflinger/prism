@@ -4,7 +4,7 @@
 #include "data/config.h"
 #include <raylib.h>
 
-#define NUMKEYS 19
+#define NUMKEYS 20
 #define NUMBTNS 2
 
 typedef enum {
@@ -27,6 +27,7 @@ typedef enum {
     IK_BACKSPACE = 16,
     IK_DELETE = 17,
     IK_I_OVERRIDE = 18,
+    IK_P_OVERRIDE = 19,
 } InputKey;
 
 typedef enum {

@@ -628,6 +628,24 @@ BOOL Smoothen(float smoothening) {
     }
 }
 
+BOOL Remesh(float nudge) {
+    CleanManifoldMesh(&(g_renderer.geometry.manifold));
+    g_renderer.geometry.manifold = GenerateManifoldMesh(
+        g_renderer.geometry.vertices,
+        g_renderer.geometry.normals,
+        g_renderer.geometry.triangles);
+    if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
+        EZ_ERROR("Mesh was not detected to be a valid manifold");
+        CleanManifoldMesh(&(g_renderer.geometry.manifold));
+        return FALSE;
+    } else {
+        SerialRemesh(&(g_renderer.geometry.manifold), nudge);
+        ReformatFromManifold(&(g_renderer.geometry));
+        CleanManifoldMesh(&(g_renderer.geometry.manifold));
+        return TRUE;
+    }
+}
+
 void SaveRender(const char* filepath) {
 	RenderTexture rt = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
     BeginTextureMode(rt);

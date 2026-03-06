@@ -30,6 +30,49 @@ IMPL_PQUEUE(CollapseTarget);
 DECLARE_ARRLIST(PQPAIR_CollapseTarget);
 IMPL_ARRLIST(PQPAIR_CollapseTarget);
 
+size_t VertexDegree(ManifoldMesh* manifold, uint32_t vertex) {
+    uint32_t start = manifold->vertices.data[vertex].halfedge;
+    uint32_t curr = start;
+    size_t degree = 0;
+    do {
+        degree++;
+        curr = manifold->halfedges.data[manifold->halfedges.data[curr].twin].next;
+    } while (curr != start);
+    return degree;
+}
+
+BOOL IsValidCollapse(ManifoldMesh* manifold, uint32_t edge) {
+    uint32_t he = manifold->edges.data[edge].halfedge;
+    if (he == (uint32_t)-1) return FALSE;
+    uint32_t v1 = manifold->halfedges.data[he].vertex;
+    uint32_t v2 = manifold->halfedges.data[manifold->halfedges.data[he].twin].vertex;
+    uint32_t start = manifold->vertices.data[v1].halfedge;
+    uint32_t curr = start;
+    uint32_t numtouches = 0;
+    do {
+        uint32_t twin = manifold->halfedges.data[curr].twin;
+        uint32_t vert = manifold->halfedges.data[twin].vertex;
+        uint32_t degree = 0;
+        uint32_t start2 = manifold->vertices.data[vert].halfedge;
+        uint32_t curr2 = start2;
+        BOOL touches = FALSE;
+        do {
+            degree++;
+            uint32_t twin2 = manifold->halfedges.data[curr2].twin;
+            uint32_t vert2 = manifold->halfedges.data[twin2].vertex;
+            if (vert2 == v2) touches = TRUE;
+            curr2 = manifold->halfedges.data[twin2].next;
+        } while (curr2 != start2);
+        if (touches && degree == 3) {
+            return FALSE;
+        }
+        if (touches) numtouches++;
+        curr = manifold->halfedges.data[twin].next;
+        if (curr == start) break;
+    } while (curr != start);
+    return numtouches <= 2;
+}
+
 void CleanManifoldMesh(ManifoldMesh* manifold) {
     ARRLIST_ManifoldVertex_clear(&(manifold->vertices));
     ARRLIST_ManifoldEdge_clear(&(manifold->edges));
@@ -646,43 +689,12 @@ void SerialSimplify(ManifoldMesh* manifold, size_t reduction) {
     }
     PQUEUE_CollapseTarget_build(&pq, errors.data, errors.size);
 
-    // collapse targets
-    inline BOOL check_valid_collapse(uint32_t edge) {
-        uint32_t he = manifold->edges.data[edge].halfedge;
-        if (he == (uint32_t)-1) return FALSE;
-        uint32_t v1 = manifold->halfedges.data[he].vertex;
-        uint32_t v2 = manifold->halfedges.data[manifold->halfedges.data[he].twin].vertex;
-        uint32_t start = manifold->vertices.data[v1].halfedge;
-        uint32_t curr = start;
-        uint32_t numtouches = 0;
-        do {
-            uint32_t twin = manifold->halfedges.data[curr].twin;
-            uint32_t vert = manifold->halfedges.data[twin].vertex;
-            uint32_t degree = 0;
-            uint32_t start2 = manifold->vertices.data[vert].halfedge;
-            uint32_t curr2 = start2;
-            BOOL touches = FALSE;
-            do {
-                degree++;
-                uint32_t twin2 = manifold->halfedges.data[curr2].twin;
-                uint32_t vert2 = manifold->halfedges.data[twin2].vertex;
-                if (vert2 == v2) touches = TRUE;
-                curr2 = manifold->halfedges.data[twin2].next;
-            } while (curr2 != start2);
-            if (touches && degree == 3) {
-                return FALSE;
-            }
-            if (touches) numtouches++;
-            curr = manifold->halfedges.data[twin].next;
-            if (curr == start) break;
-        } while (curr != start);
-        return numtouches <= 2;
-    }
+    // collapse targets 
     for (size_t i = 0; i < reduction; i++) {
         if (pq.size == 0) EZ_ERROR("Unable to simplify a mesh into a negative number of edges");
         CollapseTarget target = PQUEUE_CollapseTarget_pop(&pq);
         uint32_t edge = target.edge;
-        if (!check_valid_collapse(edge)) {
+        if (!IsValidCollapse(manifold, edge)) {
             i--;
             continue;
         }
@@ -736,4 +748,96 @@ void SerialFilter(ManifoldMesh* manifold, float smoothing) {
         glm_vec3_add(manifold->vertices.data[i].position, n, manifold->vertices.data[i].position);
     }
     ARRLIST_float_clear(&deltas);
+}
+
+void SerialRemesh(ManifoldMesh* manifold, float nudge) {
+    float average_distance = 0.0f;
+    for (size_t i = 0; i < manifold->edges.size; i++) {
+        uint32_t he = manifold->edges.data[i].halfedge;
+        uint32_t twin = manifold->halfedges.data[he].twin;
+        uint32_t v1 = manifold->halfedges.data[he].vertex;
+        uint32_t v2 = manifold->halfedges.data[twin].vertex;
+        vec3 e;
+        glm_vec3_sub(manifold->vertices.data[v1].position, manifold->vertices.data[v2].position, e);
+        average_distance += glm_vec3_norm(e);
+    }
+    average_distance /= (float)manifold->edges.size;
+    float split_threshold = 4.0f * average_distance / 3.0f;
+    float collapse_threshold = 4.0f * average_distance / 5.0f;
+    size_t numedges = manifold->edges.size;
+    for (size_t i = 0; i < numedges; i++) {
+        uint32_t he = manifold->edges.data[i].halfedge;
+        uint32_t twin = manifold->halfedges.data[he].twin;
+        uint32_t v1 = manifold->halfedges.data[he].vertex;
+        uint32_t v2 = manifold->halfedges.data[twin].vertex;
+        vec3 e;
+        glm_vec3_sub(manifold->vertices.data[v1].position, manifold->vertices.data[v2].position, e);
+        float curr_distance = glm_vec3_norm(e);
+        if (curr_distance > split_threshold) {
+            EdgeSplit(manifold, i);
+        }
+    }
+    numedges = manifold->edges.size;
+    for (size_t i = 0; i < numedges; i++) {
+        uint32_t he = manifold->edges.data[i].halfedge;
+        if (he != (uint32_t)-1) {
+            uint32_t twin = manifold->halfedges.data[he].twin;
+            uint32_t v1 = manifold->halfedges.data[he].vertex;
+            uint32_t v2 = manifold->halfedges.data[twin].vertex;
+            vec3 e;
+            glm_vec3_sub(manifold->vertices.data[v1].position, manifold->vertices.data[v2].position, e);
+            float curr_distance = glm_vec3_norm(e);
+            if (curr_distance < collapse_threshold) {
+                if (IsValidCollapse(manifold, i)) EdgeCollapse(manifold, i);
+            }
+        }
+    }
+    for (size_t i = 0; i < manifold->edges.size; i++) {
+        uint32_t he = manifold->edges.data[i].halfedge;
+        if (he != (uint32_t)-1) {
+            uint32_t twin = manifold->halfedges.data[he].twin;
+            uint32_t v1 = manifold->halfedges.data[he].vertex;
+            uint32_t v2 = manifold->halfedges.data[twin].vertex;
+            uint32_t v3 = manifold->halfedges.data[manifold->halfedges.data[manifold->halfedges.data[he].next].next].vertex;
+            uint32_t v4 = manifold->halfedges.data[manifold->halfedges.data[manifold->halfedges.data[twin].next].next].vertex;
+            int d1 = (int)VertexDegree(manifold, v1);
+            int d2 = (int)VertexDegree(manifold, v2);
+            int d3 = (int)VertexDegree(manifold, v3);
+            int d4 = (int)VertexDegree(manifold, v4);
+            int before = (d1 - 6)*(d1 - 6) + (d2 - 6)*(d2 - 6) + (d3 - 6)*(d4 - 6) + (d4 - 6)*(d4 - 6);
+            int after = (d1 - 7)*(d1 - 7) + (d2 - 7)*(d2 - 7) + (d3 - 5)*(d4 - 5) + (d4 - 5)*(d4 - 5);
+            if (d1 != 3 && d2 != 3 && after < before) {
+                EdgeFlip(manifold, i);
+            }
+        }
+    }
+    vec3* new_positions = EZ_ALLOC(manifold->vertices.size, sizeof(vec3));
+    for (size_t i = 0; i < manifold->vertices.size; i++) {
+        uint32_t start = manifold->vertices.data[i].halfedge;
+        if (start != (uint32_t)-1) {
+            uint32_t curr = start;
+            size_t degree = 0;
+            vec3 pos = { 0 };
+            do {
+                uint32_t twin = manifold->halfedges.data[curr].twin;
+                degree++;
+                glm_vec3_add(pos, manifold->vertices.data[manifold->halfedges.data[twin].vertex].position, pos);
+                curr = manifold->halfedges.data[twin].next;
+            } while (curr != start);
+            glm_vec3_scale(pos, 1.0f / ((float)degree), pos);
+            vec3 v, n;
+            glm_vec3_sub(pos, manifold->vertices.data[i].position, v);
+            float ndotv = glm_vec3_dot(manifold->vertices.data[i].normal, v);
+            glm_vec3_scale(manifold->vertices.data[i].normal, ndotv, n);
+            glm_vec3_sub(v, n, v);
+            glm_vec3_scale(v, nudge, v);
+            glm_vec3_add(v, manifold->vertices.data[i].position, new_positions[i]);
+        }
+    }
+    for (size_t i = 0; i < manifold->vertices.size; i++) {
+        if (manifold->vertices.data[i].halfedge != (uint32_t)-1) {
+            SETVEC(manifold->vertices.data[i].position, new_positions[i]);
+        }
+    }
+    EZ_FREE(new_positions);
 }

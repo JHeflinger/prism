@@ -109,6 +109,8 @@ void Displace(float displacement);
 
 BOOL Smoothen(float smoothening);
 
+BOOL Remesh(float nudge);
+
 void SaveRender(const char* filepath);
 
 char* GPUModel();

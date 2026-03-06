@@ -23,6 +23,7 @@ void InitializeInput() {
     g_input_map.keymap[IK_BACKSPACE] = KEY_BACKSPACE;
     g_input_map.keymap[IK_DELETE] = KEY_DELETE;
     g_input_map.keymap[IK_I_OVERRIDE] = KEY_I;
+    g_input_map.keymap[IK_P_OVERRIDE] = KEY_P;
 
     g_input_map.btnmap[IK_MOUSELEFT] = MOUSE_BUTTON_LEFT;
     g_input_map.btnmap[IK_MOUSERIGHT] = MOUSE_BUTTON_RIGHT;
@@ -46,6 +47,7 @@ void InitializeInput() {
     g_input_map.keynames[IK_BACKSPACE] = "BACK";
     g_input_map.keynames[IK_DELETE] = "DELETE";
     g_input_map.keynames[IK_I_OVERRIDE] = "I";
+    g_input_map.keynames[IK_P_OVERRIDE] = "P";
 
     g_input_map.btnnames[IK_MOUSELEFT] = "LEFT CLICK";
     g_input_map.btnnames[IK_MOUSERIGHT] = "RIGHT CLICK";

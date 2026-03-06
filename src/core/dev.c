@@ -30,6 +30,11 @@ void LoadOut() {
     FitCamera();
 }
 
+void LoadPeter() {
+    LoadOBJ("/home/jason/Dev/MESH/meshes/peter.obj");
+    FitCamera();
+}
+
 void Screenshot() {
     SaveRender("out.png");
 }
@@ -58,6 +63,10 @@ void DevInitialize() {
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_O_OVERRIDE, BIND_KEY_PRESSED });
+    AddBind("load peter", LoadPeter,
+        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
+        (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
+        (BindCommand){ IK_P_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("clear scene", ClearScene,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_C_OVERRIDE, BIND_KEY_PRESSED });

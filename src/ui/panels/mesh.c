@@ -29,6 +29,12 @@ void DrawMeshPanel(float width, float height) {
     }
     UIMoveCursor((width - 20.0f)/2.0f, -20);
     UIDragFloat(&smoothening, 0, FLT_MAX, 0.001f, (width - 20.0f)/2.0f);
+    static float nudgening = 0.5f;
+    if (UIButton("Remesh", (width - 20)/2.0f)) {
+        Remesh(nudgening);
+    }
+    UIMoveCursor((width - 20.0f)/2.0f, -20);
+    UIDragFloat(&nudgening, 0, 1.0f, 0.001f, (width - 20.0f)/2.0f);
 }
 
 Panel GenerateMeshPanel() {
