@@ -50,12 +50,8 @@ typedef struct {
 } UniformBufferObject;
 
 typedef struct {
-    alignas(4) float minx;
-    alignas(4) float miny;
-    alignas(4) float minz;
-    alignas(4) float maxx;
-    alignas(4) float maxy;
-    alignas(4) float maxz;
+    alignas(16) vec3 minBB;
+    alignas(16) vec3 maxBB;
 } GeometryUniformBufferObject;
 
 typedef struct {

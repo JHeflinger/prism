@@ -18,9 +18,14 @@ layout(binding = 2) uniform OverlayUniformBufferObject {
 	uint image_height;
 	uint single_selected_tid;
     uint divisor;
-} ubo;
+} o_ubo;
 
-layout(binding = 3) buffer OverlaySSBO {
+layout(binding = 3) uniform GeometryUniformBufferObject { 
+    vec3 minBB;
+    vec3 maxBB;
+} g_ubo;
+
+layout(binding = 4) buffer OverlaySSBO {
 	uint hovered_tid;
 };
 
@@ -29,8 +34,8 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 const float mixfactor = 0.2;
 
 void highlight_triangle(uint htid) {
-	int rx = int(gl_GlobalInvocationID.x%ubo.image_width);
-    int ry = int(gl_GlobalInvocationID.x/ubo.image_width);
+	int rx = int(gl_GlobalInvocationID.x%o_ubo.image_width);
+    int ry = int(gl_GlobalInvocationID.x/o_ubo.image_width);
     if (htid != -1 && raygenIn[gl_GlobalInvocationID.x].tid == htid) {
         int radius = 2;
 		int minx = 0;
@@ -39,18 +44,18 @@ void highlight_triangle(uint htid) {
 		int maxy = ry;
 		if (rx > radius) minx = rx - radius;
 		if (ry > radius) miny = ry - radius;
-		if (maxx + radius < ubo.image_width) maxx += radius;
-		if (maxy + radius < ubo.image_height) maxy += radius;
+		if (maxx + radius < o_ubo.image_width) maxx += radius;
+		if (maxy + radius < o_ubo.image_height) maxy += radius;
 		bool border = false;
 		for (int x = minx; x < maxx; x++) {
 			for (int y = miny; y < maxy; y++) {
-				RayGenerator rg = raygenIn[y*ubo.image_width + x];
+				RayGenerator rg = raygenIn[y*o_ubo.image_width + x];
 				if (rg.tid != htid) {
 					border = true;
 				}
 			}
 		}
-        float divisor = float(ubo.divisor) * (1.0 - mixfactor);
+        float divisor = float(o_ubo.divisor) * (1.0 - mixfactor);
 		if (border) {
 			imageStore(outputImage, ivec2(rx, ry), vec4(1.0, 0.52, 0.0, 1.0) / divisor);
 		} else {
@@ -61,10 +66,10 @@ void highlight_triangle(uint htid) {
 }
 
 void outline_triangle() {
-	int rx = int(gl_GlobalInvocationID.x%ubo.image_width);
-    int ry = int(gl_GlobalInvocationID.x/ubo.image_width);
+	int rx = int(gl_GlobalInvocationID.x%o_ubo.image_width);
+    int ry = int(gl_GlobalInvocationID.x/o_ubo.image_width);
     uint tid = raygenIn[gl_GlobalInvocationID.x].tid;
-    float d = raygenIn[gl_GlobalInvocationID.x].distance;
+    float d = raygenIn[gl_GlobalInvocationID.x].distance / length(g_ubo.maxBB - g_ubo.minBB);
     if (tid != -1) {
         int radius = 1;
         int minx = 0;
@@ -73,12 +78,12 @@ void outline_triangle() {
         int maxy = ry;
         if (rx > radius) minx = rx - radius;
 		if (ry > radius) miny = ry - radius;
-		if (maxx + radius < ubo.image_width) maxx += radius;
-		if (maxy + radius < ubo.image_height) maxy += radius;
+		if (maxx + radius < o_ubo.image_width) maxx += radius;
+		if (maxy + radius < o_ubo.image_height) maxy += radius;
 		bool border = false;
 		for (int x = minx; x < maxx; x++) {
 			for (int y = miny; y < maxy; y++) {
-				RayGenerator rg = raygenIn[y*ubo.image_width + x];
+				RayGenerator rg = raygenIn[y*o_ubo.image_width + x];
 				if (rg.tid != tid) {
 					border = true;
 				}
@@ -86,15 +91,15 @@ void outline_triangle() {
 		}
 		if (border) {
 			vec4 oldc = imageLoad(outputImage, ivec2(rx, ry));
-			imageStore(outputImage, ivec2(rx, ry), mix(oldc, vec4(0.1, 0.1, 0.1, 1.0), min(10.0 / d, 1.0)));
+			imageStore(outputImage, ivec2(rx, ry), mix(oldc, vec4(0.1, 0.1, 0.1, 1.0), min(1.0 / d, 1.0)));
         }
     }
 }
 
 void main() {
-    if (ubo.divisor == 1.0)
+    if (o_ubo.divisor == 1.0)
         outline_triangle();
     highlight_triangle(hovered_tid);
-	if (hovered_tid != ubo.single_selected_tid)
-		highlight_triangle(ubo.single_selected_tid);
+	if (hovered_tid != o_ubo.single_selected_tid)
+		highlight_triangle(o_ubo.single_selected_tid);
 }

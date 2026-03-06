@@ -320,12 +320,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     // geometry uniform buffer
     {
         GeometryUniformBufferObject ubo = { 0 };
-        ubo.minx = g_vupdt_renderer_ref->geometry.bounds.min[0];
-        ubo.miny = g_vupdt_renderer_ref->geometry.bounds.min[1];
-        ubo.minz = g_vupdt_renderer_ref->geometry.bounds.min[2];
-        ubo.maxx = g_vupdt_renderer_ref->geometry.bounds.max[0];
-        ubo.maxy = g_vupdt_renderer_ref->geometry.bounds.max[1];
-        ubo.maxz = g_vupdt_renderer_ref->geometry.bounds.max[2];
+        SETVEC(ubo.minBB, g_vupdt_renderer_ref->geometry.bounds.min);
+        SETVEC(ubo.maxBB, g_vupdt_renderer_ref->geometry.bounds.max);
         memcpy(ubos->geometry_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(GeometryUniformBufferObject));
     }
 }
