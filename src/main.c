@@ -10,78 +10,9 @@
 
 #define MAX_STR 512
 
-typedef struct {
-    char infile[MAX_STR];
-    char outfile[MAX_STR];
-    int method;
-    int args1;
-} Config;
-
-static void trim(char *str) {
-    while (isspace((unsigned char)*str)) memmove(str, str + 1, strlen(str));
-    int len = strlen(str);
-    while (len > 0 && isspace((unsigned char)str[len - 1])) {
-        str[len - 1] = '\0';
-        len--;
-    }
-}
-
-int load_config(const char *filepath, Config *cfg) {
-    FILE *f = fopen(filepath, "r");
-    if (!f) return 0;
-    char line[1024];
-    while (fgets(line, sizeof(line), f)) {
-        trim(line);
-        if (line[0] == '\0')
-            continue;
-        if (line[0] == ';')
-            continue;
-        if (line[0] == '[')
-            continue;
-        char *eq = strchr(line, '=');
-        if (!eq) continue;
-        *eq = '\0';
-        char key[256];
-        char value[512];
-        strncpy(key, line, sizeof(key));
-        strncpy(value, eq + 1, sizeof(value));
-        trim(key);
-        trim(value);
-        if (strcmp(key, "infile") == 0) {
-            strncpy(cfg->infile, value, MAX_STR);
-        }
-        else if (strcmp(key, "outfile") == 0) {
-            strncpy(cfg->outfile, value, MAX_STR);
-        }
-        else if (strcmp(key, "method") == 0) {
-            if (strcmp(value, "subdivide") == 0) cfg->method = 0;
-            else if (strcmp(value, "simplify") == 0) cfg->method = 1;
-            else if (strcmp(value, "filter") == 0) cfg->method = 2;
-            else if (strcmp(value, "remesh") == 0) cfg->method = 3;
-        }
-        else if (strcmp(key, "args1") == 0) {
-            if (cfg->method > 1) {
-                int arg1;
-                float argf = atof(value);
-                memcpy(&arg1, &argf, sizeof(int));
-                cfg->args1 = arg1;
-            } else {
-                cfg->args1 = atoi(value);
-            }
-        }
-    }
-    fclose(f);
-    return 1;
-}
-
 int main(int argc, char** argv) {
     if (argc == 1) {
         RunEditor();
-    } else if (argc == 2) {
-        Config cfg = { 0 };
-        load_config(argv[1], &cfg);
-        EZ_INFO("%s %s %d %d", cfg.infile, cfg.outfile, cfg.method, cfg.args1);
-        RunGeometryExecutor(cfg.infile, cfg.outfile, cfg.method, cfg.args1);
     } else if (argc == 3) {
 		int rx = atoi(argv[1]);
 		int ry = atoi(argv[2]);
