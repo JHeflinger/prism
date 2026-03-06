@@ -83,6 +83,7 @@ DECLARE_ARRLIST(SurfaceMaterial);
 
 typedef struct {
     alignas(4) uint32_t tid;
+    alignas(4) float distance;
 } RayGenerator;
 
 typedef struct {

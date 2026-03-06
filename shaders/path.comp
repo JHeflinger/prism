@@ -20,6 +20,7 @@ struct BVHNode {
 
 struct RayGenerator {
     uint tid;
+    float distance;
 };
 
 struct Ray {
@@ -546,7 +547,7 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
     }
 }
 
-vec3 pathtrace(Ray ray, inout uint hit_id) {
+vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     vec3 throughput = vec3(1.0);
     vec3 radiance = vec3(0.0);
     bool firsthit = true;
@@ -560,6 +561,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id) {
         if (firsthit) {
             firsthit = false;
             hit_id = hid;
+            hit_distance = h.distance;
         }
         if (h.distance <= 0) break;
         Material material = materialIn[h.material];
@@ -610,8 +612,10 @@ void main() {
 
 	// calculate ray color
     uint hit_id = -1;
-    vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id);
+    float hit_distance = -1.0f;
+    vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id, hit_distance);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;
+    raygenIn[gl_GlobalInvocationID.x].distance = hit_distance;
     
     // failures
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);

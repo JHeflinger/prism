@@ -15,6 +15,7 @@ struct BVHNode {
 
 struct RayGenerator {
     uint tid;
+    float distance;
 };
 
 struct Ray {
@@ -207,7 +208,7 @@ float plane_intersect(Ray ray, vec3 planepoint, vec3 normal) {
     return dot(planepoint - ray.position, normal) / dot(ray.direction, normal);
 }
 
-vec3 getcolor(vec2 ray_coordinate, inout uint hit_id) {
+vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) {
 	// create ray
     Ray ray = create_ray(ray_coordinate);
 
@@ -249,7 +250,7 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id) {
     } else if (gridhit) {
         color = mix(background_color, vec3(0.7), gridmix);
     }
-	
+    hit_distance = hit.distance;	
 	return color;
 }
 
@@ -264,8 +265,10 @@ void main() {
 	// calculate ray color
 	vec3 color = vec3(0);
     uint hit_id = -1;
-	color = getcolor(vec2(rx, ry), hit_id);
+    float hit_distance = -1.0;
+	color = getcolor(vec2(rx, ry), hit_id, hit_distance);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;
+    raygenIn[gl_GlobalInvocationID.x].distance = hit_distance;
 
     // failures
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);

@@ -2,6 +2,7 @@
 
 struct RayGenerator {
     uint tid;
+    float distance;
 };
 
 layout(binding = 0) readonly buffer RayGeneratorSSBOIn {
@@ -63,6 +64,7 @@ void outline_triangle() {
 	int rx = int(gl_GlobalInvocationID.x%ubo.image_width);
     int ry = int(gl_GlobalInvocationID.x/ubo.image_width);
     uint tid = raygenIn[gl_GlobalInvocationID.x].tid;
+    float d = raygenIn[gl_GlobalInvocationID.x].distance;
     if (tid != -1) {
         int radius = 1;
         int minx = 0;
@@ -83,7 +85,8 @@ void outline_triangle() {
 			}
 		}
 		if (border) {
-			imageStore(outputImage, ivec2(rx, ry), vec4(0.1, 0.1, 0.1, 1.0));
+			vec4 oldc = imageLoad(outputImage, ivec2(rx, ry));
+			imageStore(outputImage, ivec2(rx, ry), mix(oldc, vec4(0.1, 0.1, 0.1, 1.0), min(10.0 / d, 1.0)));
         }
     }
 }

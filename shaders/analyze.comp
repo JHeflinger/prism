@@ -2,6 +2,7 @@
 
 struct RayGenerator {
     uint tid;
+    float distance;
 };
 
 layout(binding = 0) buffer RayGeneratorSSBOIn {
