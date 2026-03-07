@@ -60,12 +60,15 @@ typedef struct {
 	alignas(4) uint32_t image_width;
 	alignas(4) uint32_t image_height;
 	alignas(4) uint32_t single_selected_tid;
+	alignas(4) uint32_t single_selected_vid;
 	alignas(4) uint32_t divisor;
     alignas(4) uint32_t mode;
 } OverlayUniformBufferObject;
 
 typedef struct {
 	alignas(4) TriangleID hovered_tid;
+    alignas(8) vec2 vertex_position;
+    alignas(8) vec2 selected_vertex_position;
 } OverlaySSBO;
 
 typedef struct {

@@ -313,6 +313,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 		ubo.image_width = g_vupdt_renderer_ref->dimensions.x;
 		ubo.image_height = g_vupdt_renderer_ref->dimensions.y;
         ubo.single_selected_tid = GetSelectedTriangle();
+        ubo.single_selected_vid = GetSelectedVertex();
         ubo.divisor = g_vupdt_renderer_ref->config.flags & PATHTRACE_SHADER_FLAG ? CPUSWAP_LENGTH : 1;
         ubo.mode = GetOverlayMode();
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));

@@ -255,7 +255,7 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
 }
 
 void main() {
-	// create ray generator coordinates	
+	// create ray generator coordinates
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
 

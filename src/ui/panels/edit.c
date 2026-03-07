@@ -8,7 +8,8 @@
 typedef enum {
     EDIT_MATERIAL,
     EDIT_LIGHT,
-    EDIT_SINGLE_TRIANGLE
+    EDIT_SINGLE_TRIANGLE,
+    EDIT_SINGLE_VERTEX,
 } EditType;
 
 size_t g_edit_item_index = 0;
@@ -21,6 +22,7 @@ void SetEditMaterial(size_t index) {
     g_edit_item_index = index;
     g_edit_type = EDIT_MATERIAL;
     SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((TriangleID)-1);
 }
 
 void SetEditLight(size_t index) {
@@ -28,17 +30,27 @@ void SetEditLight(size_t index) {
     g_edit_item_index = index;
     g_edit_type = EDIT_LIGHT;
     SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((TriangleID)-1);
 }
 
 void SetEditTriangle(size_t index) {
     g_item_selected = TRUE;
     g_edit_item_index = index;
     g_edit_type = EDIT_SINGLE_TRIANGLE;
+    SetSelectedVertex((TriangleID)-1);
+}
+
+void SetEditVertex(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_SINGLE_VERTEX;
+    SetSelectedTriangle((TriangleID)-1);
 }
 
 void DeselectEditTarget() {
     g_item_selected = FALSE;
     SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((TriangleID)-1);
 }
 
 void DrawEditPanel(float width, float height) {
@@ -307,6 +319,33 @@ void DrawEditPanel(float width, float height) {
             glm_vec3_sub(VertexReference(tref->a), old_a, adiff);
             glm_vec3_add(VertexReference(tref->b), adiff, VertexReference(tref->b));
             glm_vec3_add(VertexReference(tref->c), adiff, VertexReference(tref->c));
+            if (edited) UpdateVertices();
+            if (UIGetCursor().y + 60 < height) {
+                UISetCursor(UIGetCursor().x, height - 60);
+            }
+            UIMoveCursor((width - 20 - 200) / 2.0f, 0);
+            if (UIButton("Delete", 200)) EZ_WARN("This functionality is not implemented yet");
+        } else if (g_edit_type == EDIT_SINGLE_VERTEX) {
+            BOOL edited = FALSE;
+            float* vref = VertexReference(g_edit_item_index);
+            float component_width = (width - 20 - (3 * 15) - (2 * 10)) / 3.0f;
+            UIMoveCursor((width - 20 - UITextWidth("Edit Vertex")) / 2.0f, 0);
+            UIDrawText("Edit Vertex");
+            UIMoveCursor(0, 15);
+            UIMoveCursor((width / 2) - (UITextWidth("Position") / 2) - 10, 0);
+            UIDrawText("Position");
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            edited |= UIDragFloat(&(vref[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            edited |= UIDragFloat(&(vref[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            edited |= UIDragFloat(&(vref[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             if (edited) UpdateVertices();
             if (UIGetCursor().y + 60 < height) {
                 UISetCursor(UIGetCursor().x, height - 60);

@@ -25,4 +25,10 @@ TriangleID GetSelectedTriangle();
 
 OverlayMode GetOverlayMode();
 
+VertexID HoveredVertex();
+
+void SetSelectedVertex(VertexID vid);
+
+VertexID GetSelectedVertex();
+
 #endif

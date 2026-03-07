@@ -149,12 +149,26 @@ void UpdateViewportPanel(float width, float height) {
 
     // selection controls
     if (InputButtonPressed(IK_MOUSELEFT) && g_lfocused) {
-        TriangleID tindex = HoveredTriangle();
-        if (tindex != (TriangleID)-1) {
-            SetEditTriangle(tindex);
-            SetSelectedTriangle(tindex);
-        } else {
-            DeselectEditTarget();
+        switch (GetOverlayMode()) {
+            case TRIANGLE_SELECT_MODE:
+                TriangleID tindex = HoveredTriangle();
+                if (tindex != (TriangleID)-1) {
+                    SetEditTriangle(tindex);
+                    SetSelectedTriangle(tindex);
+                } else {
+                    DeselectEditTarget();
+                }
+                break;
+            case VERTEX_SELECT_MODE:
+                VertexID vindex = HoveredVertex();
+                if (vindex != (VertexID)-1) {
+                    SetEditVertex(vindex);
+                    SetSelectedVertex(vindex);
+                } else {
+                    DeselectEditTarget();
+                }
+                break;
+            default: DeselectEditTarget();
         }
     }
 

@@ -4,8 +4,9 @@
 
 Renderer* g_overlay_renderer_ref = NULL;
 Rectangle g_viewport_dims = { 0 };
-OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (TriangleID)-1 };
+OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (TriangleID)-1, { 0, 0 }, { 0, 0 } };
 TriangleID g_single_selected_triangle = -1;
+VertexID g_single_selected_vertex = -1;
 OverlayMode g_overlay_mode = NO_SELECT_MODE;
 
 void SelectNoneMode() {
@@ -42,7 +43,8 @@ Rectangle GetViewportRec() {
 }
 
 TriangleID HoveredTriangle() {
-    return g_exposed_overlay_ssbo.hovered_tid;
+    if (g_overlay_mode == TRIANGLE_SELECT_MODE) return g_exposed_overlay_ssbo.hovered_tid;
+    return (TriangleID)-1;
 }
 
 OverlaySSBO* ExposedOverlaySSBO() {
@@ -59,4 +61,17 @@ TriangleID GetSelectedTriangle() {
 
 OverlayMode GetOverlayMode() {
     return g_overlay_mode;
+}
+
+VertexID HoveredVertex() {
+    if (g_overlay_mode == VERTEX_SELECT_MODE) return g_exposed_overlay_ssbo.hovered_tid;
+    return (VertexID)-1;
+}
+
+void SetSelectedVertex(VertexID vid) {
+    g_single_selected_vertex = vid;
+}
+
+VertexID GetSelectedVertex() {
+    return g_single_selected_vertex;
 }

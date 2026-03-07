@@ -9,6 +9,7 @@
 
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
+typedef uint32_t VertexID;
 typedef uint32_t LightID;
 
 DECLARE_ARRLIST(TriangleID);
