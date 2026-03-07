@@ -4,7 +4,7 @@
 #include "data/config.h"
 #include <raylib.h>
 
-#define NUMKEYS 24
+#define NUMKEYS 25
 #define NUMBTNS 2
 
 typedef enum {
@@ -32,6 +32,7 @@ typedef enum {
     IK_SELECT_VERTEX = 21,
     IK_SELECT_NONE = 22,
     IK_SELECT = 23,
+    IK_PAN_SELECTED = 24,
 } InputKey;
 
 typedef enum {

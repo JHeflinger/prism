@@ -66,7 +66,7 @@ void ZoomCameraControls() {
         glm_vec3_sub(camera.position, camera.look, offset);
         float radius = glm_vec3_norm(offset);
         float rbefore = radius;
-        radius -= (mousedelta_offset / 32.0f) * (to_previous < to_current ? -1.0f : 1.0f);
+        radius -= (mousedelta_offset * radius / 512.0f) * (to_previous < to_current ? -1.0f : 1.0f);
         if (radius < 1e-6f) radius = 1e-6f;
         glm_vec3_normalize(offset);
         glm_vec3_scale(offset, radius, offset);
@@ -104,6 +104,10 @@ void PanCameraControls() {
         camera.position[2] = camera.look[2] + (radius * sin(phi) * sin(theta));
         MoveCamera(camera);
     }
+}
+
+void PanSelectedObject() {
+
 }
 
 void DrawViewportPanel(float width, float height) {
@@ -186,8 +190,9 @@ Panel GenerateViewportPanel() {
     p.draw = DrawViewportPanel;
     p.update = UpdateViewportPanel;
     g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
-    AddBind("rotate viewport camera", RotateCameraControls, (BindCommand){ IK_MOUSERIGHT, BIND_BUTTON_END });
-    AddBind("pan viewport camera", PanCameraControls, (BindCommand){ IK_MOUSELEFT, BIND_BUTTON_END });
+    AddBind("rotate viewport camera", RotateCameraControls, (BindCommand){ IK_PAN_CAMERA, BIND_KEY_DOWN }, (BindCommand){ IK_MOUSERIGHT, BIND_BUTTON_END });
+    AddBind("pan viewport camera", PanCameraControls, (BindCommand){ IK_PAN_CAMERA, BIND_KEY_DOWN }, (BindCommand){ IK_MOUSELEFT, BIND_BUTTON_END });
+    AddBind("yank selected object", PanSelectedObject, (BindCommand){ IK_PAN_SELECTED, BIND_KEY_DOWN }, (BindCommand){ IK_MOUSELEFT, BIND_BUTTON_END });
     AddBind("zoom viewport camera", ZoomCameraControls, (BindCommand){ IK_ZOOM, BIND_KEY_END });
 	AddBind("reset viewport camera", ResetViewportCamera, (BindCommand){ IK_RESET_CAMERA, BIND_KEY_PRESSED });
 	AddBind("fit viewport camera to model", FitCamera, (BindCommand){ IK_FIT_CAMERA, BIND_KEY_PRESSED });
