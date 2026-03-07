@@ -1,5 +1,9 @@
 #version 450
 
+#define NO_SELECT 0
+#define TRIANGLE_SELECT 1
+#define VERTEX_SELECT 2
+
 struct RayGenerator {
     uint tid;
     float distance;
@@ -18,6 +22,7 @@ layout(binding = 2) uniform OverlayUniformBufferObject {
 	uint image_height;
 	uint single_selected_tid;
     uint divisor;
+    uint mode;
 } o_ubo;
 
 layout(binding = 3) uniform GeometryUniformBufferObject { 
@@ -99,7 +104,8 @@ void outline_triangle() {
 void main() {
     if (o_ubo.divisor == 1.0)
         outline_triangle();
-    highlight_triangle(hovered_tid);
+    if (o_ubo.mode == TRIANGLE_SELECT)
+        highlight_triangle(hovered_tid);
 	if (hovered_tid != o_ubo.single_selected_tid)
 		highlight_triangle(o_ubo.single_selected_tid);
 }

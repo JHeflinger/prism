@@ -20,6 +20,7 @@ layout(binding = 2) uniform OverlayUniformBufferObject {
 	uint image_height;
 	uint single_selected_tid;
     uint divisor;
+    uint mode;
 } ubo;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;

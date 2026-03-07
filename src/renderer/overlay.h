@@ -3,6 +3,12 @@
 
 #include "renderer/vulkan/vstructs.h"
 
+typedef enum {
+    NO_SELECT_MODE = 0,
+    TRIANGLE_SELECT_MODE = 1,
+    VERTEX_SELECT_MODE = 2,
+} OverlayMode;
+
 void SetOverlayContext(Renderer* renderer);
 
 void SetViewportRec(Rectangle rec);
@@ -16,5 +22,7 @@ OverlaySSBO* ExposedOverlaySSBO();
 void SetSelectedTriangle(TriangleID tid);
 
 TriangleID GetSelectedTriangle();
+
+OverlayMode GetOverlayMode();
 
 #endif
