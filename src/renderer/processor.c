@@ -1,5 +1,6 @@
 #include "processor.h"
 #include "renderer/renderer.h"
+#include "renderer/rmath.h"
 #include <easyhash.h>
 #include <easybasics.h>
 

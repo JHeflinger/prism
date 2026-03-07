@@ -4,8 +4,10 @@
 #include "data/profile.h"
 #include "data/strings.h"
 #include "renderer/vulkan/vconfig.h"
-#include "renderer/rmath.h"
+#define CGLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <cglm/cglm.h>
 #include <vulkan/vulkan.h>
+#include <raylib.h>
 
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;

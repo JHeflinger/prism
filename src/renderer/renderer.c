@@ -4,6 +4,7 @@
 #include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vclean.h"
+#include "renderer/rmath.h"
 #include "renderer/overlay.h"
 #include "renderer/processor.h"
 #include <GLFW/glfw3.h>

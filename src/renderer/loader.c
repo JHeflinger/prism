@@ -1,5 +1,6 @@
 #include "loader.h"
 #include "renderer/renderer.h"
+#include "renderer/rmath.h"
 #include "core/file.h"
 #include <raylib.h>
 #include <errno.h>

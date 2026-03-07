@@ -448,6 +448,10 @@ Vector2 UIGetCursor() {
     return g_ui_cursor;
 }
 
+Vector2 UIGetPosition() {
+    return g_ui_position;
+}
+
 void UICheckbox(BOOL* value) {
     if (InputButtonPressed(IK_MOUSELEFT) &&
         CheckCollisionPointRec(

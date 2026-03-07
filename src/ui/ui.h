@@ -96,6 +96,8 @@ void UIMoveCursor(float x, float y);
 
 Vector2 UIGetCursor();
 
+Vector2 UIGetPosition();
+
 void UICheckbox(BOOL* value);
 
 void UICheckboxLabeled(const char* label, BOOL* value);

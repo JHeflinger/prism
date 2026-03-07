@@ -1,6 +1,7 @@
 #include "edit.h"
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
+#include "renderer/rmath.h"
 #include "ui/shared.h"
 #include <easylogger.h>
 #include <raymath.h>

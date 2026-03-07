@@ -13,3 +13,12 @@ void Mat4Add(mat4 a, mat4 b, mat4 dest) {
         for (int j = 0; j < 4; ++j)
             dest[i][j] = a[i][j] + b[i][j];
 }
+
+void CameraUVW(SimpleCamera camera, vec3 u, vec3 v, vec3 w) {
+    glm_vec3_sub(camera.look, camera.position, camera.look);
+    glm_vec3_normalize(camera.up);
+    glm_vec3_normalize(camera.look);
+    glm_vec3_negate_to(camera.look, w);
+    glm_vec3_crossn(camera.up, w, u);
+    glm_vec3_crossn(w, u, v);
+}

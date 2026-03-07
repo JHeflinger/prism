@@ -5,6 +5,7 @@
 #include "renderer/vulkan/vclean.h"
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
+#include "renderer/rmath.h"
 
 Renderer* g_vupdt_renderer_ref = NULL;
 
@@ -275,9 +276,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         SETVEC(ubo.up, g_vupdt_renderer_ref->camera.up);
         glm_vec3_normalize(ubo.up);
         glm_vec3_normalize(ubo.look);
-        glm_vec3_negate_to(ubo.look, ubo.w);
-        glm_vec3_crossn(ubo.up, ubo.w, ubo.u);
-        glm_vec3_crossn(ubo.w, ubo.u, ubo.v);
+        CameraUVW(g_vupdt_renderer_ref->camera, ubo.u, ubo.v, ubo.w);
         ubo.fov = glm_rad(g_vupdt_renderer_ref->camera.fov);
         ubo.width = g_vupdt_renderer_ref->dimensions.x;
         ubo.height = g_vupdt_renderer_ref->dimensions.y;
