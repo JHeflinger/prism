@@ -35,8 +35,6 @@ ICEBOX:
 41. bug: mesh flickers during moving/reconstructing bvh - is this bc of the bvh, or is it the waiting to idle? check by turning on bvh construction all the time, if it still flickers its the bvh construction, seems to probably be due to pipeline refreshing
 
 Next:
-2. lock vertices
-3. color locked vertices red - perhaps we can just take advantage of the fact that verts are actually vec4s
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

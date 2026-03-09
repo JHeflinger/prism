@@ -163,14 +163,23 @@ float* VertexReference(VertexID vertex) {
 }
 
 void LockVertex(VertexID vertex) {
+    EZ_ASSERT(vertex < g_renderer.geometry.vertices.size, "Vertex does not exist for requested index");
     HASHMAP_Locks_set(&(g_renderer.geometry.locks), vertex, TRUE);
+    g_renderer.geometry.vertices.data[vertex][3] = 1.0f;
+    UpdateVertices();
 }
 
 void UnlockVertex(VertexID vertex) {
-    HASHMAP_Locks_set(&(g_renderer.geometry.locks), vertex, FALSE);
+    EZ_ASSERT(vertex < g_renderer.geometry.vertices.size, "Vertex does not exist for requested index");
+    if (HASHMAP_Locks_has(&(g_renderer.geometry.locks), vertex)) {
+        HASHMAP_Locks_set(&(g_renderer.geometry.locks), vertex, FALSE);
+        g_renderer.geometry.vertices.data[vertex][3] = 0.0f;
+        UpdateVertices();
+    }
 }
 
 BOOL VertexLocked(VertexID vertex) {
+    EZ_ASSERT(vertex < g_renderer.geometry.vertices.size, "Vertex does not exist for requested index");
     if (HASHMAP_Locks_has(&(g_renderer.geometry.locks), vertex)) 
         return HASHMAP_Locks_get(&(g_renderer.geometry.locks), vertex);
     return FALSE;

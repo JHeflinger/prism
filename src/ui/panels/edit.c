@@ -347,7 +347,17 @@ void DrawEditPanel(float width, float height) {
             UIDrawText("z");
             UIMoveCursor((2*component_width) + 65, -20);
             edited |= UIDragFloat(&(vref[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
-            if (edited) UpdateVertices();
+            UIMoveCursor(0, 15);
+            UIDrawText("(Deform) Lock");
+            UIMoveCursor(140, -20);
+            BOOL locked = VertexLocked(g_edit_item_index);
+            UICheckbox(&locked);
+            edited |= locked != VertexLocked(g_edit_item_index);
+            if (edited) {
+                if (locked) LockVertex(g_edit_item_index);
+                else UnlockVertex(g_edit_item_index);
+                UpdateVertices();
+            }
             if (UIGetCursor().y + 60 < height) {
                 UISetCursor(UIGetCursor().x, height - 60);
             }
