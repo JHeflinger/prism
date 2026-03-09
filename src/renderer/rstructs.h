@@ -17,6 +17,7 @@ typedef uint32_t LightID;
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARR_ARRLIST(vec4);
 DECLARE_ARR_ARRLIST(vec3);
+DECLARE_HASHMAP(VertexID, BOOL, Locks);
 
 #define PREVIEW_PIPELINE_FLAGS   0b110011111111
 #define PATHTRACE_PIPELINE_FLAGS 0b111101111111
@@ -181,6 +182,7 @@ typedef struct {
     ARRLIST_TriangleID emissives;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;
+    HASHMAP_Locks locks;
     float lightarea;
     ChangeSet changes;
     AxisAlignedBoundingBox bounds;

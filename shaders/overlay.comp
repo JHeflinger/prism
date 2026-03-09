@@ -39,7 +39,14 @@ layout(binding = 4) buffer OverlaySSBO {
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
+const float vhighlight_radius = 50.0;
 const float mixfactor = 0.2;
+vec4 highlight_color;
+
+void calculate_highlight_color() {
+    float divisor = float(o_ubo.divisor) * (1.0 - mixfactor);
+    highlight_color = vec4(1.0, 0.52, 0.0, 1.0) / divisor;
+}
 
 void highlight_triangle(uint htid) {
 	int rx = int(gl_GlobalInvocationID.x%o_ubo.image_width);
@@ -63,12 +70,11 @@ void highlight_triangle(uint htid) {
 				}
 			}
 		}
-        float divisor = float(o_ubo.divisor) * (1.0 - mixfactor);
 		if (border) {
-			imageStore(outputImage, ivec2(rx, ry), vec4(1.0, 0.52, 0.0, 1.0) / divisor);
+			imageStore(outputImage, ivec2(rx, ry), highlight_color);
 		} else {
 			vec4 oldc = imageLoad(outputImage, ivec2(rx, ry));
-			imageStore(outputImage, ivec2(rx, ry), mix(oldc, vec4(1.0, 0.52, 0.0, 1.0) / divisor, mixfactor));
+			imageStore(outputImage, ivec2(rx, ry), mix(oldc, highlight_color, mixfactor));
 		}
     }
 }
@@ -77,9 +83,8 @@ void highlight_vertex(uint hvid, vec2 vpos) {
     if (hvid != -1) {
 	    int rx = int(gl_GlobalInvocationID.x%o_ubo.image_width);
         int ry = int(gl_GlobalInvocationID.x/o_ubo.image_width);
-        float divisor = float(o_ubo.divisor) * (1.0 - mixfactor);
         if (length(vec2(rx, ry) - vpos) < 3.0) {
-			imageStore(outputImage, ivec2(rx, ry), vec4(1.0, 0.52, 0.0, 1.0) / divisor);
+			imageStore(outputImage, ivec2(rx, ry), highlight_color);
         }
     }
 }
@@ -110,12 +115,24 @@ void outline_triangle() {
 		}
 		if (border) {
 			vec4 oldc = imageLoad(outputImage, ivec2(rx, ry));
-			imageStore(outputImage, ivec2(rx, ry), mix(oldc, vec4(0.1, 0.1, 0.1, 1.0), min(1.0 / d, 1.0)));
+            vec4 newc = vec4(0.1, 0.1, 0.1, 1.0);
+            float vdist = vhighlight_radius;
+            if (o_ubo.single_selected_vid != -1)
+                vdist = length(selected_vertex_position - vec2(rx, ry));
+            if (o_ubo.mode == VERTEX_SELECT && hovered_tid != o_ubo.single_selected_vid && hovered_tid != -1)
+                vdist = min(vdist, length(vertex_position - vec2(rx, ry)));
+            if (vdist < vhighlight_radius) {
+                float mixing = 1.0 - (vdist / vhighlight_radius);
+                mixing = mixing*mixing*mixing;
+                newc = mix(newc, highlight_color, mixing);
+            }
+			imageStore(outputImage, ivec2(rx, ry), mix(oldc, newc, min(1.0 / d, 1.0)));
         }
     }
 }
 
 void main() {
+    calculate_highlight_color();
     if (o_ubo.divisor == 1.0)
         outline_triangle();
     if (o_ubo.mode == TRIANGLE_SELECT)

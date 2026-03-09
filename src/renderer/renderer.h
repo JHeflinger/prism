@@ -25,11 +25,17 @@ void ReorientCamera();
 
 void GetVertex(size_t index, vec3 out);
 
-float* VertexReference(size_t index);
+float* VertexReference(VertexID vertex);
 
 void SubmitVertex(vec3 vertex);
 
 void ClearVertices();
+
+void LockVertex(VertexID vertex);
+
+void UnlockVertex(VertexID vertex);
+
+BOOL VertexLocked(VertexID vertex);
 
 void SubmitNormal(vec3 normal);
 

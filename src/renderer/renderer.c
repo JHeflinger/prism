@@ -157,9 +157,23 @@ void GetVertex(size_t index, vec3 out) {
     SETVEC(out, g_renderer.geometry.vertices.data[index]);
 }
 
-float* VertexReference(size_t index) {
-    EZ_ASSERT(index < g_renderer.geometry.vertices.size, "Vertex reference does not exist for requested index");
-    return g_renderer.geometry.vertices.data[index];
+float* VertexReference(VertexID vertex) {
+    EZ_ASSERT(vertex < g_renderer.geometry.vertices.size, "Vertex reference does not exist for requested index");
+    return g_renderer.geometry.vertices.data[vertex];
+}
+
+void LockVertex(VertexID vertex) {
+    HASHMAP_Locks_set(&(g_renderer.geometry.locks), vertex, TRUE);
+}
+
+void UnlockVertex(VertexID vertex) {
+    HASHMAP_Locks_set(&(g_renderer.geometry.locks), vertex, FALSE);
+}
+
+BOOL VertexLocked(VertexID vertex) {
+    if (HASHMAP_Locks_has(&(g_renderer.geometry.locks), vertex)) 
+        return HASHMAP_Locks_get(&(g_renderer.geometry.locks), vertex);
+    return FALSE;
 }
 
 void SubmitVertex(vec3 vertex) {
@@ -178,6 +192,7 @@ void SubmitVertex(vec3 vertex) {
 void ClearVertices() {
     if (g_renderer.geometry.vertices.maxsize == 0) return;
     ARRLIST_vec4_clear(&(g_renderer.geometry.vertices));
+    HASHMAP_Locks_clear(&(g_renderer.geometry.locks));
     g_renderer.geometry.changes.update_vertices = TRUE;
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
     SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
