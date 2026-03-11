@@ -36,6 +36,7 @@ ICEBOX:
 
 Next:
 1. bug - something is wrong with lighting - best seen by scene lighting only
+2. on graph draw vertical y lines for the max of each line basically
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything
