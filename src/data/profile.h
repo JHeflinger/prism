@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define PROFILER_MAX_DATASTREAM 512
+#define PROFILER_MAX_DATASTREAM 32
 
 typedef struct {
     double datastream[PROFILER_MAX_DATASTREAM];
