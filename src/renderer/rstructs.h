@@ -198,6 +198,7 @@ typedef struct {
     BOOL showdof;
     BOOL directonly;
     BOOL scenelighting;
+    BOOL scenelightingonly;
     PipelineFlags flags;
 } RendererConfig;
 

@@ -73,7 +73,8 @@ void DrawDevPanel(float width, float height) {
     UICheckboxLabeled("Direct Light Sampling:", &(RenderConfig()->direct));
     UICheckboxLabeled("Direct Light Only:", &(RenderConfig()->directonly));
     UICheckboxLabeled("Scene Light Sampling:", &(RenderConfig()->scenelighting));
-    
+    UICheckboxLabeled("Scene Light Only:", &(RenderConfig()->scenelightingonly));
+
     UIMoveCursor(0, 20.0f);
     UIDragFloatLabeled("Whitepoint:", &(RenderConfig()->whitepoint), 0.01f, 999999999.0f, 0.1f, width - 20);
     UIDragFloatLabeled("Gamma:", &(RenderConfig()->gamma), 0.01f, 999999999.0f, 0.01f, width - 20);
