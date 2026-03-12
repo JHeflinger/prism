@@ -116,6 +116,8 @@ void UIPopup(Popup* popup);
 
 float UITextWidth(const char* text, ...);
 
+float UITextHeight(const char* text, ...);
+
 void UIDivider(size_t w);
 
 void UIDropList_(PersistantUIData* data, const char* label, size_t width, size_t num_items, char** items, SelectFunction func);

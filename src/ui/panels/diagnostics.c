@@ -14,7 +14,7 @@ const char* mem_size_descriptor(size_t count) {
         return "GB";
     } else if (count > 1000000) {
         return "MB";
-    } else if (count >1000) {
+    } else if (count > 1000) {
         return "KB";
     } else {
         return "bytes";

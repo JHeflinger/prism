@@ -26,8 +26,9 @@ void InitializeColors() {
     g_color_map.colors[UI_DROPDOWN_MENU_PRS_COLOR] = (Color){ 45, 45, 45, 255 };
     g_color_map.colors[UI_TEXT_INPUT_BG_COLOR] = (Color) { 55, 55, 55, 255 };
     g_color_map.colors[UI_TEXT_INPUT_FOCUS_COLOR] = (Color) { 65, 65, 65, 255 };
-    g_color_map.colors[PANEL_GRAPH_BG_COLOR] = (Color) { 55, 55, 55, 255 };
+    g_color_map.colors[PANEL_GRAPH_BG_COLOR] = (Color) { 20, 20, 20, 255 };
     g_color_map.colors[PANEL_GRAPH_LINE_COLOR] = (Color) { 240, 240, 240, 255 };
+    g_color_map.colors[PANEL_GRAPH_SUBTLE_LINE_COLOR] = (Color) { 240, 240, 240, 100 };
     g_color_map.initialized = TRUE;
 }
 

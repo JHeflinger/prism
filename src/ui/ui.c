@@ -548,6 +548,13 @@ float UITextWidth(const char* text, ...) {
     return MeasureTextEx(FontAsset(), g_ui_text_buffer, LINE_HEIGHT, 0).x;
 }
 
+float UITextHeight(const char* text, ...) {
+    va_list args;
+    va_start(args, text);
+    vsnprintf(g_ui_text_buffer, MAX_LINE_WIDTH - 1, text, args);
+    return MeasureTextEx(FontAsset(), g_ui_text_buffer, LINE_HEIGHT, 0).y;
+}
+
 void UIDivider(size_t w) {
     DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + (LINE_HEIGHT/2.0f) - 1, w, 2, MappedColor(UI_DIVIDER_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
