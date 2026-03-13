@@ -8,6 +8,11 @@
 #include "core/binds.h"
 #include "ui/panels/edit.h"
 
+void LoadArmadillo() {
+    LoadOBJ("/home/jason/Dev/ARAP/meshes/armadillo.obj");
+    FitCamera();
+}
+
 void LoadCow() {
     LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
     FitCamera();
@@ -47,6 +52,10 @@ void ClearScene() {
 }
 
 void DevInitialize() {
+    AddBind("load armadillo", LoadArmadillo,
+        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
+        (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
+        (BindCommand){ IK_A_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("load cow", LoadCow,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },

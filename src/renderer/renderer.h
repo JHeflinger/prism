@@ -117,6 +117,8 @@ BOOL Smoothen(float smoothening);
 
 BOOL Remesh(float nudge);
 
+void SavePose();
+
 void SaveRender(const char* filepath);
 
 char* GPUModel();

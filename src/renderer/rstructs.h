@@ -14,10 +14,22 @@ typedef uint32_t TriangleID;
 typedef uint32_t VertexID;
 typedef uint32_t LightID;
 
+typedef struct {
+    VertexID a;
+    VertexID b;
+} Edge;
+
+typedef struct {
+    TriangleID a;
+    TriangleID b;
+} EdgeMeta;
+
+DECLARE_ARRLIST(Edge);
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARR_ARRLIST(vec4);
 DECLARE_ARR_ARRLIST(vec3);
 DECLARE_HASHMAP(VertexID, BOOL, Locks);
+DECLARE_HASHMAP(Edge, EdgeMeta, EdgeGlue);
 
 #define PREVIEW_PIPELINE_FLAGS   0b110011111111
 #define PATHTRACE_PIPELINE_FLAGS 0b111101111111
@@ -173,6 +185,20 @@ typedef struct {
 } ManifoldMesh;
 
 typedef struct {
+    size_t rows;
+    size_t nnz;
+    double* values;
+    size_t* cindices;
+    size_t* rpointers;
+    size_t* rcounts;
+    size_t* cursor;
+    double* diag;
+    vec4* originals;
+    size_t max_nnz;
+    size_t max_rows;
+} StaticSparseMatrix;
+
+typedef struct {
     ManifoldMesh manifold;
     ARRLIST_vec4 vertices;
     ARRLIST_vec4 normals;
@@ -183,6 +209,9 @@ typedef struct {
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;
     HASHMAP_Locks locks;
+    HASHMAP_EdgeGlue glue;
+    ARRLIST_Edge edges;
+    StaticSparseMatrix laplacian;
     float lightarea;
     ChangeSet changes;
     AxisAlignedBoundingBox bounds;

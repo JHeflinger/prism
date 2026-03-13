@@ -16,6 +16,129 @@ Renderer g_renderer = { 0 };
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
 
+void CleanLaplacian() {
+    if (g_renderer.geometry.laplacian.values != NULL) {
+        EZ_FREE(g_renderer.geometry.laplacian.values);
+        EZ_FREE(g_renderer.geometry.laplacian.cindices);
+        EZ_FREE(g_renderer.geometry.laplacian.rpointers);
+        EZ_FREE(g_renderer.geometry.laplacian.rcounts);
+        EZ_FREE(g_renderer.geometry.laplacian.cursor);
+        EZ_FREE(g_renderer.geometry.laplacian.diag);
+        EZ_FREE(g_renderer.geometry.laplacian.originals);
+    }
+    g_renderer.geometry.laplacian.values = NULL;
+    g_renderer.geometry.laplacian.cindices = NULL;
+    g_renderer.geometry.laplacian.rpointers = NULL;
+    g_renderer.geometry.laplacian.rcounts = NULL;
+    g_renderer.geometry.laplacian.cursor = NULL;
+    g_renderer.geometry.laplacian.diag = NULL;
+    g_renderer.geometry.laplacian.originals = NULL;
+    g_renderer.geometry.laplacian.rows = 0;
+    g_renderer.geometry.laplacian.nnz = 0;
+    g_renderer.geometry.laplacian.max_nnz = 0;
+    g_renderer.geometry.laplacian.max_rows = 0;
+}
+
+float EdgeWeight(Edge e) {
+    EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), e);
+    TriangleID tris[2] = { em.a, em.b };
+    size_t cp = 0;
+    VertexID c[2] = { 0 };
+    VertexID a = e.a;
+    VertexID b = e.b;
+    for (size_t i = 0; i < 2; i++) {
+        if (tris[i] == (TriangleID)-1) continue;
+        Triangle t = g_renderer.geometry.triangles.data[tris[i]];
+        VertexID abc[3] = { t.a, t.b, t.c };
+        for (size_t j = 0; j < 3; j++) {
+            if (abc[j] != a && abc[j] != b) {
+                c[cp] = abc[j];
+                cp++;
+            }
+        }
+    }
+    EZ_ASSERT(cp == 1 || cp == 2, "Broken connectivity detected");
+    float weight = 0.0f;
+    for (size_t i = 0; i < cp; i++) {
+        vec3 u, v, cross;
+        glm_vec3_sub(g_renderer.geometry.vertices.data[a], g_renderer.geometry.vertices.data[c[i]], u);
+        glm_vec3_sub(g_renderer.geometry.vertices.data[b], g_renderer.geometry.vertices.data[c[i]], v);
+        glm_vec3_cross(u, v, cross);
+        weight += glm_vec3_dot(u, v) / glm_vec3_norm(cross);
+    }
+    return weight / ((float)cp);
+}
+
+void ReconstructLaplacian() {
+    size_t nnz = 2 * g_renderer.geometry.glue.size + g_renderer.geometry.vertices.size;
+    size_t nrows = g_renderer.geometry.vertices.size + 1;
+    g_renderer.geometry.laplacian.nnz = nnz;
+    if (nnz > g_renderer.geometry.laplacian.max_nnz) {
+        if (g_renderer.geometry.laplacian.cindices == NULL)
+            g_renderer.geometry.laplacian.cindices = EZ_ALLOC(nnz, sizeof(size_t));
+        else EZ_REALLOC(g_renderer.geometry.laplacian.cindices, nnz, sizeof(size_t));
+        if (g_renderer.geometry.laplacian.values == NULL)
+            g_renderer.geometry.laplacian.values = EZ_ALLOC(nnz, sizeof(double));
+        else EZ_REALLOC(g_renderer.geometry.laplacian.values, nnz, sizeof(double));
+        g_renderer.geometry.laplacian.max_nnz = nnz;
+    }
+    if (nrows > g_renderer.geometry.laplacian.max_rows) {
+        if (g_renderer.geometry.laplacian.rpointers == NULL)
+            g_renderer.geometry.laplacian.rpointers = EZ_ALLOC(nrows, sizeof(size_t));
+        else EZ_REALLOC(g_renderer.geometry.laplacian.rpointers, nrows, sizeof(size_t));
+        if (g_renderer.geometry.laplacian.rcounts == NULL)
+            g_renderer.geometry.laplacian.rcounts = EZ_ALLOC(nrows - 1, sizeof(size_t));
+        else EZ_REALLOC(g_renderer.geometry.laplacian.rcounts, nrows - 1, sizeof(size_t));
+        if (g_renderer.geometry.laplacian.cursor == NULL)
+            g_renderer.geometry.laplacian.cursor = EZ_ALLOC(nrows - 1, sizeof(size_t));
+        else EZ_REALLOC(g_renderer.geometry.laplacian.cursor, nrows - 1, sizeof(size_t));
+        if (g_renderer.geometry.laplacian.diag == NULL)
+            g_renderer.geometry.laplacian.diag = EZ_ALLOC(nrows - 1, sizeof(double));
+        else EZ_REALLOC(g_renderer.geometry.laplacian.diag, nrows - 1, sizeof(double));
+        if (g_renderer.geometry.laplacian.originals == NULL)
+            g_renderer.geometry.laplacian.originals = EZ_ALLOC(nrows - 1, sizeof(vec4));
+        else EZ_REALLOC(g_renderer.geometry.laplacian.originals, nrows - 1, sizeof(vec4));
+        g_renderer.geometry.laplacian.max_rows = nrows;
+    }
+    memcpy(g_renderer.geometry.laplacian.originals, g_renderer.geometry.vertices.data, g_renderer.geometry.vertices.size * sizeof(vec4));
+    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++)
+        g_renderer.geometry.laplacian.rcounts[i] = 1;
+    for (size_t i = 0; i < g_renderer.geometry.edges.size; i++) {
+        Edge e = g_renderer.geometry.edges.data[i];
+        g_renderer.geometry.laplacian.rcounts[e.a]++;
+        g_renderer.geometry.laplacian.rcounts[e.b]++;
+    }
+    g_renderer.geometry.laplacian.rpointers[0] = 0;
+    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
+        g_renderer.geometry.laplacian.rpointers[i + 1] = 
+            g_renderer.geometry.laplacian.rpointers[i] + g_renderer.geometry.laplacian.rcounts[i];
+        g_renderer.geometry.laplacian.cursor[i] = g_renderer.geometry.laplacian.rpointers[i];
+        g_renderer.geometry.laplacian.diag[i] = 0.0;
+    }
+    for (size_t i = 0; i < g_renderer.geometry.edges.size; i++) {
+        Edge e = g_renderer.geometry.edges.data[i];
+        double w = EdgeWeight(e);
+        size_t i_index = g_renderer.geometry.laplacian.cursor[e.a]++;
+        size_t j_index = g_renderer.geometry.laplacian.cursor[e.b]++;
+        g_renderer.geometry.laplacian.cindices[i_index] = e.b;
+        g_renderer.geometry.laplacian.values[i_index] = -w;
+        g_renderer.geometry.laplacian.cindices[j_index] = e.a;
+        g_renderer.geometry.laplacian.values[j_index] = -w;
+        g_renderer.geometry.laplacian.diag[e.a] += w;
+        g_renderer.geometry.laplacian.diag[e.b] += w;
+    }
+    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
+        size_t idx = g_renderer.geometry.laplacian.cursor[i]++;
+        g_renderer.geometry.laplacian.cindices[idx] = i;
+        g_renderer.geometry.laplacian.values[idx] = g_renderer.geometry.laplacian.diag[i];
+    }
+}
+//1. create free mappings
+//  a. set num rows while counding during free mappings
+//2. modify counting pass
+//3. modify setting pass
+//4. count the real nnz and set it
+
 PipelineFlags GetPipelineFlags() {
     return g_renderer.config.flags;
 }
@@ -112,6 +235,7 @@ void DestroyRenderer() {
     ClearMaterials();
     ClearLights();
     CleanManifoldMesh(&(g_renderer.geometry.manifold));
+    CleanLaplacian();
 
     // destroy vulkan resources
     VCLEAN_Vulkan(&(g_renderer.vulkan));
@@ -168,6 +292,7 @@ void LockVertex(VertexID vertex) {
     HASHMAP_Locks_set(&(g_renderer.geometry.locks), vertex, TRUE);
     g_renderer.geometry.vertices.data[vertex][3] = 1.0f;
     UpdateVertices();
+    SavePose();
 }
 
 void UnlockVertex(VertexID vertex) {
@@ -176,6 +301,7 @@ void UnlockVertex(VertexID vertex) {
         HASHMAP_Locks_set(&(g_renderer.geometry.locks), vertex, FALSE);
         g_renderer.geometry.vertices.data[vertex][3] = 0.0f;
         UpdateVertices();
+        SavePose();
     }
 }
 
@@ -203,6 +329,7 @@ void ClearVertices() {
     if (g_renderer.geometry.vertices.maxsize == 0) return;
     ARRLIST_vec4_clear(&(g_renderer.geometry.vertices));
     HASHMAP_Locks_clear(&(g_renderer.geometry.locks));
+    ARRLIST_Edge_clear(&(g_renderer.geometry.edges));
     g_renderer.geometry.changes.update_vertices = TRUE;
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
     SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
@@ -235,14 +362,32 @@ TriangleID SubmitTriangle(Triangle triangle) {
             g_renderer.geometry.vertices.data[triangle.b],
             g_renderer.geometry.vertices.data[triangle.c]);
     }
+    TriangleID id = g_renderer.geometry.triangles.size;
     ARRLIST_Triangle_add(&(g_renderer.geometry.triangles), triangle);
-    return g_renderer.geometry.triangles.size - 1;
+    VertexID vs[] = { triangle.a, triangle.b, triangle.c };
+    for (size_t i = 0; i < 3; i++) {
+        VertexID a = vs[i];
+        VertexID b = vs[(i + 1)%3];
+        Edge e = { a, b };
+        Edge alternate = { b, a };
+        Edge primed = HASHMAP_EdgeGlue_has(&(g_renderer.geometry.glue), e) ? e : alternate;
+        if (!HASHMAP_EdgeGlue_has(&(g_renderer.geometry.glue), primed)) {
+            HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), primed, (EdgeMeta){ id, (TriangleID)-1 });
+            ARRLIST_Edge_add(&(g_renderer.geometry.edges), primed);
+        } else {
+            EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), primed);
+            em.b = id;
+            HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), primed, em);
+        }
+    }
+    return id;
 }
 
 void ClearTriangles() {
     if (g_renderer.geometry.triangles.maxsize == 0) return;
     ARRLIST_Triangle_clear(&(g_renderer.geometry.triangles));
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.emissives));
+    HASHMAP_EdgeGlue_clear(&(g_renderer.geometry.glue));
     g_renderer.geometry.changes.update_triangles = TRUE;
 }
 
@@ -362,6 +507,7 @@ void Render() {
         // update triangles if needed
         if (g_renderer.geometry.changes.update_triangles) {
             g_renderer.geometry.changes.update_triangles = FALSE;
+            SavePose();
             if (g_renderer.geometry.changes.max_triangles != g_renderer.geometry.triangles.maxsize) {
                 vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
                 g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
@@ -670,6 +816,10 @@ BOOL Remesh(float nudge) {
         CleanManifoldMesh(&(g_renderer.geometry.manifold));
         return TRUE;
     }
+}
+
+void SavePose() {
+    ReconstructLaplacian();
 }
 
 void SaveRender(const char* filepath) {

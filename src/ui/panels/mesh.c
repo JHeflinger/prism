@@ -35,6 +35,13 @@ void DrawMeshPanel(float width, float height) {
     }
     UIMoveCursor((width - 20.0f)/2.0f, -20);
     UIDragFloat(&nudgening, 0, 1.0f, 0.001f, (width - 20.0f)/2.0f);
+    UIMoveCursor(0, 15);
+    UIDrawText("Mesh Deformation");
+    UIDivider(width - 20);
+    if (UIButton("Set Pose", width - 20)) {
+        SavePose();
+    }
+
 }
 
 Panel GenerateMeshPanel() {
