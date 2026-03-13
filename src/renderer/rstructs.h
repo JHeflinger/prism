@@ -193,6 +193,8 @@ typedef struct {
     size_t* rcounts;
     size_t* cursor;
     double* diag;
+    size_t* v2f;
+    size_t* f2v;
     vec4* originals;
     size_t max_nnz;
     size_t max_rows;

@@ -25,6 +25,8 @@ void CleanLaplacian() {
         EZ_FREE(g_renderer.geometry.laplacian.cursor);
         EZ_FREE(g_renderer.geometry.laplacian.diag);
         EZ_FREE(g_renderer.geometry.laplacian.originals);
+        EZ_FREE(g_renderer.geometry.laplacian.v2f);
+        EZ_FREE(g_renderer.geometry.laplacian.f2v);
     }
     g_renderer.geometry.laplacian.values = NULL;
     g_renderer.geometry.laplacian.cindices = NULL;
@@ -33,6 +35,8 @@ void CleanLaplacian() {
     g_renderer.geometry.laplacian.cursor = NULL;
     g_renderer.geometry.laplacian.diag = NULL;
     g_renderer.geometry.laplacian.originals = NULL;
+    g_renderer.geometry.laplacian.v2f = NULL;
+    g_renderer.geometry.laplacian.f2v = NULL;
     g_renderer.geometry.laplacian.rows = 0;
     g_renderer.geometry.laplacian.nnz = 0;
     g_renderer.geometry.laplacian.max_nnz = 0;
@@ -70,43 +74,50 @@ float EdgeWeight(Edge e) {
 }
 
 void ReconstructLaplacian() {
+    inline BOOL isunlocked(size_t i) { return g_renderer.geometry.laplacian.v2f[i] != (size_t)-1; }
+    inline void saferealloc(void** ptr, size_t x, size_t y) {
+        if (*ptr == NULL) *ptr = EZ_ALLOC(x, y);
+        else *ptr = EZ_REALLOC(*ptr, x, y);
+    }
     size_t nnz = 2 * g_renderer.geometry.glue.size + g_renderer.geometry.vertices.size;
     size_t nrows = g_renderer.geometry.vertices.size + 1;
     g_renderer.geometry.laplacian.nnz = nnz;
     if (nnz > g_renderer.geometry.laplacian.max_nnz) {
-        if (g_renderer.geometry.laplacian.cindices == NULL)
-            g_renderer.geometry.laplacian.cindices = EZ_ALLOC(nnz, sizeof(size_t));
-        else EZ_REALLOC(g_renderer.geometry.laplacian.cindices, nnz, sizeof(size_t));
-        if (g_renderer.geometry.laplacian.values == NULL)
-            g_renderer.geometry.laplacian.values = EZ_ALLOC(nnz, sizeof(double));
-        else EZ_REALLOC(g_renderer.geometry.laplacian.values, nnz, sizeof(double));
+        saferealloc((void**)&g_renderer.geometry.laplacian.cindices, nnz, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.laplacian.values, nnz, sizeof(double));
         g_renderer.geometry.laplacian.max_nnz = nnz;
     }
     if (nrows > g_renderer.geometry.laplacian.max_rows) {
-        if (g_renderer.geometry.laplacian.rpointers == NULL)
-            g_renderer.geometry.laplacian.rpointers = EZ_ALLOC(nrows, sizeof(size_t));
-        else EZ_REALLOC(g_renderer.geometry.laplacian.rpointers, nrows, sizeof(size_t));
-        if (g_renderer.geometry.laplacian.rcounts == NULL)
-            g_renderer.geometry.laplacian.rcounts = EZ_ALLOC(nrows - 1, sizeof(size_t));
-        else EZ_REALLOC(g_renderer.geometry.laplacian.rcounts, nrows - 1, sizeof(size_t));
-        if (g_renderer.geometry.laplacian.cursor == NULL)
-            g_renderer.geometry.laplacian.cursor = EZ_ALLOC(nrows - 1, sizeof(size_t));
-        else EZ_REALLOC(g_renderer.geometry.laplacian.cursor, nrows - 1, sizeof(size_t));
-        if (g_renderer.geometry.laplacian.diag == NULL)
-            g_renderer.geometry.laplacian.diag = EZ_ALLOC(nrows - 1, sizeof(double));
-        else EZ_REALLOC(g_renderer.geometry.laplacian.diag, nrows - 1, sizeof(double));
-        if (g_renderer.geometry.laplacian.originals == NULL)
-            g_renderer.geometry.laplacian.originals = EZ_ALLOC(nrows - 1, sizeof(vec4));
-        else EZ_REALLOC(g_renderer.geometry.laplacian.originals, nrows - 1, sizeof(vec4));
+        saferealloc((void**)&g_renderer.geometry.laplacian.rpointers, nrows, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.laplacian.rcounts, nrows - 1, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.laplacian.cursor, nrows - 1, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.laplacian.diag, nrows - 1, sizeof(double));
+        saferealloc((void**)&g_renderer.geometry.laplacian.originals, nrows - 1, sizeof(vec4));
+        saferealloc((void**)&g_renderer.geometry.laplacian.v2f, nrows - 1, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.laplacian.f2v, nrows - 1, sizeof(size_t));
         g_renderer.geometry.laplacian.max_rows = nrows;
     }
     memcpy(g_renderer.geometry.laplacian.originals, g_renderer.geometry.vertices.data, g_renderer.geometry.vertices.size * sizeof(vec4));
-    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++)
-        g_renderer.geometry.laplacian.rcounts[i] = 1;
+    g_renderer.geometry.laplacian.rows = 0;
+    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
+        if (HASHMAP_Locks_has(&(g_renderer.geometry.locks), i) && HASHMAP_Locks_get(&(g_renderer.geometry.locks), i)) {
+            g_renderer.geometry.laplacian.v2f[i] = (size_t)-1;
+            g_renderer.geometry.laplacian.rcounts[i] = 0;
+        } else {
+            g_renderer.geometry.laplacian.v2f[i] = g_renderer.geometry.laplacian.rows;
+            g_renderer.geometry.laplacian.f2v[g_renderer.geometry.laplacian.rows] = i;
+            g_renderer.geometry.laplacian.rows++;
+            g_renderer.geometry.laplacian.rcounts[i] = 1;
+        }
+    }
+    size_t double_free_edges = 0;
     for (size_t i = 0; i < g_renderer.geometry.edges.size; i++) {
         Edge e = g_renderer.geometry.edges.data[i];
-        g_renderer.geometry.laplacian.rcounts[e.a]++;
-        g_renderer.geometry.laplacian.rcounts[e.b]++;
+        if (isunlocked(e.a) && isunlocked(e.b)) {
+            g_renderer.geometry.laplacian.rcounts[e.a]++;
+            g_renderer.geometry.laplacian.rcounts[e.b]++;
+            double_free_edges++;
+        }
     }
     g_renderer.geometry.laplacian.rpointers[0] = 0;
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
@@ -118,26 +129,32 @@ void ReconstructLaplacian() {
     for (size_t i = 0; i < g_renderer.geometry.edges.size; i++) {
         Edge e = g_renderer.geometry.edges.data[i];
         double w = EdgeWeight(e);
-        size_t i_index = g_renderer.geometry.laplacian.cursor[e.a]++;
-        size_t j_index = g_renderer.geometry.laplacian.cursor[e.b]++;
-        g_renderer.geometry.laplacian.cindices[i_index] = e.b;
-        g_renderer.geometry.laplacian.values[i_index] = -w;
-        g_renderer.geometry.laplacian.cindices[j_index] = e.a;
-        g_renderer.geometry.laplacian.values[j_index] = -w;
-        g_renderer.geometry.laplacian.diag[e.a] += w;
-        g_renderer.geometry.laplacian.diag[e.b] += w;
+        if (isunlocked(e.a) && isunlocked(e.b)) {
+            size_t fa = g_renderer.geometry.laplacian.v2f[e.a];
+            size_t fb = g_renderer.geometry.laplacian.v2f[e.b];
+            size_t i_index = g_renderer.geometry.laplacian.cursor[fa]++;
+            size_t j_index = g_renderer.geometry.laplacian.cursor[fb]++;
+            g_renderer.geometry.laplacian.cindices[i_index] = fb;
+            g_renderer.geometry.laplacian.values[i_index] = -w;
+            g_renderer.geometry.laplacian.cindices[j_index] = fa;
+            g_renderer.geometry.laplacian.values[j_index] = -w;
+            g_renderer.geometry.laplacian.diag[fa] += w;
+            g_renderer.geometry.laplacian.diag[fb] += w;
+        } else if (isunlocked(e.a)) {
+            size_t fa = g_renderer.geometry.laplacian.v2f[e.a];
+            g_renderer.geometry.laplacian.diag[fa] += w;
+        } else if (isunlocked(e.b)) {
+            size_t fb = g_renderer.geometry.laplacian.v2f[e.b];
+            g_renderer.geometry.laplacian.diag[fb] += w;
+        }
     }
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
         size_t idx = g_renderer.geometry.laplacian.cursor[i]++;
         g_renderer.geometry.laplacian.cindices[idx] = i;
         g_renderer.geometry.laplacian.values[idx] = g_renderer.geometry.laplacian.diag[i];
     }
+    g_renderer.geometry.laplacian.nnz = g_renderer.geometry.laplacian.rows + 2 * double_free_edges;
 }
-//1. create free mappings
-//  a. set num rows while counding during free mappings
-//2. modify counting pass
-//3. modify setting pass
-//4. count the real nnz and set it
 
 PipelineFlags GetPipelineFlags() {
     return g_renderer.config.flags;
