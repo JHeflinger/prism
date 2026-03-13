@@ -33,10 +33,11 @@ ICEBOX:
 39. make a much more efficient way to update gpu memory based on host memory (which is definitely possible btw!)
 40. all remove vertex and update ids support
 41. bug: mesh flickers during moving/reconstructing bvh - is this bc of the bvh, or is it the waiting to idle? check by turning on bvh construction all the time, if it still flickers its the bvh construction, seems to probably be due to pipeline refreshing
+42. Ensure windows compat
 
 Next:
 1. bug - something is wrong with lighting - best seen by scene lighting only
-2. on graph draw vertical y lines for the max of each line basically
+2. write in house cholesky solver
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

@@ -26,3 +26,8 @@ LIB vendor/raylib/lib
 WINDOWS LIB platform/windows/vulkan/libs
 WINDOWS LIB platform/windows/GLFW
 SOURCE vendor/EasyC/include
+LINUX LINK cholmod
+LINUX LINK amd
+LINUX LINK colamd
+LINUX LINK openblas
+LINUX INCLUDE vendor/suitesparse/include

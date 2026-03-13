@@ -8,6 +8,7 @@
 #include <cglm/cglm.h>
 #include <vulkan/vulkan.h>
 #include <raylib.h>
+#include <cholmod.h>
 
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
