@@ -15,6 +15,7 @@
 Renderer g_renderer = { 0 };
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
+cholmod_common g_cholmod = { 0 };
 
 void CleanLaplacian() {
     if (g_renderer.geometry.laplacian.values != NULL) {
@@ -177,6 +178,9 @@ void OverrideResolution(size_t x, size_t y) {
 void InitializeRenderer() {
 	// init rand
 	srand(time(NULL));
+
+    // init cholmod
+    cholmod_start(&g_cholmod);
 
     // initialize config
     g_renderer.config.whitepoint = 20.0f;

@@ -40,15 +40,19 @@ void InitEditor() {
     ((UI*)g_ui->right)->vertical = TRUE;
     ((UI*)g_ui->left)->right = GenerateUI();
     ((UI*)g_ui->left)->left = GenerateUI();
-    ((UI*)g_ui->left)->divide = 300;
+    ((UI*)((UI*)g_ui->left)->left)->left = GenerateUI();
+    ((UI*)((UI*)g_ui->left)->left)->right = GenerateUI();
+    ((UI*)((UI*)g_ui->left)->left)->divide = GetScreenHeight() - 420;
+    ((UI*)((UI*)g_ui->left)->left)->vertical = TRUE;
+    ((UI*)g_ui->left)->divide = 350;
     ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->right))->panels), GenerateDiagnosticsPanel());
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->right))->panels), GenerateGraphPanel());
     ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->left))->panels), GenerateOverviewPanel());
     ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->left))->panels), GenerateActionsPanel());
     ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->left)->right))->panels), GenerateViewportPanel());
-	ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->left)->left))->panels), GenerateEditPanel());
-	ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->left)->left))->panels), GenerateMeshPanel());
-    g_ui->divide = (3 * GetScreenWidth())/4;
+    ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_ui)))->panels), GenerateEditPanel());
+    ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_ui)))->panels), GenerateMeshPanel());
+    ARRLIST_Panel_add(&(GetRightUI(GetLeftUI(GetLeftUI(g_ui)))->panels), GenerateGraphPanel());
+    g_ui->divide = 1250;
     SetPrimaryUI(g_ui);
     DevInitialize();
 }

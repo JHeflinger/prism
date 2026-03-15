@@ -51,6 +51,14 @@ BOOL g_scratch_target_in_use = FALSE;
 #define LINE_HEIGHT 20
 #define NAMEBAR_HEIGHT 25
 
+UI* GetLeftUI(UI* ui) {
+    return (UI*)(ui->left);
+}
+
+UI* GetRightUI(UI* ui) {
+    return (UI*)(ui->right);
+}
+
 void SetPrimaryUI(UI* ui) {
     g_primary_ui = ui;
 }

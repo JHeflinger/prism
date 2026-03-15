@@ -52,6 +52,10 @@ typedef struct {
     BOOL arbitrary_bool;
 } PersistantUIData;
 
+UI* GetLeftUI(UI* ui);
+
+UI* GetRightUI(UI* ui);
+
 void SetPrimaryUI(UI* ui);
 
 UI* GenerateUI();
