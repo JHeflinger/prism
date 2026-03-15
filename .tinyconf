@@ -29,5 +29,4 @@ SOURCE vendor/EasyC/include
 LINUX LINK cholmod
 LINUX LINK amd
 LINUX LINK colamd
-LINUX LINK openblas
 LINUX INCLUDE vendor/suitesparse/include

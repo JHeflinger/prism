@@ -62,7 +62,7 @@ float EdgeWeight(Edge e) {
             }
         }
     }
-    EZ_ASSERT(cp == 1 || cp == 2, "Broken connectivity detected");
+    EZ_ASSERT(cp == 1 || cp == 2, "Broken connectivity detected %d");
     float weight = 0.0f;
     for (size_t i = 0; i < cp; i++) {
         vec3 u, v, cross;

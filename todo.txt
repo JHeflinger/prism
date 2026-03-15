@@ -8,11 +8,9 @@ ICEBOX:
 5. Reimplement SDFs properly, represent in scene as boxes if marching isn't enabled, otherwise march instead of trace
 6. Volumetrics
 9. Spectral
-11. Point/Spot/Directional lights
 12. Delete buttons on edit panel
 12. Rotate triangles
 13. Extrude triangles
-15. Use mouse to move vertices
 16. Offline rendering pipeline
 18. Textures/mipmapping/bilinear/trilinear filtering
 19. Dynamically adjustable resolution (window is max resolution, scale down viewport and usage from there)
@@ -20,9 +18,6 @@ ICEBOX:
 21. Compositing pipeline
 22. SDF construction pipeline using union, intersection, modifiers, etc
 24. New test suite
-26. Edit Material name
-27. Light names
-28. Edit light name
 31. no need to trace initial hit every single time when accumulating paths? restir?
 32. optimization - caclulation struct! pre calculate everything possible and just pass the struct around as to reduce redundant calculations
 33. for sampling a direct light uniformly, weight each emissive material by area. Then make a mapping array that maps the random index you get to the weighted index of the emissive array
@@ -38,6 +33,7 @@ ICEBOX:
 Next:
 1. bug - something is wrong with lighting - best seen by scene lighting only
 2. write in house cholesky solver
+3. bug - stressful geometry operations do eventually break if you play around enough
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

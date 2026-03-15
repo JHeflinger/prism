@@ -501,6 +501,9 @@ void ReformatFromManifold(Geometry* geometry) {
     ARRLIST_vec4_wipe(&(geometry->normals));
     ARRLIST_Triangle_wipe(&(geometry->triangles));
     ARRLIST_TriangleID_wipe(&(geometry->emissives));
+    ARRLIST_Edge_wipe(&(geometry->edges));
+    HASHMAP_EdgeGlue_clear(&(geometry->glue));
+    HASHMAP_Locks_clear(&(geometry->locks));
     uint32_t* vertex_remapping = EZ_ALLOC(geometry->manifold.vertices.size, sizeof(uint32_t));
     size_t new_v_ind = 0;
     for (size_t i = 0; i < geometry->manifold.vertices.size; i++) {
