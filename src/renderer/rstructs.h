@@ -199,6 +199,10 @@ typedef struct {
     vec4* originals;
     size_t max_nnz;
     size_t max_rows;
+    cholmod_sparse* A;
+    cholmod_dense* B;
+    cholmod_dense* X;
+    cholmod_factor* L;
 } StaticSparseMatrix;
 
 typedef struct {

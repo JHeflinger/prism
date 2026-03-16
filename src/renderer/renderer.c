@@ -28,6 +28,10 @@ void CleanLaplacian() {
         EZ_FREE(g_renderer.geometry.laplacian.originals);
         EZ_FREE(g_renderer.geometry.laplacian.v2f);
         EZ_FREE(g_renderer.geometry.laplacian.f2v);
+        cholmod_free_sparse(&g_renderer.geometry.laplacian.A, &g_cholmod);
+        cholmod_free_factor(&g_renderer.geometry.laplacian.L, &g_cholmod);
+        cholmod_free_dense(&g_renderer.geometry.laplacian.B, &g_cholmod);
+        cholmod_free_dense(&g_renderer.geometry.laplacian.X, &g_cholmod);
     }
     g_renderer.geometry.laplacian.values = NULL;
     g_renderer.geometry.laplacian.cindices = NULL;
@@ -62,7 +66,7 @@ float EdgeWeight(Edge e) {
             }
         }
     }
-    EZ_ASSERT(cp == 1 || cp == 2, "Broken connectivity detected %d");
+    EZ_ASSERT(cp == 1 || cp == 2, "Broken connectivity detected");
     float weight = 0.0f;
     for (size_t i = 0; i < cp; i++) {
         vec3 u, v, cross;
@@ -257,6 +261,9 @@ void DestroyRenderer() {
     ClearLights();
     CleanManifoldMesh(&(g_renderer.geometry.manifold));
     CleanLaplacian();
+
+    // destroy cholmod
+    cholmod_finish(&g_cholmod);
 
     // destroy vulkan resources
     VCLEAN_Vulkan(&(g_renderer.vulkan));

@@ -4,6 +4,7 @@ INCLUDE vendor/raylib/include
 INCLUDE vendor/stb_image/include
 INCLUDE vendor/cglm/include
 INCLUDE vendor/EasyC/include
+INCLUDE vendor/suitesparse/include
 WINDOWS INCLUDE platform/windows/vulkan/include
 WINDOWS INCLUDE platform/windows/GLFW/include
 LINUX LINK vulkan
@@ -29,4 +30,3 @@ SOURCE vendor/EasyC/include
 LINUX LINK cholmod
 LINUX LINK amd
 LINUX LINK colamd
-LINUX INCLUDE vendor/suitesparse/include
