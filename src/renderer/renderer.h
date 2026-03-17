@@ -119,6 +119,8 @@ BOOL Remesh(float nudge);
 
 void SavePose();
 
+void RigidDeform();
+
 void SaveRender(const char* filepath);
 
 char* GPUModel();

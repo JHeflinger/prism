@@ -34,6 +34,7 @@ Next:
 1. bug - something is wrong with lighting - best seen by scene lighting only
 2. write in house cholesky solver
 3. bug - stressful geometry operations do eventually break if you play around enough
+4. change SETVEC to glm_vec3_copy
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

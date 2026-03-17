@@ -17,35 +17,41 @@ Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
 cholmod_common g_cholmod = { 0 };
 
-void CleanLaplacian() {
-    if (g_renderer.geometry.laplacian.values != NULL) {
-        EZ_FREE(g_renderer.geometry.laplacian.values);
-        EZ_FREE(g_renderer.geometry.laplacian.cindices);
-        EZ_FREE(g_renderer.geometry.laplacian.rpointers);
-        EZ_FREE(g_renderer.geometry.laplacian.rcounts);
-        EZ_FREE(g_renderer.geometry.laplacian.cursor);
-        EZ_FREE(g_renderer.geometry.laplacian.diag);
-        EZ_FREE(g_renderer.geometry.laplacian.originals);
-        EZ_FREE(g_renderer.geometry.laplacian.v2f);
-        EZ_FREE(g_renderer.geometry.laplacian.f2v);
-        cholmod_free_sparse(&g_renderer.geometry.laplacian.A, &g_cholmod);
-        cholmod_free_factor(&g_renderer.geometry.laplacian.L, &g_cholmod);
-        cholmod_free_dense(&g_renderer.geometry.laplacian.B, &g_cholmod);
-        cholmod_free_dense(&g_renderer.geometry.laplacian.X, &g_cholmod);
+void CleanARAP() {
+    if (g_renderer.geometry.arap.values != NULL) {
+        EZ_FREE(g_renderer.geometry.arap.values);
+        EZ_FREE(g_renderer.geometry.arap.cindices);
+        EZ_FREE(g_renderer.geometry.arap.rpointers);
+        EZ_FREE(g_renderer.geometry.arap.rcounts);
+        EZ_FREE(g_renderer.geometry.arap.cursor);
+        EZ_FREE(g_renderer.geometry.arap.diag);
+        EZ_FREE(g_renderer.geometry.arap.originals);
+        EZ_FREE(g_renderer.geometry.arap.rotations);
+        EZ_FREE(g_renderer.geometry.arap.v2f);
+        EZ_FREE(g_renderer.geometry.arap.f2v);
+        EZ_FREE(g_renderer.geometry.arap.b);
+        cholmod_free_sparse(&g_renderer.geometry.arap.A, &g_cholmod);
+        cholmod_free_factor(&g_renderer.geometry.arap.L, &g_cholmod);
+        EZ_FREE(g_renderer.geometry.arap.Ai_back);
     }
-    g_renderer.geometry.laplacian.values = NULL;
-    g_renderer.geometry.laplacian.cindices = NULL;
-    g_renderer.geometry.laplacian.rpointers = NULL;
-    g_renderer.geometry.laplacian.rcounts = NULL;
-    g_renderer.geometry.laplacian.cursor = NULL;
-    g_renderer.geometry.laplacian.diag = NULL;
-    g_renderer.geometry.laplacian.originals = NULL;
-    g_renderer.geometry.laplacian.v2f = NULL;
-    g_renderer.geometry.laplacian.f2v = NULL;
-    g_renderer.geometry.laplacian.rows = 0;
-    g_renderer.geometry.laplacian.nnz = 0;
-    g_renderer.geometry.laplacian.max_nnz = 0;
-    g_renderer.geometry.laplacian.max_rows = 0;
+    g_renderer.geometry.arap.values = NULL;
+    g_renderer.geometry.arap.cindices = NULL;
+    g_renderer.geometry.arap.rpointers = NULL;
+    g_renderer.geometry.arap.rcounts = NULL;
+    g_renderer.geometry.arap.cursor = NULL;
+    g_renderer.geometry.arap.diag = NULL;
+    g_renderer.geometry.arap.originals = NULL;
+    g_renderer.geometry.arap.rotations = NULL;
+    g_renderer.geometry.arap.v2f = NULL;
+    g_renderer.geometry.arap.f2v = NULL;
+    g_renderer.geometry.arap.b = NULL;
+    g_renderer.geometry.arap.rows = 0;
+    g_renderer.geometry.arap.nnz = 0;
+    g_renderer.geometry.arap.max_nnz = 0;
+    g_renderer.geometry.arap.max_rows = 0;
+    g_renderer.geometry.arap.A = NULL;
+    g_renderer.geometry.arap.L = NULL;
+    g_renderer.geometry.arap.Ai_back = NULL;
 }
 
 float EdgeWeight(Edge e) {
@@ -75,90 +81,124 @@ float EdgeWeight(Edge e) {
         glm_vec3_cross(u, v, cross);
         weight += glm_vec3_dot(u, v) / glm_vec3_norm(cross);
     }
-    return weight / ((float)cp);
+    em.weight = weight / ((float)cp);
+    glm_vec3_sub(g_renderer.geometry.vertices.data[a], g_renderer.geometry.vertices.data[b], em.pij);
+    HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), e, em);
+    return em.weight;
 }
 
-void ReconstructLaplacian() {
-    inline BOOL isunlocked(size_t i) { return g_renderer.geometry.laplacian.v2f[i] != (size_t)-1; }
+void ReconstructARAP() {
+    inline BOOL isunlocked(size_t i) { return g_renderer.geometry.arap.v2f[i] != (size_t)-1; }
     inline void saferealloc(void** ptr, size_t x, size_t y) {
         if (*ptr == NULL) *ptr = EZ_ALLOC(x, y);
         else *ptr = EZ_REALLOC(*ptr, x, y);
     }
+    if (g_renderer.geometry.arap.A != NULL) {
+        cholmod_free_sparse(&g_renderer.geometry.arap.A, &g_cholmod);
+        cholmod_free_factor(&g_renderer.geometry.arap.L, &g_cholmod);
+    }
     size_t nnz = 2 * g_renderer.geometry.glue.size + g_renderer.geometry.vertices.size;
     size_t nrows = g_renderer.geometry.vertices.size + 1;
-    g_renderer.geometry.laplacian.nnz = nnz;
-    if (nnz > g_renderer.geometry.laplacian.max_nnz) {
-        saferealloc((void**)&g_renderer.geometry.laplacian.cindices, nnz, sizeof(size_t));
-        saferealloc((void**)&g_renderer.geometry.laplacian.values, nnz, sizeof(double));
-        g_renderer.geometry.laplacian.max_nnz = nnz;
+    g_renderer.geometry.arap.nnz = nnz;
+    if (nnz > g_renderer.geometry.arap.max_nnz) {
+        saferealloc((void**)&g_renderer.geometry.arap.cindices, nnz, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.arap.values, nnz, sizeof(double));
+        g_renderer.geometry.arap.max_nnz = nnz;
     }
-    if (nrows > g_renderer.geometry.laplacian.max_rows) {
-        saferealloc((void**)&g_renderer.geometry.laplacian.rpointers, nrows, sizeof(size_t));
-        saferealloc((void**)&g_renderer.geometry.laplacian.rcounts, nrows - 1, sizeof(size_t));
-        saferealloc((void**)&g_renderer.geometry.laplacian.cursor, nrows - 1, sizeof(size_t));
-        saferealloc((void**)&g_renderer.geometry.laplacian.diag, nrows - 1, sizeof(double));
-        saferealloc((void**)&g_renderer.geometry.laplacian.originals, nrows - 1, sizeof(vec4));
-        saferealloc((void**)&g_renderer.geometry.laplacian.v2f, nrows - 1, sizeof(size_t));
-        saferealloc((void**)&g_renderer.geometry.laplacian.f2v, nrows - 1, sizeof(size_t));
-        g_renderer.geometry.laplacian.max_rows = nrows;
+    if (nrows > g_renderer.geometry.arap.max_rows) {
+        saferealloc((void**)&g_renderer.geometry.arap.rpointers, nrows, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.arap.rcounts, nrows - 1, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.arap.cursor, nrows - 1, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.arap.diag, nrows - 1, sizeof(double));
+        saferealloc((void**)&g_renderer.geometry.arap.originals, nrows - 1, sizeof(vec4));
+        saferealloc((void**)&g_renderer.geometry.arap.v2f, nrows - 1, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.arap.f2v, nrows - 1, sizeof(size_t));
+        saferealloc((void**)&g_renderer.geometry.arap.Ai_back, nrows - 1, sizeof(int));
+        saferealloc((void**)&g_renderer.geometry.arap.rotations, nrows - 1, sizeof(mat3));
+        saferealloc((void**)&g_renderer.geometry.arap.b, nrows - 1, sizeof(vec3));
+        g_renderer.geometry.arap.max_rows = nrows;
     }
-    memcpy(g_renderer.geometry.laplacian.originals, g_renderer.geometry.vertices.data, g_renderer.geometry.vertices.size * sizeof(vec4));
-    g_renderer.geometry.laplacian.rows = 0;
+    memcpy(g_renderer.geometry.arap.originals, g_renderer.geometry.vertices.data, g_renderer.geometry.vertices.size * sizeof(vec4));
+    g_renderer.geometry.arap.rows = 0;
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
         if (HASHMAP_Locks_has(&(g_renderer.geometry.locks), i) && HASHMAP_Locks_get(&(g_renderer.geometry.locks), i)) {
-            g_renderer.geometry.laplacian.v2f[i] = (size_t)-1;
-            g_renderer.geometry.laplacian.rcounts[i] = 0;
+            g_renderer.geometry.arap.v2f[i] = (size_t)-1;
         } else {
-            g_renderer.geometry.laplacian.v2f[i] = g_renderer.geometry.laplacian.rows;
-            g_renderer.geometry.laplacian.f2v[g_renderer.geometry.laplacian.rows] = i;
-            g_renderer.geometry.laplacian.rows++;
-            g_renderer.geometry.laplacian.rcounts[i] = 1;
+            g_renderer.geometry.arap.v2f[i] = g_renderer.geometry.arap.rows;
+            g_renderer.geometry.arap.f2v[g_renderer.geometry.arap.rows] = i;
+            g_renderer.geometry.arap.rows++;
         }
+        g_renderer.geometry.arap.rcounts[i] = 1;
     }
     size_t double_free_edges = 0;
     for (size_t i = 0; i < g_renderer.geometry.edges.size; i++) {
         Edge e = g_renderer.geometry.edges.data[i];
         if (isunlocked(e.a) && isunlocked(e.b)) {
-            g_renderer.geometry.laplacian.rcounts[e.a]++;
-            g_renderer.geometry.laplacian.rcounts[e.b]++;
+            g_renderer.geometry.arap.rcounts[g_renderer.geometry.arap.v2f[e.a]]++;
+            g_renderer.geometry.arap.rcounts[g_renderer.geometry.arap.v2f[e.b]]++;
             double_free_edges++;
         }
     }
-    g_renderer.geometry.laplacian.rpointers[0] = 0;
-    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
-        g_renderer.geometry.laplacian.rpointers[i + 1] = 
-            g_renderer.geometry.laplacian.rpointers[i] + g_renderer.geometry.laplacian.rcounts[i];
-        g_renderer.geometry.laplacian.cursor[i] = g_renderer.geometry.laplacian.rpointers[i];
-        g_renderer.geometry.laplacian.diag[i] = 0.0;
+    g_renderer.geometry.arap.rpointers[0] = 0;
+    for (size_t i = 0; i < g_renderer.geometry.arap.rows; i++) {
+        g_renderer.geometry.arap.rpointers[i + 1] =
+            g_renderer.geometry.arap.rpointers[i] + g_renderer.geometry.arap.rcounts[i];
+        g_renderer.geometry.arap.cursor[i] = g_renderer.geometry.arap.rpointers[i];
+        g_renderer.geometry.arap.diag[i] = 0.0;
     }
     for (size_t i = 0; i < g_renderer.geometry.edges.size; i++) {
         Edge e = g_renderer.geometry.edges.data[i];
         double w = EdgeWeight(e);
         if (isunlocked(e.a) && isunlocked(e.b)) {
-            size_t fa = g_renderer.geometry.laplacian.v2f[e.a];
-            size_t fb = g_renderer.geometry.laplacian.v2f[e.b];
-            size_t i_index = g_renderer.geometry.laplacian.cursor[fa]++;
-            size_t j_index = g_renderer.geometry.laplacian.cursor[fb]++;
-            g_renderer.geometry.laplacian.cindices[i_index] = fb;
-            g_renderer.geometry.laplacian.values[i_index] = -w;
-            g_renderer.geometry.laplacian.cindices[j_index] = fa;
-            g_renderer.geometry.laplacian.values[j_index] = -w;
-            g_renderer.geometry.laplacian.diag[fa] += w;
-            g_renderer.geometry.laplacian.diag[fb] += w;
+            size_t fa = g_renderer.geometry.arap.v2f[e.a];
+            size_t fb = g_renderer.geometry.arap.v2f[e.b];
+            size_t i_index = g_renderer.geometry.arap.cursor[fa]++;
+            size_t j_index = g_renderer.geometry.arap.cursor[fb]++;
+            g_renderer.geometry.arap.cindices[i_index] = fb;
+            g_renderer.geometry.arap.values[i_index] = -w;
+            g_renderer.geometry.arap.cindices[j_index] = fa;
+            g_renderer.geometry.arap.values[j_index] = -w;
+            g_renderer.geometry.arap.diag[fa] += w;
+            g_renderer.geometry.arap.diag[fb] += w;
         } else if (isunlocked(e.a)) {
-            size_t fa = g_renderer.geometry.laplacian.v2f[e.a];
-            g_renderer.geometry.laplacian.diag[fa] += w;
+            size_t fa = g_renderer.geometry.arap.v2f[e.a];
+            g_renderer.geometry.arap.diag[fa] += w;
         } else if (isunlocked(e.b)) {
-            size_t fb = g_renderer.geometry.laplacian.v2f[e.b];
-            g_renderer.geometry.laplacian.diag[fb] += w;
+            size_t fb = g_renderer.geometry.arap.v2f[e.b];
+            g_renderer.geometry.arap.diag[fb] += w;
         }
     }
-    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
-        size_t idx = g_renderer.geometry.laplacian.cursor[i]++;
-        g_renderer.geometry.laplacian.cindices[idx] = i;
-        g_renderer.geometry.laplacian.values[idx] = g_renderer.geometry.laplacian.diag[i];
+    for (size_t i = 0; i < g_renderer.geometry.arap.rows; i++) {
+        size_t idx = g_renderer.geometry.arap.cursor[i]++;
+        g_renderer.geometry.arap.cindices[idx] = i;
+        g_renderer.geometry.arap.values[idx] = g_renderer.geometry.arap.diag[i];
     }
-    g_renderer.geometry.laplacian.nnz = g_renderer.geometry.laplacian.rows + 2 * double_free_edges;
+    g_renderer.geometry.arap.nnz = g_renderer.geometry.arap.rows + 2 * double_free_edges;
+
+    g_renderer.geometry.arap.A = cholmod_allocate_sparse(
+        g_renderer.geometry.arap.rows,
+        g_renderer.geometry.arap.rows,
+        g_renderer.geometry.arap.nnz,
+        1, 1, 0, CHOLMOD_REAL, &g_cholmod);
+    int* Ap = (int*)g_renderer.geometry.arap.A->p;
+    int* Ai = (int*)g_renderer.geometry.arap.A->i;
+    double* Ax = (double*)g_renderer.geometry.arap.A->x;
+    for (size_t i = 0; i <= g_renderer.geometry.arap.rows; i++) Ap[i] = 0;
+    for (size_t i = 0; i < g_renderer.geometry.arap.nnz; i++) Ap[g_renderer.geometry.arap.cindices[i] + 1]++;
+    for (size_t i = 0; i < g_renderer.geometry.arap.rows; i++) {
+        Ap[i + 1] += Ap[i];
+        g_renderer.geometry.arap.Ai_back[i] = Ap[i];
+    }
+    for (size_t i = 0; i < g_renderer.geometry.arap.rows; i++) {
+        for (size_t j = g_renderer.geometry.arap.rpointers[i]; j < g_renderer.geometry.arap.rpointers[i + 1]; j++) {
+            size_t col = g_renderer.geometry.arap.cindices[j];
+            size_t dst = g_renderer.geometry.arap.Ai_back[col]++;
+            Ai[dst] = i;
+            Ax[dst] = g_renderer.geometry.arap.values[j];
+        }
+    }
+    g_renderer.geometry.arap.L = cholmod_analyze(g_renderer.geometry.arap.A, &g_cholmod);
+    cholmod_factorize(g_renderer.geometry.arap.A, g_renderer.geometry.arap.L, &g_cholmod);
 }
 
 PipelineFlags GetPipelineFlags() {
@@ -260,7 +300,7 @@ void DestroyRenderer() {
     ClearMaterials();
     ClearLights();
     CleanManifoldMesh(&(g_renderer.geometry.manifold));
-    CleanLaplacian();
+    CleanARAP();
 
     // destroy cholmod
     cholmod_finish(&g_cholmod);
@@ -400,7 +440,7 @@ TriangleID SubmitTriangle(Triangle triangle) {
         Edge alternate = { b, a };
         Edge primed = HASHMAP_EdgeGlue_has(&(g_renderer.geometry.glue), e) ? e : alternate;
         if (!HASHMAP_EdgeGlue_has(&(g_renderer.geometry.glue), primed)) {
-            HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), primed, (EdgeMeta){ id, (TriangleID)-1 });
+            HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), primed, (EdgeMeta){ id, (TriangleID)-1, 0.0f, {0, 0, 0} });
             ARRLIST_Edge_add(&(g_renderer.geometry.edges), primed);
         } else {
             EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), primed);
@@ -847,7 +887,102 @@ BOOL Remesh(float nudge) {
 }
 
 void SavePose() {
-    ReconstructLaplacian();
+    ReconstructARAP();
+}
+
+void RigidDeform() {
+    inline BOOL isunlocked(size_t i) { return g_renderer.geometry.arap.v2f[i] != (size_t)-1; }
+    inline void outer(vec3 a, vec3 b, mat3 result) {
+        result[0][0] = a[0] * b[0];
+        result[0][1] = a[0] * b[1];
+        result[0][2] = a[0] * b[2];
+        result[1][0] = a[1] * b[0];
+        result[1][1] = a[1] * b[1];
+        result[1][2] = a[1] * b[2];
+        result[2][0] = a[2] * b[0];
+        result[2][1] = a[2] * b[1];
+        result[2][2] = a[2] * b[2];
+    }
+    inline void pdecompose(mat3 R) {
+        mat3 R_invT;
+        for (int iter = 0; iter < 5; iter++) {
+            glm_mat3_transpose_to(R, R_invT);
+            glm_mat3_inv(R_invT, R_invT);
+            for (int i = 0; i < 3; i++)
+                for (int j = 0; j < 3; j++)
+                    R[i][j] = 0.5f * (R[i][j] + R_invT[i][j]);
+        }
+        float det = glm_mat3_det(R);
+        if (det < 0.0f) {
+            for (int i = 0; i < 3; i++)
+                R[i][2] *= -1.0f;
+        }
+    }
+    for (size_t i = 0; i < 10; i++) {
+        // compute rotations
+        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) glm_mat3_zero(g_renderer.geometry.arap.rotations[j]);
+        for (size_t j = 0; j < g_renderer.geometry.edges.size; j++) {
+            Edge e = g_renderer.geometry.edges.data[j];
+            if (!isunlocked(e.a) && !isunlocked(e.b)) continue;
+            EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), e);
+            vec3 xij;
+            mat3 C;
+            glm_vec3_sub(g_renderer.geometry.vertices.data[e.a], g_renderer.geometry.vertices.data[e.b], xij);
+            outer(xij, em.pij, C);
+            glm_mat3_scale(C, em.weight);
+            if (isunlocked(e.a)) Mat3Add(C, g_renderer.geometry.arap.rotations[e.a], g_renderer.geometry.arap.rotations[e.a]);
+            if (isunlocked(e.b)) Mat3Add(C, g_renderer.geometry.arap.rotations[e.b], g_renderer.geometry.arap.rotations[e.b]);
+        }
+        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) 
+            if (isunlocked(j))
+                pdecompose(g_renderer.geometry.arap.rotations[j]);
+
+        // build RHS
+        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++)
+            if (isunlocked(j))
+                glm_vec3_zero(g_renderer.geometry.arap.b[j]);
+        for (size_t j = 0; j < g_renderer.geometry.edges.size; j++) {
+            Edge e = g_renderer.geometry.edges.data[j];
+            EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), e);
+            vec3 ti, ri_pij, rj_pij;
+            if (isunlocked(e.a)) glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.a], em.pij, ri_pij);
+            else glm_vec3_zero(ri_pij);
+            if (isunlocked(e.b)) glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.b], em.pij, rj_pij);
+            else glm_vec3_zero(rj_pij);
+            glm_vec3_add(ri_pij, rj_pij, ti);
+            glm_vec3_scale(ti, 0.5f * em.weight, ti);
+            if (isunlocked(e.a)) glm_vec3_add(g_renderer.geometry.arap.b[e.a], ti, g_renderer.geometry.arap.b[e.a]);
+            glm_vec3_scale(ti, -1.0f, ti);
+            if (isunlocked(e.b)) glm_vec3_add(g_renderer.geometry.arap.b[e.b], ti, g_renderer.geometry.arap.b[e.b]);
+        }
+
+        // solve
+        int rows = g_renderer.geometry.arap.L->n;
+        cholmod_dense* b_dense = cholmod_allocate_dense(rows, 3, rows*3, CHOLMOD_REAL, &g_cholmod);
+        double* b_ptr = (double*)b_dense->x;
+        int free_idx = 0;
+        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
+            if (isunlocked(j)) {
+                b_ptr[free_idx + 0*rows] = g_renderer.geometry.arap.b[j][0];
+                b_ptr[free_idx + 1*rows] = g_renderer.geometry.arap.b[j][1];
+                b_ptr[free_idx + 2*rows] = g_renderer.geometry.arap.b[j][2];
+                free_idx++;
+            }
+        }
+        cholmod_dense* x_dense = cholmod_solve(CHOLMOD_A, g_renderer.geometry.arap.L, b_dense, &g_cholmod);
+        double* x_ptr = (double*)x_dense->x;
+        free_idx = 0;
+        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
+            if (isunlocked(j)) {
+                g_renderer.geometry.vertices.data[j][0] = x_ptr[free_idx + 0*rows];
+                g_renderer.geometry.vertices.data[j][1] = x_ptr[free_idx + 1*rows];
+                g_renderer.geometry.vertices.data[j][2] = x_ptr[free_idx + 2*rows];
+                free_idx++;
+            }
+        }
+        cholmod_free_dense(&b_dense, &g_cholmod);
+        cholmod_free_dense(&x_dense, &g_cholmod);
+    }
 }
 
 void SaveRender(const char* filepath) {

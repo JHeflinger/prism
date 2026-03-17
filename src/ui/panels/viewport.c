@@ -137,6 +137,7 @@ void PanSelectedObject() {
         glm_vec3_add(u, v, selected);
         glm_vec3_sub(selected, w, selected);
         glm_vec3_add(camera.position, selected, VertexReference(GetSelectedVertex()));
+        if (VertexLocked(GetSelectedVertex())) RigidDeform();
         UpdateVertices();
     }
 }

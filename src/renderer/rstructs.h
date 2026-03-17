@@ -23,6 +23,8 @@ typedef struct {
 typedef struct {
     TriangleID a;
     TriangleID b;
+    float weight;
+    vec3 pij;
 } EdgeMeta;
 
 DECLARE_ARRLIST(Edge);
@@ -196,14 +198,15 @@ typedef struct {
     double* diag;
     size_t* v2f;
     size_t* f2v;
+    vec3* b;
     vec4* originals;
+    mat3* rotations;
     size_t max_nnz;
     size_t max_rows;
     cholmod_sparse* A;
-    cholmod_dense* B;
-    cholmod_dense* X;
     cholmod_factor* L;
-} StaticSparseMatrix;
+    int* Ai_back;
+} ARAPData;
 
 typedef struct {
     ManifoldMesh manifold;
@@ -218,7 +221,7 @@ typedef struct {
     HASHMAP_Locks locks;
     HASHMAP_EdgeGlue glue;
     ARRLIST_Edge edges;
-    StaticSparseMatrix laplacian;
+    ARAPData arap;
     float lightarea;
     ChangeSet changes;
     AxisAlignedBoundingBox bounds;

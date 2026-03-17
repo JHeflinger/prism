@@ -8,6 +8,8 @@
 
 float TriangleArea(vec3 a, vec3 b, vec3 c);
 
+void Mat3Add(mat3 a, mat3 b, mat3 dest);
+
 void Mat4Add(mat4 a, mat4 b, mat4 dest);
 
 void CameraUVW(SimpleCamera camera, vec3 u, vec3 v, vec3 w);
