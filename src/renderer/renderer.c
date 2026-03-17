@@ -897,7 +897,10 @@ void RigidDeform() {
             for (int row = 0; row < 3; row++)
                 result[col][row] = a[row] * b[col];
     }
-    for (size_t i = 0; i < 30; i++) {
+    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
+        if (isunlocked(i)) SETVEC(g_renderer.geometry.vertices.data[i], g_renderer.geometry.arap.originals[i]);
+    }
+    for (size_t i = 0; i < 10; i++) {
         // compute rotations
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
             glm_mat3_zero(g_renderer.geometry.arap.rotations[j]);

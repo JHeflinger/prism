@@ -36,6 +36,7 @@ Next:
 3. bug - stressful geometry operations do eventually break if you play around enough
 4. change SETVEC to glm_vec3_copy
 5. don't need arap.originals
+6. clean up cholmod dependency
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything
