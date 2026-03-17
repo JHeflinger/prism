@@ -240,6 +240,7 @@ typedef struct {
     BOOL scenelighting;
     BOOL scenelightingonly;
     PipelineFlags flags;
+    uint32_t arapiterations;
 } RendererConfig;
 
 #endif

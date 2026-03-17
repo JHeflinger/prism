@@ -31,9 +31,9 @@ void CleanARAP() {
         EZ_FREE(g_renderer.geometry.arap.v2f);
         EZ_FREE(g_renderer.geometry.arap.f2v);
         EZ_FREE(g_renderer.geometry.arap.b);
+        EZ_FREE(g_renderer.geometry.arap.Ai_back);
         cholmod_free_sparse(&g_renderer.geometry.arap.A, &g_cholmod);
         cholmod_free_factor(&g_renderer.geometry.arap.L, &g_cholmod);
-        EZ_FREE(g_renderer.geometry.arap.Ai_back);
     }
     g_renderer.geometry.arap.values = NULL;
     g_renderer.geometry.arap.cindices = NULL;
@@ -47,13 +47,13 @@ void CleanARAP() {
     g_renderer.geometry.arap.v2f = NULL;
     g_renderer.geometry.arap.f2v = NULL;
     g_renderer.geometry.arap.b = NULL;
+    g_renderer.geometry.arap.A = NULL;
+    g_renderer.geometry.arap.L = NULL;
+    g_renderer.geometry.arap.Ai_back = NULL;
     g_renderer.geometry.arap.rows = 0;
     g_renderer.geometry.arap.nnz = 0;
     g_renderer.geometry.arap.max_nnz = 0;
     g_renderer.geometry.arap.max_rows = 0;
-    g_renderer.geometry.arap.A = NULL;
-    g_renderer.geometry.arap.L = NULL;
-    g_renderer.geometry.arap.Ai_back = NULL;
 }
 
 float EdgeWeight(Edge e) {
@@ -101,7 +101,6 @@ void ReconstructARAP() {
     }
     size_t nnz = 2 * g_renderer.geometry.glue.size + g_renderer.geometry.vertices.size;
     size_t nrows = g_renderer.geometry.vertices.size + 1;
-    g_renderer.geometry.arap.nnz = nnz;
     if (nnz > g_renderer.geometry.arap.max_nnz) {
         saferealloc((void**)&g_renderer.geometry.arap.cindices, nnz, sizeof(size_t));
         saferealloc((void**)&g_renderer.geometry.arap.values, nnz, sizeof(double));
@@ -121,12 +120,11 @@ void ReconstructARAP() {
         saferealloc((void**)&g_renderer.geometry.arap.covariance, nrows - 1, sizeof(mat3));
         g_renderer.geometry.arap.max_rows = nrows;
     }
-    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++)
-        glm_mat3_identity(g_renderer.geometry.arap.rotations[i]);
     memcpy(g_renderer.geometry.arap.originals, g_renderer.geometry.vertices.data, g_renderer.geometry.vertices.size * sizeof(vec4));
     g_renderer.geometry.arap.rows = 0;
     memset(g_renderer.geometry.arap.rcounts, 0, (nrows - 1)*sizeof(size_t));
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
+        glm_mat3_identity(g_renderer.geometry.arap.rotations[i]);
         if (HASHMAP_Locks_has(&(g_renderer.geometry.locks), i) && HASHMAP_Locks_get(&(g_renderer.geometry.locks), i)) {
             g_renderer.geometry.arap.v2f[i] = (size_t)-1;
         } else {
@@ -155,24 +153,18 @@ void ReconstructARAP() {
     for (size_t i = 0; i < g_renderer.geometry.edges.size; i++) {
         Edge e = g_renderer.geometry.edges.data[i];
         double w = EdgeWeight(e);
+        size_t fa = g_renderer.geometry.arap.v2f[e.a];
+        size_t fb = g_renderer.geometry.arap.v2f[e.b];
         if (isunlocked(e.a) && isunlocked(e.b)) {
-            size_t fa = g_renderer.geometry.arap.v2f[e.a];
-            size_t fb = g_renderer.geometry.arap.v2f[e.b];
             size_t i_index = g_renderer.geometry.arap.cursor[fa]++;
             size_t j_index = g_renderer.geometry.arap.cursor[fb]++;
             g_renderer.geometry.arap.cindices[i_index] = fb;
             g_renderer.geometry.arap.values[i_index] = -w;
             g_renderer.geometry.arap.cindices[j_index] = fa;
             g_renderer.geometry.arap.values[j_index] = -w;
-            g_renderer.geometry.arap.diag[fa] += w;
-            g_renderer.geometry.arap.diag[fb] += w;
-        } else if (isunlocked(e.a)) {
-            size_t fa = g_renderer.geometry.arap.v2f[e.a];
-            g_renderer.geometry.arap.diag[fa] += w;
-        } else if (isunlocked(e.b)) {
-            size_t fb = g_renderer.geometry.arap.v2f[e.b];
-            g_renderer.geometry.arap.diag[fb] += w;
         }
+        if (isunlocked(e.a)) g_renderer.geometry.arap.diag[fa] += w;
+        if (isunlocked(e.b)) g_renderer.geometry.arap.diag[fb] += w;
     }
     for (size_t i = 0; i < g_renderer.geometry.arap.rows; i++) {
         size_t idx = g_renderer.geometry.arap.cursor[i]++;
@@ -243,6 +235,7 @@ void InitializeRenderer() {
     g_renderer.config.scenelightingonly = FALSE;
     g_renderer.config.normals = TRUE;
     g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
+    g_renderer.config.arapiterations = 10;
 
     // initialize min/max BB
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
@@ -336,7 +329,7 @@ void FitCamera() {
     glm_vec3_scale(extend, 0.5f, min2o);
     glm_vec3_add(min2o, g_renderer.geometry.bounds.min, newo);
     float width = glm_vec3_norm(extend);
-    SETVEC(g_renderer.camera.look, newo);
+    glm_vec3_copy(newo, g_renderer.camera.look);
     glm_vec3_scale(l2p, width, l2p);
     glm_vec3_add(l2p, newo, g_renderer.camera.position);
 }
@@ -347,12 +340,12 @@ void ReorientCamera() {
         g_renderer.camera.look[i] += sign*1e-6f;
     }
     vec3 desired = { 0, 1, 0 };
-    SETVEC(g_renderer.camera.up, desired);
+    glm_vec3_copy(desired, g_renderer.camera.up);
 }
 
 void GetVertex(size_t index, vec3 out) {
     EZ_ASSERT(index < g_renderer.geometry.vertices.size, "Vertex does not exist for requested index");
-    SETVEC(out, g_renderer.geometry.vertices.data[index]);
+    glm_vec3_copy(g_renderer.geometry.vertices.data[index], out);
 }
 
 float* VertexReference(VertexID vertex) {
@@ -388,7 +381,7 @@ BOOL VertexLocked(VertexID vertex) {
 void SubmitVertex(vec3 vertex) {
     g_renderer.geometry.changes.update_vertices = TRUE;
     vec4 v = { 0 };
-    SETVEC(v, vertex);
+    glm_vec3_copy(vertex, v);
     ARRLIST_vec4_add(&(g_renderer.geometry.vertices), v);
     if (vertex[0] < g_renderer.geometry.bounds.min[0]) g_renderer.geometry.bounds.min[0] = vertex[0];
     if (vertex[1] < g_renderer.geometry.bounds.min[1]) g_renderer.geometry.bounds.min[1] = vertex[1];
@@ -411,7 +404,7 @@ void ClearVertices() {
 void SubmitNormal(vec3 normal) {
     g_renderer.geometry.changes.update_normals = TRUE;
     vec4 n = { 0 };
-    SETVEC(n, normal);
+    glm_vec3_copy(normal, n);
     ARRLIST_vec4_add(&(g_renderer.geometry.normals), n);
 }
 
@@ -427,7 +420,8 @@ TriangleID SubmitTriangle(Triangle triangle) {
     EZ_ASSERT(triangle.a < g_renderer.geometry.vertices.size &&
               triangle.b < g_renderer.geometry.vertices.size &&
               triangle.c < g_renderer.geometry.vertices.size, "Triangle vertex does not exist");
-    vec3 emission; SETVEC(emission, g_renderer.geometry.materials.data[triangle.material].emission);
+    vec3 emission; 
+    glm_vec3_copy(g_renderer.geometry.materials.data[triangle.material].emission, emission);
     if (emission[0] != 0 || emission[1] != 0 || emission[2] != 0) {
         ARRLIST_TriangleID_add(&(g_renderer.geometry.emissives), g_renderer.geometry.triangles.size);
         g_renderer.geometry.lightarea += TriangleArea(
@@ -898,14 +892,11 @@ void SavePose() {
 void RigidDeform() {
     inline BOOL isunlocked(size_t i) { return g_renderer.geometry.arap.v2f[i] != (size_t)-1; }
     inline void outer(vec3 a, vec3 b, mat3 result) {
-        for (int col = 0; col < 3; col++)
-            for (int row = 0; row < 3; row++)
-                result[col][row] = a[row] * b[col];
+        for (int col = 0; col < 3; col++) for (int row = 0; row < 3; row++) result[col][row] = a[row] * b[col];
     }
-    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
-        if (isunlocked(i)) SETVEC(g_renderer.geometry.vertices.data[i], g_renderer.geometry.arap.originals[i]);
-    }
-    for (size_t i = 0; i < 10; i++) {
+    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++)
+        if (isunlocked(i)) glm_vec3_copy(g_renderer.geometry.arap.originals[i], g_renderer.geometry.vertices.data[i]);
+    for (size_t i = 0; i < g_renderer.config.arapiterations; i++) {
         // compute rotations
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
             glm_mat3_zero(g_renderer.geometry.arap.covariance[j]);
@@ -924,17 +915,11 @@ void RigidDeform() {
             Mat3Add(C, g_renderer.geometry.arap.covariance[e.b], g_renderer.geometry.arap.covariance[e.b]);
         }
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
-            mat3 S;
+            mat3 S, reg, R;
             glm_mat3_copy(g_renderer.geometry.arap.covariance[j], S);
-            mat3 reg;
             glm_mat3_copy(g_renderer.geometry.arap.rotations[j], reg);
             glm_mat3_scale(reg, 1e-6f);
-            for (int c = 0; c < 3; c++) {
-                for (int r = 0; r < 3; r++) {
-                    S[c][r] += reg[c][r];
-                }
-            }
-            mat3 R;
+            for (int c = 0; c < 3; c++) for (int r = 0; r < 3; r++) S[c][r] += reg[c][r];
             PolarDecompose(S, R);
             glm_mat3_copy(R, g_renderer.geometry.arap.rotations[j]);
         }
@@ -943,31 +928,25 @@ void RigidDeform() {
         for (size_t j = 0; j < g_renderer.geometry.edges.size; j++) {
             Edge e = g_renderer.geometry.edges.data[j];
             EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), e);
-            vec3 ti, ri_pij, rj_pij, neg_pij;
+            vec3 ti = { 0 }, ri_pij = { 0 }, rj_pij = { 0 }, neg_pij = { 0 }, rot_contrib = { 0 }, locked_contrib = { 0 };
             glm_vec3_negate_to(em.pij, neg_pij);
             if (isunlocked(e.a)) glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.a], em.pij, ri_pij);
-            else glm_vec3_zero(ri_pij);
             if (isunlocked(e.b)) glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.b], em.pij, rj_pij);
-            else glm_vec3_zero(rj_pij);
             glm_vec3_add(ri_pij, rj_pij, ti);
             glm_vec3_scale(ti, 0.5f * em.weight, ti);
             if (isunlocked(e.a)) glm_vec3_add(g_renderer.geometry.arap.b[e.a], ti, g_renderer.geometry.arap.b[e.a]);
-            glm_vec3_scale(ti, -1.0f, ti);
+            glm_vec3_negate_to(ti, ti);
             if (isunlocked(e.b)) glm_vec3_add(g_renderer.geometry.arap.b[e.b], ti, g_renderer.geometry.arap.b[e.b]);
             if (!isunlocked(e.a) && isunlocked(e.b)) {
-                vec3 rot_contrib;
                 glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.b], em.pij, rot_contrib);
-                glm_vec3_scale(rot_contrib, -0.5f * em.weight, rot_contrib);  // Ri*(-pij), Ri=I
+                glm_vec3_scale(rot_contrib, -0.5f * em.weight, rot_contrib);
                 glm_vec3_add(g_renderer.geometry.arap.b[e.b], rot_contrib, g_renderer.geometry.arap.b[e.b]);
-                vec3 locked_contrib;
                 glm_vec3_scale(g_renderer.geometry.vertices.data[e.a], em.weight, locked_contrib);
                 glm_vec3_add(g_renderer.geometry.arap.b[e.b], locked_contrib, g_renderer.geometry.arap.b[e.b]);
             } else if (isunlocked(e.a) && !isunlocked(e.b)) {
-                vec3 rot_contrib;
                 glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.a], neg_pij, rot_contrib);
-                glm_vec3_scale(rot_contrib, -0.5f * em.weight, rot_contrib);  // Ri*(-pij), Ri=I
+                glm_vec3_scale(rot_contrib, -0.5f * em.weight, rot_contrib);
                 glm_vec3_add(g_renderer.geometry.arap.b[e.a], rot_contrib, g_renderer.geometry.arap.b[e.a]);
-                vec3 locked_contrib;
                 glm_vec3_scale(g_renderer.geometry.vertices.data[e.b], em.weight, locked_contrib);
                 glm_vec3_add(g_renderer.geometry.arap.b[e.a], locked_contrib, g_renderer.geometry.arap.b[e.a]);
             }

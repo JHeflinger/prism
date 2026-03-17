@@ -121,7 +121,7 @@ ManifoldMesh GenerateManifoldMesh(const ARRLIST_vec4 vertices, const ARRLIST_vec
 
     // step 3: normalize and set vertex positions
     for (size_t i = 0; i < vertices.size; i++) {
-        SETVEC(mesh.vertices.data[i].position, vertices.data[i]);
+        glm_vec3_copy(vertices.data[i], mesh.vertices.data[i].position);
         glm_vec3_normalize(mesh.vertices.data[i].normal);
     }
 
@@ -439,7 +439,7 @@ void DirectedEdgeCollapse(ManifoldMesh* manifold, uint32_t edge, vec3 position) 
         uint32_t twin = manifold->halfedges.data[curr].twin;
         curr = manifold->halfedges.data[twin].next;
     } while (curr != walkstart);
-    SETVEC(manifold->vertices.data[v3].position, position);
+    glm_vec3_copy(position, manifold->vertices.data[v3].position);
     manifold->halfedges.data[h9].twin = h10;
     manifold->halfedges.data[h10].twin = h9;
     manifold->halfedges.data[h8].twin = h7;
@@ -684,7 +684,7 @@ void SerialSimplify(ManifoldMesh* manifold, size_t reduction) {
         vec4 tmp;
         glm_mat4_mulv(Q, v, tmp);
         output->value.edge = i;
-        SETVEC(output->value.position, optimal_position);
+        glm_vec3_copy(optimal_position, output->value.position);
         return glm_vec4_dot(v, tmp);
     }
     for (size_t i = 0; i < manifold->edges.size; i++) {
@@ -840,7 +840,7 @@ void SerialRemesh(ManifoldMesh* manifold, float nudge) {
     }
     for (size_t i = 0; i < manifold->vertices.size; i++) {
         if (manifold->vertices.data[i].halfedge != (uint32_t)-1) {
-            SETVEC(manifold->vertices.data[i].position, new_positions[i]);
+            glm_vec3_copy(new_positions[i], manifold->vertices.data[i].position);
         }
     }
     EZ_FREE(new_positions);

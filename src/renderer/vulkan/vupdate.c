@@ -270,10 +270,10 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     // core uniform buffer
     {
         UniformBufferObject ubo = { 0 };
-        SETVEC(ubo.position, g_vupdt_renderer_ref->camera.position);
-        SETVEC(ubo.look, g_vupdt_renderer_ref->camera.look);
+        glm_vec3_copy(g_vupdt_renderer_ref->camera.position, ubo.position);
+        glm_vec3_copy(g_vupdt_renderer_ref->camera.look, ubo.look);
         glm_vec3_sub(ubo.look, ubo.position, ubo.look);
-        SETVEC(ubo.up, g_vupdt_renderer_ref->camera.up);
+        glm_vec3_copy(g_vupdt_renderer_ref->camera.up, ubo.up);
         glm_vec3_normalize(ubo.up);
         glm_vec3_normalize(ubo.look);
         CameraUVW(g_vupdt_renderer_ref->camera, ubo.u, ubo.v, ubo.w);
@@ -322,8 +322,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     // geometry uniform buffer
     {
         GeometryUniformBufferObject ubo = { 0 };
-        SETVEC(ubo.minBB, g_vupdt_renderer_ref->geometry.bounds.min);
-        SETVEC(ubo.maxBB, g_vupdt_renderer_ref->geometry.bounds.max);
+        glm_vec3_copy(g_vupdt_renderer_ref->geometry.bounds.min, ubo.minBB);
+        glm_vec3_copy(g_vupdt_renderer_ref->geometry.bounds.max, ubo.maxBB);
         memcpy(ubos->geometry_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(GeometryUniformBufferObject));
     }
 }

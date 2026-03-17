@@ -114,7 +114,7 @@ void PanSelectedObject() {
         vec3 selected, offset, u, v, w, _w;
         if (GetSelectedVertex() != (VertexID)-1) {
             float* vref = VertexReference(GetSelectedVertex());
-            SETVEC(selected, vref);
+            glm_vec3_copy(vref, selected);
         } else return;
         SimpleCamera camera = GetCamera();
         CameraUVW(camera, u, v, w);

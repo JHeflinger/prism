@@ -301,7 +301,7 @@ void DrawEditPanel(float width, float height) {
             UIDrawText("x");
             UIMoveCursor(15, -20);
             vec3 old_a;
-            SETVEC(old_a, VertexReference(tref->a));
+            glm_vec3_copy(VertexReference(tref->a), old_a);
             edited |= UIDragFloat(&(VertexReference(tref->a)[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("y");

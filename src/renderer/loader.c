@@ -723,9 +723,9 @@ BOOL LoadXML(const char* filepath) { // TODO: marked for removal
         EZ_WARN("Unable to find all required camera parameters - default camera settings will be used");
     } else {
         SimpleCamera camera = GetCamera();
-        SETVEC(camera.position, pos);
-        SETVEC(camera.look, look);
-        SETVEC(camera.up, up);
+        glm_vec3_copy(pos, camera.position);
+        glm_vec3_copy(look, camera.look);
+        glm_vec3_copy(up, camera.up);
         camera.fov = heightangle;
         MoveCamera(camera);
         ReorientCamera();

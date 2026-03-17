@@ -41,6 +41,9 @@ void DrawMeshPanel(float width, float height) {
     if (UIButton("Set Pose", width - 20)) {
         SavePose();
     }
+    UIDrawText("Iterations");
+    UIMoveCursor((width - 20.0f)/2.0f, -20);
+    UIDragUInt(&(RenderConfig()->arapiterations), 0, 100, 1, (width - 20.0f)/2.0f);
 
 }
 
