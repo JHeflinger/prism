@@ -27,6 +27,7 @@ void CleanARAP() {
         EZ_FREE(g_renderer.geometry.arap.diag);
         EZ_FREE(g_renderer.geometry.arap.originals);
         EZ_FREE(g_renderer.geometry.arap.rotations);
+        EZ_FREE(g_renderer.geometry.arap.covariance);
         EZ_FREE(g_renderer.geometry.arap.v2f);
         EZ_FREE(g_renderer.geometry.arap.f2v);
         EZ_FREE(g_renderer.geometry.arap.b);
@@ -42,6 +43,7 @@ void CleanARAP() {
     g_renderer.geometry.arap.diag = NULL;
     g_renderer.geometry.arap.originals = NULL;
     g_renderer.geometry.arap.rotations = NULL;
+    g_renderer.geometry.arap.covariance = NULL;
     g_renderer.geometry.arap.v2f = NULL;
     g_renderer.geometry.arap.f2v = NULL;
     g_renderer.geometry.arap.b = NULL;
@@ -116,8 +118,11 @@ void ReconstructARAP() {
         saferealloc((void**)&g_renderer.geometry.arap.Ai_back, nrows - 1, sizeof(int));
         saferealloc((void**)&g_renderer.geometry.arap.rotations, nrows - 1, sizeof(mat3));
         saferealloc((void**)&g_renderer.geometry.arap.b, nrows - 1, sizeof(vec3));
+        saferealloc((void**)&g_renderer.geometry.arap.covariance, nrows - 1, sizeof(mat3));
         g_renderer.geometry.arap.max_rows = nrows;
     }
+    for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++)
+        glm_mat3_identity(g_renderer.geometry.arap.rotations[i]);
     memcpy(g_renderer.geometry.arap.originals, g_renderer.geometry.vertices.data, g_renderer.geometry.vertices.size * sizeof(vec4));
     g_renderer.geometry.arap.rows = 0;
     memset(g_renderer.geometry.arap.rcounts, 0, (nrows - 1)*sizeof(size_t));
@@ -903,7 +908,7 @@ void RigidDeform() {
     for (size_t i = 0; i < 10; i++) {
         // compute rotations
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
-            glm_mat3_zero(g_renderer.geometry.arap.rotations[j]);
+            glm_mat3_zero(g_renderer.geometry.arap.covariance[j]);
             glm_vec3_zero(g_renderer.geometry.arap.b[j]);
         }
         for (size_t j = 0; j < g_renderer.geometry.edges.size; j++) {
@@ -915,12 +920,22 @@ void RigidDeform() {
             glm_vec3_sub(g_renderer.geometry.vertices.data[e.a], g_renderer.geometry.vertices.data[e.b], xij);
             outer(xij, em.pij, C);
             glm_mat3_scale(C, em.weight);
-            Mat3Add(C, g_renderer.geometry.arap.rotations[e.a], g_renderer.geometry.arap.rotations[e.a]);
-            Mat3Add(C, g_renderer.geometry.arap.rotations[e.b], g_renderer.geometry.arap.rotations[e.b]);
+            Mat3Add(C, g_renderer.geometry.arap.covariance[e.a], g_renderer.geometry.arap.covariance[e.a]);
+            Mat3Add(C, g_renderer.geometry.arap.covariance[e.b], g_renderer.geometry.arap.covariance[e.b]);
         }
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
+            mat3 S;
+            glm_mat3_copy(g_renderer.geometry.arap.covariance[j], S);
+            mat3 reg;
+            glm_mat3_copy(g_renderer.geometry.arap.rotations[j], reg);
+            glm_mat3_scale(reg, 1e-6f);
+            for (int c = 0; c < 3; c++) {
+                for (int r = 0; r < 3; r++) {
+                    S[c][r] += reg[c][r];
+                }
+            }
             mat3 R;
-            PolarDecompose(g_renderer.geometry.arap.rotations[j], R);
+            PolarDecompose(S, R);
             glm_mat3_copy(R, g_renderer.geometry.arap.rotations[j]);
         }
 

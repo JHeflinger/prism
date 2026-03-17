@@ -201,6 +201,7 @@ typedef struct {
     vec3* b;
     vec4* originals;
     mat3* rotations;
+    mat3* covariance;
     size_t max_nnz;
     size_t max_rows;
     cholmod_sparse* A;
