@@ -26,12 +26,12 @@ void LoadBox() {
 }
 
 void LoadDice() {
-    LoadOBJ("/home/jason/Dev/MESH/meshes/icosahedron.obj");
+    LoadOBJ("/home/jason/Dev/ARAP/meshes/tetrahedron.obj");
     FitCamera();
 }
 
 void LoadOut() {
-    LoadOBJ("out.obj");
+    LoadOBJ("/home/jason/Dev/ARAP/meshes/bean.obj");
     FitCamera();
 }
 
@@ -60,7 +60,7 @@ void DevInitialize() {
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_C_OVERRIDE, BIND_KEY_PRESSED });
-    AddBind("load icosahedron", LoadDice,
+    AddBind("load tetrahedron", LoadDice,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_I_OVERRIDE, BIND_KEY_PRESSED });
@@ -68,7 +68,7 @@ void DevInitialize() {
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_B_OVERRIDE, BIND_KEY_PRESSED });
-    AddBind("load out.obj", LoadOut,
+    AddBind("load bean", LoadOut,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_O_OVERRIDE, BIND_KEY_PRESSED });

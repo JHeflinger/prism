@@ -145,7 +145,7 @@ void ReconstructARAP() {
         g_renderer.geometry.arap.rpointers[i + 1] =
             g_renderer.geometry.arap.rpointers[i] + g_renderer.geometry.arap.rcounts[i];
         g_renderer.geometry.arap.cursor[i] = g_renderer.geometry.arap.rpointers[i];
-        g_renderer.geometry.arap.diag[i] = 0.0;
+        g_renderer.geometry.arap.diag[i] = 1e-6;
     }
     for (size_t i = 0; i < g_renderer.geometry.edges.size; i++) {
         Edge e = g_renderer.geometry.edges.data[i];
@@ -893,17 +893,11 @@ void SavePose() {
 void RigidDeform() {
     inline BOOL isunlocked(size_t i) { return g_renderer.geometry.arap.v2f[i] != (size_t)-1; }
     inline void outer(vec3 a, vec3 b, mat3 result) {
-        result[0][0] = a[0] * b[0];
-        result[0][1] = a[0] * b[1];
-        result[0][2] = a[0] * b[2];
-        result[1][0] = a[1] * b[0];
-        result[1][1] = a[1] * b[1];
-        result[1][2] = a[1] * b[2];
-        result[2][0] = a[2] * b[0];
-        result[2][1] = a[2] * b[1];
-        result[2][2] = a[2] * b[2];
+        for (int col = 0; col < 3; col++)
+            for (int row = 0; row < 3; row++)
+                result[col][row] = a[row] * b[col];
     }
-    for (size_t i = 0; i < 20; i++) {
+    for (size_t i = 0; i < 30; i++) {
         // compute rotations
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
             glm_mat3_zero(g_renderer.geometry.arap.rotations[j]);
@@ -918,24 +912,21 @@ void RigidDeform() {
             glm_vec3_sub(g_renderer.geometry.vertices.data[e.a], g_renderer.geometry.vertices.data[e.b], xij);
             outer(xij, em.pij, C);
             glm_mat3_scale(C, em.weight);
-            if (isunlocked(e.a)) Mat3Add(C, g_renderer.geometry.arap.rotations[e.a], g_renderer.geometry.arap.rotations[e.a]);
-            if (isunlocked(e.b)) Mat3Add(C, g_renderer.geometry.arap.rotations[e.b], g_renderer.geometry.arap.rotations[e.b]);
+            Mat3Add(C, g_renderer.geometry.arap.rotations[e.a], g_renderer.geometry.arap.rotations[e.a]);
+            Mat3Add(C, g_renderer.geometry.arap.rotations[e.b], g_renderer.geometry.arap.rotations[e.b]);
         }
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
-            if (isunlocked(j)) {
-                mat3 R;
-                PolarDecompose(g_renderer.geometry.arap.rotations[j], R);
-                glm_mat3_copy(R, g_renderer.geometry.arap.rotations[j]);
-            } else {
-                glm_mat3_identity(g_renderer.geometry.arap.rotations[j]);
-            }
+            mat3 R;
+            PolarDecompose(g_renderer.geometry.arap.rotations[j], R);
+            glm_mat3_copy(R, g_renderer.geometry.arap.rotations[j]);
         }
 
         // build RHS
         for (size_t j = 0; j < g_renderer.geometry.edges.size; j++) {
             Edge e = g_renderer.geometry.edges.data[j];
             EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), e);
-            vec3 ti, ri_pij, rj_pij;
+            vec3 ti, ri_pij, rj_pij, neg_pij;
+            glm_vec3_negate_to(em.pij, neg_pij);
             if (isunlocked(e.a)) glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.a], em.pij, ri_pij);
             else glm_vec3_zero(ri_pij);
             if (isunlocked(e.b)) glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.b], em.pij, rj_pij);
@@ -946,12 +937,20 @@ void RigidDeform() {
             glm_vec3_scale(ti, -1.0f, ti);
             if (isunlocked(e.b)) glm_vec3_add(g_renderer.geometry.arap.b[e.b], ti, g_renderer.geometry.arap.b[e.b]);
             if (!isunlocked(e.a) && isunlocked(e.b)) {
+                vec3 rot_contrib;
+                glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.b], em.pij, rot_contrib);
+                glm_vec3_scale(rot_contrib, -0.5f * em.weight, rot_contrib);  // Ri*(-pij), Ri=I
+                glm_vec3_add(g_renderer.geometry.arap.b[e.b], rot_contrib, g_renderer.geometry.arap.b[e.b]);
                 vec3 locked_contrib;
-                glm_vec3_scale((float*)g_renderer.geometry.vertices.data[e.a], em.weight, locked_contrib);
+                glm_vec3_scale(g_renderer.geometry.vertices.data[e.a], em.weight, locked_contrib);
                 glm_vec3_add(g_renderer.geometry.arap.b[e.b], locked_contrib, g_renderer.geometry.arap.b[e.b]);
             } else if (isunlocked(e.a) && !isunlocked(e.b)) {
+                vec3 rot_contrib;
+                glm_mat3_mulv(g_renderer.geometry.arap.rotations[e.a], neg_pij, rot_contrib);
+                glm_vec3_scale(rot_contrib, -0.5f * em.weight, rot_contrib);  // Ri*(-pij), Ri=I
+                glm_vec3_add(g_renderer.geometry.arap.b[e.a], rot_contrib, g_renderer.geometry.arap.b[e.a]);
                 vec3 locked_contrib;
-                glm_vec3_scale((float*)g_renderer.geometry.vertices.data[e.b], em.weight, locked_contrib);
+                glm_vec3_scale(g_renderer.geometry.vertices.data[e.b], em.weight, locked_contrib);
                 glm_vec3_add(g_renderer.geometry.arap.b[e.a], locked_contrib, g_renderer.geometry.arap.b[e.a]);
             }
         }
