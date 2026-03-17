@@ -81,7 +81,7 @@ float EdgeWeight(Edge e) {
         glm_vec3_cross(u, v, cross);
         weight += glm_vec3_dot(u, v) / glm_vec3_norm(cross);
     }
-    em.weight = weight / ((float)cp);
+    em.weight = fmaxf(weight / ((float)cp), 1e-6f);
     glm_vec3_sub(g_renderer.geometry.vertices.data[a], g_renderer.geometry.vertices.data[b], em.pij);
     HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), e, em);
     return em.weight;
@@ -120,15 +120,16 @@ void ReconstructARAP() {
     }
     memcpy(g_renderer.geometry.arap.originals, g_renderer.geometry.vertices.data, g_renderer.geometry.vertices.size * sizeof(vec4));
     g_renderer.geometry.arap.rows = 0;
+    memset(g_renderer.geometry.arap.rcounts, 0, (nrows - 1)*sizeof(size_t));
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
         if (HASHMAP_Locks_has(&(g_renderer.geometry.locks), i) && HASHMAP_Locks_get(&(g_renderer.geometry.locks), i)) {
             g_renderer.geometry.arap.v2f[i] = (size_t)-1;
         } else {
             g_renderer.geometry.arap.v2f[i] = g_renderer.geometry.arap.rows;
             g_renderer.geometry.arap.f2v[g_renderer.geometry.arap.rows] = i;
+            g_renderer.geometry.arap.rcounts[g_renderer.geometry.arap.rows] = 1;
             g_renderer.geometry.arap.rows++;
         }
-        g_renderer.geometry.arap.rcounts[i] = 1;
     }
     size_t double_free_edges = 0;
     for (size_t i = 0; i < g_renderer.geometry.edges.size; i++) {
@@ -174,12 +175,11 @@ void ReconstructARAP() {
         g_renderer.geometry.arap.values[idx] = g_renderer.geometry.arap.diag[i];
     }
     g_renderer.geometry.arap.nnz = g_renderer.geometry.arap.rows + 2 * double_free_edges;
-
     g_renderer.geometry.arap.A = cholmod_allocate_sparse(
         g_renderer.geometry.arap.rows,
         g_renderer.geometry.arap.rows,
         g_renderer.geometry.arap.nnz,
-        1, 1, 0, CHOLMOD_REAL, &g_cholmod);
+        1, 1, -1, CHOLMOD_REAL, &g_cholmod);
     int* Ap = (int*)g_renderer.geometry.arap.A->p;
     int* Ai = (int*)g_renderer.geometry.arap.A->i;
     double* Ax = (double*)g_renderer.geometry.arap.A->x;
@@ -903,24 +903,12 @@ void RigidDeform() {
         result[2][1] = a[2] * b[1];
         result[2][2] = a[2] * b[2];
     }
-    inline void pdecompose(mat3 R) {
-        mat3 R_invT;
-        for (int iter = 0; iter < 5; iter++) {
-            glm_mat3_transpose_to(R, R_invT);
-            glm_mat3_inv(R_invT, R_invT);
-            for (int i = 0; i < 3; i++)
-                for (int j = 0; j < 3; j++)
-                    R[i][j] = 0.5f * (R[i][j] + R_invT[i][j]);
-        }
-        float det = glm_mat3_det(R);
-        if (det < 0.0f) {
-            for (int i = 0; i < 3; i++)
-                R[i][2] *= -1.0f;
-        }
-    }
-    for (size_t i = 0; i < 10; i++) {
+    for (size_t i = 0; i < 20; i++) {
         // compute rotations
-        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) glm_mat3_zero(g_renderer.geometry.arap.rotations[j]);
+        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
+            glm_mat3_zero(g_renderer.geometry.arap.rotations[j]);
+            glm_vec3_zero(g_renderer.geometry.arap.b[j]);
+        }
         for (size_t j = 0; j < g_renderer.geometry.edges.size; j++) {
             Edge e = g_renderer.geometry.edges.data[j];
             if (!isunlocked(e.a) && !isunlocked(e.b)) continue;
@@ -933,14 +921,17 @@ void RigidDeform() {
             if (isunlocked(e.a)) Mat3Add(C, g_renderer.geometry.arap.rotations[e.a], g_renderer.geometry.arap.rotations[e.a]);
             if (isunlocked(e.b)) Mat3Add(C, g_renderer.geometry.arap.rotations[e.b], g_renderer.geometry.arap.rotations[e.b]);
         }
-        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) 
-            if (isunlocked(j))
-                pdecompose(g_renderer.geometry.arap.rotations[j]);
+        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
+            if (isunlocked(j)) {
+                mat3 R;
+                PolarDecompose(g_renderer.geometry.arap.rotations[j], R);
+                glm_mat3_copy(R, g_renderer.geometry.arap.rotations[j]);
+            } else {
+                glm_mat3_identity(g_renderer.geometry.arap.rotations[j]);
+            }
+        }
 
         // build RHS
-        for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++)
-            if (isunlocked(j))
-                glm_vec3_zero(g_renderer.geometry.arap.b[j]);
         for (size_t j = 0; j < g_renderer.geometry.edges.size; j++) {
             Edge e = g_renderer.geometry.edges.data[j];
             EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), e);
@@ -954,11 +945,20 @@ void RigidDeform() {
             if (isunlocked(e.a)) glm_vec3_add(g_renderer.geometry.arap.b[e.a], ti, g_renderer.geometry.arap.b[e.a]);
             glm_vec3_scale(ti, -1.0f, ti);
             if (isunlocked(e.b)) glm_vec3_add(g_renderer.geometry.arap.b[e.b], ti, g_renderer.geometry.arap.b[e.b]);
+            if (!isunlocked(e.a) && isunlocked(e.b)) {
+                vec3 locked_contrib;
+                glm_vec3_scale((float*)g_renderer.geometry.vertices.data[e.a], em.weight, locked_contrib);
+                glm_vec3_add(g_renderer.geometry.arap.b[e.b], locked_contrib, g_renderer.geometry.arap.b[e.b]);
+            } else if (isunlocked(e.a) && !isunlocked(e.b)) {
+                vec3 locked_contrib;
+                glm_vec3_scale((float*)g_renderer.geometry.vertices.data[e.b], em.weight, locked_contrib);
+                glm_vec3_add(g_renderer.geometry.arap.b[e.a], locked_contrib, g_renderer.geometry.arap.b[e.a]);
+            }
         }
 
         // solve
         int rows = g_renderer.geometry.arap.L->n;
-        cholmod_dense* b_dense = cholmod_allocate_dense(rows, 3, rows*3, CHOLMOD_REAL, &g_cholmod);
+        cholmod_dense* b_dense = cholmod_allocate_dense(rows, 3, rows, CHOLMOD_REAL, &g_cholmod);
         double* b_ptr = (double*)b_dense->x;
         int free_idx = 0;
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {

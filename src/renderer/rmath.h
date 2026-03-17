@@ -14,4 +14,6 @@ void Mat4Add(mat4 a, mat4 b, mat4 dest);
 
 void CameraUVW(SimpleCamera camera, vec3 u, vec3 v, vec3 w);
 
+void PolarDecompose(mat3 C, mat3 R_out);
+
 #endif
