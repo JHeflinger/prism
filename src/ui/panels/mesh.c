@@ -44,7 +44,6 @@ void DrawMeshPanel(float width, float height) {
     UIDrawText("Iterations");
     UIMoveCursor((width - 20.0f)/2.0f, -20);
     UIDragUInt(&(RenderConfig()->arapiterations), 0, 100, 1, (width - 20.0f)/2.0f);
-
 }
 
 Panel GenerateMeshPanel() {

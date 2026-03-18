@@ -7,8 +7,6 @@
 
 BOOL g_vsync_enabled = TRUE;
 
-float poop = 0.0f;
-
 const char* mem_size_descriptor(size_t count) {
     if (count > 1000000000) {
         return "GB";
@@ -63,7 +61,7 @@ void DrawDevPanel(float width, float height) {
             100.0f*((float)allocated)/((float)budget),
             '%');
     }
-    
+
     UIMoveCursor(0, 20.0f);
     UICheckboxLabeled("Grid:", &(RenderConfig()->grid));
     UICheckboxLabeled("Smooth Normals:", &(RenderConfig()->normals));

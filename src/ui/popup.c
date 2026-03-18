@@ -24,7 +24,7 @@ int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UISetPosition(0, 0);
     UISetCursor(0, ypos + 10);
     DrawRectangle(xpos, ypos, width, height, MappedColor(PANEL_BG_COLOR));
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add to Scene...") / 2), 0);
+    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add to Scene") / 2), 0);
     UIDrawText("Add to Scene");
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 20);
     if (UIButton("Material", button_width)) return 0;
@@ -306,7 +306,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIDrawText("z");
     UIMoveCursor(xpos + 265, -20);
     UIDragFloat(&(g_cube_scale[2]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-    
+
     UIMoveCursor(xpos + 2, 30);
     UIDrawText("Select Material");
     UIMoveCursor(xpos + 110, -20);
