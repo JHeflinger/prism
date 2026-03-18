@@ -9,34 +9,31 @@
 #include "ui/panels/edit.h"
 
 void LoadArmadillo() {
-    LoadOBJ("/home/jason/Dev/ARAP/meshes/armadillo.obj");
+    LoadOBJ("assets/models/OBJ/naked/armadillo.obj");
     FitCamera();
 }
 
 void LoadCow() {
-    LoadOBJ("/home/jason/Dev/MESH/meshes/cow.obj");
+    LoadOBJ("assets/models/OBJ/naked/cow.obj");
     FitCamera();
 }
 
 void LoadBox() {
-    LoadXML("/home/jason/Dev/ADVGRAPHICS/example-scenes/CornellBox-Sphere.xml");
-    SimpleCamera c = GetCamera();
-    c.fov = 90.0f;
-    MoveCamera(c);
+    LoadOBJ("assets/models/OBJ/dressed/CornellBox-Sphere.obj");
 }
 
 void LoadDice() {
-    LoadOBJ("/home/jason/Dev/ARAP/meshes/tetrahedron.obj");
+    LoadOBJ("assets/models/OBJ/naked/tetrahedron.obj");
     FitCamera();
 }
 
 void LoadOut() {
-    LoadOBJ("/home/jason/Dev/ARAP/meshes/bean.obj");
+    LoadOBJ("assets/models/OBJ/naked/bean.obj");
     FitCamera();
 }
 
 void LoadPeter() {
-    LoadOBJ("/home/jason/Dev/MESH/meshes/peter.obj");
+    LoadOBJ("assets/models/OBJ/naked/peter.obj");
     FitCamera();
 }
 

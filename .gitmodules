@@ -1,3 +1,6 @@
 [submodule "vendor/EasyC"]
 	path = vendor/EasyC
 	url = https://github.com/JHeflinger/EasyC.git
+[submodule "assets/models"]
+	path = assets/models
+	url = https://github.com/JHeflinger/models.git
