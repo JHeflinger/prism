@@ -30,9 +30,10 @@ ICEBOX:
 41. bug: mesh flickers during moving/reconstructing bvh - is this bc of the bvh, or is it the waiting to idle? check by turning on bvh construction all the time, if it still flickers its the bvh construction, seems to probably be due to pipeline refreshing
 42. Ensure windows compat
 43. bug - stressful geometry operations do eventually break if you play around enough
+44. bug - something is wrong with lighting - best seen by scene lighting only
 
 Next:
-1. bug - something is wrong with lighting - best seen by scene lighting only
+2. open files via mini file explorer
 6. do cholmod yourself
 
 ideas:

@@ -20,6 +20,7 @@ void LoadCow() {
 
 void LoadBox() {
     LoadOBJ("assets/models/OBJ/dressed/CornellBox-Sphere.obj");
+    FitCamera();
 }
 
 void LoadDice() {
@@ -28,7 +29,7 @@ void LoadDice() {
 }
 
 void LoadOut() {
-    LoadOBJ("assets/models/OBJ/naked/bean.obj");
+    LoadOBJ("assets/models/OBJ/dressed/CornellBox-Water.obj");
     FitCamera();
 }
 
@@ -65,7 +66,7 @@ void DevInitialize() {
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_B_OVERRIDE, BIND_KEY_PRESSED });
-    AddBind("load bean", LoadOut,
+    AddBind("load water box", LoadOut,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_O_OVERRIDE, BIND_KEY_PRESSED });
