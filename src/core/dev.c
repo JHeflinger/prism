@@ -14,7 +14,7 @@ void LoadArmadillo() {
 }
 
 void LoadCow() {
-    LoadOBJ("assets/models/OBJ/naked/cow.obj");
+    LoadOBJ("assets/models/OBJ/naked/bean.obj");
     FitCamera();
 }
 
@@ -24,7 +24,7 @@ void LoadBox() {
 }
 
 void LoadDice() {
-    LoadOBJ("assets/models/OBJ/naked/tetrahedron.obj");
+    LoadOBJ("assets/models/OBJ/naked/bunny.obj");
     FitCamera();
 }
 

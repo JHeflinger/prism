@@ -207,6 +207,10 @@ typedef struct {
     cholmod_sparse* A;
     cholmod_factor* L;
     int* Ai_back;
+    vec3* z;
+    vec3* u;
+    vec3* normals;
+    float* areas;
 } ARAPData;
 
 typedef struct {
@@ -229,6 +233,14 @@ typedef struct {
 } Geometry;
 
 typedef struct {
+    size_t style;
+    uint32_t iterations;
+    float cube_lambda;
+    float cube_rho;
+    size_t addm;
+} ARAPConfig;
+
+typedef struct {
     float whitepoint;
     float gamma;
     BOOL normals;
@@ -240,7 +252,7 @@ typedef struct {
     BOOL scenelighting;
     BOOL scenelightingonly;
     PipelineFlags flags;
-    uint32_t arapiterations;
+    ARAPConfig arap;
 } RendererConfig;
 
 #endif

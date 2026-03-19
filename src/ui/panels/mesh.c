@@ -1,5 +1,6 @@
 #include "mesh.h"
 #include "renderer/renderer.h"
+#include "ui/shared.h"
 
 void DrawMeshPanel(float width, float height) {
     UIMoveCursor((width - 20 - UITextWidth("Edit Mesh")) / 2.0f, 0);
@@ -43,7 +44,29 @@ void DrawMeshPanel(float width, float height) {
     }
     UIDrawText("Iterations");
     UIMoveCursor((width - 20.0f)/2.0f, -20);
-    UIDragUInt(&(RenderConfig()->arapiterations), 0, 100, 1, (width - 20.0f)/2.0f);
+    UIDragUInt(&(RenderConfig()->arap.iterations), 0, 100, 1, (width - 20.0f)/2.0f);
+    UIDrawText("Style");
+    UIMoveCursor((width - 20.0f)/2.0f, -20);
+    UIDropdownMenu((width - 20.0f)/2.0f, 2, ARAPModelLabels(), DropdownSelectARAPModel, NULL);
+    if (RenderConfig()->arap.style == 1) {
+        UIMoveCursor(0, 15);
+        UIDrawText("Cubify Configuration");
+        UIDivider(width - 20);
+        if (UIButton("Cubify", width - 20)) {
+            RigidDeform();
+        }
+        UIDrawText("Iterations");
+        UIMoveCursor((width - 20.0f)/2.0f, -20);
+        uint32_t addm = RenderConfig()->arap.addm;
+        UIDragUInt(&(addm), 1, 100, 1, (width - 20.0f)/2.0f);
+        RenderConfig()->arap.addm = addm;
+        UIDrawText("Lambda");
+        UIMoveCursor((width - 20.0f)/2.0f, -20);
+        UIDragFloat(&(RenderConfig()->arap.cube_lambda), 0.01, 1.0, 0.01f, (width - 20.0f)/2.0f);
+        UIDrawText("Rho");
+        UIMoveCursor((width - 20.0f)/2.0f, -20);
+        UIDragFloat(&(RenderConfig()->arap.cube_rho), 0.0001, 0.1, 0.0005f, (width - 20.0f)/2.0f);
+    }
 }
 
 Panel GenerateMeshPanel() {

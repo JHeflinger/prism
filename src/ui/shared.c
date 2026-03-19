@@ -1,7 +1,8 @@
 #include "shared.h"
 #include "renderer/renderer.h"
 
-char* g_labels[] = { "lambertian", "mirror", "dielectric" };
+char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric" };
+char* g_arapmodel_labels[] = { "rigid", "cubic" };
 
 size_t DropdownSelectMaterial(void* data, size_t index) {
     Triangle* triref = (Triangle*)data;
@@ -38,6 +39,19 @@ size_t DropdownSelectLightModel(void* data, size_t index) {
     return index;
 }
 
+size_t DropdownSelectARAPModel(void* data, size_t index) {
+    if (index == (size_t)-1) {
+        return RenderConfig()->arap.style;
+    } else {
+        RenderConfig()->arap.style = index;
+    }
+    return index;
+}
+
 char** LightModelLabels() {
-    return g_labels;
+    return g_lightmodel_labels;
+}
+
+char** ARAPModelLabels() {
+    return g_arapmodel_labels;
 }
