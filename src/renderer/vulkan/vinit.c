@@ -46,6 +46,10 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
         "build/shaders/path.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
+        "shaders/fluid.comp",
+        "build/shaders/fluid.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
         "shaders/tonemap.comp",
         "build/shaders/tonemap.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
@@ -158,6 +162,11 @@ BOOL VINIT_UniformBuffers(UBOArray* ubos) {
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             &(ubos->geometry_objects[i]));
+        VUTIL_CreateBuffer(
+            sizeof(SimulationUniformBufferObject),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &(ubos->simulation_objects[i]));
         vkMapMemory(
             g_vinit_renderer_ref->vulkan.core.general.interface,
             ubos->objects[i].memory,
@@ -170,6 +179,10 @@ BOOL VINIT_UniformBuffers(UBOArray* ubos) {
             g_vinit_renderer_ref->vulkan.core.general.interface,
             ubos->geometry_objects[i].memory,
             0, sizeof(GeometryUniformBufferObject), 0, &(ubos->geometry_mapped[i]));
+        vkMapMemory(
+            g_vinit_renderer_ref->vulkan.core.general.interface,
+            ubos->simulation_objects[i].memory,
+            0, sizeof(SimulationUniformBufferObject), 0, &(ubos->simulation_mapped[i]));
     }
     return TRUE;
 }
@@ -464,6 +477,24 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
     return TRUE;
 }
 
+BOOL VINIT_Simulation(VulkanFluidSimulation* vfs) {
+    VUTIL_CreateImage3D(
+        g_vinit_renderer_ref->geometry.fluid.width,
+        g_vinit_renderer_ref->geometry.fluid.height,
+        g_vinit_renderer_ref->geometry.fluid.length,
+        1,
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_FORMAT_R32_SFLOAT,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        &(vfs->density.image));
+    vfs->density.sampler = VUTIL_CreateSampler3D();
+    VUPDT_Simulation(vfs);
+    return TRUE;
+}
+
 BOOL VINIT_Normals(VulkanDataBuffer* normals) {
     size_t arrsize = sizeof(vec4) * g_vinit_renderer_ref->geometry.normals.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
@@ -712,6 +743,7 @@ BOOL VINIT_Geometry(VulkanGeometry* geometry) {
 	if (!VINIT_Emissives(&(geometry->emissives))) return FALSE;
 	if (!VINIT_Materials(&(geometry->materials))) return FALSE;
 	if (!VINIT_Lights(&(geometry->lights))) return FALSE;
+	if (!VINIT_Simulation(&(geometry->fluid))) return FALSE;
     return TRUE;
 }
 
@@ -730,8 +762,8 @@ BOOL VINIT_Metadata(VulkanMetadata* metadata) {
 BOOL VINIT_Core(VulkanCore* core) {
 	if (!VINIT_Shaders(&(core->shaders))) return FALSE;
 	if (!VINIT_General(&(core->general))) return FALSE;
-	if (!VINIT_Geometry(&(core->geometry))) return FALSE;
 	if (!VINIT_Scheduler(&(core->scheduler))) return FALSE;
+	if (!VINIT_Geometry(&(core->geometry))) return FALSE;
 	if (!VINIT_Bridge(&(core->bridge))) return FALSE;
 	if (!VINIT_RenderContext(&(core->context))) return FALSE;
     return TRUE;

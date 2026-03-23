@@ -1,5 +1,8 @@
 PROJECT src
 MAIN main.c
+LIB vendor/raylib/lib
+WINDOWS LIB platform/windows/vulkan/libs
+WINDOWS LIB platform/windows/GLFW
 INCLUDE vendor/raylib/include
 INCLUDE vendor/stb_image/include
 INCLUDE vendor/cglm/include
@@ -8,13 +11,14 @@ INCLUDE vendor/suitesparse/include
 WINDOWS INCLUDE platform/windows/vulkan/include
 WINDOWS INCLUDE platform/windows/GLFW/include
 LINUX LINK vulkan
-WINDOWS LINK vulkan-1
 LINUX LINK glfw
 LINUX LINK GLU
 LINUX LINK GL
 LINUX LINK pthread
 LINUX LINK m
+LINUX LINK cholmod
 LINUX LINK :linux_amdx64_libraylib.a
+WINDOWS LINK vulkan-1
 WINDOWS LINK shell32
 WINDOWS LINK user32
 WINDOWS LINK opengl32
@@ -23,8 +27,6 @@ WINDOWS LINK winmm
 WINDOWS LINK winpthread
 WINDOWS LINK ws2_32
 WINDOWS LINK :win_x64_libraylib.a
-LIB vendor/raylib/lib
-WINDOWS LIB platform/windows/vulkan/libs
-WINDOWS LIB platform/windows/GLFW
 SOURCE vendor/EasyC/include
-LINUX LINK cholmod
+FLAG audit
+FLAG fast

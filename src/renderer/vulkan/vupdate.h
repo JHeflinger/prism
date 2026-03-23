@@ -3,6 +3,8 @@
 
 #include "renderer/vulkan/vstructs.h"
 
+void VUPDT_Simulation(VulkanFluidSimulation* vfs);
+
 void VUPDT_Lights(VulkanDataBuffer* lights);
 
 void VUPDT_Normals(VulkanDataBuffer* normals);

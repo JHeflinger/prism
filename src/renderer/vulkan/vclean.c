@@ -29,6 +29,11 @@ void VCLEAN_BVH(VulkanBVH* bvh) {
     VUTIL_DestroyBuffer(bvh->buckets);
 }
 
+void VCLEAN_Simulation(VulkanFluidSimulation* vfs) {
+    VUTIL_DestroyImage(vfs->density.image);
+    vkDestroySampler(g_vclean_renderer_ref->vulkan.core.general.interface, vfs->density.sampler, NULL);
+}
+
 void VCLEAN_Normals(VulkanDataBuffer* normals) {
     VUTIL_DestroyBuffer(*normals);
 }
@@ -57,6 +62,7 @@ void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Emissives(&(geometry->emissives));
     VCLEAN_Materials(&(geometry->materials));
     VCLEAN_Lights(&(geometry->lights));
+    VCLEAN_Simulation(&(geometry->fluid));
 }
 
 void VCLEAN_Metadata(VulkanMetadata* metadata) {
@@ -84,6 +90,7 @@ void VCLEAN_RenderData(VulkanRenderData* renderdata) {
         VUTIL_DestroyBuffer(renderdata->ubos.objects[i]);
         VUTIL_DestroyBuffer(renderdata->ubos.overlay_objects[i]);
         VUTIL_DestroyBuffer(renderdata->ubos.geometry_objects[i]);
+        VUTIL_DestroyBuffer(renderdata->ubos.simulation_objects[i]);
     }
     for (size_t i = 0; i < g_vclean_renderer_ref->vulkan.core.shaders.size; i++) {
         vkDestroyDescriptorPool(g_vclean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].pool, NULL);
@@ -95,12 +102,8 @@ void VCLEAN_RenderData(VulkanRenderData* renderdata) {
 
 void VCLEAN_RenderContext(VulkanRenderContext* context) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
-        vkDestroyImageView(g_vclean_renderer_ref->vulkan.core.general.interface, context->targets[i].view, NULL);
-        vkDestroyImage(g_vclean_renderer_ref->vulkan.core.general.interface, context->targets[i].image, NULL);
-        vkFreeMemory(g_vclean_renderer_ref->vulkan.core.general.interface, context->targets[i].memory, NULL);
-        vkDestroyImageView(g_vclean_renderer_ref->vulkan.core.general.interface, context->hdr[i].view, NULL);
-        vkDestroyImage(g_vclean_renderer_ref->vulkan.core.general.interface, context->hdr[i].image, NULL);
-        vkFreeMemory(g_vclean_renderer_ref->vulkan.core.general.interface, context->hdr[i].memory, NULL);
+        VUTIL_DestroyImage(context->targets[i]);
+        VUTIL_DestroyImage(context->hdr[i]);
     }
 
     VCLEAN_RenderData(&(context->renderdata));

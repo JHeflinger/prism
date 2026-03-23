@@ -1,0 +1,110 @@
+#version 450
+
+#define STEPSIZE 0.05
+#define EPS 0.0001
+
+struct Ray {
+    vec3 position;
+    vec3 direction;
+};
+
+layout(binding = 0) uniform UniformBufferObject {
+    vec3 look;
+    vec3 position;
+    vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    vec2 viewport;
+    uint triangles;
+    uint emissives;
+    uint lights;
+    uint samples;
+	uint seed;
+    uint grid;
+    uint reset;
+    uint direct;
+    uint directonly;
+    uint showdof;
+    uint normals;
+    uint scenelighting;
+    uint scenelightingonly;
+    float fov;
+    float width;
+    float height;
+    float swap;
+	float frametime;
+    float whitepoint;
+    float gamma;
+    float lightarea;
+    float aperature;
+    float focus;
+} ubo;
+
+layout(binding = 1) uniform SimulationUniformBufferObject { 
+    vec3 minBB;
+    vec3 maxBB;
+} sim_ubo;
+
+layout(binding = 2, rgba8) uniform image2D outputImage;
+
+layout(binding = 3) uniform sampler3D densityImage;
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+Ray create_ray(vec2 rg) {
+	float r = ubo.width / 2.0;
+	float b = ubo.height / 2.0;
+	float l = -1.0 * r;
+	float t = -1.0 * b;
+    float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
+    float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
+	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
+    Ray ray;
+    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+    ray.position = ubo.position;
+    return ray;
+}
+
+vec2 volume_intersect(Ray ray) {
+	vec3 dfrac = 1.0 / ray.direction;
+    vec3 mindif = (sim_ubo.minBB - ray.position)*dfrac;
+    vec3 maxdif = (sim_ubo.maxBB - ray.position)*dfrac;
+	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
+	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
+    if (tmax < 0.0 || tmin > tmax) return vec2(-1.0, -1.0);
+    if (tmin < 0.0) return vec2(0.0, tmax);
+    return vec2(tmin, tmax);
+}
+
+void main() {
+	// create ray generator coordinates
+	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+	
+    // create ray
+    Ray ray = create_ray(vec2(rx, ry));
+
+    vec3 color = vec3(0.0);
+    vec2 raybounds = volume_intersect(ray);
+    float transmit = 1.0;
+    if (raybounds.x >= 0.0) {
+        float t = raybounds.x;
+        while (t < raybounds.y) {
+            vec3 p = ray.position + t * ray.direction;
+            vec3 uvw = (p - sim_ubo.minBB) / (sim_ubo.maxBB - sim_ubo.minBB);
+            float d = texture(densityImage, uvw).r;
+            if (d > EPS) {
+                float extinction = d * 0.2; // TODO: replace 0.2 with absorbtion coeff
+                float steptrans = exp(-extinction * STEPSIZE);
+                color += transmit * (1.0 - steptrans) * vec3(1.0); // TODO: replace vec3 with smokecolor
+                transmit *= steptrans;
+                if (transmit < 0.001) break;
+            }
+            t += STEPSIZE;
+        }
+    }
+
+    // write to image
+	imageStore(outputImage, ivec2(rx, ry), vec4(color, 1.0));
+}

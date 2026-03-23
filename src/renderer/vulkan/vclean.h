@@ -9,6 +9,8 @@ void VCLEAN_Lights(VulkanDataBuffer* lights);
 
 void VCLEAN_BVH(VulkanBVH* bvh);
 
+void VCLEAN_Simulation(VulkanFluidSimulation* vfs);
+
 void VCLEAN_Normals(VulkanDataBuffer* normals);
 
 void VCLEAN_Vertices(VulkanDataBuffer* vertices);

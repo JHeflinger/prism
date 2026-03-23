@@ -35,6 +35,8 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context);
 
 BOOL VINIT_BVH(VulkanBVH* bvh);
 
+BOOL VINIT_Simulation(VulkanFluidSimulation* vfs);
+
 BOOL VINIT_Normals(VulkanDataBuffer* normals);
 
 BOOL VINIT_Vertices(VulkanDataBuffer* vertices);

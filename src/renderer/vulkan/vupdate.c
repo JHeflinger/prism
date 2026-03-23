@@ -9,6 +9,26 @@
 
 Renderer* g_vupdt_renderer_ref = NULL;
 
+void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
+    if (g_vupdt_renderer_ref->geometry.fluid.swapstate) {
+        VUTIL_UploadImage3D(
+            &(vfs->density.image),
+            g_vupdt_renderer_ref->geometry.fluid.dswap,
+            g_vupdt_renderer_ref->geometry.fluid.width,
+            g_vupdt_renderer_ref->geometry.fluid.height,
+            g_vupdt_renderer_ref->geometry.fluid.length,
+            VK_FORMAT_R32_SFLOAT);
+    } else {
+        VUTIL_UploadImage3D(
+            &(vfs->density.image),
+            g_vupdt_renderer_ref->geometry.fluid.density,
+            g_vupdt_renderer_ref->geometry.fluid.width,
+            g_vupdt_renderer_ref->geometry.fluid.height,
+            g_vupdt_renderer_ref->geometry.fluid.length,
+            VK_FORMAT_R32_SFLOAT);
+    }
+}
+
 void VUPDT_Lights(VulkanDataBuffer* lights) {
     if (sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
@@ -219,6 +239,12 @@ void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
                     imageInfos[k].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                     imageInfos[k].imageView = var.data.reference ? *((VkImageView*)var.data.value) : (VkImageView)var.data.value;
                     descriptorWrites[k].pImageInfo = &(imageInfos[k]);
+                } else if (var.type == IMAGE_SAMPLER) {
+                    VulkanImageSampler* vis = (VulkanImageSampler*)(var.data.value);
+                    imageInfos[k].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    imageInfos[k].imageView = vis->image.view;
+                    imageInfos[k].sampler = vis->sampler;
+                    descriptorWrites[k].pImageInfo = &(imageInfos[k]);
                 } else {
                     bufferInfos[k].buffer = var.data.reference ? *((VkBuffer*)var.data.value) : (VkBuffer)var.data.value;
                     bufferInfos[k].offset = 0;
@@ -325,6 +351,18 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         glm_vec3_copy(g_vupdt_renderer_ref->geometry.bounds.min, ubo.minBB);
         glm_vec3_copy(g_vupdt_renderer_ref->geometry.bounds.max, ubo.maxBB);
         memcpy(ubos->geometry_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(GeometryUniformBufferObject));
+    }
+
+    // simulation uniform buffer
+    {
+        SimulationUniformBufferObject ubo = { 0 };
+        ubo.minBB[0] = -(float)(g_vupdt_renderer_ref->geometry.fluid.width) * 0.5f;
+        ubo.minBB[1] = -(float)(g_vupdt_renderer_ref->geometry.fluid.height) * 0.5f;
+        ubo.minBB[2] = -(float)(g_vupdt_renderer_ref->geometry.fluid.length) * 0.5f;
+        ubo.maxBB[0] = (float)(g_vupdt_renderer_ref->geometry.fluid.width) * 0.5f;
+        ubo.maxBB[1] = (float)(g_vupdt_renderer_ref->geometry.fluid.height) * 0.5f;
+        ubo.maxBB[2] = (float)(g_vupdt_renderer_ref->geometry.fluid.length) * 0.5f;
+        memcpy(ubos->simulation_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(SimulationUniformBufferObject));
     }
 }
 

@@ -14,7 +14,7 @@ void LoadArmadillo() {
 }
 
 void LoadCow() {
-    LoadOBJ("assets/models/OBJ/naked/bean.obj");
+    LoadOBJ("assets/models/OBJ/naked/tetrahedron.obj");
     FitCamera();
 }
 

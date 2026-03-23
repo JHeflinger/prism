@@ -61,4 +61,36 @@ void VUTIL_CreateImage(
     VkImageAspectFlags aspectFlags,
     VulkanImage* image);
 
+void VUTIL_UploadImage(
+    VulkanImage* image,
+    void* data,
+    uint32_t width,
+    uint32_t height,
+    VkFormat format);
+
+void VUTIL_CreateImage3D(
+    uint32_t width,
+    uint32_t height,
+    uint32_t length,
+    uint32_t mipLevels,
+    VkSampleCountFlagBits numSamples,
+    VkFormat format,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    VkMemoryPropertyFlags properties,
+    VkImageAspectFlags aspectFlags,
+    VulkanImage* image);
+
+void VUTIL_UploadImage3D(
+    VulkanImage* image,
+    void* data,
+    uint32_t width,
+    uint32_t height,
+    uint32_t length,
+    VkFormat format);
+
+void VUTIL_DestroyImage(VulkanImage image);
+
+VkSampler VUTIL_CreateSampler3D();
+
 #endif

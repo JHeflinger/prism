@@ -67,6 +67,30 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(GeometryUniformBufferObject)
 			},
 		};
+	} else if (strcmp(name, "SimulationUniformBufferObject") == 0) {
+		return (VulkanBoundVariable) {
+			UNIFORM_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.renderdata.ubos.simulation_objects[i].buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					FALSE,
+					(void*)1
+				}, 0.0f,
+				sizeof(SimulationUniformBufferObject)
+			},
+		};
+	} else if (strcmp(name, "densityImage") == 0) {
+		return (VulkanBoundVariable) {
+			IMAGE_SAMPLER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.fluid.density)
+			},
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
+		};
 	} else if (strcmp(name, "RayGeneratorSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,

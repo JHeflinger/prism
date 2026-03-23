@@ -31,10 +31,26 @@ ICEBOX:
 42. Ensure windows compat
 43. bug - stressful geometry operations do eventually break if you play around enough
 44. bug - something is wrong with lighting - best seen by scene lighting only
+45. do cholmod yourself
+46. basic analysis on image sections to determine if need to trace more on it or not so we can prioritize parts of the image that needs more samples
 
 Next:
 2. open files via mini file explorer
-6. do cholmod yourself
+7. bug - some keybinds don't work (save on desktop and load i on laptop) - S is because its entering select mode, shouldn't be transitioning if its not there, because S was earlier in the bind queue its being prioritized
+
+1. make seperate tabs - preview - render - simulate and viewport changes based on that
+
+1. get basic structs up for fluid sim 
+2. get basic ui up for sim
+3. basic render sim
+4. implement sim
+5. dynamic timestep
+6. NOTE WE CANNOT DO GPU IMPLEMENTATION THATS MULTI FRAME BUFFERED AT ALL FOR SIMULATION!!
+7. make update simulation call not flicker and unsmooth, and everything else while you're at it
+8. optimize memory bits and types
+9. surely there must be a way to create a global staging pipeline stage to do all this stuff in-pipeline?
+10. should have a scratch staging buffer that stays alive and is used
+11. also use the correct bits for staging properly based on first upload or consecutive upload
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

@@ -121,6 +121,10 @@ void SavePose();
 
 void RigidDeform();
 
+void UpdateSimulation();
+
+void ClearSimulation();
+
 void SaveRender(const char* filepath);
 
 char* GPUModel();

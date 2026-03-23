@@ -36,9 +36,6 @@ void ImportExecuteScene(const char* scenefile) {
         case DOTOBJ:
             LoadOBJ(scenefile);
             break;
-        case DOTXML:
-            LoadXML(scenefile);
-            break;
         default:
             EZ_ERROR("Unsupported scene file type detected - unable to render");
             CleanExecutor();

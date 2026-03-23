@@ -319,7 +319,7 @@ void VUTIL_CreateImage(
     EZ_ASSERT(result == VK_SUCCESS, "Failed to allocate image memory!");
 
     vkBindImageMemory(g_vutil_renderer_ref->vulkan.core.general.interface, image->image, image->memory, 0);
-    
+
     VkImageViewCreateInfo viewInfo = { 0 };
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = image->image;
@@ -333,4 +333,209 @@ void VUTIL_CreateImage(
 
     result = vkCreateImageView(g_vutil_renderer_ref->vulkan.core.general.interface, &viewInfo, NULL, &(image->view));
     EZ_ASSERT(result == VK_SUCCESS, "failed to create texture image view!");
+}
+
+void VUTIL_UploadImage(
+    VulkanImage* image,
+    void* data,
+    uint32_t width,
+    uint32_t height,
+    VkFormat format) {
+    VUTIL_UploadImage3D(image, data, width, height, 1, format);
+}
+
+void VUTIL_CreateImage3D(
+    uint32_t width,
+    uint32_t height,
+    uint32_t length,
+    uint32_t mipLevels,
+    VkSampleCountFlagBits numSamples,
+    VkFormat format,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    VkMemoryPropertyFlags properties,
+    VkImageAspectFlags aspectFlags,
+    VulkanImage* image) {
+    VkImageCreateInfo imageInfo = { 0 };
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_3D;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = length;
+    imageInfo.mipLevels = mipLevels;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = tiling;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = usage;
+    imageInfo.samples = numSamples;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VkResult result = vkCreateImage(g_vutil_renderer_ref->vulkan.core.general.interface, &imageInfo, NULL, &(image->image));
+    EZ_ASSERT(result == VK_SUCCESS, "Failed to create image!");
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(g_vutil_renderer_ref->vulkan.core.general.interface, image->image, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo = { 0 };
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    Schrodingnum memoryType = VUTIL_FindMemoryType(memRequirements.memoryTypeBits, properties);
+    EZ_ASSERT(memoryType.exists, "Unable to find valid memory type");
+    allocInfo.memoryTypeIndex = memoryType.value;
+    result = vkAllocateMemory(g_vutil_renderer_ref->vulkan.core.general.interface, &allocInfo, NULL, &(image->memory));
+    EZ_ASSERT(result == VK_SUCCESS, "Failed to allocate image memory!");
+
+    vkBindImageMemory(g_vutil_renderer_ref->vulkan.core.general.interface, image->image, image->memory, 0);
+
+    VkImageViewCreateInfo viewInfo = { 0 };
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image->image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = mipLevels;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    result = vkCreateImageView(g_vutil_renderer_ref->vulkan.core.general.interface, &viewInfo, NULL, &(image->view));
+    EZ_ASSERT(result == VK_SUCCESS, "Failed to create texture image view!");
+}
+
+void VUTIL_UploadImage3D(
+    VulkanImage* image,
+    void* data,
+    uint32_t width,
+    uint32_t height,
+    uint32_t length,
+    VkFormat format) {
+    uint32_t bytesPerPixel;
+    switch (format) {
+        case VK_FORMAT_R32_SFLOAT: bytesPerPixel = 4; break;
+        case VK_FORMAT_R32G32_SFLOAT: bytesPerPixel = 8; break;
+        case VK_FORMAT_R32G32B32A32_SFLOAT: bytesPerPixel = 16; break;
+        case VK_FORMAT_R8_UNORM: bytesPerPixel = 1; break;
+        case VK_FORMAT_R8G8B8A8_UNORM: bytesPerPixel = 4; break;
+        default:
+            EZ_ASSERT(0, "Unsupported format");
+            return;
+    }
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingMemory;
+    VkDeviceSize totalBytes = (VkDeviceSize)width * height * length * bytesPerPixel;
+    VkBufferCreateInfo bufInfo = { 0 };
+    bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufInfo.size = totalBytes;
+    bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VkResult result = vkCreateBuffer(g_vutil_renderer_ref->vulkan.core.general.interface, &bufInfo, NULL, &stagingBuffer);
+    EZ_ASSERT(result == VK_SUCCESS, "Failed to create staging buffer");
+
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements(g_vutil_renderer_ref->vulkan.core.general.interface, stagingBuffer, &memReqs);
+    VkMemoryAllocateInfo allocInfo = { 0 };
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memReqs.size;
+    Schrodingnum memType = VUTIL_FindMemoryType(
+        memReqs.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    EZ_ASSERT(memType.exists, "Failed to find staging memory type");
+    allocInfo.memoryTypeIndex = memType.value;
+    result = vkAllocateMemory(g_vutil_renderer_ref->vulkan.core.general.interface, &allocInfo, NULL, &stagingMemory);
+    EZ_ASSERT(result == VK_SUCCESS, "Failed to allocate staging memory");
+
+    vkBindBufferMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingBuffer, stagingMemory, 0);
+    void *mapped;
+    vkMapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingMemory, 0, totalBytes, 0, &mapped);
+    memcpy(mapped, data, (size_t)totalBytes);
+    vkUnmapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingMemory);
+    VkCommandBuffer cmd = VUTIL_BeginSingleTimeCommands();
+    VkImageMemoryBarrier toTransfer = { 0 };
+    toTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    toTransfer.srcAccessMask = 0;
+    toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    toTransfer.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransfer.image = image->image;
+    toTransfer.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    toTransfer.subresourceRange.baseMipLevel = 0;
+    toTransfer.subresourceRange.levelCount = 1;
+    toTransfer.subresourceRange.baseArrayLayer = 0;
+    toTransfer.subresourceRange.layerCount = 1;
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0, 0, NULL, 0, NULL, 1, &toTransfer);
+
+    VkBufferImageCopy region = { 0 };
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;  // tightly packed
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = (VkOffset3D){ 0, 0, 0 };
+    region.imageExtent = (VkExtent3D){ width, height, length };
+    vkCmdCopyBufferToImage(cmd,
+        stagingBuffer,
+        image->image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1, &region);
+
+    VkImageMemoryBarrier toShader = { 0 };
+    toShader.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    toShader.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    toShader.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    toShader.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    toShader.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    toShader.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toShader.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toShader.image = image->image;
+    toShader.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    toShader.subresourceRange.baseMipLevel = 0;
+    toShader.subresourceRange.levelCount = 1;
+    toShader.subresourceRange.baseArrayLayer = 0;
+    toShader.subresourceRange.layerCount = 1;
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, NULL, 0, NULL, 1, &toShader);
+    VUTIL_EndSingleTimeCommands(cmd);
+
+    vkDestroyBuffer(g_vutil_renderer_ref->vulkan.core.general.interface, stagingBuffer, NULL);
+    vkFreeMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingMemory, NULL);
+}
+
+void VUTIL_DestroyImage(VulkanImage image) {
+    vkDestroyImageView(g_vutil_renderer_ref->vulkan.core.general.interface, image.view, NULL);
+    vkDestroyImage(g_vutil_renderer_ref->vulkan.core.general.interface, image.image, NULL);
+    vkFreeMemory(g_vutil_renderer_ref->vulkan.core.general.interface, image.memory, NULL);
+}
+
+VkSampler VUTIL_CreateSampler3D() {
+    VkSamplerCreateInfo info = { 0 };
+    info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    info.magFilter= VK_FILTER_LINEAR;
+    info.minFilter= VK_FILTER_LINEAR;
+    info.mipmapMode= VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    info.mipLodBias = 0.0f;
+    info.anisotropyEnable = VK_FALSE;
+    info.compareEnable = VK_FALSE;
+    info.minLod = 0.0f;
+    info.maxLod = 0.0f;
+    info.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+    info.unnormalizedCoordinates = VK_FALSE;
+    VkSampler sampler;
+    VkResult result = vkCreateSampler(
+        g_vutil_renderer_ref->vulkan.core.general.interface,
+        &info, NULL, &sampler);
+    EZ_ASSERT(result == VK_SUCCESS, "Failed to create sampler");
+    return sampler;
 }

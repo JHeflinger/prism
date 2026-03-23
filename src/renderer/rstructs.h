@@ -34,10 +34,10 @@ DECLARE_ARR_ARRLIST(vec3);
 DECLARE_HASHMAP(VertexID, BOOL, Locks);
 DECLARE_HASHMAP(Edge, EdgeMeta, EdgeGlue);
 
-#define PREVIEW_PIPELINE_FLAGS   0b110011111111
-#define PATHTRACE_PIPELINE_FLAGS 0b111101111111
-#define HEADLESS_PIPELINE_FLAGS  0b001101111111
-#define BVH_PIPELINE_FLAGS       0b000001111111
+#define PREVIEW_PIPELINE_FLAGS   0b1101001111111 //0b1100011111111
+#define PATHTRACE_PIPELINE_FLAGS 0b1110101111111
+#define HEADLESS_PIPELINE_FLAGS  0b0010101111111
+#define BVH_PIPELINE_FLAGS       0b0000001111111
 #define CENTROID_SHADER_FLAG     0b1
 #define HISTOGRAM_SHADER_FLAG    0b10
 #define HISTORY_SHADER_FLAG      0b100
@@ -47,9 +47,10 @@ DECLARE_HASHMAP(Edge, EdgeMeta, EdgeGlue);
 #define REBIND_SHADER_FLAG       0b1000000
 #define DEFAULT_SHADER_FLAG      0b10000000
 #define PATHTRACE_SHADER_FLAG    0b100000000
-#define TONEMAP_SHADER_FLAG      0b1000000000
-#define ANALYZE_SHADER_FLAG      0b10000000000
-#define OVERLAY_SHADER_FLAG      0b100000000000
+#define FLUID_SHADER_FLAG        0b1000000000
+#define TONEMAP_SHADER_FLAG      0b10000000000
+#define ANALYZE_SHADER_FLAG      0b100000000000
+#define OVERLAY_SHADER_FLAG      0b1000000000000
 
 typedef uint32_t PipelineFlags;
 
@@ -123,11 +124,13 @@ typedef struct {
     size_t max_emissives;
     size_t max_materials;
     size_t max_lights;
+    size_t max_sim_size;
     BOOL update_normals;
     BOOL update_vertices;
     BOOL update_triangles;
     BOOL update_materials;
     BOOL update_lights;
+    BOOL update_simulation;
     size_t update_bvh;
 } ChangeSet;
 
@@ -214,6 +217,24 @@ typedef struct {
 } ARAPData;
 
 typedef struct {
+    float timestep;
+    float diffusion;
+    float dissipation;
+    float viscosity;
+    size_t width;
+    size_t length;
+    size_t height;
+    size_t iterations;
+    vec3* velocity;
+    vec3* vswap;
+    float* density;
+    float* dswap;
+    BOOL swapstate;
+} FluidSimulation;
+#define SimSize(fs) (((fs).width+2)*((fs).length+2)*((fs).height+2))
+#define SimIndex(fs, x, y, z) ((x) + ((fs).width + 2)*(y) + ((fs).length + 2)*((fs).height + 2)*(z))
+
+typedef struct {
     ManifoldMesh manifold;
     ARRLIST_vec4 vertices;
     ARRLIST_vec4 normals;
@@ -227,6 +248,7 @@ typedef struct {
     HASHMAP_EdgeGlue glue;
     ARRLIST_Edge edges;
     ARAPData arap;
+    FluidSimulation fluid;
     float lightarea;
     ChangeSet changes;
     AxisAlignedBoundingBox bounds;

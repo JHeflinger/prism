@@ -274,6 +274,33 @@ void InitializeRenderer() {
     g_renderer.config.arap.cube_rho = 1e-4f;
     g_renderer.config.arap.addm = 5;
 
+    // initialize sim
+    g_renderer.geometry.fluid.timestep = 0.1f;
+    g_renderer.geometry.fluid.diffusion = 0.01;
+    g_renderer.geometry.fluid.dissipation = 0.001f;
+    g_renderer.geometry.fluid.viscosity = 0.0001f;
+    g_renderer.geometry.fluid.iterations = 20;
+
+    // TODO: KILLLLL
+    {
+        g_renderer.geometry.fluid.width = 100;
+        g_renderer.geometry.fluid.length = 100;
+        g_renderer.geometry.fluid.height = 100;
+        size_t ss = SimSize(g_renderer.geometry.fluid);
+        g_renderer.geometry.fluid.velocity = EZ_ALLOC(ss, sizeof(vec3));
+        g_renderer.geometry.fluid.vswap = EZ_ALLOC(ss, sizeof(vec3));
+        g_renderer.geometry.fluid.density = EZ_ALLOC(ss, sizeof(float));
+        g_renderer.geometry.fluid.dswap = EZ_ALLOC(ss, sizeof(float));
+        for (size_t i = 0; i < 102; i++) {
+            for (size_t j = 0; j < 102; j++) {
+                for (size_t k = 0; k < 102; k++) {
+                    g_renderer.geometry.fluid.density[SimIndex(g_renderer.geometry.fluid, i, j, k)] = 1.0f;
+                }
+            }
+        }
+        UpdateSimulation();
+    }
+
     // initialize min/max BB
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
     SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
@@ -336,6 +363,7 @@ void DestroyRenderer() {
     ClearLights();
     CleanManifoldMesh(&(g_renderer.geometry.manifold));
     CleanARAP();
+    ClearSimulation();
 
     // destroy cholmod
     cholmod_finish(&g_cholmod);
@@ -357,14 +385,26 @@ void MoveCamera(SimpleCamera camera) {
 }
 
 void FitCamera() {
-    if (g_renderer.geometry.bounds.min[0] >= g_renderer.geometry.bounds.max[0]) return;
+    vec3 min, max;
+    if (g_renderer.config.flags & FLUID_SHADER_FLAG) {
+        min[0] = -(float)(g_renderer.geometry.fluid.width) * 0.5f;
+        min[1] = -(float)(g_renderer.geometry.fluid.height) * 0.5f;
+        min[2] = -(float)(g_renderer.geometry.fluid.length) * 0.5f;
+        max[0] = (float)(g_renderer.geometry.fluid.width) * 0.5f;
+        max[1] = (float)(g_renderer.geometry.fluid.height) * 0.5f;
+        max[2] = (float)(g_renderer.geometry.fluid.length) * 0.5f;
+    } else {
+        glm_vec3_copy(g_renderer.geometry.bounds.min, min);
+        glm_vec3_copy(g_renderer.geometry.bounds.max, max);
+    }
+    if (min[0] >= max[0]) return;
     vec3 l2p;
     glm_vec3_sub(g_renderer.camera.position, g_renderer.camera.look, l2p);
     glm_vec3_normalize(l2p);
     vec3 extend, min2o, newo;
-    glm_vec3_sub(g_renderer.geometry.bounds.max, g_renderer.geometry.bounds.min, extend);
+    glm_vec3_sub(max, min, extend);
     glm_vec3_scale(extend, 0.5f, min2o);
-    glm_vec3_add(min2o, g_renderer.geometry.bounds.min, newo);
+    glm_vec3_add(min2o, min, newo);
     float width = glm_vec3_norm(extend);
     glm_vec3_copy(newo, g_renderer.camera.look);
     glm_vec3_scale(l2p, width, l2p);
@@ -576,7 +616,8 @@ void Render() {
             g_renderer.geometry.changes.update_materials |
             g_renderer.geometry.changes.update_lights |
             g_renderer.geometry.changes.update_vertices |
-            g_renderer.geometry.changes.update_normals;
+            g_renderer.geometry.changes.update_normals |
+            g_renderer.geometry.changes.update_simulation;
 
         // set bvh reconstruction
         if (g_renderer.geometry.changes.update_vertices || g_renderer.geometry.changes.update_triangles)
@@ -655,6 +696,19 @@ void Render() {
                 VINIT_Lights(&(g_renderer.vulkan.core.geometry.lights));
             } else {
                 VUPDT_Lights(&(g_renderer.vulkan.core.geometry.lights));
+            }
+        }
+
+        // update simulation if needed
+        if (g_renderer.geometry.changes.update_simulation) {
+            g_renderer.geometry.changes.update_simulation = FALSE;
+            if (g_renderer.geometry.changes.max_sim_size != SimSize(g_renderer.geometry.fluid)) {
+                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                g_renderer.geometry.changes.max_sim_size = SimSize(g_renderer.geometry.fluid);
+                VCLEAN_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
+                VINIT_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
+            } else {
+                VUPDT_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
             }
         }
 
@@ -1060,6 +1114,19 @@ void RigidDeform() {
         }
         cholmod_free_dense(&b_dense, &g_cholmod);
         cholmod_free_dense(&x_dense, &g_cholmod);
+    }
+}
+
+void UpdateSimulation() {
+    g_renderer.geometry.changes.update_simulation = TRUE;
+}
+
+void ClearSimulation() {
+    if (g_renderer.geometry.fluid.velocity != NULL) {
+        EZ_FREE(g_renderer.geometry.fluid.velocity);
+        EZ_FREE(g_renderer.geometry.fluid.vswap);
+        EZ_FREE(g_renderer.geometry.fluid.density);
+        EZ_FREE(g_renderer.geometry.fluid.dswap);
     }
 }
 

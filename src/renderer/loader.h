@@ -5,8 +5,6 @@
 
 BOOL LoadOBJ(const char* filepath);
 
-BOOL LoadXML(const char* filepath);
-
 BOOL LoadScene(const char* filepath);
 
 #endif

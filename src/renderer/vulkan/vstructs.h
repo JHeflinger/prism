@@ -56,6 +56,11 @@ typedef struct {
 } GeometryUniformBufferObject;
 
 typedef struct {
+    alignas(16) vec3 minBB;
+    alignas(16) vec3 maxBB;
+} SimulationUniformBufferObject;
+
+typedef struct {
     alignas(4) uint32_t mouse_x;
     alignas(4) uint32_t mouse_y;
 	alignas(4) uint32_t image_width;
@@ -86,9 +91,11 @@ typedef struct {
     VulkanDataBuffer objects[CPUSWAP_LENGTH];
     VulkanDataBuffer overlay_objects[CPUSWAP_LENGTH];
     VulkanDataBuffer geometry_objects[CPUSWAP_LENGTH];
+    VulkanDataBuffer simulation_objects[CPUSWAP_LENGTH];
     void* mapped[CPUSWAP_LENGTH];
     void* overlay_mapped[CPUSWAP_LENGTH];
     void* geometry_mapped[CPUSWAP_LENGTH];
+    void* simulation_mapped[CPUSWAP_LENGTH];
 } UBOArray;
 
 typedef struct {
@@ -150,6 +157,15 @@ typedef struct {
 } VulkanBVH;
 
 typedef struct {
+    VulkanImage image;
+    VkSampler sampler;
+} VulkanImageSampler;
+
+typedef struct {
+    VulkanImageSampler density;
+} VulkanFluidSimulation;
+
+typedef struct {
     VulkanBVH bvh;
     VulkanDataBuffer normals;
     VulkanDataBuffer vertices;
@@ -157,6 +173,7 @@ typedef struct {
     VulkanDataBuffer emissives;
     VulkanDataBuffer materials;
     VulkanDataBuffer lights;
+    VulkanFluidSimulation fluid;
 } VulkanGeometry;
 
 typedef struct {
@@ -167,6 +184,7 @@ typedef enum {
 	UNIFORM_BUFFER = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 	STORAGE_BUFFER = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 	STORAGE_IMAGE = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+    IMAGE_SAMPLER = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 } VulkanVariableType;
 
 typedef struct {
