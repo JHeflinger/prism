@@ -17,4 +17,6 @@ void CleanPopup(Popup* popup);
 
 Popup* GenerateAddObjectPopup();
 
+Popup* GenerateAddSimObjectPopup();
+
 #endif

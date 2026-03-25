@@ -5,6 +5,8 @@
 
 #define SETVEC3(v, x, y, z) {v[0] = x; v[1] = y; v[2] = z;}
 #define CLAMP(x, min, max) (x < min ? min : (x > max ? max : x))
+#define MIN(x, y) (x < y ? x : y)
+#define MAX(x, y) (x > y ? x : y)
 
 float TriangleArea(vec3 a, vec3 b, vec3 c);
 

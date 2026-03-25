@@ -53,9 +53,6 @@ void DevInitialize() {
     AddBind("screenshot", Screenshot,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_S_OVERRIDE, BIND_KEY_PRESSED });
-    AddBind("simulate", UpdateSimulation,
-        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
-        (BindCommand){ IK_O_OVERRIDE, BIND_KEY_END });
 }
 
 void DevUpdate() {}

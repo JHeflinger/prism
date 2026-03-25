@@ -34,23 +34,24 @@ DECLARE_ARR_ARRLIST(vec3);
 DECLARE_HASHMAP(VertexID, BOOL, Locks);
 DECLARE_HASHMAP(Edge, EdgeMeta, EdgeGlue);
 
-#define PREVIEW_PIPELINE_FLAGS   0b1101001111111 //0b1100011111111
-#define PATHTRACE_PIPELINE_FLAGS 0b1110101111111
-#define HEADLESS_PIPELINE_FLAGS  0b0010101111111
-#define BVH_PIPELINE_FLAGS       0b0000001111111
-#define CENTROID_SHADER_FLAG     0b1
-#define HISTOGRAM_SHADER_FLAG    0b10
-#define HISTORY_SHADER_FLAG      0b100
-#define SCATTER_SHADER_FLAG      0b1000
-#define LEAVES_SHADER_FLAG       0b10000
-#define BVH_SHADER_FLAG          0b100000
-#define REBIND_SHADER_FLAG       0b1000000
-#define DEFAULT_SHADER_FLAG      0b10000000
-#define PATHTRACE_SHADER_FLAG    0b100000000
-#define FLUID_SHADER_FLAG        0b1000000000
-#define TONEMAP_SHADER_FLAG      0b10000000000
-#define ANALYZE_SHADER_FLAG      0b100000000000
-#define OVERLAY_SHADER_FLAG      0b1000000000000
+#define PREVIEW_PIPELINE_FLAGS    0b1100011111111
+#define SIMULATE_PIPELINE_FLAGS   0b0001000000000
+#define PATHTRACE_PIPELINE_FLAGS  0b1110101111111
+#define HEADLESS_PIPELINE_FLAGS   0b0010101111111
+#define BVH_PIPELINE_FLAGS        0b0000001111111
+#define CENTROID_SHADER_FLAG      0b1
+#define HISTOGRAM_SHADER_FLAG     0b10
+#define HISTORY_SHADER_FLAG       0b100
+#define SCATTER_SHADER_FLAG       0b1000
+#define LEAVES_SHADER_FLAG        0b10000
+#define BVH_SHADER_FLAG           0b100000
+#define REBIND_SHADER_FLAG        0b1000000
+#define DEFAULT_SHADER_FLAG       0b10000000
+#define PATHTRACE_SHADER_FLAG     0b100000000
+#define FLUID_SHADER_FLAG         0b1000000000
+#define TONEMAP_SHADER_FLAG       0b10000000000
+#define ANALYZE_SHADER_FLAG       0b100000000000
+#define OVERLAY_SHADER_FLAG       0b1000000000000
 
 typedef uint32_t PipelineFlags;
 
@@ -217,6 +218,31 @@ typedef struct {
 } ARAPData;
 
 typedef struct {
+    size_t width;
+    size_t height;
+    size_t length;
+    size_t x;
+    size_t y;
+    size_t z;
+    float density;
+    float lifetime;
+    float timer;
+} FluidSource;
+DECLARE_ARRLIST(FluidSource);
+
+typedef struct {
+    BOOL global;
+    size_t width;
+    size_t height;
+    size_t length;
+    size_t x;
+    size_t y;
+    size_t z;
+    vec3 force;
+} FluidForce;
+DECLARE_ARRLIST(FluidForce);
+
+typedef struct {
     float timestep;
     float diffusion;
     float dissipation;
@@ -225,13 +251,16 @@ typedef struct {
     size_t length;
     size_t height;
     size_t iterations;
-    vec3* forces;
     vec3* velocity;
     vec3* vswap;
     float* density;
     float* dswap;
     float* pressure;
     float* divergence;
+    ARRLIST_FluidForce forces;
+    ARRLIST_FluidSource sources;
+    ARRLIST_DynamicString forcenames;
+    ARRLIST_DynamicString sourcenames;
 } FluidSimulation;
 #define SimSize(fs) (((fs).width+2)*((fs).length+2)*((fs).height+2))
 #define SimIndex(fs, x, y, z) ((x) + ((fs).length + 2)*(z) + ((fs).length + 2)*((fs).width + 2)*(y))

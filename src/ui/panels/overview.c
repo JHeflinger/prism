@@ -7,12 +7,18 @@ void DrawOverviewPanel(float width, float height) {
     UIDrawText("Add To Scene...");
     UIMoveCursor(width - 45, -20);
     if (UIButton("+", 0)) {
-        UIPopup(GenerateAddObjectPopup());
+        UIPopup(RenderConfig()->flags & FLUID_SHADER_FLAG ? GenerateAddSimObjectPopup() : GenerateAddObjectPopup());
     }
     UIDivider(width - 20);
-    UIDropList("Materials", width - 20, NumMaterials(), MaterialNameReference(0), SetEditMaterial);
-    UIMoveCursor(0, 5);
-    UIDropList("Lights", width - 20, NumLights(), LightNameReference(0), SetEditLight);
+    if (RenderConfig()->flags & FLUID_SHADER_FLAG) {
+        UIDropList("Forces", width - 20, NumForces(), ForceNameReference(0), SetEditForce);
+        UIMoveCursor(0, 5);
+        UIDropList("Sources", width - 20, NumSources(), SourceNameReference(0), SetEditSource);
+    } else {
+        UIDropList("Materials", width - 20, NumMaterials(), MaterialNameReference(0), SetEditMaterial);
+        UIMoveCursor(0, 5);
+        UIDropList("Lights", width - 20, NumLights(), LightNameReference(0), SetEditLight);
+    }
 }
 
 Panel GenerateOverviewPanel() {

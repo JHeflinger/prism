@@ -114,6 +114,14 @@ BOOL UIDragUIntLabeled_(PersistantUIData* data, const char* label, uint32_t* val
 #define UIDragUIntLabeled(label, value, min, max, speed, w) \
     PERSISTANT_UI(UIDragUIntLabeled_, label, value, min, max, speed, w)
 
+BOOL UIDragSize_(PersistantUIData* data, size_t* value, size_t min, size_t max, size_t speed, size_t w);
+#define UIDragSize(value, min, max, speed, w) \
+    PERSISTANT_UI(UIDragSize_, value, min, max, speed, w)
+
+BOOL UIDragSizeLabeled_(PersistantUIData* data, const char* label, size_t* value, size_t min, size_t max, size_t speed, size_t w);
+#define UIDragSizeLabeled(label, value, min, max, speed, w) \
+    PERSISTANT_UI(UIDragSizeLabeled_, label, value, min, max, speed, w)
+
 BOOL UIButton(const char* label, size_t w);
 
 void UIPopup(Popup* popup);
@@ -135,5 +143,9 @@ void UIDropdownMenu_(PersistantUIData* data, size_t width, size_t num_items, cha
 void UITextInput_(PersistantUIData* data, const char* label, char* buffer, size_t size, size_t width);
 #define UITextInput(label, buffer, size, width) \
     PERSISTANT_UI(UITextInput_, label, buffer, size, width)
+
+void DisableUI();
+
+void EnableUI();
 
 #endif

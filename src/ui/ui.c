@@ -47,6 +47,7 @@ BOOL g_was_ui_element_just_used = FALSE;
 RenderTexture2D g_ui_scratch_target = { 0 };
 RenderTexture2D g_current_ui_target = { 0 };
 BOOL g_scratch_target_in_use = FALSE;
+BOOL g_ui_disabled = FALSE;
 
 #define LINE_HEIGHT 20
 #define NAMEBAR_HEIGHT 25
@@ -390,7 +391,9 @@ void UIDrawText(const char* text, ...) {
     va_list args;
     va_start(args, text);
     vsnprintf(g_ui_text_buffer, MAX_LINE_WIDTH - 1, text, args);
-    DrawTextEx(FontAsset(), g_ui_text_buffer, g_ui_cursor, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+    DrawTextEx(
+        FontAsset(), g_ui_text_buffer, g_ui_cursor, LINE_HEIGHT, 0, 
+        g_ui_disabled ? MappedColor(UI_TEXT_DISABLED) : MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
 }
@@ -406,7 +409,7 @@ void UIDrawSubtleText(const char* text, ...) {
 
 BOOL UIDragFloat_(PersistantUIData* data, float* value, float min, float max, float speed, size_t w) {
     BOOL ret = FALSE;
-    if (InputButtonPressed(IK_MOUSELEFT) &&
+    if (!g_ui_disabled && InputButtonPressed(IK_MOUSELEFT) &&
         CheckCollisionPointRec(
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, w, LINE_HEIGHT - 4})) {
@@ -423,8 +426,12 @@ BOOL UIDragFloat_(PersistantUIData* data, float* value, float min, float max, fl
     char buffer[32] = { 0 };
     snprintf(buffer, 32, "%.3f", *value);
     Vector2 text_size = MeasureTextEx(FontAsset(), buffer, LINE_HEIGHT, 0);
-    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 1, w, LINE_HEIGHT - 2, MappedColor(UI_DRAG_FLOAT_COLOR));
-    DrawTextEx(FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+    DrawRectangle(
+        g_ui_cursor.x, g_ui_cursor.y + 1, w, LINE_HEIGHT - 2,
+        g_ui_disabled ? MappedColor(UI_BOX_DISABLED) : MappedColor(UI_DRAG_FLOAT_COLOR));
+    DrawTextEx(
+        FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0, 
+        g_ui_disabled ? MappedColor(UI_TEXT_DISABLED) : MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
     return ret;
@@ -520,6 +527,46 @@ BOOL UIDragUIntLabeled_(PersistantUIData* data, const char* label, uint32_t* val
     float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
     UIMoveCursor(xdif + 5, -LINE_HEIGHT);
     return UIDragUInt_(data, value, min, max, speed, w - 5 - xdif);
+}
+
+BOOL UIDragSize_(PersistantUIData* data, size_t* value, size_t min, size_t max, size_t speed, size_t w) {
+    BOOL ret = FALSE;
+    if (!g_ui_disabled && InputButtonPressed(IK_MOUSELEFT) &&
+        CheckCollisionPointRec(
+            GetMousePosition(),
+            (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 2, w, LINE_HEIGHT - 4})) {
+        g_active_ui_element = data;
+    }
+    if (g_active_ui_element == data) {
+        size_t prev = *value;
+        if (GetMouseDelta().x * speed < 0 && GetMouseDelta().x * speed * -1 > *value)
+            *value = 0;
+        else
+            *value += GetMouseDelta().x * speed;
+        if (*value < min) *value = min;
+        if (*value > max) *value = max;
+        if (prev != *value) ret = TRUE;
+        g_was_ui_element_just_used = TRUE;
+    }
+    char buffer[32] = { 0 };
+    snprintf(buffer, 32, "%llu", (long long unsigned int)(*value));
+    Vector2 text_size = MeasureTextEx(FontAsset(), buffer, LINE_HEIGHT, 0);
+    DrawRectangle(
+        g_ui_cursor.x, g_ui_cursor.y + 1, w, LINE_HEIGHT - 2,
+        g_ui_disabled ? MappedColor(UI_BOX_DISABLED) : MappedColor(UI_DRAG_INT_COLOR));
+    DrawTextEx(
+        FontAsset(), buffer, (Vector2){ g_ui_cursor.x + (w/2) - (text_size.x/2), g_ui_cursor.y }, LINE_HEIGHT, 0,
+        g_ui_disabled ? MappedColor(UI_TEXT_DISABLED) : MappedColor(UI_TEXT_COLOR));
+    g_ui_cursor.y += LINE_HEIGHT;
+    g_ui_cursor.x = 10;
+    return ret;
+}
+
+BOOL UIDragSizeLabeled_(PersistantUIData* data, const char* label, size_t* value, size_t min, size_t max, size_t speed, size_t w) {
+    UIDrawText(label);
+    float xdif = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x;
+    UIMoveCursor(xdif + 5, -LINE_HEIGHT);
+    return UIDragSize_(data, value, min, max, speed, w - 5 - xdif);
 }
 
 BOOL UIButton(const char* label, size_t w) {
@@ -692,4 +739,12 @@ void UITextInput_(PersistantUIData* data, const char* label, char* buffer, size_
     }
     g_ui_cursor.x = 10;
     g_ui_cursor.y += LINE_HEIGHT;
+}
+
+void DisableUI() {
+    g_ui_disabled = TRUE;
+}
+
+void EnableUI() {
+    g_ui_disabled = FALSE;
 }

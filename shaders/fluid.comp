@@ -92,10 +92,12 @@ void main() {
         float t = raybounds.x;
         while (t < raybounds.y) {
             vec3 p = ray.position + t * ray.direction;
-            vec3 uvw = (p - sim_ubo.minBB) / (sim_ubo.maxBB - sim_ubo.minBB);
+            vec3 dmin = sim_ubo.minBB - vec3(1);
+            vec3 dmax = sim_ubo.maxBB + vec3(1);
+            vec3 uvw = (p - dmin) / (dmax - dmin);
             float d = texture(densityImage, uvw).r;
             if (d > EPS) {
-                float extinction = d * 0.9; // TODO: replace 0.2 with absorbtion coeff
+                float extinction = d * 0.05; // TODO: replace 0.2 with absorbtion coeff
                 float steptrans = exp(-extinction * STEPSIZE);
                 color += transmit * (1.0 - steptrans) * vec3(1.0); // TODO: replace vec3 with smokecolor
                 transmit *= steptrans;

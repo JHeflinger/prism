@@ -10,9 +10,11 @@
 Renderer* g_vupdt_renderer_ref = NULL;
 
 void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
+    float temp[8] = { 0 };
+    size_t ss = SimSize(g_vupdt_renderer_ref->geometry.fluid);
     VUTIL_UploadImage3D(
         &(vfs->density.image),
-        g_vupdt_renderer_ref->geometry.fluid.density,
+        ss > 8 ? g_vupdt_renderer_ref->geometry.fluid.density : temp,
         g_vupdt_renderer_ref->geometry.fluid.width + 2,
         g_vupdt_renderer_ref->geometry.fluid.height + 2,
         g_vupdt_renderer_ref->geometry.fluid.length + 2,

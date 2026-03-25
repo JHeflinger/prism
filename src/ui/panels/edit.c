@@ -11,6 +11,8 @@ typedef enum {
     EDIT_LIGHT,
     EDIT_SINGLE_TRIANGLE,
     EDIT_SINGLE_VERTEX,
+    EDIT_SINGLE_FORCE,
+    EDIT_SINGLE_SOURCE
 } EditType;
 
 size_t g_edit_item_index = 0;
@@ -46,6 +48,22 @@ void SetEditVertex(size_t index) {
     g_edit_item_index = index;
     g_edit_type = EDIT_SINGLE_VERTEX;
     SetSelectedTriangle((TriangleID)-1);
+}
+
+void SetEditForce(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_SINGLE_FORCE;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((TriangleID)-1);
+}
+
+void SetEditSource(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_SINGLE_SOURCE;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((TriangleID)-1);
 }
 
 void DeselectEditTarget() {
@@ -363,6 +381,15 @@ void DrawEditPanel(float width, float height) {
             }
             UIMoveCursor((width - 20 - 200) / 2.0f, 0);
             if (UIButton("Delete", 200)) EZ_WARN("This functionality is not implemented yet");
+        } else if (g_edit_type == EDIT_SINGLE_SOURCE) {
+            BOOL edited = FALSE;
+            UIMoveCursor((width - 20 - UITextWidth("Edit Source")) / 2.0f, 0);
+            UIDrawText("Edit Source");
+            UIMoveCursor(0, 15);
+            UITextInput("Name", *(SourceNameReference(g_edit_item_index)), MAX_SOURCE_NAME_SIZE, width - 20);
+            UIMoveCursor(0, 15);
+        } else if (g_edit_type == EDIT_SINGLE_FORCE) {
+
         } else {
             EZ_FATAL("Unhandled edit type detected");
         }

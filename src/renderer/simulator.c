@@ -127,12 +127,49 @@ void SetVelocityBoundary(vec3 *v, FluidSimulation* fsim) {
     #undef CORNER3
 }
 
-void AddForce(vec3* v, vec3* f, FluidSimulation* fsim) {
-    size_t ss = SimSize(*fsim);
-    for (size_t i = 0; i < ss; i++) {
-        v[i][0] += fsim->timestep * f[i][0];
-        v[i][1] += fsim->timestep * f[i][1];
-        v[i][2] += fsim->timestep * f[i][2];
+void AddForce(vec3* v, FluidForce f, FluidSimulation* fsim) {
+    if (f.global) {
+        size_t ss = SimSize(*fsim);
+        for (size_t i = 0; i < ss; i++) {
+            v[i][0] += fsim->timestep * f.force[0];
+            v[i][1] += fsim->timestep * f.force[1];
+            v[i][2] += fsim->timestep * f.force[2];
+        }
+    } else {
+        size_t minx = MIN(f.x + 1, fsim->width - 1);
+        size_t miny = MIN(f.y + 1, fsim->height - 1);
+        size_t minz = MIN(f.z + 1, fsim->length - 1);
+        size_t maxx = MIN(f.x + f.width + 1, fsim->width - 1);
+        size_t maxy = MIN(f.y + f.height + 1, fsim->height - 1);
+        size_t maxz = MIN(f.z + f.length + 1, fsim->length - 1);
+        for (size_t i = minx; i < maxx; i++) {
+            for (size_t j = miny; j < maxy; j++) {
+                for (size_t k = minz; k < maxz; k++) {
+                    v[IND(i, j, k)][0] += fsim->timestep * f.force[0];
+                    v[IND(i, j, k)][1] += fsim->timestep * f.force[1];
+                    v[IND(i, j, k)][2] += fsim->timestep * f.force[2];
+                }
+            }
+        }
+    }
+}
+
+void AddSource(float* d, FluidSource* s, FluidSimulation* fsim) {
+    if (s->timer > 0) {
+        s->timer -= fsim->timestep;
+        size_t minx = MIN(s->x + 1, fsim->width - 1);
+        size_t miny = MIN(s->y + 1, fsim->height - 1);
+        size_t minz = MIN(s->z + 1, fsim->length - 1);
+        size_t maxx = MIN(s->x + s->width + 1, fsim->width - 1);
+        size_t maxy = MIN(s->y + s->height + 1, fsim->height - 1);
+        size_t maxz = MIN(s->z + s->length + 1, fsim->length - 1);
+        for (size_t i = minx; i < maxx; i++) {
+            for (size_t j = miny; j < maxy; j++) {
+                for (size_t k = minz; k < maxz; k++) {
+                    d[IND(i, j, k)] += fsim->timestep * s->density;
+                }
+            }
+        }
     }
 }
 
@@ -311,7 +348,8 @@ void TransportDensity(float* dest, float* src, FluidSimulation* fsim) {
 }
 
 void StepVelocity(FluidSimulation* fsim) {
-    AddForce(fsim->velocity, fsim->forces, fsim);
+    for (size_t i = 0; i < fsim->forces.size; i++)
+        AddForce(fsim->velocity, fsim->forces.data[i], fsim);
     SimSwapV(*fsim);
     TransportVelocity(fsim->velocity, fsim->vswap, fsim);
     SimSwapV(*fsim);
@@ -320,6 +358,8 @@ void StepVelocity(FluidSimulation* fsim) {
 }
 
 void StepDensity(FluidSimulation* fsim) {
+    for (size_t i = 0; i < fsim->sources.size; i++)
+        AddSource(fsim->density, &(fsim->sources.data[i]), fsim);
     SimSwapD(*fsim);
     DiffuseDensity(fsim->density, fsim->dswap, fsim);
     SimSwapD(*fsim);

@@ -123,7 +123,25 @@ void RigidDeform();
 
 void UpdateSimulation();
 
+void StepSimulation();
+
 void ClearSimulation();
+
+void ConfigureSimulation(size_t w, size_t h, size_t l, float dt);
+
+void RestartSimulation();
+
+size_t NumForces();
+
+char** ForceNameReference(size_t index);
+
+size_t NumSources();
+
+char** SourceNameReference(size_t index);
+
+void SubmitForce(FluidForce force, const char* name);
+
+void SubmitSource(FluidSource source, const char* name);
 
 void SaveRender(const char* filepath);
 

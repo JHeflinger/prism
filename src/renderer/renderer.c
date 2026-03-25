@@ -282,29 +282,6 @@ void InitializeRenderer() {
     g_renderer.geometry.fluid.viscosity = 0.000001f;
     g_renderer.geometry.fluid.iterations = 20;
 
-    // TODO: KILLLLL
-    {
-        g_renderer.geometry.fluid.width = 20;
-        g_renderer.geometry.fluid.length = 20;
-        g_renderer.geometry.fluid.height = 20;
-        size_t ss = SimSize(g_renderer.geometry.fluid);
-        g_renderer.geometry.fluid.velocity = EZ_ALLOC(ss, sizeof(vec3));
-        g_renderer.geometry.fluid.vswap = EZ_ALLOC(ss, sizeof(vec3));
-        g_renderer.geometry.fluid.density = EZ_ALLOC(ss, sizeof(float));
-        g_renderer.geometry.fluid.dswap = EZ_ALLOC(ss, sizeof(float));
-        g_renderer.geometry.fluid.forces = EZ_ALLOC(ss, sizeof(vec3));
-        g_renderer.geometry.fluid.pressure = EZ_ALLOC(ss, sizeof(float));
-        g_renderer.geometry.fluid.divergence = EZ_ALLOC(ss, sizeof(float));
-        for (size_t i = 8; i <= g_renderer.geometry.fluid.width - 8; i++) {
-            for (size_t j = 8; j <= g_renderer.geometry.fluid.height - 8; j++) {
-                for (size_t k = 8; k <= g_renderer.geometry.fluid.length - 8; k++) {
-                    g_renderer.geometry.fluid.density[SimIndex(g_renderer.geometry.fluid, i, j, k)] = 1.0f;
-                    g_renderer.geometry.fluid.velocity[SimIndex(g_renderer.geometry.fluid, i, j, k)][1] = 5.0f;
-                }
-            }
-        }
-    }
-
     // initialize min/max BB
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
     SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
@@ -1122,13 +1099,27 @@ void RigidDeform() {
 }
 
 void UpdateSimulation() {
-    SimulateFluidStep(&(g_renderer.geometry.fluid));
     g_renderer.geometry.changes.update_simulation = TRUE;
 }
 
+void StepSimulation() {
+    BOOL dynamicts = g_renderer.geometry.fluid.timestep == 0.0f;
+    if (dynamicts) g_renderer.geometry.fluid.timestep = GetFrameTime();
+    SimulateFluidStep(&(g_renderer.geometry.fluid));
+    if (dynamicts) g_renderer.geometry.fluid.timestep = 0.0f;
+    UpdateSimulation();
+}
+
 void ClearSimulation() {
+    for (size_t i = 0; i < g_renderer.geometry.fluid.sourcenames.size; i++)
+        EZ_FREE(g_renderer.geometry.fluid.sourcenames.data[i]);
+    for (size_t i = 0; i < g_renderer.geometry.fluid.forcenames.size; i++)
+        EZ_FREE(g_renderer.geometry.fluid.forcenames.data[i]);
+    ARRLIST_FluidForce_clear(&(g_renderer.geometry.fluid.forces));
+    ARRLIST_FluidSource_clear(&(g_renderer.geometry.fluid.sources));
+    ARRLIST_DynamicString_clear(&(g_renderer.geometry.fluid.forcenames));
+    ARRLIST_DynamicString_clear(&(g_renderer.geometry.fluid.sourcenames));
     if (g_renderer.geometry.fluid.velocity != NULL) {
-        EZ_FREE(g_renderer.geometry.fluid.forces);
         EZ_FREE(g_renderer.geometry.fluid.velocity);
         EZ_FREE(g_renderer.geometry.fluid.vswap);
         EZ_FREE(g_renderer.geometry.fluid.density);
@@ -1136,6 +1127,84 @@ void ClearSimulation() {
         EZ_FREE(g_renderer.geometry.fluid.pressure);
         EZ_FREE(g_renderer.geometry.fluid.divergence);
     }
+}
+
+void ConfigureSimulation(size_t w, size_t h, size_t l, float dt) {
+    ClearSimulation();
+    g_renderer.geometry.fluid.width = w;
+    g_renderer.geometry.fluid.length = h;
+    g_renderer.geometry.fluid.height = l;
+    g_renderer.geometry.fluid.timestep = dt;
+    size_t ss = SimSize(g_renderer.geometry.fluid);
+    g_renderer.geometry.fluid.velocity = EZ_ALLOC(ss, sizeof(vec3));
+    g_renderer.geometry.fluid.vswap = EZ_ALLOC(ss, sizeof(vec3));
+    g_renderer.geometry.fluid.density = EZ_ALLOC(ss, sizeof(float));
+    g_renderer.geometry.fluid.dswap = EZ_ALLOC(ss, sizeof(float));
+    g_renderer.geometry.fluid.pressure = EZ_ALLOC(ss, sizeof(float));
+    g_renderer.geometry.fluid.divergence = EZ_ALLOC(ss, sizeof(float));
+    UpdateSimulation();
+}
+
+void RestartSimulation() {
+    size_t ss = SimSize(g_renderer.geometry.fluid);
+    memset(g_renderer.geometry.fluid.velocity, 0, ss * sizeof(vec3));
+    memset(g_renderer.geometry.fluid.vswap, 0, ss * sizeof(vec3));
+    memset(g_renderer.geometry.fluid.density, 0, ss * sizeof(float));
+    memset(g_renderer.geometry.fluid.dswap, 0, ss * sizeof(float));
+    memset(g_renderer.geometry.fluid.pressure, 0, ss * sizeof(float));
+    memset(g_renderer.geometry.fluid.divergence, 0, ss * sizeof(float));
+    for (size_t i = 0; i < g_renderer.geometry.fluid.sources.size; i++) {
+        FluidSource s = g_renderer.geometry.fluid.sources.data[i];
+        g_renderer.geometry.fluid.sources.data[i].timer = s.lifetime;
+        if (s.lifetime == 0.0f) {
+            size_t minx = MIN(s.x + 1, g_renderer.geometry.fluid.width - 1);
+            size_t miny = MIN(s.y + 1, g_renderer.geometry.fluid.height - 1);
+            size_t minz = MIN(s.z + 1, g_renderer.geometry.fluid.length - 1);
+            size_t maxx = MIN(s.x + s.width + 1, g_renderer.geometry.fluid.width);
+            size_t maxy = MIN(s.y + s.height + 1, g_renderer.geometry.fluid.height);
+            size_t maxz = MIN(s.z + s.length + 1, g_renderer.geometry.fluid.length);
+            for (size_t i = minx; i < maxx; i++) {
+                for (size_t j = miny; j < maxy; j++) {
+                    for (size_t k = minz; k < maxz; k++) {
+                        g_renderer.geometry.fluid.density[SimIndex(g_renderer.geometry.fluid, i, j, k)] = s.density;
+                    }
+                }
+            }
+        }
+    }
+    UpdateSimulation();
+}
+
+size_t NumForces() {
+    return g_renderer.geometry.fluid.forces.size;
+}
+
+char** ForceNameReference(size_t index) {
+    return &(g_renderer.geometry.fluid.forcenames.data[index]);
+}
+
+size_t NumSources() {
+    return g_renderer.geometry.fluid.sources.size;
+}
+
+char** SourceNameReference(size_t index) {
+    return &(g_renderer.geometry.fluid.sourcenames.data[index]);
+}
+
+void SubmitForce(FluidForce force, const char* name) {
+    ARRLIST_FluidForce_add(&(g_renderer.geometry.fluid.forces), force);
+    char* b = EZ_ALLOC(MAX_FORCE_NAME_SIZE + 1, sizeof(char));
+    strncpy(b, name, MAX_FORCE_NAME_SIZE);
+    ARRLIST_DynamicString_add(&(g_renderer.geometry.fluid.forcenames), b);
+    UpdateSimulation();
+}
+
+void SubmitSource(FluidSource source, const char* name) {
+    ARRLIST_FluidSource_add(&(g_renderer.geometry.fluid.sources), source);
+    char* b = EZ_ALLOC(MAX_SOURCE_NAME_SIZE + 1, sizeof(char));
+    strncpy(b, name, MAX_SOURCE_NAME_SIZE);
+    ARRLIST_DynamicString_add(&(g_renderer.geometry.fluid.sourcenames), b);
+    UpdateSimulation();
 }
 
 void SaveRender(const char* filepath) {
