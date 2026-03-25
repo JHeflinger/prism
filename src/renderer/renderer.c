@@ -1,12 +1,13 @@
 #include "renderer.h"
-#include <easylogger.h>
 #include "renderer/vulkan/vutils.h"
 #include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vclean.h"
-#include "renderer/rmath.h"
-#include "renderer/overlay.h"
 #include "renderer/processor.h"
+#include "renderer/simulator.h"
+#include "renderer/overlay.h"
+#include "renderer/rmath.h"
+#include <easylogger.h>
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
 #include <string.h>
@@ -275,30 +276,33 @@ void InitializeRenderer() {
     g_renderer.config.arap.addm = 5;
 
     // initialize sim
-    g_renderer.geometry.fluid.timestep = 0.1f;
-    g_renderer.geometry.fluid.diffusion = 0.01;
-    g_renderer.geometry.fluid.dissipation = 0.001f;
-    g_renderer.geometry.fluid.viscosity = 0.0001f;
+    g_renderer.geometry.fluid.timestep = 0.016f;
+    g_renderer.geometry.fluid.diffusion = 0.000001;
+    g_renderer.geometry.fluid.dissipation = 0.005f;
+    g_renderer.geometry.fluid.viscosity = 0.000001f;
     g_renderer.geometry.fluid.iterations = 20;
 
     // TODO: KILLLLL
     {
-        g_renderer.geometry.fluid.width = 100;
-        g_renderer.geometry.fluid.length = 100;
-        g_renderer.geometry.fluid.height = 100;
+        g_renderer.geometry.fluid.width = 20;
+        g_renderer.geometry.fluid.length = 20;
+        g_renderer.geometry.fluid.height = 20;
         size_t ss = SimSize(g_renderer.geometry.fluid);
         g_renderer.geometry.fluid.velocity = EZ_ALLOC(ss, sizeof(vec3));
         g_renderer.geometry.fluid.vswap = EZ_ALLOC(ss, sizeof(vec3));
         g_renderer.geometry.fluid.density = EZ_ALLOC(ss, sizeof(float));
         g_renderer.geometry.fluid.dswap = EZ_ALLOC(ss, sizeof(float));
-        for (size_t i = 0; i < 102; i++) {
-            for (size_t j = 0; j < 102; j++) {
-                for (size_t k = 0; k < 102; k++) {
+        g_renderer.geometry.fluid.forces = EZ_ALLOC(ss, sizeof(vec3));
+        g_renderer.geometry.fluid.pressure = EZ_ALLOC(ss, sizeof(float));
+        g_renderer.geometry.fluid.divergence = EZ_ALLOC(ss, sizeof(float));
+        for (size_t i = 8; i <= g_renderer.geometry.fluid.width - 8; i++) {
+            for (size_t j = 8; j <= g_renderer.geometry.fluid.height - 8; j++) {
+                for (size_t k = 8; k <= g_renderer.geometry.fluid.length - 8; k++) {
                     g_renderer.geometry.fluid.density[SimIndex(g_renderer.geometry.fluid, i, j, k)] = 1.0f;
+                    g_renderer.geometry.fluid.velocity[SimIndex(g_renderer.geometry.fluid, i, j, k)][1] = 5.0f;
                 }
             }
         }
-        UpdateSimulation();
     }
 
     // initialize min/max BB
@@ -1118,15 +1122,19 @@ void RigidDeform() {
 }
 
 void UpdateSimulation() {
+    SimulateFluidStep(&(g_renderer.geometry.fluid));
     g_renderer.geometry.changes.update_simulation = TRUE;
 }
 
 void ClearSimulation() {
     if (g_renderer.geometry.fluid.velocity != NULL) {
+        EZ_FREE(g_renderer.geometry.fluid.forces);
         EZ_FREE(g_renderer.geometry.fluid.velocity);
         EZ_FREE(g_renderer.geometry.fluid.vswap);
         EZ_FREE(g_renderer.geometry.fluid.density);
         EZ_FREE(g_renderer.geometry.fluid.dswap);
+        EZ_FREE(g_renderer.geometry.fluid.pressure);
+        EZ_FREE(g_renderer.geometry.fluid.divergence);
     }
 }
 

@@ -13,23 +13,8 @@ void LoadArmadillo() {
     FitCamera();
 }
 
-void LoadCow() {
-    LoadOBJ("assets/models/OBJ/naked/tetrahedron.obj");
-    FitCamera();
-}
-
 void LoadBox() {
     LoadOBJ("assets/models/OBJ/dressed/CornellBox-Sphere.obj");
-    FitCamera();
-}
-
-void LoadDice() {
-    LoadOBJ("assets/models/OBJ/naked/bunny.obj");
-    FitCamera();
-}
-
-void LoadOut() {
-    LoadOBJ("assets/models/OBJ/dressed/CornellBox-Water.obj");
     FitCamera();
 }
 
@@ -54,22 +39,10 @@ void DevInitialize() {
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_A_OVERRIDE, BIND_KEY_PRESSED });
-    AddBind("load cow", LoadCow,
-        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
-        (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
-        (BindCommand){ IK_C_OVERRIDE, BIND_KEY_PRESSED });
-    AddBind("load tetrahedron", LoadDice,
-        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
-        (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
-        (BindCommand){ IK_I_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("load cornell box", LoadBox,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_B_OVERRIDE, BIND_KEY_PRESSED });
-    AddBind("load water box", LoadOut,
-        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
-        (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
-        (BindCommand){ IK_O_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("load peter", LoadPeter,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
@@ -80,6 +53,9 @@ void DevInitialize() {
     AddBind("screenshot", Screenshot,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_S_OVERRIDE, BIND_KEY_PRESSED });
+    AddBind("simulate", UpdateSimulation,
+        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
+        (BindCommand){ IK_O_OVERRIDE, BIND_KEY_END });
 }
 
 void DevUpdate() {}

@@ -95,7 +95,7 @@ void main() {
             vec3 uvw = (p - sim_ubo.minBB) / (sim_ubo.maxBB - sim_ubo.minBB);
             float d = texture(densityImage, uvw).r;
             if (d > EPS) {
-                float extinction = d * 0.2; // TODO: replace 0.2 with absorbtion coeff
+                float extinction = d * 0.9; // TODO: replace 0.2 with absorbtion coeff
                 float steptrans = exp(-extinction * STEPSIZE);
                 color += transmit * (1.0 - steptrans) * vec3(1.0); // TODO: replace vec3 with smokecolor
                 transmit *= steptrans;

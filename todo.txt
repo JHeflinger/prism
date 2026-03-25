@@ -51,6 +51,7 @@ Next:
 9. surely there must be a way to create a global staging pipeline stage to do all this stuff in-pipeline?
 10. should have a scratch staging buffer that stays alive and is used
 11. also use the correct bits for staging properly based on first upload or consecutive upload
+12. just use ptr swap isntead of this boolean swapstate bs
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

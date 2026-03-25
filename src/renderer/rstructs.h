@@ -225,14 +225,18 @@ typedef struct {
     size_t length;
     size_t height;
     size_t iterations;
+    vec3* forces;
     vec3* velocity;
     vec3* vswap;
     float* density;
     float* dswap;
-    BOOL swapstate;
+    float* pressure;
+    float* divergence;
 } FluidSimulation;
 #define SimSize(fs) (((fs).width+2)*((fs).length+2)*((fs).height+2))
-#define SimIndex(fs, x, y, z) ((x) + ((fs).width + 2)*(y) + ((fs).length + 2)*((fs).height + 2)*(z))
+#define SimIndex(fs, x, y, z) ((x) + ((fs).length + 2)*(z) + ((fs).length + 2)*((fs).width + 2)*(y))
+#define SimSwapV(fs) { vec3* t = (fs).velocity; (fs).velocity = (fs).vswap; (fs).vswap = t; }
+#define SimSwapD(fs) { float* t = (fs).density; (fs).density = (fs).dswap; (fs).dswap = t; }
 
 typedef struct {
     ManifoldMesh manifold;

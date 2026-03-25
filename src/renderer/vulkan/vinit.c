@@ -479,9 +479,9 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
 
 BOOL VINIT_Simulation(VulkanFluidSimulation* vfs) {
     VUTIL_CreateImage3D(
-        g_vinit_renderer_ref->geometry.fluid.width,
-        g_vinit_renderer_ref->geometry.fluid.height,
-        g_vinit_renderer_ref->geometry.fluid.length,
+        g_vinit_renderer_ref->geometry.fluid.width + 2,
+        g_vinit_renderer_ref->geometry.fluid.height + 2,
+        g_vinit_renderer_ref->geometry.fluid.length + 2,
         1,
         VK_SAMPLE_COUNT_1_BIT,
         VK_FORMAT_R32_SFLOAT,

@@ -10,23 +10,13 @@
 Renderer* g_vupdt_renderer_ref = NULL;
 
 void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
-    if (g_vupdt_renderer_ref->geometry.fluid.swapstate) {
-        VUTIL_UploadImage3D(
-            &(vfs->density.image),
-            g_vupdt_renderer_ref->geometry.fluid.dswap,
-            g_vupdt_renderer_ref->geometry.fluid.width,
-            g_vupdt_renderer_ref->geometry.fluid.height,
-            g_vupdt_renderer_ref->geometry.fluid.length,
-            VK_FORMAT_R32_SFLOAT);
-    } else {
-        VUTIL_UploadImage3D(
-            &(vfs->density.image),
-            g_vupdt_renderer_ref->geometry.fluid.density,
-            g_vupdt_renderer_ref->geometry.fluid.width,
-            g_vupdt_renderer_ref->geometry.fluid.height,
-            g_vupdt_renderer_ref->geometry.fluid.length,
-            VK_FORMAT_R32_SFLOAT);
-    }
+    VUTIL_UploadImage3D(
+        &(vfs->density.image),
+        g_vupdt_renderer_ref->geometry.fluid.density,
+        g_vupdt_renderer_ref->geometry.fluid.width + 2,
+        g_vupdt_renderer_ref->geometry.fluid.height + 2,
+        g_vupdt_renderer_ref->geometry.fluid.length + 2,
+        VK_FORMAT_R32_SFLOAT);
 }
 
 void VUPDT_Lights(VulkanDataBuffer* lights) {
