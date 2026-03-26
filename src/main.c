@@ -1,14 +1,9 @@
+#ifndef EXTEND_PRISM
+
 #include "core/editor.h"
 #include "core/executor.h"
 #include "renderer/renderer.h"
 #include <easylogger.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-
-#define MAX_STR 512
 
 int main(int argc, char** argv) {
     if (argc == 1) {
@@ -47,3 +42,5 @@ int main(int argc, char** argv) {
     EZ_INFO("See you, Space Cowboy");
     return 0;
 }
+
+#endif
