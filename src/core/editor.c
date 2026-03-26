@@ -113,5 +113,7 @@ void RunEditor() {
     CleanEditor();
 
     // Clean memory check
+    #ifndef PROD_BUILD
     EZ_ASSERT(memcheck == EZ_ALLOCATED(), "Memory cleanup revealed a leak of %d bytes", (int)(EZ_ALLOCATED() - memcheck));
+    #endif
 }
