@@ -459,8 +459,8 @@ int add_fluid_force_stage_0(size_t x, size_t y, size_t w, size_t h) {
     EnableUI();
 
     UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Force") / 2) - 10, 0);
-    UIDrawText("Force");
+    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Force Vector") / 2) - 10, 0);
+    UIDrawText("Force Vector");
     UIMoveCursor(xpos, 0);
     UIDrawText("x");
     UIMoveCursor(xpos + 15, -20);

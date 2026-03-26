@@ -1179,12 +1179,20 @@ size_t NumForces() {
     return g_renderer.geometry.fluid.forces.size;
 }
 
+FluidForce* ForceReference(size_t index) {
+    return &(g_renderer.geometry.fluid.forces.data[index]);
+}
+
 char** ForceNameReference(size_t index) {
     return &(g_renderer.geometry.fluid.forcenames.data[index]);
 }
 
 size_t NumSources() {
     return g_renderer.geometry.fluid.sources.size;
+}
+
+FluidSource* SourceReference(size_t index) {
+    return &(g_renderer.geometry.fluid.sources.data[index]);
 }
 
 char** SourceNameReference(size_t index) {

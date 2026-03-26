@@ -133,9 +133,13 @@ void RestartSimulation();
 
 size_t NumForces();
 
+FluidForce* ForceReference(size_t index);
+
 char** ForceNameReference(size_t index);
 
 size_t NumSources();
+
+FluidSource* SourceReference(size_t index);
 
 char** SourceNameReference(size_t index);
 
