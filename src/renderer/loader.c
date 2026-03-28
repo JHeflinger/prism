@@ -353,7 +353,7 @@ BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t n
     char mtlloc[MAX_MTLLIB_PATH_SIZE] = { 0 };
     char mtlpath[MAX_MTLLIB_PATH_SIZE] = { 0 };
     strcpy(mtlloc, state->filepath);
-    char* fnstart = StripFilename(mtlloc);
+    char* fnstart = (char*)StripFilename(mtlloc);
     if (fnstart) fnstart[0] = 0;
     else mtlloc[0] = 0;
     sprintf(mtlpath, "%s%s", mtlloc, lineargs[1]);
@@ -606,6 +606,7 @@ BOOL ConstructOBJ(const StateOBJ state) {
 
 BOOL LoadOBJ(const char* filepath) {
     SimpleFile* file = ReadFile(filepath);
+    VertexID startv = NumVertices();
     if (!file) {
         EZ_ERROR("Unable to load invalid filepath \"%s\"", filepath);
         return FALSE;
@@ -628,14 +629,14 @@ BOOL LoadOBJ(const char* filepath) {
             } else EZ_WARN("%s:%d - Unknown OBJ property detected: \"%s\", skipping parsing this field...", filepath, (int)parser.line, lineargs[0]);
         }
     }
-    if (!ConstructOBJ(state)) EZ_ERROR("Unable to construct .obj \"%s\" due to an error", filepath);
+    if (!ConstructOBJ(state)) {
+        EZ_ERROR("Unable to construct .obj \"%s\" due to an error", filepath);
+        FreeFile(file);
+        return FALSE;
+    } else {
+        SubmitMeshDescriptor((MeshDescriptor){ startv, NumVertices() - 1, GLM_MAT4_IDENTITY_INIT, GLM_MAT4_IDENTITY_INIT }, StripFilename(filepath));
+    }
     CleanStateOBJ(&state);
     FreeFile(file);
     return TRUE;
-}
-
-BOOL LoadScene(const char* filepath) {
-    // TODO:
-    EZ_ERROR("LoadScene has not been implemented yet!");
-    return FALSE;
 }

@@ -18,6 +18,8 @@ void DrawOverviewPanel(float width, float height) {
         UIDropList("Materials", width - 20, NumMaterials(), MaterialNameReference(0), SetEditMaterial);
         UIMoveCursor(0, 5);
         UIDropList("Lights", width - 20, NumLights(), LightNameReference(0), SetEditLight);
+        UIMoveCursor(0, 5);
+        UIDropList("Objects", width - 20, NumMeshes(), MeshNameReference(0), SetEditMesh);
     }
 }
 

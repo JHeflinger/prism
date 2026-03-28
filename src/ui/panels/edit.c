@@ -12,7 +12,8 @@ typedef enum {
     EDIT_SINGLE_TRIANGLE,
     EDIT_SINGLE_VERTEX,
     EDIT_SINGLE_FORCE,
-    EDIT_SINGLE_SOURCE
+    EDIT_SINGLE_SOURCE,
+    EDIT_MESH,
 } EditType;
 
 size_t g_edit_item_index = 0;
@@ -62,6 +63,14 @@ void SetEditSource(size_t index) {
     g_item_selected = TRUE;
     g_edit_item_index = index;
     g_edit_type = EDIT_SINGLE_SOURCE;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((TriangleID)-1);
+}
+
+void SetEditMesh(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_MESH;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((TriangleID)-1);
 }
@@ -491,6 +500,11 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor((2*component_width) + 65, -20);
             edited |= UIDragFloat(&(forceref->force[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(0, 15);
+        } else if (g_edit_type == EDIT_MESH) {
+            UIMoveCursor((width - 20 - UITextWidth("Edit Object")) / 2.0f, 0);
+            UIDrawText("Edit Object");
+            UIMoveCursor(0, 15);
+            UITextInput("Name", *(MeshNameReference(g_edit_item_index)), MAX_MESH_NAME_SIZE, width - 20);
         } else {
             EZ_FATAL("Unhandled edit type detected");
         }

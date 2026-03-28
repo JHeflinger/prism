@@ -27,7 +27,7 @@ typedef struct {
 
 FileType GetFileType(const char* path);
 
-char* StripFilename(char* path);
+const char* StripFilename(const char* path);
 
 SimpleFile* ReadFile(const char* filename);
 

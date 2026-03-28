@@ -30,7 +30,7 @@ FileType GetFileType(const char* path) {
     return UNKNOWN;
 }
 
-char* StripFilename(char* path) {
+const char* StripFilename(const char* path) {
     for (int i = (int)strlen(path) - 1; i >= 0; i--) {
         if (path[i] == '/' || path[i] == '\\') {
             if (i == (int)strlen(path) - 1) return NULL;

@@ -147,6 +147,18 @@ void SubmitForce(FluidForce force, const char* name);
 
 void SubmitSource(FluidSource source, const char* name);
 
+size_t NumMeshes();
+
+char** MeshNameReference(size_t index);
+
+void SubmitMeshDescriptor(MeshDescriptor md, const char* name);
+
+void ClearMeshDescriptors();
+
+void SetObjectTransform(mat4 transform, size_t object);
+
+void UpdateMeshes();
+
 void SaveRender(const char* filepath);
 
 char* GPUModel();

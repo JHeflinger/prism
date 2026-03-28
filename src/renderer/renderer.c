@@ -345,6 +345,7 @@ void DestroyRenderer() {
     CleanManifoldMesh(&(g_renderer.geometry.manifold));
     CleanARAP();
     ClearSimulation();
+    ClearMeshDescriptors();
 
     // destroy cholmod
     cholmod_finish(&g_cholmod);
@@ -598,7 +599,8 @@ void Render() {
             g_renderer.geometry.changes.update_lights |
             g_renderer.geometry.changes.update_vertices |
             g_renderer.geometry.changes.update_normals |
-            g_renderer.geometry.changes.update_simulation;
+            g_renderer.geometry.changes.update_simulation |
+            (g_renderer.geometry.changes.update_meshes != 0);
 
         // set bvh reconstruction
         if (g_renderer.geometry.changes.update_vertices || g_renderer.geometry.changes.update_triangles)
@@ -690,6 +692,28 @@ void Render() {
                 VINIT_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
             } else {
                 VUPDT_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
+            }
+        }
+
+        // update transform requests if needed
+        if (g_renderer.geometry.changes.update_meshes != 0) {
+            g_renderer.geometry.changes.update_meshes--;
+            if (g_renderer.geometry.changes.max_meshes != g_renderer.geometry.meshes.maxsize) {
+                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                g_renderer.geometry.changes.max_meshes = g_renderer.geometry.meshes.maxsize;
+                //VCLEAN_Transforms(&(g_renderer.vulkan.core.geometry.meshes));
+                //VINIT_Transforms(&(g_renderer.vulkan.core.geometry.meshes));
+            } else {
+                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: remove later
+                //VUPDT_Transforms(&(g_renderer.vulkan.core.geometry.meshes));
+                // TODO: implement these, then create the shader
+            }
+            if (g_renderer.geometry.changes.update_meshes == 0) {
+                g_renderer.geometry.changes.update_mesh_queue--;
+                if (g_renderer.geometry.changes.update_mesh_queue > 0) g_renderer.geometry.changes.update_meshes = CPUSWAP_LENGTH;
+                for (size_t i = 0; i < g_renderer.geometry.meshes.size; i++) {
+                    memcpy(g_renderer.geometry.meshes.data[i].transform, g_renderer.geometry.meshes.data[i].request, sizeof(mat4));
+                }
             }
         }
 
@@ -1213,6 +1237,40 @@ void SubmitSource(FluidSource source, const char* name) {
     strncpy(b, name, MAX_SOURCE_NAME_SIZE);
     ARRLIST_DynamicString_add(&(g_renderer.geometry.fluid.sourcenames), b);
     UpdateSimulation();
+}
+
+size_t NumMeshes() {
+    return g_renderer.geometry.meshes.size;
+}
+
+char** MeshNameReference(size_t index) {
+    return &(g_renderer.geometry.meshnames.data[index]);
+}
+
+void SubmitMeshDescriptor(MeshDescriptor md, const char* name) {
+    ARRLIST_MeshDescriptor_add(&(g_renderer.geometry.meshes), md);
+    char* b = EZ_ALLOC(MAX_MESH_NAME_SIZE + 1, sizeof(char));
+    strncpy(b, name, MAX_MESH_NAME_SIZE);
+    ARRLIST_DynamicString_add(&(g_renderer.geometry.meshnames), b);
+    UpdateMeshes();
+}
+
+void ClearMeshDescriptors() {
+    for (size_t i = 0; i < g_renderer.geometry.meshnames.size; i++)
+        EZ_FREE(g_renderer.geometry.meshnames.data[i]);
+    ARRLIST_DynamicString_clear(&g_renderer.geometry.meshnames);
+    ARRLIST_MeshDescriptor_clear(&g_renderer.geometry.meshes);
+}
+
+void SetObjectTransform(mat4 transform, size_t object) {
+    EZ_ASSERT(object < g_renderer.geometry.meshes.size, "Cannot set object transform due to index out of bounds");
+    memcpy(g_renderer.geometry.meshes.data[object].request, transform, sizeof(mat4));
+    UpdateMeshes();
+}
+
+void UpdateMeshes() {
+    g_renderer.geometry.changes.update_meshes = CPUSWAP_LENGTH;
+    g_renderer.geometry.changes.update_mesh_queue = 2;
 }
 
 void SaveRender(const char* filepath) {

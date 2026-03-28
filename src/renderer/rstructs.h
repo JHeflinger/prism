@@ -126,6 +126,7 @@ typedef struct {
     size_t max_materials;
     size_t max_lights;
     size_t max_sim_size;
+    size_t max_meshes;
     BOOL update_normals;
     BOOL update_vertices;
     BOOL update_triangles;
@@ -133,6 +134,8 @@ typedef struct {
     BOOL update_lights;
     BOOL update_simulation;
     size_t update_bvh;
+    size_t update_meshes;
+    size_t update_mesh_queue;
 } ChangeSet;
 
 typedef struct {
@@ -268,6 +271,14 @@ typedef struct {
 #define SimSwapD(fs) { float* t = (fs).density; (fs).density = (fs).dswap; (fs).dswap = t; }
 
 typedef struct {
+    alignas(4) VertexID start;
+    alignas(4) VertexID end;
+    alignas(16) mat4 transform;
+    alignas(16) mat4 request;
+} MeshDescriptor;
+DECLARE_ARRLIST(MeshDescriptor);
+
+typedef struct {
     ManifoldMesh manifold;
     ARRLIST_vec4 vertices;
     ARRLIST_vec4 normals;
@@ -285,6 +296,8 @@ typedef struct {
     float lightarea;
     ChangeSet changes;
     AxisAlignedBoundingBox bounds;
+    ARRLIST_MeshDescriptor meshes;
+    ARRLIST_DynamicString meshnames;
 } Geometry;
 
 typedef struct {

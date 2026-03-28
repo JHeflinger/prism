@@ -16,6 +16,8 @@ void SetEditForce(size_t index);
 
 void SetEditSource(size_t index);
 
+void SetEditMesh(size_t index);
+
 void DeselectEditTarget();
 
 Panel GenerateEditPanel();
