@@ -128,7 +128,7 @@ layout(binding = 6) readonly buffer EmissiveSSBOIn {
     uint emissiveIn[ ];
 };
 
-layout(binding = 7) readonly buffer VertexSSBOIn {
+layout(binding = 7) readonly buffer TransformedVertexSSBOIn {
     vec3 vertexIn[ ];
 };
 

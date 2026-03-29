@@ -37,7 +37,7 @@ layout(binding = 4) buffer OverlaySSBO {
     vec2 selected_vertex_position;
 };
 
-layout(binding = 5) readonly buffer VertexSSBOIn {
+layout(binding = 5) readonly buffer TransformedVertexSSBOIn {
     vec4 vertexIn[ ];
 };
 

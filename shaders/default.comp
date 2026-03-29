@@ -82,7 +82,7 @@ layout(binding = 3) readonly buffer TriangleSSBOIn {
     Triangle triangleIn[ ];
 };
 
-layout(binding = 4) readonly buffer VertexSSBOIn {
+layout(binding = 4) readonly buffer TransformedVertexSSBOIn {
     vec3 vertexIn[ ];
 };
 
