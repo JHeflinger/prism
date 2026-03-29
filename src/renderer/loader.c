@@ -317,6 +317,11 @@ BOOL ParseMTL_Rd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
+BOOL ParseMTL_d(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+    // Not useful for prism right now, implement later if needed
+    return TRUE;
+}
+
 BOOL ParseMTL_newmtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
         EZ_ERROR("Invalid format for newmtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
@@ -341,6 +346,7 @@ ParseFuncMTL GetParserFromArgMTL(const char* header) {
     GETPARSER(Ni);
     GETPARSER(Tf);
     GETPARSER(Rd);
+    GETPARSER(d);
     #undef GETPARSER
     return NULL;
 }
