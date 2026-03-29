@@ -41,7 +41,7 @@ BOOL VINIT_Simulation(VulkanFluidSimulation* vfs);
 
 BOOL VINIT_Normals(VulkanDataBuffer* normals);
 
-BOOL VINIT_Vertices(VulkanDataBuffer* vertices);
+BOOL VINIT_Vertices(VulkanVertices* vertices);
 
 BOOL VINIT_Triangles(VulkanDataBuffer* triangles);
 

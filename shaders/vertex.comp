@@ -1,0 +1,54 @@
+#version 450
+
+struct MeshDescriptor {
+    uint start;
+    uint end;
+    vec3 translate;
+    vec3 rotate;
+    vec3 scale;
+    mat4 transform;
+};
+
+layout(binding = 0) readonly buffer VertexSSBOIn {
+    vec4 vertexIn[ ];
+};
+
+layout(binding = 1) buffer TransformedVertexSSBOIn {
+    vec4 transformedIn[ ];
+};
+
+layout(binding = 2) readonly buffer TransformsSSBOIn {
+    MeshDescriptor transformsIn[ ];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint elements;
+    uint bitstart;
+} pc;
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+uint find_transform(uint i) {
+    float pct = float(i) / float(transformsIn[pc.elements - 1].end + 1);
+    if (pct >= 1.0) return -1;
+    uint ind = uint(pct * float(pc.elements));
+    for (int i = 0; i < pc.elements; i++) {
+        MeshDescriptor md = transformsIn[ind];
+        if (gl_GlobalInvocationID.x >= md.start && gl_GlobalInvocationID.x <= md.end) return ind;
+        else if (gl_GlobalInvocationID.x < md.start) ind--;
+        else ind++;
+    }
+    return -1;
+}
+
+void main() {
+    if (pc.elements == 0) return;
+    uint mi = find_transform(gl_GlobalInvocationID.x);
+    if (mi == -1) {
+        transformedIn[gl_GlobalInvocationID.x] = vertexIn[gl_GlobalInvocationID.x];
+        return;
+    }
+    MeshDescriptor md = transformsIn[mi];
+    vec3 newpos = (md.transform * vec4(vertexIn[gl_GlobalInvocationID.x].xyz, 1.0)).xyz;
+    transformedIn[gl_GlobalInvocationID.x] = vec4(newpos, vertexIn[gl_GlobalInvocationID.x].w);
+}

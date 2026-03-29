@@ -42,8 +42,9 @@ void VCLEAN_Normals(VulkanDataBuffer* normals) {
     VUTIL_DestroyBuffer(*normals);
 }
 
-void VCLEAN_Vertices(VulkanDataBuffer* vertices) {
-    VUTIL_DestroyBuffer(*vertices);
+void VCLEAN_Vertices(VulkanVertices* vertices) {
+    VUTIL_DestroyBuffer(vertices->original);
+    VUTIL_DestroyBuffer(vertices->transformed);
 }
 
 void VCLEAN_Triangles(VulkanDataBuffer* triangles) {

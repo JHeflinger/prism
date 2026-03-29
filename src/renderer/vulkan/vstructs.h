@@ -166,9 +166,14 @@ typedef struct {
 } VulkanFluidSimulation;
 
 typedef struct {
+    VulkanDataBuffer original;
+    VulkanDataBuffer transformed;
+} VulkanVertices;
+
+typedef struct {
     VulkanBVH bvh;
     VulkanDataBuffer normals;
-    VulkanDataBuffer vertices;
+    VulkanVertices vertices;
     VulkanDataBuffer triangles;
     VulkanDataBuffer emissives;
     VulkanDataBuffer materials;

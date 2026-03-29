@@ -603,7 +603,9 @@ void Render() {
             g_renderer.geometry.changes.update_meshes;
 
         // set bvh reconstruction
-        if (g_renderer.geometry.changes.update_vertices || g_renderer.geometry.changes.update_triangles)
+        if (g_renderer.geometry.changes.update_vertices ||
+            g_renderer.geometry.changes.update_triangles ||
+            g_renderer.geometry.changes.update_meshes)
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH;
 
         // update normals if needed
@@ -697,6 +699,7 @@ void Render() {
 
         // update transform requests if needed
         if (g_renderer.geometry.changes.update_meshes) {
+            g_renderer.geometry.changes.update_meshes = FALSE;
             if (g_renderer.geometry.changes.max_meshes != g_renderer.geometry.meshes.maxsize) {
                 vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
                 g_renderer.geometry.changes.max_meshes = g_renderer.geometry.meshes.maxsize;
@@ -1233,6 +1236,10 @@ size_t NumMeshes() {
     return g_renderer.geometry.meshes.size;
 }
 
+MeshDescriptor* MeshReference(size_t index) {
+    return &(g_renderer.geometry.meshes.data[index]);
+}
+
 char** MeshNameReference(size_t index) {
     return &(g_renderer.geometry.meshnames.data[index]);
 }
@@ -1252,10 +1259,20 @@ void ClearMeshDescriptors() {
     ARRLIST_MeshDescriptor_clear(&g_renderer.geometry.meshes);
 }
 
-void SetObjectTransform(mat4 transform, size_t object) {
-    // TODO: change into a function that takes in the 3 vec3s and composes the transform
-    EZ_ASSERT(object < g_renderer.geometry.meshes.size, "Cannot set object transform due to index out of bounds");
-    memcpy(g_renderer.geometry.meshes.data[object].transform, transform, sizeof(mat4));
+void UpdateObjectTransform(size_t i) {
+    EZ_ASSERT(i < g_renderer.geometry.meshes.size, "Cannot set object transform due to index out of bounds");
+    mat4 T, R, S, TR, transform;
+    glm_mat4_identity(T);
+    glm_mat4_identity(R);
+    glm_mat4_identity(S);
+    glm_translate(T, g_renderer.geometry.meshes.data[i].translate);
+    glm_rotate_x(R, glm_rad(g_renderer.geometry.meshes.data[i].rotate[0]), R);
+    glm_rotate_y(R, glm_rad(g_renderer.geometry.meshes.data[i].rotate[1]), R);
+    glm_rotate_z(R, glm_rad(g_renderer.geometry.meshes.data[i].rotate[2]), R);
+    glm_scale(S, g_renderer.geometry.meshes.data[i].scale);
+    glm_mat4_mul(T, R, TR);
+    glm_mat4_mul(TR, S, transform);
+    memcpy(g_renderer.geometry.meshes.data[i].transform, transform, sizeof(mat4));
     UpdateMeshes();
 }
 

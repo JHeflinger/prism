@@ -174,7 +174,7 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry.vertices.buffer)
+				&(renderer->vulkan.core.geometry.vertices.original.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
@@ -182,6 +182,36 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					&(renderer->geometry.vertices.size)
 				}, 0.0f,
 				sizeof(vec4)
+			}
+		};
+	} else if (strcmp(name, "TransformedVertexSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.vertices.transformed.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.vertices.size)
+				}, 0.0f,
+				sizeof(vec4)
+			}
+		};
+	} else if (strcmp(name, "TransformsSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.transforms.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.meshes.size)
+				}, 0.0f,
+				sizeof(MeshDescriptor)
 			}
 		};
 	} else if (strcmp(name, "WorkGroupOffsetSSBOIn") == 0) {

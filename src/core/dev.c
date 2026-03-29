@@ -31,6 +31,7 @@ void ClearScene() {
     ClearTriangles();
     ClearVertices();
     ClearNormals();
+    ClearMeshDescriptors();
     DeselectEditTarget();
 }
 

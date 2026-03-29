@@ -11,7 +11,7 @@ void VUPDT_Lights(VulkanDataBuffer* lights);
 
 void VUPDT_Normals(VulkanDataBuffer* normals);
 
-void VUPDT_Vertices(VulkanDataBuffer* vertices);
+void VUPDT_Vertices(VulkanVertices* vertices);
 
 void VUPDT_Triangles(VulkanDataBuffer* triangles);
 

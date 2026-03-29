@@ -10,6 +10,10 @@ Renderer* g_vinit_renderer_ref = NULL;
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
+        "shaders/vertex.comp",
+        "build/shaders/vertex.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
         "shaders/centroids.comp",
         "build/shaders/centroids.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
@@ -519,14 +523,19 @@ BOOL VINIT_Normals(VulkanDataBuffer* normals) {
     return TRUE;
 }
 
-BOOL VINIT_Vertices(VulkanDataBuffer* vertices) {
+BOOL VINIT_Vertices(VulkanVertices* vertices) {
     size_t arrsize = sizeof(vec4) * g_vinit_renderer_ref->geometry.vertices.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        vertices);
+        &(vertices->original));
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(vertices->transformed));
     VUPDT_Vertices(vertices);
     return TRUE;
 }

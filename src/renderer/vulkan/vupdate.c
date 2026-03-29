@@ -48,13 +48,13 @@ void VUPDT_Normals(VulkanDataBuffer* normals) {
         normals->buffer);
 }
 
-void VUPDT_Vertices(VulkanDataBuffer* vertices) {
+void VUPDT_Vertices(VulkanVertices* vertices) {
     if (sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.vertices.data,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.size,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.maxsize,
-        vertices->buffer);
+        vertices->original.buffer);
 }
 
 void VUPDT_Triangles(VulkanDataBuffer* triangles) {
@@ -109,6 +109,11 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
         uint32_t invocations = (uint32_t)g_vupdt_renderer_ref->dimensions.x * (uint32_t)g_vupdt_renderer_ref->dimensions.y;
+
+        if ((1u << i) & VERTEX_SHADER_FLAG) {
+            invocations = (uint32_t)g_vupdt_renderer_ref->geometry.vertices.size;
+            _record_push_constants(g_vupdt_renderer_ref->geometry.meshes.size);
+        }
 
         if (((1u << i) & CENTROID_SHADER_FLAG) ||
             ((1u << i) & HISTOGRAM_SHADER_FLAG) ||

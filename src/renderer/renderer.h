@@ -149,13 +149,15 @@ void SubmitSource(FluidSource source, const char* name);
 
 size_t NumMeshes();
 
+MeshDescriptor* MeshReference(size_t index);
+
 char** MeshNameReference(size_t index);
 
 void SubmitMeshDescriptor(MeshDescriptor md, const char* name);
 
 void ClearMeshDescriptors();
 
-void SetObjectTransform(mat4 transform, size_t object);
+void UpdateObjectTransform(size_t i);
 
 void UpdateMeshes();
 
