@@ -5,6 +5,8 @@
 
 void VCLEAN_Shaders(ARRLIST_VulkanShaderPtr* shaders);
 
+void VCLEAN_Transforms(VulkanDataBuffer* transforms);
+
 void VCLEAN_Lights(VulkanDataBuffer* lights);
 
 void VCLEAN_BVH(VulkanBVH* bvh);

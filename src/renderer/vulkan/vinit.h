@@ -7,6 +7,8 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders);
 
 BOOL VINIT_OverlaySSBOs(VulkanDataBuffer* ssbo_array);
 
+BOOL VINIT_Transforms(VulkanDataBuffer* transforms);
+
 BOOL VINIT_Lights(VulkanDataBuffer* lights);
 
 BOOL VINIT_Queue(VkQueue* queue);

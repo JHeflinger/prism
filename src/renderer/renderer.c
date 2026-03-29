@@ -600,7 +600,7 @@ void Render() {
             g_renderer.geometry.changes.update_vertices |
             g_renderer.geometry.changes.update_normals |
             g_renderer.geometry.changes.update_simulation |
-            (g_renderer.geometry.changes.update_meshes != 0);
+            g_renderer.geometry.changes.update_meshes;
 
         // set bvh reconstruction
         if (g_renderer.geometry.changes.update_vertices || g_renderer.geometry.changes.update_triangles)
@@ -696,24 +696,14 @@ void Render() {
         }
 
         // update transform requests if needed
-        if (g_renderer.geometry.changes.update_meshes != 0) {
-            g_renderer.geometry.changes.update_meshes--;
+        if (g_renderer.geometry.changes.update_meshes) {
             if (g_renderer.geometry.changes.max_meshes != g_renderer.geometry.meshes.maxsize) {
                 vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
                 g_renderer.geometry.changes.max_meshes = g_renderer.geometry.meshes.maxsize;
-                //VCLEAN_Transforms(&(g_renderer.vulkan.core.geometry.meshes));
-                //VINIT_Transforms(&(g_renderer.vulkan.core.geometry.meshes));
+                VCLEAN_Transforms(&(g_renderer.vulkan.core.geometry.transforms));
+                VINIT_Transforms(&(g_renderer.vulkan.core.geometry.transforms));
             } else {
-                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); // TODO: remove later
-                //VUPDT_Transforms(&(g_renderer.vulkan.core.geometry.meshes));
-                // TODO: implement these, then create the shader
-            }
-            if (g_renderer.geometry.changes.update_meshes == 0) {
-                g_renderer.geometry.changes.update_mesh_queue--;
-                if (g_renderer.geometry.changes.update_mesh_queue > 0) g_renderer.geometry.changes.update_meshes = CPUSWAP_LENGTH;
-                for (size_t i = 0; i < g_renderer.geometry.meshes.size; i++) {
-                    memcpy(g_renderer.geometry.meshes.data[i].transform, g_renderer.geometry.meshes.data[i].request, sizeof(mat4));
-                }
+                VUPDT_Transforms(&(g_renderer.vulkan.core.geometry.transforms));
             }
         }
 
@@ -1263,14 +1253,14 @@ void ClearMeshDescriptors() {
 }
 
 void SetObjectTransform(mat4 transform, size_t object) {
+    // TODO: change into a function that takes in the 3 vec3s and composes the transform
     EZ_ASSERT(object < g_renderer.geometry.meshes.size, "Cannot set object transform due to index out of bounds");
-    memcpy(g_renderer.geometry.meshes.data[object].request, transform, sizeof(mat4));
+    memcpy(g_renderer.geometry.meshes.data[object].transform, transform, sizeof(mat4));
     UpdateMeshes();
 }
 
 void UpdateMeshes() {
-    g_renderer.geometry.changes.update_meshes = CPUSWAP_LENGTH;
-    g_renderer.geometry.changes.update_mesh_queue = 2;
+    g_renderer.geometry.changes.update_meshes = TRUE;
 }
 
 void SaveRender(const char* filepath) {

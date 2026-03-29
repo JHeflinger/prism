@@ -74,6 +74,18 @@ BOOL VINIT_OverlaySSBOs(VulkanDataBuffer* ssbo_array) {
 	return TRUE;
 }
 
+BOOL VINIT_Transforms(VulkanDataBuffer* transforms) {
+    size_t arrsize = sizeof(MeshDescriptor) * g_vinit_renderer_ref->geometry.meshes.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        transforms);
+    VUPDT_Transforms(transforms);
+    return TRUE;
+}
+
 BOOL VINIT_Lights(VulkanDataBuffer* lights) {
     size_t arrsize = sizeof(SceneLight) * g_vinit_renderer_ref->geometry.lights.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
@@ -744,6 +756,7 @@ BOOL VINIT_Geometry(VulkanGeometry* geometry) {
 	if (!VINIT_Materials(&(geometry->materials))) return FALSE;
 	if (!VINIT_Lights(&(geometry->lights))) return FALSE;
 	if (!VINIT_Simulation(&(geometry->fluid))) return FALSE;
+	if (!VINIT_Transforms(&(geometry->transforms))) return FALSE;
     return TRUE;
 }
 

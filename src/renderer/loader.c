@@ -634,7 +634,7 @@ BOOL LoadOBJ(const char* filepath) {
         FreeFile(file);
         return FALSE;
     } else {
-        SubmitMeshDescriptor((MeshDescriptor){ startv, NumVertices() - 1, GLM_MAT4_IDENTITY_INIT, GLM_MAT4_IDENTITY_INIT }, StripFilename(filepath));
+        SubmitMeshDescriptor((MeshDescriptor){ startv, NumVertices() - 1, { 0 }, { 0 }, { 0 }, GLM_MAT4_IDENTITY_INIT }, StripFilename(filepath));
     }
     CleanStateOBJ(&state);
     FreeFile(file);

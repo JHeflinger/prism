@@ -174,6 +174,7 @@ typedef struct {
     VulkanDataBuffer materials;
     VulkanDataBuffer lights;
     VulkanFluidSimulation fluid;
+    VulkanDataBuffer transforms;
 } VulkanGeometry;
 
 typedef struct {

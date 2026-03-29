@@ -133,9 +133,8 @@ typedef struct {
     BOOL update_materials;
     BOOL update_lights;
     BOOL update_simulation;
+    BOOL update_meshes;
     size_t update_bvh;
-    size_t update_meshes;
-    size_t update_mesh_queue;
 } ChangeSet;
 
 typedef struct {
@@ -273,8 +272,10 @@ typedef struct {
 typedef struct {
     alignas(4) VertexID start;
     alignas(4) VertexID end;
+    alignas(16) vec3 translate;
+    alignas(16) vec3 rotate;
+    alignas(16) vec3 scale;
     alignas(16) mat4 transform;
-    alignas(16) mat4 request;
 } MeshDescriptor;
 DECLARE_ARRLIST(MeshDescriptor);
 

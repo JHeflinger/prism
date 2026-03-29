@@ -21,6 +21,15 @@ void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
         VK_FORMAT_R32_SFLOAT);
 }
 
+void VUPDT_Transforms(VulkanDataBuffer* transforms) {
+    if (sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.maxsize == 0) return;
+    VUTIL_CopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.meshes.data,
+        sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.size,
+        sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.maxsize,
+        transforms->buffer);
+}
+
 void VUPDT_Lights(VulkanDataBuffer* lights) {
     if (sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.maxsize == 0) return;
     VUTIL_CopyHostToBuffer(
