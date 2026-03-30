@@ -442,12 +442,8 @@ void SubmitVertex(vec3 vertex) {
     vec4 v = { 0 };
     glm_vec3_copy(vertex, v);
     ARRLIST_vec4_add(&(g_renderer.geometry.vertices), v);
-    if (vertex[0] < g_renderer.geometry.bounds.min[0]) g_renderer.geometry.bounds.min[0] = vertex[0];
-    if (vertex[1] < g_renderer.geometry.bounds.min[1]) g_renderer.geometry.bounds.min[1] = vertex[1];
-    if (vertex[2] < g_renderer.geometry.bounds.min[2]) g_renderer.geometry.bounds.min[2] = vertex[2];
-    if (vertex[0] > g_renderer.geometry.bounds.max[0]) g_renderer.geometry.bounds.max[0] = vertex[0];
-    if (vertex[1] > g_renderer.geometry.bounds.max[1]) g_renderer.geometry.bounds.max[1] = vertex[1];
-    if (vertex[2] > g_renderer.geometry.bounds.max[2]) g_renderer.geometry.bounds.max[2] = vertex[2];
+    glm_vec3_minv(g_renderer.geometry.bounds.min, vertex, g_renderer.geometry.bounds.min);
+    glm_vec3_maxv(g_renderer.geometry.bounds.max, vertex, g_renderer.geometry.bounds.max);
 }
 
 void ClearVertices() {
@@ -601,6 +597,38 @@ void Render() {
             g_renderer.geometry.changes.update_normals |
             g_renderer.geometry.changes.update_simulation |
             g_renderer.geometry.changes.update_meshes;
+
+        // recompute min/max
+        if (g_renderer.geometry.changes.update_meshes || g_renderer.geometry.changes.update_vertices) {
+            for (size_t i = 0; i < g_renderer.geometry.meshes.size; i++) {
+                MeshDescriptor* md = MeshReference(i);
+                vec3 center, extents, worldcenter, worldextents, worldmin, worldmax;
+                mat4 transform;
+                mat3 m3;
+                memcpy(transform, md->transform, sizeof(mat4));
+                memcpy(center, md->center, sizeof(vec3));
+                memcpy(extents, md->extents, sizeof(vec3));
+                glm_mat4_mulv3(transform, center, 1.0f, worldcenter);
+                glm_mat4_pick3(transform, m3);
+                for (int r = 0; r < 3; r++) for (int c = 0; c < 3; c++) m3[r][c] = fabsf(m3[r][c]);
+                worldextents[0] =
+                    m3[0][0] * extents[0] +
+                    m3[0][1] * extents[1] +
+                    m3[0][2] * extents[2];
+                worldextents[1] =
+                    m3[1][0] * extents[0] +
+                    m3[1][1] * extents[1] +
+                    m3[1][2] * extents[2];
+                worldextents[2] =
+                    m3[2][0] * extents[0] +
+                    m3[2][1] * extents[1] +
+                    m3[2][2] * extents[2];
+                glm_vec3_sub(worldcenter, worldextents, worldmin);
+                glm_vec3_add(worldcenter, worldextents, worldmax);
+                glm_vec3_minv(worldmin, g_renderer.geometry.bounds.min, g_renderer.geometry.bounds.min);
+                glm_vec3_maxv(worldmax, g_renderer.geometry.bounds.max, g_renderer.geometry.bounds.max);
+            }
+        }
 
         // set bvh reconstruction
         if (g_renderer.geometry.changes.update_vertices ||
