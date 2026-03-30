@@ -640,7 +640,20 @@ BOOL LoadOBJ(const char* filepath) {
         FreeFile(file);
         return FALSE;
     } else {
-        SubmitMeshDescriptor((MeshDescriptor){ startv, NumVertices() - 1, { 0 }, { 0 }, { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, StripFilename(filepath));
+        vec3 min, max, center, extent;
+        glm_vec3_copy(state.vertices.data[0], min);
+        glm_vec3_copy(state.vertices.data[0], max);
+        for (size_t i = 1; i < state.vertices.size; i++) {
+            glm_vec3_minv(state.vertices.data[i], min, min);
+            glm_vec3_maxv(state.vertices.data[i], max, max);
+        }
+        glm_vec3_add(max, min, center);
+        glm_vec3_scale(center, 0.5f, center);
+        glm_vec3_sub(max, min, extent);
+        glm_vec3_scale(extent, 0.5f, extent);
+        SubmitMeshDescriptor((MeshDescriptor){
+            startv, NumVertices() - 1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
+            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, StripFilename(filepath));
     }
     CleanStateOBJ(&state);
     FreeFile(file);

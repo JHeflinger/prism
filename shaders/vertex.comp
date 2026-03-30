@@ -3,6 +3,8 @@
 struct MeshDescriptor {
     uint start;
     uint end;
+    vec3 center;
+    vec3 extents;
     vec3 translate;
     vec3 rotate;
     vec3 scale;

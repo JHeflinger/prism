@@ -7,6 +7,7 @@
 #define CLAMP(x, min, max) (x < min ? min : (x > max ? max : x))
 #define MIN(x, y) (x < y ? x : y)
 #define MAX(x, y) (x > y ? x : y)
+#define INLINEV3(v) { v[0], v[1], v[2] }
 
 float TriangleArea(vec3 a, vec3 b, vec3 c);
 

@@ -273,6 +273,8 @@ typedef struct {
 typedef struct {
     alignas(4) VertexID start;
     alignas(4) VertexID end;
+    alignas(16) vec3 center;
+    alignas(16) vec3 extents;
     alignas(16) vec3 translate;
     alignas(16) vec3 rotate;
     alignas(16) vec3 scale;
