@@ -139,7 +139,7 @@ void VCLEAN_Scheduler(VulkanScheduler* scheduler) {
 }
 
 void VCLEAN_Transfer(VulkanTransfer* transfer) {
-    vkFreeCommandBuffers(g_vclean_renderer_ref->vulkan.core.general.interface, transfer->pool, 1, &transfer->commands);
+    vkFreeCommandBuffers(g_vclean_renderer_ref->vulkan.core.general.interface, transfer->pool, CPUSWAP_LENGTH, transfer->commands);
     vkDestroyCommandPool(g_vclean_renderer_ref->vulkan.core.general.interface, transfer->pool, NULL);
     vkDestroySemaphore(g_vclean_renderer_ref->vulkan.core.general.interface, transfer->semaphore, NULL);
     vkUnmapMemory(g_vclean_renderer_ref->vulkan.core.general.interface, transfer->staging.memory);

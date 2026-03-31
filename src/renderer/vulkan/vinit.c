@@ -388,9 +388,9 @@ BOOL VINIT_Transfer(VulkanTransfer* transfer) {
     vkCreateCommandPool(g_vinit_renderer_ref->vulkan.core.general.interface, &pi, NULL, &transfer->pool);
     VkCommandBufferAllocateInfo ai = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = transfer->pool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1
+        .commandPool = transfer->pool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = CPUSWAP_LENGTH
     };
-    vkAllocateCommandBuffers(g_vinit_renderer_ref->vulkan.core.general.interface, &ai, &transfer->commands);
+    vkAllocateCommandBuffers(g_vinit_renderer_ref->vulkan.core.general.interface, &ai, transfer->commands);
     VkSemaphoreTypeCreateInfo sti = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
         .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE, .initialValue = 0
@@ -399,6 +399,7 @@ BOOL VINIT_Transfer(VulkanTransfer* transfer) {
     vkCreateSemaphore(g_vinit_renderer_ref->vulkan.core.general.interface, &sci, NULL, &transfer->semaphore);
     transfer->signal = 0;
     transfer->pending = 0;
+    transfer->index = 0;
     VUTIL_CreateBuffer(
         INITIAL_TRANSFER_STAGE_SIZE,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,

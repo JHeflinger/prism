@@ -220,42 +220,55 @@ void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
 
 VkCommandBuffer VUTIL_BeginTransferCommands() {
     VulkanTransfer* t = &g_vutil_renderer_ref->vulkan.core.transfer;
-    VkDevice dev      =  g_vutil_renderer_ref->vulkan.core.general.interface;
 
-    // wait for the previous transfer to complete before reusing the command buffer
-    if (t->signal > 0) {
-        VkSemaphoreWaitInfo waitInfo = {
+    t->index = (t->index + 1) % CPUSWAP_LENGTH;
+    VkCommandBuffer cmd = t->commands[t->index];
+    if (t->signal >= CPUSWAP_LENGTH) {
+        uint64_t wait_for = t->signal - (CPUSWAP_LENGTH - 1);
+        VkSemaphoreWaitInfo wi = {
             .sType          = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
             .semaphoreCount = 1,
             .pSemaphores    = &t->semaphore,
-            .pValues        = &t->signal,
+            .pValues        = &wait_for,
         };
-        vkWaitSemaphores(dev, &waitInfo, UINT64_MAX);
+        vkWaitSemaphores(g_vutil_renderer_ref->vulkan.core.general.interface, &wi, UINT64_MAX);
     }
 
-    vkResetCommandBuffer(t->commands, 0);
+    vkResetCommandBuffer(cmd, 0);
 
     VkCommandBufferBeginInfo bi = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
     };
-    vkBeginCommandBuffer(t->commands, &bi);
-    return t->commands;
+    vkBeginCommandBuffer(cmd, &bi);
+    return cmd;
 }
 
 void VUTIL_EndTransferCommands() {
     VulkanTransfer* t = &g_vutil_renderer_ref->vulkan.core.transfer;
-    vkEndCommandBuffer(t->commands);
+    VkCommandBuffer cmd = t->commands[t->index];
+    vkEndCommandBuffer(cmd);
+    uint64_t waitVal = t->signal;
     t->signal++;
+    uint64_t signalVal = t->signal;
     VkTimelineSemaphoreSubmitInfo tsi = {
-        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+        .sType                     = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+        .waitSemaphoreValueCount   = waitVal > 0 ? 1 : 0,  // skip wait on first frame
+        .pWaitSemaphoreValues      = &waitVal,
         .signalSemaphoreValueCount = 1,
-        .pSignalSemaphoreValues = &t->signal
+        .pSignalSemaphoreValues    = &signalVal,
     };
+    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     VkSubmitInfo si = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = &tsi,
-        .commandBufferCount = 1, .pCommandBuffers = &t->commands,
-        .signalSemaphoreCount = 1, .pSignalSemaphores = &t->semaphore
+        .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext                = &tsi,
+        .waitSemaphoreCount   = waitVal > 0 ? 1 : 0,
+        .pWaitSemaphores      = &t->semaphore,
+        .pWaitDstStageMask    = &waitStage,
+        .commandBufferCount   = 1,
+        .pCommandBuffers      = &cmd,
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores    = &t->semaphore,
     };
     vkQueueSubmit(t->queue, 1, &si, VK_NULL_HANDLE);
 }

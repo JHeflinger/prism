@@ -26,7 +26,8 @@ typedef struct {
 typedef struct {
     VkQueue queue;
     VkCommandPool pool;
-    VkCommandBuffer commands;
+    VkCommandBuffer commands[CPUSWAP_LENGTH];
+    size_t index;
     VkSemaphore semaphore;
     uint64_t signal;
     uint32_t pending;
