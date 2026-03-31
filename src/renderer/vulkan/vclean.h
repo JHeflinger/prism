@@ -39,6 +39,8 @@ void VCLEAN_OverlayBridge(VulkanDataBuffer* bridge);
 
 void VCLEAN_Scheduler(VulkanScheduler* scheduler);
 
+void VCLEAN_Transfer(VulkanTransfer* transfer);
+
 void VCLEAN_Core(VulkanCore* core);
 
 void VCLEAN_Vulkan(VulkanObject* vulkan);

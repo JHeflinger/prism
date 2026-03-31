@@ -24,11 +24,17 @@ void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize
 
 void VUTIL_CopyBufferToHost(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer);
 
+void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer);
+
 Schrodingnum VUTIL_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 VkCommandBuffer VUTIL_BeginSingleTimeCommands();
 
 void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer);
+
+VkCommandBuffer VUTIL_BeginTransferCommands();
+
+void VUTIL_EndTransferCommands();
 
 void VUTIL_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 

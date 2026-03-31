@@ -7,6 +7,15 @@
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
 
+#define TRANSFER_ACQUIRE_VERTICES   (1 << 0)
+#define TRANSFER_ACQUIRE_NORMALS    (1 << 1)
+#define TRANSFER_ACQUIRE_TRIANGLES  (1 << 2)
+#define TRANSFER_ACQUIRE_EMISSIVES  (1 << 3)
+#define TRANSFER_ACQUIRE_MATERIALS  (1 << 4)
+#define TRANSFER_ACQUIRE_LIGHTS     (1 << 5)
+#define TRANSFER_ACQUIRE_TRANSFORMS (1 << 6)
+#define PENDING(x) g_vupdt_renderer_ref->vulkan.core.transfer.pending |= x
+
 Renderer* g_vupdt_renderer_ref = NULL;
 
 void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
@@ -23,65 +32,72 @@ void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
 
 void VUPDT_Transforms(VulkanDataBuffer* transforms) {
     if (sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
+    VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.meshes.data,
         sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.size,
         sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.maxsize,
         transforms->buffer);
+    PENDING(TRANSFER_ACQUIRE_TRANSFORMS);
 }
 
 void VUPDT_Lights(VulkanDataBuffer* lights) {
     if (sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
+    VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.lights.data,
         sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.size,
         sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.maxsize,
         lights->buffer);
+    PENDING(TRANSFER_ACQUIRE_LIGHTS);
 }
 
 void VUPDT_Normals(VulkanDataBuffer* normals) {
     if (sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
+    VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.normals.data,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.size,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.maxsize,
         normals->buffer);
+    PENDING(TRANSFER_ACQUIRE_NORMALS);
 }
 
 void VUPDT_Vertices(VulkanVertices* vertices) {
     if (sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
+    VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.vertices.data,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.size,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.maxsize,
         vertices->original.buffer);
+    PENDING(TRANSFER_ACQUIRE_VERTICES);
 }
 
 void VUPDT_Triangles(VulkanDataBuffer* triangles) {
     if (sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
+    VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.triangles.data,
         sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.size,
         sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.maxsize,
         triangles->buffer);
+    PENDING(TRANSFER_ACQUIRE_TRIANGLES);
 }
 
 void VUPDT_Emissives(VulkanDataBuffer* emissives) {
     if (sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
+    VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.emissives.data,
         sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.size,
         sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.maxsize,
         emissives->buffer);
+    PENDING(TRANSFER_ACQUIRE_EMISSIVES);
 }
 
 void VUPDT_Materials(VulkanDataBuffer* materials) {
     if (sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.maxsize == 0) return;
-    VUTIL_CopyHostToBuffer(
+    VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.materials.data,
         sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.size,
         sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.maxsize,
         materials->buffer);
+    PENDING(TRANSFER_ACQUIRE_MATERIALS);
 }
 
 void VUPDT_RecordCommand(VkCommandBuffer command) {
@@ -90,6 +106,38 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     VkResult result = vkBeginCommandBuffer(command, &beginInfo);
     EZ_ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
 
+    // ownership aquisition
+    VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vupdt_renderer_ref->vulkan.core.general.gpu);
+    if (g_vupdt_renderer_ref->vulkan.core.transfer.pending && families.transfer.value != families.graphics.value) {
+        VkBufferMemoryBarrier barriers[7] = { 0 };
+        uint32_t count = 0;
+        #define MAYBE_ACQUIRE(flag, buf) \
+            if (g_vupdt_renderer_ref->vulkan.core.transfer.pending & (flag)) { \
+                barriers[count++] = (VkBufferMemoryBarrier){ \
+                    .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, \
+                    .srcAccessMask       = 0, \
+                    .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT, \
+                    .srcQueueFamilyIndex = families.transfer.value, \
+                    .dstQueueFamilyIndex = families.graphics.value, \
+                    .buffer              = (buf), \
+                    .size                = VK_WHOLE_SIZE \
+                }; \
+            }
+        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_VERTICES, g_vupdt_renderer_ref->vulkan.core.geometry.vertices.original.buffer)
+        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_MATERIALS, g_vupdt_renderer_ref->vulkan.core.geometry.materials.buffer)
+        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_LIGHTS, g_vupdt_renderer_ref->vulkan.core.geometry.lights.buffer)
+        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_EMISSIVES, g_vupdt_renderer_ref->vulkan.core.geometry.emissives.buffer)
+        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRIANGLES, g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer)
+        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_NORMALS, g_vupdt_renderer_ref->vulkan.core.geometry.normals.buffer)
+        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRANSFORMS, g_vupdt_renderer_ref->vulkan.core.geometry.transforms.buffer)
+        #undef MAYBE_ACQUIRE
+        if (count > 0) {
+            vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, count, barriers, 0, NULL);
+            g_vupdt_renderer_ref->vulkan.core.transfer.pending = 0;
+        }
+    }
+
+    // bvh configuration
     if (g_vupdt_renderer_ref->geometry.changes.update_bvh) {
         g_vupdt_renderer_ref->geometry.changes.update_bvh--;
         g_vupdt_renderer_ref->config.flags |= BVH_PIPELINE_FLAGS;
@@ -226,46 +274,52 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
 void VUPDT_DescriptorSets(VulkanDescriptors* descriptors) {
     size_t num_shaders = g_vupdt_renderer_ref->vulkan.core.shaders.size;
+    size_t safe = (g_vupdt_renderer_ref->swapchain.index + 1) % CPUSWAP_LENGTH;
     for (size_t i = 0; i < num_shaders; i++) {
         VulkanShader* shader = g_vupdt_renderer_ref->vulkan.core.shaders.data[i];
         size_t vars = shader->variables[0].size;
-        for (size_t j = 0; j < CPUSWAP_LENGTH; j++) {
-            VkDescriptorBufferInfo* bufferInfos = EZ_ALLOC(vars, sizeof(VkDescriptorBufferInfo));
-            VkDescriptorImageInfo* imageInfos = EZ_ALLOC(vars, sizeof(VkDescriptorImageInfo));
-            VkWriteDescriptorSet* descriptorWrites = EZ_ALLOC(vars, sizeof(VkWriteDescriptorSet));
-            for (size_t k = 0; k < vars; k++) {
-                VulkanBoundVariable var = shader->variables[j].data[k];
-                descriptorWrites[k].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                descriptorWrites[k].dstSet = descriptors[i].sets[j];
-                descriptorWrites[k].dstBinding = k;
-                descriptorWrites[k].dstArrayElement = 0;
-                descriptorWrites[k].descriptorType = (VkDescriptorType)var.type;
-                descriptorWrites[k].descriptorCount = 1;
-                if (var.type == STORAGE_IMAGE) {
-                    imageInfos[k].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    imageInfos[k].imageView = var.data.reference ? *((VkImageView*)var.data.value) : (VkImageView)var.data.value;
-                    descriptorWrites[k].pImageInfo = &(imageInfos[k]);
-                } else if (var.type == IMAGE_SAMPLER) {
-                    VulkanImageSampler* vis = (VulkanImageSampler*)(var.data.value);
-                    imageInfos[k].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                    imageInfos[k].imageView = vis->image.view;
-                    imageInfos[k].sampler = vis->sampler;
-                    descriptorWrites[k].pImageInfo = &(imageInfos[k]);
-                } else {
-                    bufferInfos[k].buffer = var.data.reference ? *((VkBuffer*)var.data.value) : (VkBuffer)var.data.value;
-                    bufferInfos[k].offset = 0;
-                    bufferInfos[k].range = var.size.size * ceil((var.size.count.reference ? 
-                        (*((size_t*)var.size.count.value)) :
-                        (size_t)var.size.count.value) / (var.size.reduction > 0.0f ? var.size.reduction : 1.0f));
-                    bufferInfos[k].range = bufferInfos[k].range > 0 ? bufferInfos[k].range : 1;
-                    descriptorWrites[k].pBufferInfo = &(bufferInfos[k]);
-                }
+        VkDescriptorBufferInfo* bufferInfos = EZ_ALLOC(vars, sizeof(VkDescriptorBufferInfo));
+        VkDescriptorImageInfo* imageInfos = EZ_ALLOC(vars, sizeof(VkDescriptorImageInfo));
+        VkWriteDescriptorSet* descriptorWrites = EZ_ALLOC(vars, sizeof(VkWriteDescriptorSet));
+        for (size_t k = 0; k < vars; k++) {
+            VulkanBoundVariable var = shader->variables[safe].data[k];
+            descriptorWrites[k].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[k].dstSet = descriptors[i].sets[safe];
+            descriptorWrites[k].dstBinding = k;
+            descriptorWrites[k].dstArrayElement = 0;
+            descriptorWrites[k].descriptorType = (VkDescriptorType)var.type;
+            descriptorWrites[k].descriptorCount = 1;
+            if (var.type == STORAGE_IMAGE) {
+                imageInfos[k].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+                imageInfos[k].imageView = var.data.reference ? *((VkImageView*)var.data.value) : (VkImageView)var.data.value;
+                descriptorWrites[k].pImageInfo = &(imageInfos[k]);
+            } else if (var.type == IMAGE_SAMPLER) {
+                VulkanImageSampler* vis = (VulkanImageSampler*)(var.data.value);
+                imageInfos[k].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[k].imageView = vis->image.view;
+                imageInfos[k].sampler = vis->sampler;
+                descriptorWrites[k].pImageInfo = &(imageInfos[k]);
+            } else {
+                bufferInfos[k].buffer = var.data.reference ? *((VkBuffer*)var.data.value) : (VkBuffer)var.data.value;
+                bufferInfos[k].offset = 0;
+                bufferInfos[k].range = var.size.size * ceil((var.size.count.reference ? 
+                    (*((size_t*)var.size.count.value)) :
+                    (size_t)var.size.count.value) / (var.size.reduction > 0.0f ? var.size.reduction : 1.0f));
+                bufferInfos[k].range = bufferInfos[k].range > 0 ? bufferInfos[k].range : 1;
+                descriptorWrites[k].pBufferInfo = &(bufferInfos[k]);
             }
-            vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, vars, descriptorWrites, 0, NULL);
-            EZ_FREE(bufferInfos);
-            EZ_FREE(imageInfos);
-            EZ_FREE(descriptorWrites);
         }
+        vkUpdateDescriptorSets(g_vupdt_renderer_ref->vulkan.core.general.interface, vars, descriptorWrites, 0, NULL);
+        EZ_FREE(bufferInfos);
+        EZ_FREE(imageInfos);
+        EZ_FREE(descriptorWrites);
+    }
+}
+
+void VUPDT_DescriptorSetsAll(VulkanDescriptors* descriptors) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUPDT_DescriptorSets(descriptors);
+        g_vupdt_renderer_ref->swapchain.index = (g_vupdt_renderer_ref->swapchain.index + 1) % CPUSWAP_LENGTH;
     }
 }
 

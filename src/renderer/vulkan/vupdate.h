@@ -23,6 +23,8 @@ void VUPDT_RecordCommand(VkCommandBuffer command);
 
 void VUPDT_DescriptorSets(VulkanDescriptors* descriptors);
 
+void VUPDT_DescriptorSetsAll(VulkanDescriptors* descriptors);
+
 void VUPDT_UniformBuffers(UBOArray* ubos);
 
 void VUPDT_SetVulkanUpdateContext(Renderer* renderer);

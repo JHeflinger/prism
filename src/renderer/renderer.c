@@ -580,6 +580,12 @@ void ClearMaterials() {
 
 void Render() {
     static BOOL async_update = TRUE;
+    static uint32_t descriptor_changes = 0;
+	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
+    BOOL resized_buffers = FALSE;
+
+    // helpers for readability
+    inline void geowait() { vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, &g_renderer.vulkan.core.scheduler.syncro.fences[new_ind], VK_TRUE, UINT64_MAX); resized_buffers = TRUE; }
 
     // update render frame time;
     g_rft += GetFrameTime();
@@ -589,14 +595,13 @@ void Render() {
         // profile for stats
         BeginProfile(&(g_renderer.stats.profile));
 
-        BOOL descriptor_changes = 
-            g_renderer.geometry.changes.update_triangles |
+        if (g_renderer.geometry.changes.update_triangles |
             g_renderer.geometry.changes.update_materials |
             g_renderer.geometry.changes.update_lights |
             g_renderer.geometry.changes.update_vertices |
             g_renderer.geometry.changes.update_normals |
             g_renderer.geometry.changes.update_simulation |
-            g_renderer.geometry.changes.update_meshes;
+            g_renderer.geometry.changes.update_meshes) descriptor_changes = CPUSWAP_LENGTH;
 
         // recompute min/max
         if (g_renderer.geometry.changes.update_meshes || g_renderer.geometry.changes.update_vertices) {
@@ -640,7 +645,7 @@ void Render() {
         if (g_renderer.geometry.changes.update_normals) {
             g_renderer.geometry.changes.update_normals = FALSE;
             if (g_renderer.geometry.changes.max_normals != g_renderer.geometry.normals.maxsize) {
-                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                geowait();
                 g_renderer.geometry.changes.max_normals = g_renderer.geometry.normals.maxsize;
                 VCLEAN_Normals(&(g_renderer.vulkan.core.geometry.normals));
                 VINIT_Normals(&(g_renderer.vulkan.core.geometry.normals));
@@ -653,7 +658,7 @@ void Render() {
         if (g_renderer.geometry.changes.update_vertices) {
             g_renderer.geometry.changes.update_vertices = FALSE;
             if (g_renderer.geometry.changes.max_vertices != g_renderer.geometry.vertices.maxsize) {
-                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                geowait();
                 g_renderer.geometry.changes.max_vertices = g_renderer.geometry.vertices.maxsize;
                 VCLEAN_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
                 VINIT_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
@@ -667,7 +672,7 @@ void Render() {
             g_renderer.geometry.changes.update_triangles = FALSE;
             SavePose();
             if (g_renderer.geometry.changes.max_triangles != g_renderer.geometry.triangles.maxsize) {
-                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                geowait();
                 g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
                 VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
                 VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
@@ -677,7 +682,7 @@ void Render() {
                 VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
             }
             if (g_renderer.geometry.changes.max_emissives != g_renderer.geometry.emissives.maxsize) {
-                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                geowait();
                 g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize;
                 VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
                 VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
@@ -690,7 +695,7 @@ void Render() {
         if (g_renderer.geometry.changes.update_materials) {
             g_renderer.geometry.changes.update_materials = FALSE;
             if (g_renderer.geometry.changes.max_materials != g_renderer.geometry.materials.maxsize) {
-                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                geowait();
                 g_renderer.geometry.changes.max_materials = g_renderer.geometry.materials.maxsize;
                 VCLEAN_Materials(&(g_renderer.vulkan.core.geometry.materials));
                 VINIT_Materials(&(g_renderer.vulkan.core.geometry.materials));
@@ -703,7 +708,7 @@ void Render() {
         if (g_renderer.geometry.changes.update_lights) {
             g_renderer.geometry.changes.update_lights = FALSE;
             if (g_renderer.geometry.changes.max_lights != g_renderer.geometry.lights.maxsize) {
-                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                geowait();
                 g_renderer.geometry.changes.max_lights = g_renderer.geometry.lights.maxsize;
                 VCLEAN_Lights(&(g_renderer.vulkan.core.geometry.lights));
                 VINIT_Lights(&(g_renderer.vulkan.core.geometry.lights));
@@ -716,7 +721,7 @@ void Render() {
         if (g_renderer.geometry.changes.update_simulation) {
             g_renderer.geometry.changes.update_simulation = FALSE;
             if (g_renderer.geometry.changes.max_sim_size != SimSize(g_renderer.geometry.fluid)) {
-                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                geowait();
                 g_renderer.geometry.changes.max_sim_size = SimSize(g_renderer.geometry.fluid);
                 VCLEAN_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
                 VINIT_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
@@ -729,7 +734,7 @@ void Render() {
         if (g_renderer.geometry.changes.update_meshes) {
             g_renderer.geometry.changes.update_meshes = FALSE;
             if (g_renderer.geometry.changes.max_meshes != g_renderer.geometry.meshes.maxsize) {
-                vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                geowait();
                 g_renderer.geometry.changes.max_meshes = g_renderer.geometry.meshes.maxsize;
                 VCLEAN_Transforms(&(g_renderer.vulkan.core.geometry.transforms));
                 VINIT_Transforms(&(g_renderer.vulkan.core.geometry.transforms));
@@ -739,7 +744,13 @@ void Render() {
         }
 
         // update descriptor sets if needed
-        if (descriptor_changes) VUPDT_DescriptorSets(g_renderer.vulkan.core.context.renderdata.descriptors);
+        if (descriptor_changes > 0) {
+            descriptor_changes--;
+            if (resized_buffers) {
+                geowait();
+                VUPDT_DescriptorSetsAll(g_renderer.vulkan.core.context.renderdata.descriptors);
+            }
+        }
 
         // update uniform buffers
         VUPDT_UniformBuffers(&(g_renderer.vulkan.core.context.renderdata.ubos));
@@ -752,18 +763,27 @@ void Render() {
         VUPDT_RecordCommand(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
 
         // submit command buffer
-        VkSubmitInfo submitInfo = { 0 };
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.waitSemaphoreCount = 0;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
-        submitInfo.signalSemaphoreCount = 0;
+        uint64_t waitVal = g_renderer.vulkan.core.transfer.signal;
+        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+        VkTimelineSemaphoreSubmitInfo tsi = {
+            .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+            .waitSemaphoreValueCount = 1,
+            .pWaitSemaphoreValues = &waitVal
+        };
+        VkSubmitInfo submitInfo = {
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = &tsi,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &g_renderer.vulkan.core.transfer.semaphore,
+            .pWaitDstStageMask = &waitStage,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]),
+            .signalSemaphoreCount = 0
+        };
         VkResult result = vkQueueSubmit(g_renderer.vulkan.core.scheduler.queue, 1, &submitInfo, g_renderer.vulkan.core.scheduler.syncro.fences[g_renderer.swapchain.index]);
         EZ_ASSERT(result == VK_SUCCESS, "failed to submit draw command buffer!");
     }
 
     // wait for and reset rendering fence
-	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
     if (!g_renderer.config.async)
         vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]), VK_TRUE, UINT64_MAX);
     if (vkGetFenceStatus(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]) == VK_SUCCESS) {

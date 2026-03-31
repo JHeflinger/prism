@@ -11,11 +11,29 @@ typedef struct {
 
 typedef struct {
     Schrodingnum graphics;
+    Schrodingnum transfer;
 } VulkanFamilyGroup;
 
 typedef struct {
     VkFence fences[CPUSWAP_LENGTH];
 } VulkanSyncro;
+
+typedef struct {
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+} VulkanDataBuffer;
+
+typedef struct {
+    VkQueue queue;
+    VkCommandPool pool;
+    VkCommandBuffer commands;
+    VkSemaphore semaphore;
+    uint64_t signal;
+    uint32_t pending;
+    VulkanDataBuffer staging;
+    void* mapped;
+    VkDeviceSize size;
+} VulkanTransfer;
 
 typedef struct {
     alignas(16) vec3 look;
@@ -81,11 +99,6 @@ typedef struct {
     alignas(4) uint32_t elements;
     alignas(4) uint32_t bitstart;
 } VulkanPushConstants;
-
-typedef struct {
-    VkBuffer buffer;
-    VkDeviceMemory memory;
-} VulkanDataBuffer;
 
 typedef struct {
     VulkanDataBuffer objects[CPUSWAP_LENGTH];
@@ -227,6 +240,7 @@ typedef struct {
     VulkanDataBuffer bridge;
     VulkanScheduler scheduler;
     VulkanTarget target;
+    VulkanTransfer transfer;
 } VulkanCore;
 
 typedef struct {

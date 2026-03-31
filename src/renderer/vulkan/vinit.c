@@ -5,6 +5,8 @@
 #include "renderer/vulkan/vshaders.h"
 #include <GLFW/glfw3.h>
 
+#define INITIAL_TRANSFER_STAGE_SIZE (32 * 1024 * 1024)
+
 Renderer* g_vinit_renderer_ref = NULL;
 
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
@@ -258,7 +260,7 @@ BOOL VINIT_Descriptors(VulkanDescriptors* descriptors) {
         EZ_FREE(poolSizes);
         EZ_FREE(bindings);
     }
-    VUPDT_DescriptorSets(descriptors);
+    VUPDT_DescriptorSetsAll(descriptors);
     return TRUE;
 }
 
@@ -373,6 +375,40 @@ BOOL VINIT_Scheduler(VulkanScheduler* scheduler) {
 
 	// create queue
 	return VINIT_Queue(&(scheduler->queue));
+}
+
+BOOL VINIT_Transfer(VulkanTransfer* transfer) {
+    VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vinit_renderer_ref->vulkan.core.general.gpu);
+    vkGetDeviceQueue(g_vinit_renderer_ref->vulkan.core.general.interface, families.transfer.value, 0, &transfer->queue);
+    VkCommandPoolCreateInfo pi = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = families.transfer.value
+    };
+    vkCreateCommandPool(g_vinit_renderer_ref->vulkan.core.general.interface, &pi, NULL, &transfer->pool);
+    VkCommandBufferAllocateInfo ai = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = transfer->pool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1
+    };
+    vkAllocateCommandBuffers(g_vinit_renderer_ref->vulkan.core.general.interface, &ai, &transfer->commands);
+    VkSemaphoreTypeCreateInfo sti = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+        .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE, .initialValue = 0
+    };
+    VkSemaphoreCreateInfo sci = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = &sti };
+    vkCreateSemaphore(g_vinit_renderer_ref->vulkan.core.general.interface, &sci, NULL, &transfer->semaphore);
+    transfer->signal = 0;
+    transfer->pending = 0;
+    VUTIL_CreateBuffer(
+        INITIAL_TRANSFER_STAGE_SIZE,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &transfer->staging);
+    vkMapMemory(g_vinit_renderer_ref->vulkan.core.general.interface,
+        transfer->staging.memory, 0, INITIAL_TRANSFER_STAGE_SIZE, 0,
+        &transfer->mapped);
+    transfer->size = INITIAL_TRANSFER_STAGE_SIZE;
+    return TRUE;
 }
 
 BOOL VINIT_Bridge(VulkanDataBuffer* bridge) {
@@ -636,7 +672,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "Prism Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_1;
+    appInfo.apiVersion = VK_API_VERSION_1_2;
 
     // create info
     VkInstanceCreateInfo createInfo = { 0 };
@@ -725,19 +761,35 @@ BOOL VINIT_General(VulkanGeneral* general) {
 
 	// create device interface
 	VulkanFamilyGroup families = VUTIL_FindQueueFamilies(general->gpu);
-    VkDeviceQueueCreateInfo queueCreateInfo = { 0 };
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = families.graphics.value;
-    queueCreateInfo.queueCount = 1;
-    float queuePriority = 1.0f;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
+    VkDeviceQueueCreateInfo queueInfos[2];
+    float priority = 1.0f;
+    uint32_t queueCount = 1;
+    queueInfos[0] = (VkDeviceQueueCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueFamilyIndex = families.graphics.value,
+        .queueCount = 1, .pQueuePriorities = &priority
+    };
+    if (families.transfer.value != families.graphics.value) {
+        queueInfos[1] = (VkDeviceQueueCreateInfo){
+            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = families.transfer.value,
+            .queueCount = 1, .pQueuePriorities = &priority
+        };
+        queueCount = 2;
+    }
     VkPhysicalDeviceFeatures deviceFeatures = { 0 };
     deviceFeatures.samplerAnisotropy = VK_TRUE;
     deviceFeatures.sampleRateShading = VK_TRUE;
+    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+        .pNext = NULL,
+        .timelineSemaphore = VK_TRUE
+    };
     VkDeviceCreateInfo deviceCreateInfo = { 0 };
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceCreateInfo.queueCreateInfoCount = 1;
+    deviceCreateInfo.pNext = &timelineFeatures;
+    deviceCreateInfo.pQueueCreateInfos = queueInfos;
+    deviceCreateInfo.queueCreateInfoCount = queueCount;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
     deviceCreateInfo.enabledExtensionCount = g_vinit_renderer_ref->vulkan.metadata.extensions.device.size;
     deviceCreateInfo.ppEnabledExtensionNames  = g_vinit_renderer_ref->vulkan.metadata.extensions.device.data;
@@ -784,6 +836,7 @@ BOOL VINIT_Metadata(VulkanMetadata* metadata) {
 BOOL VINIT_Core(VulkanCore* core) {
 	if (!VINIT_Shaders(&(core->shaders))) return FALSE;
 	if (!VINIT_General(&(core->general))) return FALSE;
+    if (!VINIT_Transfer(&(core->transfer))) return FALSE;
 	if (!VINIT_Scheduler(&(core->scheduler))) return FALSE;
 	if (!VINIT_Geometry(&(core->geometry))) return FALSE;
 	if (!VINIT_Bridge(&(core->bridge))) return FALSE;

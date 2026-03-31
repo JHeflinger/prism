@@ -81,17 +81,24 @@ BOOL VUTIL_CheckGPUExtensionSupport(VkPhysicalDevice device) {
 
 VulkanFamilyGroup VUTIL_FindQueueFamilies(VkPhysicalDevice gpu) {
     VulkanFamilyGroup group = { 0 };
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, NULL);
-    VkQueueFamilyProperties* queueFamilies = EZ_ALLOC(queueFamilyCount, sizeof(VkQueueFamilyProperties));
-    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies);
-    for (uint32_t i = 0; i < queueFamilyCount; i++) {
-        if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+    uint32_t count = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &count, NULL);
+    VkQueueFamilyProperties* families = EZ_ALLOC(count, sizeof(VkQueueFamilyProperties));
+    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &count, families);
+    for (uint32_t i = 0; i < count; i++) {
+        if ((families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+            (families[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
             group.graphics = (Schrodingnum){ i, TRUE };
-            break;
+        }
+        if ((families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+           !(families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+           !(families[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+            group.transfer = (Schrodingnum){ i, TRUE };
         }
     }
-    EZ_FREE(queueFamilies);
+    if (!group.transfer.exists)
+        group.transfer = group.graphics;
+    EZ_FREE(families);
     return group;
 }
 
@@ -119,6 +126,39 @@ void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize
     vkUnmapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, stagingBuffer.memory);
     VUTIL_CopyBuffer(stagingBuffer.buffer, buffer, buffersize);
     VUTIL_DestroyBuffer(stagingBuffer);
+}
+
+void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {
+    VkDevice dev =  g_vutil_renderer_ref->vulkan.core.general.interface;
+    if (buffersize > g_vutil_renderer_ref->vulkan.core.transfer.size) {
+        vkUnmapMemory(dev, g_vutil_renderer_ref->vulkan.core.transfer.staging.memory);
+        VUTIL_DestroyBuffer(g_vutil_renderer_ref->vulkan.core.transfer.staging);
+        VUTIL_CreateBuffer(
+            buffersize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &g_vutil_renderer_ref->vulkan.core.transfer.staging);
+        vkMapMemory(dev, g_vutil_renderer_ref->vulkan.core.transfer.staging.memory, 0, buffersize, 0, &g_vutil_renderer_ref->vulkan.core.transfer.mapped);
+        g_vutil_renderer_ref->vulkan.core.transfer.size = buffersize;
+    }
+    memcpy(g_vutil_renderer_ref->vulkan.core.transfer.mapped, hostdata, size);
+    VkCommandBuffer cmd = VUTIL_BeginTransferCommands();
+    VkBufferCopy region = { .size = buffersize };
+    vkCmdCopyBuffer(cmd, g_vutil_renderer_ref->vulkan.core.transfer.staging.buffer, buffer, 1, &region);
+    VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vutil_renderer_ref->vulkan.core.general.gpu);
+    if (families.transfer.value != families.graphics.value) {
+        VkBufferMemoryBarrier release = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = 0,
+            .srcQueueFamilyIndex = families.transfer.value,
+            .dstQueueFamilyIndex = families.graphics.value,
+            .buffer = buffer,
+            .size = VK_WHOLE_SIZE
+        };
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 1, &release, 0, NULL);
+    }
+    VUTIL_EndTransferCommands();
 }
 
 void VUTIL_CopyBufferToHost(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {
@@ -168,13 +208,56 @@ VkCommandBuffer VUTIL_BeginSingleTimeCommands() {
 
 void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkEndCommandBuffer(commandBuffer);
-    VkSubmitInfo submitInfo = { 0 };
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-    vkQueueSubmit(g_vutil_renderer_ref->vulkan.core.scheduler.queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(g_vutil_renderer_ref->vulkan.core.scheduler.queue);
+    VkFence fence;
+    VkFenceCreateInfo fi = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+    vkCreateFence(g_vutil_renderer_ref->vulkan.core.general.interface, &fi, NULL, &fence);
+    VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .commandBufferCount = 1, .pCommandBuffers = &commandBuffer };
+    vkQueueSubmit(g_vutil_renderer_ref->vulkan.core.scheduler.queue, 1, &submitInfo, fence);
+    vkWaitForFences(g_vutil_renderer_ref->vulkan.core.general.interface, 1, &fence, VK_TRUE, UINT64_MAX);
+    vkDestroyFence(g_vutil_renderer_ref->vulkan.core.general.interface, fence, NULL);
     vkFreeCommandBuffers(g_vutil_renderer_ref->vulkan.core.general.interface, g_vutil_renderer_ref->vulkan.core.scheduler.commands.pool, 1, &commandBuffer);
+}
+
+VkCommandBuffer VUTIL_BeginTransferCommands() {
+    VulkanTransfer* t = &g_vutil_renderer_ref->vulkan.core.transfer;
+    VkDevice dev      =  g_vutil_renderer_ref->vulkan.core.general.interface;
+
+    // wait for the previous transfer to complete before reusing the command buffer
+    if (t->signal > 0) {
+        VkSemaphoreWaitInfo waitInfo = {
+            .sType          = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+            .semaphoreCount = 1,
+            .pSemaphores    = &t->semaphore,
+            .pValues        = &t->signal,
+        };
+        vkWaitSemaphores(dev, &waitInfo, UINT64_MAX);
+    }
+
+    vkResetCommandBuffer(t->commands, 0);
+
+    VkCommandBufferBeginInfo bi = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+    };
+    vkBeginCommandBuffer(t->commands, &bi);
+    return t->commands;
+}
+
+void VUTIL_EndTransferCommands() {
+    VulkanTransfer* t = &g_vutil_renderer_ref->vulkan.core.transfer;
+    vkEndCommandBuffer(t->commands);
+    t->signal++;
+    VkTimelineSemaphoreSubmitInfo tsi = {
+        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+        .signalSemaphoreValueCount = 1,
+        .pSignalSemaphoreValues = &t->signal
+    };
+    VkSubmitInfo si = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = &tsi,
+        .commandBufferCount = 1, .pCommandBuffers = &t->commands,
+        .signalSemaphoreCount = 1, .pSignalSemaphores = &t->semaphore
+    };
+    vkQueueSubmit(t->queue, 1, &si, VK_NULL_HANDLE);
 }
 
 void VUTIL_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {

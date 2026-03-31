@@ -29,6 +29,8 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline);
 
 BOOL VINIT_Scheduler(VulkanScheduler* scheduler);
 
+BOOL VINIT_Transfer(VulkanTransfer* transfer);
+
 BOOL VINIT_Bridge(VulkanDataBuffer* bridge);
 
 BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridge);
