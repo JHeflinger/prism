@@ -237,15 +237,15 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor(0, 5);
             UIDrawText("r");
             UIMoveCursor(15, -20);
-            edited |= UIDragFloat(&(lref->color[0]), 0.0f, 1.0f, 0.1f, component_width);
+            edited |= UIDragFloat(&(lref->color[0]), 0.0f, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(component_width + 25, -20);
             UIDrawText("g");
             UIMoveCursor(component_width + 40, -20);
-            edited |= UIDragFloat(&(lref->color[1]), 0.0f, 1.0f, 0.1f, component_width);
+            edited |= UIDragFloat(&(lref->color[1]), 0.0f, FLT_MAX, 0.1f, component_width);
             UIMoveCursor((2*component_width) + 50, -20);
             UIDrawText("b");
             UIMoveCursor((2*component_width) + 65, -20);
-            edited |= UIDragFloat(&(lref->color[2]), 0.0f, 1.0f, 0.1f, component_width);
+            edited |= UIDragFloat(&(lref->color[2]), 0.0f, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Direction") / 2) - 10, 0);
             UIDrawText("Direction");
