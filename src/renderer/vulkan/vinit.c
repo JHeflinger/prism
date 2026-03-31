@@ -380,22 +380,24 @@ BOOL VINIT_Scheduler(VulkanScheduler* scheduler) {
 BOOL VINIT_Transfer(VulkanTransfer* transfer) {
     VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vinit_renderer_ref->vulkan.core.general.gpu);
     vkGetDeviceQueue(g_vinit_renderer_ref->vulkan.core.general.interface, families.transfer.value, 0, &transfer->queue);
-    VkCommandPoolCreateInfo pi = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = families.transfer.value
-    };
+    VkCommandPoolCreateInfo pi = { 0 };
+    pi.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pi.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    pi.queueFamilyIndex = families.transfer.value;
     vkCreateCommandPool(g_vinit_renderer_ref->vulkan.core.general.interface, &pi, NULL, &transfer->pool);
-    VkCommandBufferAllocateInfo ai = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = transfer->pool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = CPUSWAP_LENGTH
-    };
+    VkCommandBufferAllocateInfo ai = { 0 };
+    ai.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    ai.commandPool = transfer->pool;
+    ai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    ai.commandBufferCount = CPUSWAP_LENGTH;
     vkAllocateCommandBuffers(g_vinit_renderer_ref->vulkan.core.general.interface, &ai, transfer->commands);
-    VkSemaphoreTypeCreateInfo sti = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
-        .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE, .initialValue = 0
-    };
-    VkSemaphoreCreateInfo sci = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = &sti };
+    VkSemaphoreTypeCreateInfo sti = { 0 };
+    sti.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+    sti.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    sti.initialValue = 0;
+    VkSemaphoreCreateInfo sci = { 0 };
+    sci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    sci.pNext = &sti;
     vkCreateSemaphore(g_vinit_renderer_ref->vulkan.core.general.interface, &sci, NULL, &transfer->semaphore);
     transfer->signal = 0;
     transfer->pending = 0;
@@ -765,27 +767,25 @@ BOOL VINIT_General(VulkanGeneral* general) {
     VkDeviceQueueCreateInfo queueInfos[2];
     float priority = 1.0f;
     uint32_t queueCount = 1;
-    queueInfos[0] = (VkDeviceQueueCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .queueFamilyIndex = families.graphics.value,
-        .queueCount = 1, .pQueuePriorities = &priority
-    };
+    queueInfos[0] = (VkDeviceQueueCreateInfo){ 0 };
+    queueInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueInfos[0].queueFamilyIndex = families.graphics.value;
+    queueInfos[0].queueCount = 1;
+    queueInfos[0].pQueuePriorities = &priority;
     if (families.transfer.value != families.graphics.value) {
-        queueInfos[1] = (VkDeviceQueueCreateInfo){
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = families.transfer.value,
-            .queueCount = 1, .pQueuePriorities = &priority
-        };
+        queueInfos[1] = (VkDeviceQueueCreateInfo){ 0 };
+        queueInfos[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueInfos[1].queueFamilyIndex = families.transfer.value;
+        queueInfos[1].queueCount = 1;
+        queueInfos[1].pQueuePriorities = &priority;
         queueCount = 2;
     }
     VkPhysicalDeviceFeatures deviceFeatures = { 0 };
     deviceFeatures.samplerAnisotropy = VK_TRUE;
     deviceFeatures.sampleRateShading = VK_TRUE;
-    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-        .pNext = NULL,
-        .timelineSemaphore = VK_TRUE
-    };
+    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = { 0 };
+    timelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+    timelineFeatures.timelineSemaphore = VK_TRUE;
     VkDeviceCreateInfo deviceCreateInfo = { 0 };
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceCreateInfo.pNext = &timelineFeatures;

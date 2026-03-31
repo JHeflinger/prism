@@ -49,6 +49,7 @@ Next:
 9. surely there must be a way to create a global staging pipeline stage to do all this stuff in-pipeline?
 10. should have a scratch staging buffer that stays alive and is used
 11. also use the correct bits for staging properly based on first upload or consecutive upload
+12. disable start sim button if not initalized 
 
 NEXT:
 UI CONTROLLING SIM PARAMS

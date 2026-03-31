@@ -147,15 +147,14 @@ void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffe
     vkCmdCopyBuffer(cmd, g_vutil_renderer_ref->vulkan.core.transfer.staging.buffer, buffer, 1, &region);
     VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vutil_renderer_ref->vulkan.core.general.gpu);
     if (families.transfer.value != families.graphics.value) {
-        VkBufferMemoryBarrier release = {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = 0,
-            .srcQueueFamilyIndex = families.transfer.value,
-            .dstQueueFamilyIndex = families.graphics.value,
-            .buffer = buffer,
-            .size = VK_WHOLE_SIZE
-        };
+        VkBufferMemoryBarrier release = { 0 };
+        release.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        release.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        release.dstAccessMask = 0;
+        release.srcQueueFamilyIndex = families.transfer.value;
+        release.dstQueueFamilyIndex = families.graphics.value;
+        release.buffer = buffer;
+        release.size = VK_WHOLE_SIZE;
         vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 1, &release, 0, NULL);
     }
     VUTIL_EndTransferCommands();
@@ -219,58 +218,49 @@ void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
 }
 
 VkCommandBuffer VUTIL_BeginTransferCommands() {
-    VulkanTransfer* t = &g_vutil_renderer_ref->vulkan.core.transfer;
-
-    t->index = (t->index + 1) % CPUSWAP_LENGTH;
-    VkCommandBuffer cmd = t->commands[t->index];
-    if (t->signal >= CPUSWAP_LENGTH) {
-        uint64_t wait_for = t->signal - (CPUSWAP_LENGTH - 1);
-        VkSemaphoreWaitInfo wi = {
-            .sType          = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
-            .semaphoreCount = 1,
-            .pSemaphores    = &t->semaphore,
-            .pValues        = &wait_for,
-        };
+    g_vutil_renderer_ref->vulkan.core.transfer.index = (g_vutil_renderer_ref->vulkan.core.transfer.index + 1) % CPUSWAP_LENGTH;
+    VkCommandBuffer cmd = g_vutil_renderer_ref->vulkan.core.transfer.commands[g_vutil_renderer_ref->vulkan.core.transfer.index];
+    if (g_vutil_renderer_ref->vulkan.core.transfer.signal >= CPUSWAP_LENGTH) {
+        uint64_t wait_for = g_vutil_renderer_ref->vulkan.core.transfer.signal - (CPUSWAP_LENGTH - 1);
+        VkSemaphoreWaitInfo wi = { 0 };
+        wi.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+        wi.semaphoreCount = 1;
+        wi.pSemaphores = &g_vutil_renderer_ref->vulkan.core.transfer.semaphore;
+        wi.pValues = &wait_for;
         vkWaitSemaphores(g_vutil_renderer_ref->vulkan.core.general.interface, &wi, UINT64_MAX);
     }
-
     vkResetCommandBuffer(cmd, 0);
-
-    VkCommandBufferBeginInfo bi = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-    };
+    VkCommandBufferBeginInfo bi = { 0 };
+    bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(cmd, &bi);
     return cmd;
 }
 
 void VUTIL_EndTransferCommands() {
-    VulkanTransfer* t = &g_vutil_renderer_ref->vulkan.core.transfer;
-    VkCommandBuffer cmd = t->commands[t->index];
+    VkCommandBuffer cmd = g_vutil_renderer_ref->vulkan.core.transfer.commands[g_vutil_renderer_ref->vulkan.core.transfer.index];
     vkEndCommandBuffer(cmd);
-    uint64_t waitVal = t->signal;
-    t->signal++;
-    uint64_t signalVal = t->signal;
-    VkTimelineSemaphoreSubmitInfo tsi = {
-        .sType                     = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .waitSemaphoreValueCount   = waitVal > 0 ? 1 : 0,  // skip wait on first frame
-        .pWaitSemaphoreValues      = &waitVal,
-        .signalSemaphoreValueCount = 1,
-        .pSignalSemaphoreValues    = &signalVal,
-    };
+    uint64_t waitVal = g_vutil_renderer_ref->vulkan.core.transfer.signal;
+    g_vutil_renderer_ref->vulkan.core.transfer.signal++;
+    uint64_t signalVal = g_vutil_renderer_ref->vulkan.core.transfer.signal;
+    VkTimelineSemaphoreSubmitInfo tsi = { 0 };
+    tsi.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+    tsi.waitSemaphoreValueCount = waitVal > 0 ? 1 : 0;
+    tsi.pWaitSemaphoreValues = &waitVal;
+    tsi.signalSemaphoreValueCount = 1;
+    tsi.pSignalSemaphoreValues = &signalVal;
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    VkSubmitInfo si = {
-        .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext                = &tsi,
-        .waitSemaphoreCount   = waitVal > 0 ? 1 : 0,
-        .pWaitSemaphores      = &t->semaphore,
-        .pWaitDstStageMask    = &waitStage,
-        .commandBufferCount   = 1,
-        .pCommandBuffers      = &cmd,
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores    = &t->semaphore,
-    };
-    vkQueueSubmit(t->queue, 1, &si, VK_NULL_HANDLE);
+    VkSubmitInfo si = { 0 };
+    si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    si.pNext = &tsi;
+    si.waitSemaphoreCount = waitVal > 0 ? 1 : 0;
+    si.pWaitSemaphores = &g_vutil_renderer_ref->vulkan.core.transfer.semaphore;
+    si.pWaitDstStageMask = &waitStage;
+    si.commandBufferCount = 1;
+    si.pCommandBuffers = &cmd;
+    si.signalSemaphoreCount = 1;
+    si.pSignalSemaphores = &g_vutil_renderer_ref->vulkan.core.transfer.semaphore;
+    vkQueueSubmit(g_vutil_renderer_ref->vulkan.core.transfer.queue, 1, &si, VK_NULL_HANDLE);
 }
 
 void VUTIL_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {

@@ -730,7 +730,7 @@ void UITextInput_(PersistantUIData* data, const char* label, char* buffer, size_
     if (CheckCollisionPointRec(
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y, box_width, LINE_HEIGHT - 2})) {
-        if (InputButtonDown(IK_MOUSELEFT)) {
+        if (InputButtonPressed(IK_MOUSELEFT)) {
             g_textinput_data = (TextInputData){
                 buffer, size, TRUE, data, strlen(buffer), 
                 (Vector2){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y}, box_width};
