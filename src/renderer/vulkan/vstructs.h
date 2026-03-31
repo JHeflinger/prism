@@ -34,6 +34,7 @@ typedef struct {
     VulkanDataBuffer staging;
     void* mapped;
     VkDeviceSize size;
+    VkDeviceSize offset;
 } VulkanTransfer;
 
 typedef struct {

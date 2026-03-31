@@ -580,7 +580,6 @@ void ClearMaterials() {
 
 void Render() {
     static BOOL async_update = TRUE;
-    static uint32_t descriptor_changes = 0;
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
     BOOL resized_buffers = FALSE;
 
@@ -599,14 +598,6 @@ void Render() {
     if (async_update) {
         // profile for stats
         BeginProfile(&(g_renderer.stats.profile));
-
-        if (g_renderer.geometry.changes.update_triangles |
-            g_renderer.geometry.changes.update_materials |
-            g_renderer.geometry.changes.update_lights |
-            g_renderer.geometry.changes.update_vertices |
-            g_renderer.geometry.changes.update_normals |
-            g_renderer.geometry.changes.update_simulation |
-            g_renderer.geometry.changes.update_meshes) descriptor_changes = CPUSWAP_LENGTH;
 
         // recompute min/max
         if (g_renderer.geometry.changes.update_meshes || g_renderer.geometry.changes.update_vertices) {
@@ -749,12 +740,9 @@ void Render() {
         }
 
         // update descriptor sets if needed
-        if (descriptor_changes > 0) {
-            descriptor_changes--;
-            if (resized_buffers) {
-                sync_transfer();
-                VUPDT_DescriptorSetsAll(g_renderer.vulkan.core.context.renderdata.descriptors);
-            }
+        if (resized_buffers) {
+            sync_transfer();
+            VUPDT_DescriptorSetsAll(g_renderer.vulkan.core.context.renderdata.descriptors);
         }
 
         // update uniform buffers

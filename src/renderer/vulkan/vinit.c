@@ -402,6 +402,7 @@ BOOL VINIT_Transfer(VulkanTransfer* transfer) {
     transfer->signal = 0;
     transfer->pending = 0;
     transfer->index = 0;
+    transfer->offset = 0;
     VUTIL_CreateBuffer(
         INITIAL_TRANSFER_STAGE_SIZE,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,

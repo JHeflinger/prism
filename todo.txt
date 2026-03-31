@@ -40,6 +40,7 @@ Next:
 7. bug - some keybinds don't work (save on desktop and load i on laptop) - S is because its entering select mode, shouldn't be transitioning if its not there, because S was earlier in the bind queue its being prioritized
 8. proper rendering/camera panel
 9. CPUswap greater than 2 breaks??
+10. loading in 6 peters breaks or 4 armadillos??
 
 1. make seperate tabs - preview - render - simulate and viewport changes based on that
 
