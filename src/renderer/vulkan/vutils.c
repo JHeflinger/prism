@@ -129,11 +129,10 @@ void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize
 }
 
 void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {
-    VkDevice dev =  g_vutil_renderer_ref->vulkan.core.general.interface;
     VkDeviceSize align  = 256;
     VkDeviceSize offset = (g_vutil_renderer_ref->vulkan.core.transfer.offset + align - 1) & ~(align - 1);
     if (offset + buffersize > g_vutil_renderer_ref->vulkan.core.transfer.size) {
-        vkUnmapMemory(dev, g_vutil_renderer_ref->vulkan.core.transfer.staging.memory);
+        vkUnmapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, g_vutil_renderer_ref->vulkan.core.transfer.staging.memory);
         VUTIL_DestroyBuffer(g_vutil_renderer_ref->vulkan.core.transfer.staging);
         VkDeviceSize newsize = (offset + buffersize) * 2;
         VUTIL_CreateBuffer(
@@ -141,7 +140,7 @@ void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffe
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             &g_vutil_renderer_ref->vulkan.core.transfer.staging);
-        vkMapMemory(dev, g_vutil_renderer_ref->vulkan.core.transfer.staging.memory, 0, newsize, 0, &g_vutil_renderer_ref->vulkan.core.transfer.mapped);
+        vkMapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, g_vutil_renderer_ref->vulkan.core.transfer.staging.memory, 0, newsize, 0, &g_vutil_renderer_ref->vulkan.core.transfer.mapped);
         g_vutil_renderer_ref->vulkan.core.transfer.size = newsize;
         g_vutil_renderer_ref->vulkan.core.transfer.offset = 0;
         offset = 0;

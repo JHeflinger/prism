@@ -27,7 +27,7 @@ void InitializeInput() {
     g_input_map.keymap[IK_SELECT_FACE] = KEY_T;
     g_input_map.keymap[IK_SELECT_VERTEX] = KEY_V;
     g_input_map.keymap[IK_SELECT_NONE] = KEY_N;
-    g_input_map.keymap[IK_SELECT] = KEY_S;
+    g_input_map.keymap[IK_SELECT] = KEY_LEFT_SHIFT;
     g_input_map.keymap[IK_PAN_SELECTED] = KEY_Y;
     g_input_map.keymap[IK_A_OVERRIDE] = KEY_A;
 
@@ -57,7 +57,7 @@ void InitializeInput() {
     g_input_map.keynames[IK_SELECT_FACE] = "T";
     g_input_map.keynames[IK_SELECT_VERTEX] = "V";
     g_input_map.keynames[IK_SELECT_NONE] = "N";
-    g_input_map.keynames[IK_SELECT] = "S";
+    g_input_map.keynames[IK_SELECT] = "LEFT SHIFT";
     g_input_map.keynames[IK_PAN_SELECTED] = "Y";
     g_input_map.keynames[IK_A_OVERRIDE] = "A";
 

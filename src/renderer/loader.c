@@ -652,7 +652,7 @@ BOOL LoadOBJ(const char* filepath) {
         glm_vec3_sub(max, min, extent);
         glm_vec3_scale(extent, 0.5f, extent);
         SubmitMeshDescriptor((MeshDescriptor){
-            startv, NumVertices() - 1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
+            FALSE, startv, NumVertices() - 1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
             { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, StripFilename(filepath));
     }
     CleanStateOBJ(&state);

@@ -510,6 +510,14 @@ void DrawEditPanel(float width, float height) {
             UIDrawText("Edit Object");
             UIMoveCursor(0, 15);
             UITextInput("Name", *(MeshNameReference(g_edit_item_index)), MAX_MESH_NAME_SIZE, width - 20);
+            UIMoveCursor(0, 15);
+            UIDrawText("Disable");
+            UIMoveCursor(140, -20);
+            BOOL disabled = md->disabled != 0;
+            UICheckbox(&disabled);
+            edited |= disabled != (md->disabled != 0);
+            md->disabled = disabled;
+            UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Translation") / 2) - 10, 0);
             UIDrawText("Translation");
             UIMoveCursor(0, 5);
@@ -554,7 +562,6 @@ void DrawEditPanel(float width, float height) {
             UIDrawText("z");
             UIMoveCursor((2*component_width) + 65, -20);
             edited |= UIDragFloat(&(md->scale[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
-            UIMoveCursor(0, 15);
             if (edited) UpdateObjectTransform(g_edit_item_index);
         } else {
             EZ_FATAL("Unhandled edit type detected");

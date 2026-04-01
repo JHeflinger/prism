@@ -35,24 +35,18 @@ ICEBOX:
 46. basic analysis on image sections to determine if need to trace more on it or not so we can prioritize parts of the image that needs more samples
 47. integrate simulator into geometry editor
 48. real spectral rendering maybe use hero rays and fix spectral aliasing
+49. simulation on GPU
+50. optimize memory bits and types
 
 Next:
 2. open files via mini file explorer
-7. bug - some keybinds don't work (save on desktop and load i on laptop) - S is because its entering select mode, shouldn't be transitioning if its not there, because S was earlier in the bind queue its being prioritized
 8. proper rendering/camera panel
 9. CPUswap greater than 2 breaks??
-10. loading in 6 peters breaks or 4 armadillos??
+10. loading in 6 peters breaks or 4 armadillos?? - like 90% of time reliable, but once it was 5 armadillos
 11. change overlay edge highlighting to just use barycentric coordinates
 
 1. make seperate tabs - preview - render - simulate and viewport changes based on that
 
-6. NOTE WE CANNOT DO GPU IMPLEMENTATION THATS MULTI FRAME BUFFERED AT ALL FOR SIMULATION!!
-7. make update simulation call not flicker and unsmooth, and everything else while you're at it
-8. optimize memory bits and types
-9. surely there must be a way to create a global staging pipeline stage to do all this stuff in-pipeline?
-10. should have a scratch staging buffer that stays alive and is used
-11. also use the correct bits for staging properly based on first upload or consecutive upload
-12. disable start sim button if not initalized
 13. uhh fwidth() is a think that may be useful for improving overlay
 
 NEXT:

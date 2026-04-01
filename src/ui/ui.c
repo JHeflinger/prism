@@ -574,7 +574,7 @@ BOOL UIButton(const char* label, size_t w) {
     float button_width = w < text_size.x + 20 ? text_size.x + 20 : w;
     Color color = MappedColor(PANEL_BTN_BG_COLOR);
     BOOL clicked = FALSE;
-    if (CheckCollisionPointRec(
+    if (!g_ui_disabled && CheckCollisionPointRec(
             GetMousePosition(),
             (Rectangle){g_ui_cursor.x + g_ui_position.x, g_ui_cursor.y + g_ui_position.y + 1, button_width, LINE_HEIGHT - 2})) {
         color = MappedColor(PANEL_BTN_HVR_COLOR);
@@ -582,10 +582,12 @@ BOOL UIButton(const char* label, size_t w) {
         clicked = InputButtonPressed(IK_MOUSELEFT);
     }
     if (clicked) g_was_ui_element_just_used = TRUE;
-    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 1, button_width, LINE_HEIGHT - 2, color);
+    DrawRectangle(g_ui_cursor.x, g_ui_cursor.y + 1, button_width, LINE_HEIGHT - 2, 
+                  g_ui_disabled ? MappedColor(UI_BOX_DISABLED) : color);
     Vector2 texpos = g_ui_cursor;
     texpos.x += (button_width - text_size.x) / 2.0f;
-    DrawTextEx(FontAsset(), label, texpos, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+    DrawTextEx(FontAsset(), label, texpos, LINE_HEIGHT, 0, 
+               g_ui_disabled ? MappedColor(UI_TEXT_DISABLED) : MappedColor(UI_TEXT_COLOR));
     g_ui_cursor.y += LINE_HEIGHT;
     g_ui_cursor.x = 10;
     return clicked;

@@ -271,6 +271,7 @@ typedef struct {
 #define SimSwapD(fs) { float* t = (fs).density; (fs).density = (fs).dswap; (fs).dswap = t; }
 
 typedef struct {
+    alignas(4) uint32_t disabled;
     alignas(4) VertexID start;
     alignas(4) VertexID end;
     alignas(16) vec3 center;

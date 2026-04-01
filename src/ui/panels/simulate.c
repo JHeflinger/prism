@@ -18,6 +18,7 @@ void DrawSimulatePanel(float width, float height) {
     SetPipelineFlags(SIMULATE_PIPELINE_FLAGS);
     UIDrawText("Simulation Controls");
     UIDivider(width - 20);
+    if (sim->width == 0 || sim->height == 0 || sim->length == 0) DisableUI();
     if (UIButton(g_simulation_started ? (g_simulation_running ? "Pause" : "Resume") : "Start", width - 20)) {
         if (g_simulation_running) g_simulation_running = FALSE;
         else g_simulation_running = TRUE;
@@ -36,6 +37,7 @@ void DrawSimulatePanel(float width, float height) {
     UIMoveCursor((width - 20.0f)/2.0f, -20);
     UIDragSize(&s_simstepsize, 1, 10000, 1, (width - 20.0f)/2.0f);
     UIMoveCursor(0, 35);
+    EnableUI();
     UIDrawText("Reconfigure Simulation");
     UIDivider(width - 20);
     UIDrawText("w");

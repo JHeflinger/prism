@@ -602,8 +602,11 @@ void Render() {
 
         // recompute min/max
         if (g_renderer.geometry.changes.update_meshes || g_renderer.geometry.changes.update_vertices) {
+            SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
+            SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
             for (size_t i = 0; i < g_renderer.geometry.meshes.size; i++) {
                 MeshDescriptor* md = MeshReference(i);
+                if (md->disabled) continue;
                 vec3 center, extents, worldcenter, worldextents, worldmin, worldmax;
                 mat4 transform;
                 mat3 m3;

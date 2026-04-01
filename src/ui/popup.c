@@ -1,5 +1,6 @@
 #include "popup.h"
 #include "renderer/renderer.h"
+#include "renderer/rmath.h"
 #include "data/colors.h"
 #include "data/input.h"
 #include "ui/shared.h"
@@ -17,6 +18,7 @@ char g_material_name[MAX_MATERIAL_NAME_SIZE] = "Untitled Material";
 char g_light_name[MAX_LIGHT_NAME_SIZE] = "Untitled Light";
 char g_force_name[MAX_FORCE_NAME_SIZE] = "Untitled Force";
 char g_source_name[MAX_SOURCE_NAME_SIZE] = "Untitled Source";
+char g_object_name[MAX_MESH_NAME_SIZE] = "Untitled Object";
 Triangle g_dummy_triangle = { 0 };
 
 int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
@@ -269,7 +271,7 @@ int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
 int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 385;
-    float height = 300;
+    float height = 340;
     float xpos = x + ((w - width) / 2.0f);
     float ypos = y + ((h - height) / 2.0f);
     float button_width = 200;
@@ -278,6 +280,9 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     DrawRectangle(xpos, ypos, width, height, MappedColor(PANEL_BG_COLOR));
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Cube") / 2), 0);
     UIDrawText("Add Cube");
+
+    UIMoveCursor(xpos, 15);
+    UITextInput("Object Name", g_object_name, MAX_MESH_NAME_SIZE, width - 20);
 
     UIMoveCursor(0, 15);
     UIMoveCursor(xpos + (width / 2) - (UITextWidth("Position") / 2) - 10, 0);
@@ -372,6 +377,13 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
         SubmitTriangle((Triangle){ vertex_base + 0, vertex_base + 1, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
         SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 4, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
         g_dummy_triangle = (Triangle){ 0 };
+        vec3 extent;
+        glm_vec3_scale(g_cube_scale, 0.5f, extent);
+        SubmitMeshDescriptor((MeshDescriptor){
+            FALSE, vertex_base, NumVertices() - 1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
+            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, g_object_name);
+        memset(g_object_name, 0, MAX_MESH_NAME_SIZE);
+        strcpy(g_object_name, "Untitled Object");
         return 0;
     }
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);

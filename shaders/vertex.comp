@@ -1,6 +1,7 @@
 #version 450
 
 struct MeshDescriptor {
+    uint disabled;
     uint start;
     uint end;
     vec3 center;
@@ -51,6 +52,10 @@ void main() {
         return;
     }
     MeshDescriptor md = transformsIn[mi];
+    if (md.disabled != 0) {
+        transformedIn[gl_GlobalInvocationID.x] = vec4(0);
+        return;
+    }
     vec3 newpos = (md.transform * vec4(vertexIn[gl_GlobalInvocationID.x].xyz, 1.0)).xyz;
     transformedIn[gl_GlobalInvocationID.x] = vec4(newpos, vertexIn[gl_GlobalInvocationID.x].w);
 }

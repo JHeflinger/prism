@@ -28,4 +28,5 @@ WINDOWS LINK winpthread
 WINDOWS LINK ws2_32
 WINDOWS LINK :win_x64_libraylib.a
 SOURCE vendor/EasyC/include
+FLAG fast
 FLAG audit
