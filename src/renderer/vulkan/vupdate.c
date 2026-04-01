@@ -388,6 +388,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.directonly = g_vupdt_renderer_ref->config.directonly;
         ubo.scenelighting = g_vupdt_renderer_ref->config.scenelighting;
         ubo.scenelightingonly = g_vupdt_renderer_ref->config.scenelightingonly;
+        ubo.scenelightshadows = g_vupdt_renderer_ref->config.scenelightshadows;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

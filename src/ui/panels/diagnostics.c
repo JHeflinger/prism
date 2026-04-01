@@ -72,6 +72,7 @@ void DrawDevPanel(float width, float height) {
     UICheckboxLabeled("Direct Light Only:", &(RenderConfig()->directonly));
     UICheckboxLabeled("Scene Light Sampling:", &(RenderConfig()->scenelighting));
     UICheckboxLabeled("Scene Light Only:", &(RenderConfig()->scenelightingonly));
+    UICheckboxLabeled("Scene Light Shadows:", &(RenderConfig()->scenelightshadows));
 
     UIMoveCursor(0, 20.0f);
     UIDragFloatLabeled("Whitepoint:", &(RenderConfig()->whitepoint), 0.01f, 999999999.0f, 0.1f, width - 20);
@@ -81,7 +82,6 @@ void DrawDevPanel(float width, float height) {
     UIDrawText("Renderer FPS: %d", (int)(1.0f / ((float)RenderTime() / 1000.0f)));
     UIDrawText("Render time: %.6f ms", (float)RenderTime());
     UIDrawText("Triangles: %d", (int)NumTriangles());
-    UIDrawText("Emissives: %d", (int)NumEmissives());
     UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
 
     SimpleCamera c = GetCamera();

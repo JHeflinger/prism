@@ -44,6 +44,11 @@ Next:
 9. CPUswap greater than 2 breaks??
 10. loading in 6 peters breaks or 4 armadillos?? - like 90% of time reliable, but once it was 5 armadillos
 11. change overlay edge highlighting to just use barycentric coordinates
+12. screen space BVH - if toggled, then in vertex shader just pass in vertices (or flag them and process triangles as a whole later), and then reconstruct bvh such that it only uses triangles in screenspace basically. Works great for scenes that don't NEED thorough GI or off-screen shadows
+    - vertex pass - if vertex is in screen space, mark the .w value as the original value + 2;
+    - triangle pass - for each triangle, if all vertices are marked with a +2, then disable triangle
+    - restore pass - for every vertex with a +2, subtract 2 to restore to original value
+    - in bvh, if screen space BVH turned on, any triangle just has 0,0,0 min/max
 
 1. make seperate tabs - preview - render - simulate and viewport changes based on that
 

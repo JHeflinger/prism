@@ -267,6 +267,7 @@ void InitializeRenderer() {
     g_renderer.config.directonly = FALSE;
     g_renderer.config.scenelighting = TRUE;
     g_renderer.config.scenelightingonly = FALSE;
+    g_renderer.config.scenelightshadows = TRUE;
     g_renderer.config.normals = TRUE;
     g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
     g_renderer.config.arap.iterations = 10;

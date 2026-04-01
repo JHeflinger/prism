@@ -94,6 +94,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint normals;
     uint scenelighting;
     uint scenelightingonly;
+    uint scenelightshadows;
     float fov;
     float width;
     float height;
@@ -474,10 +475,12 @@ vec3 sample_scene_lights(vec3 outgoing, Hit h, Material material) {
         }
         float ndotl = max(dot(incoming, h.normal), 0.0);
         if (ndotl <= 0) continue;
-        Ray sray = { h.position + (incoming * EPS), incoming };
-        uint tid;
-        Hit shit = trace(sray, tid);
-        if (shit.distance > 0 && shit.distance < distance_to_light) continue;
+        if (ubo.scenelightshadows != 0) {
+            Ray sray = { h.position + (incoming * EPS), incoming };
+            uint tid;
+            Hit shit = trace(sray, tid);
+            if (shit.distance > 0 && shit.distance < distance_to_light) continue;
+        }
         intensity += lambertian_throughput(outgoing, h.normal, incoming, material) * light.color * falloff;
     }
     return intensity;
