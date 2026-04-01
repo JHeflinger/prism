@@ -32,6 +32,7 @@ void InitEditor() {
     InitializeColors();
     InitializeAssets();
     InitializeRenderer();
+    printf("\nEnvironment configuration:\n\tGPU: %s\n\tOperating System: %s\n\n", GPUModel(), OPSYS);
     g_ui = GenerateUI();
     g_ui->left = GenerateUI();
     g_ui->right = GenerateUI();

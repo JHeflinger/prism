@@ -510,6 +510,7 @@ void ClearTriangles() {
     ARRLIST_Triangle_clear(&(g_renderer.geometry.triangles));
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.emissives));
     HASHMAP_EdgeGlue_clear(&(g_renderer.geometry.glue));
+    ARRLIST_Edge_clear(&(g_renderer.geometry.edges));
     g_renderer.geometry.changes.update_triangles = TRUE;
 }
 

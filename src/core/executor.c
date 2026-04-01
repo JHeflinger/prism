@@ -8,12 +8,6 @@
 #include <easyobjects.h>
 #include <time.h>
 
-#ifdef __WIN32
-#define OPSYS "WINDOWS"
-#else
-#define OPSYS "LINUX"
-#endif
-
 void InitializeExecutor(int w, int h) {
 	OverrideResolution(w, h);
 	SetViewportSlice(w, h);

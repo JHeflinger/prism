@@ -1,6 +1,12 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#ifdef __WIN32
+#define OPSYS "WINDOWS"
+#else
+#define OPSYS "LINUX"
+#endif
+
 #ifndef BOOL
 #define BOOL int
 #endif

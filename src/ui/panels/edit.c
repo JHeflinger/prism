@@ -26,7 +26,7 @@ void SetEditMaterial(size_t index) {
     g_edit_item_index = index;
     g_edit_type = EDIT_MATERIAL;
     SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
 }
 
 void SetEditLight(size_t index) {
@@ -34,14 +34,15 @@ void SetEditLight(size_t index) {
     g_edit_item_index = index;
     g_edit_type = EDIT_LIGHT;
     SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
 }
 
 void SetEditTriangle(size_t index) {
     g_item_selected = TRUE;
     g_edit_item_index = index;
     g_edit_type = EDIT_SINGLE_TRIANGLE;
-    SetSelectedVertex((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
+    SetSelectedTriangle(index);
 }
 
 void SetEditVertex(size_t index) {
@@ -49,6 +50,7 @@ void SetEditVertex(size_t index) {
     g_edit_item_index = index;
     g_edit_type = EDIT_SINGLE_VERTEX;
     SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex(index);
 }
 
 void SetEditForce(size_t index) {
@@ -56,7 +58,7 @@ void SetEditForce(size_t index) {
     g_edit_item_index = index;
     g_edit_type = EDIT_SINGLE_FORCE;
     SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
 }
 
 void SetEditSource(size_t index) {
@@ -64,7 +66,7 @@ void SetEditSource(size_t index) {
     g_edit_item_index = index;
     g_edit_type = EDIT_SINGLE_SOURCE;
     SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
 }
 
 void SetEditMesh(size_t index) {
@@ -72,13 +74,13 @@ void SetEditMesh(size_t index) {
     g_edit_item_index = index;
     g_edit_type = EDIT_MESH;
     SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
 }
 
 void DeselectEditTarget() {
     g_item_selected = FALSE;
     SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
 }
 
 void DrawEditPanel(float width, float height) {

@@ -128,8 +128,6 @@ void main() {
 		    hovered_tid = raygenIn[gl_GlobalInvocationID.x].tid;
         } else if (o_ubo.mode == VERTEX_SELECT) {
             hovered_tid = -1;
-	        int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
-            int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
             Ray ray = create_ray(vec2(rx, ry));
             Triangle tri = triangleIn[raygenIn[gl_GlobalInvocationID.x].tid];
             vec3 _a = vertexIn[tri.a];
