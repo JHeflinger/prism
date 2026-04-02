@@ -32,7 +32,7 @@ VkCommandBuffer VUTIL_BeginSingleTimeCommands();
 
 void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer);
 
-VkCommandBuffer VUTIL_BeginTransferCommands();
+void VUTIL_BeginTransferCommands();
 
 void VUTIL_EndTransferCommands();
 

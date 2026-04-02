@@ -581,6 +581,8 @@ void ClearMaterials() {
 }
 
 void Render() {
+    // TODO: remove this maybe or wrap it in something better and modify func signature for begin transfer commands maybe
+
     static BOOL async_update = TRUE;
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
     BOOL resized_buffers = FALSE;
@@ -600,6 +602,9 @@ void Render() {
     if (async_update) {
         // profile for stats
         BeginProfile(&(g_renderer.stats.profile));
+
+        // prep transfer commands
+        VUTIL_BeginTransferCommands();
 
         // recompute min/max
         if (g_renderer.geometry.changes.update_meshes || g_renderer.geometry.changes.update_vertices) {
@@ -743,6 +748,9 @@ void Render() {
                 VUPDT_Transforms(&(g_renderer.vulkan.core.geometry.transforms));
             }
         }
+
+        // Submit transfer commands
+        VUTIL_EndTransferCommands();
 
         // update descriptor sets if needed
         if (resized_buffers) {

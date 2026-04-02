@@ -54,6 +54,10 @@ Next:
 
 13. uhh fwidth() is a think that may be useful for improving overlay
 
+
+1. fix loading multiple things breaks it
+
+
 NEXT:
 UI CONTROLLING SIM PARAMS
 FIX COORDINATE FRAME

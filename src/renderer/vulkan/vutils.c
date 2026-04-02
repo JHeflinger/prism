@@ -132,6 +132,7 @@ void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffe
     VkDeviceSize align  = 256;
     VkDeviceSize offset = (g_vutil_renderer_ref->vulkan.core.transfer.offset + align - 1) & ~(align - 1);
     if (offset + buffersize > g_vutil_renderer_ref->vulkan.core.transfer.size) {
+        vkDeviceWaitIdle(g_vutil_renderer_ref->vulkan.core.general.interface);
         vkUnmapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, g_vutil_renderer_ref->vulkan.core.transfer.staging.memory);
         VUTIL_DestroyBuffer(g_vutil_renderer_ref->vulkan.core.transfer.staging);
         VkDeviceSize newsize = (offset + buffersize) * 2;
@@ -147,7 +148,7 @@ void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffe
     }
     memcpy(g_vutil_renderer_ref->vulkan.core.transfer.mapped + offset, hostdata, size);
     g_vutil_renderer_ref->vulkan.core.transfer.offset = offset + buffersize;
-    VkCommandBuffer cmd = VUTIL_BeginTransferCommands();
+    VkCommandBuffer cmd = g_vutil_renderer_ref->vulkan.core.transfer.commands[g_vutil_renderer_ref->vulkan.core.transfer.index];
     VkBufferCopy region = { 0 };
     region.size = buffersize;
     region.srcOffset = offset;
@@ -165,7 +166,6 @@ void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffe
         release.size = VK_WHOLE_SIZE;
         vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 1, &release, 0, NULL);
     }
-    VUTIL_EndTransferCommands();
 }
 
 void VUTIL_CopyBufferToHost(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {
@@ -225,7 +225,8 @@ void VUTIL_EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkFreeCommandBuffers(g_vutil_renderer_ref->vulkan.core.general.interface, g_vutil_renderer_ref->vulkan.core.scheduler.commands.pool, 1, &commandBuffer);
 }
 
-VkCommandBuffer VUTIL_BeginTransferCommands() {
+void VUTIL_BeginTransferCommands() {
+    g_vutil_renderer_ref->vulkan.core.transfer.offset = 0;
     g_vutil_renderer_ref->vulkan.core.transfer.index = (g_vutil_renderer_ref->vulkan.core.transfer.index + 1) % CPUSWAP_LENGTH;
     VkCommandBuffer cmd = g_vutil_renderer_ref->vulkan.core.transfer.commands[g_vutil_renderer_ref->vulkan.core.transfer.index];
     if (g_vutil_renderer_ref->vulkan.core.transfer.signal >= CPUSWAP_LENGTH) {
@@ -242,7 +243,6 @@ VkCommandBuffer VUTIL_BeginTransferCommands() {
     bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(cmd, &bi);
-    return cmd;
 }
 
 void VUTIL_EndTransferCommands() {
