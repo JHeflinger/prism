@@ -582,22 +582,25 @@ void ClearMaterials() {
 
 void Render() {
     static BOOL async_update = TRUE;
+    static size_t dupdate_queue = 0;
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
     BOOL resized_buffers = FALSE;
+    BOOL is_transferring = FALSE;
 
     // helpers for readability
-    #define TRANSFER_UPDATE(cname, sname, gname, oname, vname, tri) { \
+    #define TRANSFER_UPDATE(cname, sname, gname, gsname, oname, vname, tri) { \
         if (g_renderer.geometry.changes.update_##cname) { \
-            if (!resized_buffers) { \
-                resized_buffers = TRUE; \
-                VUTIL_BeginTransferCommands(); \
-                vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, \
-                        &g_renderer.vulkan.core.scheduler.syncro.fences[new_ind], \
-                        VK_TRUE, UINT64_MAX); \
-            } \
             g_renderer.geometry.changes.update_##cname = FALSE; \
             if (g_renderer.geometry.changes.max_##sname != gname) { \
                 g_renderer.geometry.changes.max_##sname = gname; \
+                if (!resized_buffers) { \
+                    resized_buffers = TRUE; \
+                    is_transferring = TRUE; \
+                    VUTIL_BeginTransferCommands(); \
+                    vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, \
+                            &g_renderer.vulkan.core.scheduler.syncro.fences[new_ind], \
+                            VK_TRUE, UINT64_MAX); \
+                } \
                 VCLEAN_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
                 VINIT_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
                 if (tri) { \
@@ -605,14 +608,32 @@ void Render() {
                     VINIT_BVH(&(g_renderer.vulkan.core.geometry.bvh)); \
                 } \
             } else { \
+                if (g_renderer.geometry.changes.num_##sname != gsname) { \
+                    dupdate_queue = CPUSWAP_LENGTH; \
+                    g_renderer.geometry.changes.num_##sname = gsname; \
+                } \
+                if (!is_transferring) { is_transferring = TRUE; VUTIL_BeginTransferCommands(); } \
                 VUPDT_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
             } \
             if (tri) { \
                 if (g_renderer.geometry.changes.max_emissives != g_renderer.geometry.emissives.maxsize) { \
                     g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize; \
+                    if (!resized_buffers) { \
+                        resized_buffers = TRUE; \
+                        is_transferring = TRUE; \
+                        VUTIL_BeginTransferCommands(); \
+                        vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, \
+                                &g_renderer.vulkan.core.scheduler.syncro.fences[new_ind], \
+                                VK_TRUE, UINT64_MAX); \
+                    } \
                     VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
                     VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
                 } else { \
+                    if (g_renderer.geometry.changes.num_emissives != g_renderer.geometry.emissives.size) { \
+                        dupdate_queue = CPUSWAP_LENGTH; \
+                        g_renderer.geometry.changes.num_emissives = g_renderer.geometry.emissives.size; \
+                    } \
+                    if (!is_transferring) { is_transferring = TRUE; VUTIL_BeginTransferCommands(); } \
                     VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
                 } \
             } \
@@ -672,18 +693,30 @@ void Render() {
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH;
 
         // transfer updates
-        TRANSFER_UPDATE(normals, normals, g_renderer.geometry.normals.maxsize, normals, Normals, FALSE);
-        TRANSFER_UPDATE(vertices, vertices, g_renderer.geometry.vertices.maxsize, vertices, Vertices, FALSE);
-        TRANSFER_UPDATE(triangles, triangles, g_renderer.geometry.triangles.maxsize, triangles, Triangles, TRUE);
-        TRANSFER_UPDATE(materials, materials, g_renderer.geometry.materials.maxsize, materials, Materials, FALSE);
-        TRANSFER_UPDATE(lights, lights, g_renderer.geometry.lights.maxsize, lights, Lights, FALSE);
-        TRANSFER_UPDATE(simulation, sim_size, SimSize(g_renderer.geometry.fluid), fluid, Simulation, FALSE);
-        TRANSFER_UPDATE(meshes, meshes, g_renderer.geometry.meshes.maxsize, transforms, Transforms, FALSE);
+        TRANSFER_UPDATE(normals, normals, g_renderer.geometry.normals.maxsize, g_renderer.geometry.normals.size, normals, Normals, FALSE);
+        TRANSFER_UPDATE(vertices, vertices, g_renderer.geometry.vertices.maxsize, g_renderer.geometry.vertices.size, vertices, Vertices, FALSE);
+        TRANSFER_UPDATE(triangles, triangles, g_renderer.geometry.triangles.maxsize, g_renderer.geometry.triangles.size, triangles, Triangles, TRUE);
+        TRANSFER_UPDATE(materials, materials, g_renderer.geometry.materials.maxsize, g_renderer.geometry.materials.size, materials, Materials, FALSE);
+        TRANSFER_UPDATE(lights, lights, g_renderer.geometry.lights.maxsize, g_renderer.geometry.lights.size, lights, Lights, FALSE);
+        TRANSFER_UPDATE(simulation, sim_size, SimSize(g_renderer.geometry.fluid), SimSize(g_renderer.geometry.fluid), fluid, Simulation, FALSE);
+        TRANSFER_UPDATE(meshes, meshes, g_renderer.geometry.meshes.maxsize, g_renderer.geometry.meshes.size, transforms, Transforms, FALSE);
 
-        // update descriptor sets if needed
+        // dispatch transfer commands
+        if (is_transferring) VUTIL_EndTransferCommands();
+
+        // update all descriptor sets if needed
         if (resized_buffers) {
-            VUTIL_EndTransferCommands();
+            dupdate_queue = 0;
             VUPDT_DescriptorSetsAll(g_renderer.vulkan.core.context.renderdata.descriptors);
+        }
+
+        // update only required descriptors if needed
+        if (dupdate_queue > 0) {
+            size_t oldind = g_renderer.swapchain.index;
+            g_renderer.swapchain.index = new_ind;
+            VUPDT_DescriptorSets(g_renderer.vulkan.core.context.renderdata.descriptors);
+            g_renderer.swapchain.index = oldind;
+            dupdate_queue--;
         }
 
         // update uniform buffers

@@ -159,7 +159,7 @@ void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffe
     g_vutil_renderer_ref->vulkan.core.transfer.offset = offset + buffersize;
     VkCommandBuffer cmd = g_vutil_renderer_ref->vulkan.core.transfer.commands[g_vutil_renderer_ref->vulkan.core.transfer.index];
     VkBufferCopy region = { 0 };
-    region.size = buffersize;
+    region.size = size;
     region.srcOffset = offset;
     region.dstOffset = 0;
     vkCmdCopyBuffer(cmd, g_vutil_renderer_ref->vulkan.core.transfer.staging.buffer, buffer, 1, &region);

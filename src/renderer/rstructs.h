@@ -128,6 +128,14 @@ typedef struct {
     size_t max_lights;
     size_t max_sim_size;
     size_t max_meshes;
+    size_t num_normals;
+    size_t num_vertices;
+    size_t num_triangles;
+    size_t num_emissives;
+    size_t num_materials;
+    size_t num_lights;
+    size_t num_sim_size;
+    size_t num_meshes;
     BOOL update_normals;
     BOOL update_vertices;
     BOOL update_triangles;

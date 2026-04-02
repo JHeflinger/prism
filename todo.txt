@@ -72,8 +72,8 @@ never actualy remove a thing from the data structure, but when you "delete" it, 
 
 
 1. Rename and modulate all the updates in the render loop - DONE
-2. understand and diagnose the transfer buffers working or not working
-3. fix the transfer buffers
+2. understand and diagnose the transfer buffers working or not working - DONE
+3. fix the transfer buffers - DONE
 4. screen space BVH
 5. simulation fixes
 6. simulation visualization
