@@ -42,7 +42,6 @@ Next:
 2. open files via mini file explorer
 8. proper rendering/camera panel
 9. CPUswap greater than 2 breaks??
-10. loading in 6 peters breaks or 4 armadillos?? - like 90% of time reliable, but once it was 5 armadillos
 11. change overlay edge highlighting to just use barycentric coordinates
 12. screen space BVH - if toggled, then in vertex shader just pass in vertices (or flag them and process triangles as a whole later), and then reconstruct bvh such that it only uses triangles in screenspace basically. Works great for scenes that don't NEED thorough GI or off-screen shadows
     - vertex pass - if vertex is in screen space, mark the .w value as the original value + 2;
@@ -57,6 +56,8 @@ Next:
 
 1. fix loading multiple things breaks it
 
+ughhh triangles its the triangles that cause the crashfreeze
+
 
 NEXT:
 UI CONTROLLING SIM PARAMS
@@ -68,3 +69,12 @@ COOL VISUALIZATION
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything
+
+
+1. Rename and modulate all the updates in the render loop - DONE
+2. understand and diagnose the transfer buffers working or not working
+3. fix the transfer buffers
+4. screen space BVH
+5. simulation fixes
+6. simulation visualization
+7. turn in simulation

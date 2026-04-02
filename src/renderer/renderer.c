@@ -472,7 +472,6 @@ void ClearNormals() {
 }
 
 TriangleID SubmitTriangle(Triangle triangle) {
-    g_renderer.geometry.changes.update_triangles = TRUE;
     EZ_ASSERT(triangle.a < g_renderer.geometry.vertices.size &&
               triangle.b < g_renderer.geometry.vertices.size &&
               triangle.c < g_renderer.geometry.vertices.size, "Triangle vertex does not exist");
@@ -503,6 +502,7 @@ TriangleID SubmitTriangle(Triangle triangle) {
             HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), primed, em);
         }
     }
+    UpdateTriangles();
     return id;
 }
 
@@ -512,7 +512,7 @@ void ClearTriangles() {
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.emissives));
     HASHMAP_EdgeGlue_clear(&(g_renderer.geometry.glue));
     ARRLIST_Edge_clear(&(g_renderer.geometry.edges));
-    g_renderer.geometry.changes.update_triangles = TRUE;
+    UpdateTriangles();
 }
 
 LightID SubmitLight(SceneLight light) {
@@ -581,30 +581,54 @@ void ClearMaterials() {
 }
 
 void Render() {
-    // TODO: remove this maybe or wrap it in something better and modify func signature for begin transfer commands maybe
-
     static BOOL async_update = TRUE;
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
     BOOL resized_buffers = FALSE;
 
     // helpers for readability
-    inline void sync_transfer() {
-        vkWaitForFences(g_renderer.vulkan.core.general.interface, 1,
-                        &g_renderer.vulkan.core.scheduler.syncro.fences[new_ind],
-                        VK_TRUE, UINT64_MAX);
-        resized_buffers = TRUE;
+    #define TRANSFER_UPDATE(cname, sname, gname, oname, vname, tri) { \
+        if (g_renderer.geometry.changes.update_##cname) { \
+            if (!resized_buffers) { \
+                resized_buffers = TRUE; \
+                VUTIL_BeginTransferCommands(); \
+                vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, \
+                        &g_renderer.vulkan.core.scheduler.syncro.fences[new_ind], \
+                        VK_TRUE, UINT64_MAX); \
+            } \
+            g_renderer.geometry.changes.update_##cname = FALSE; \
+            if (g_renderer.geometry.changes.max_##sname != gname) { \
+                g_renderer.geometry.changes.max_##sname = gname; \
+                VCLEAN_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
+                VINIT_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
+                if (tri) { \
+                    VCLEAN_BVH(&(g_renderer.vulkan.core.geometry.bvh)); \
+                    VINIT_BVH(&(g_renderer.vulkan.core.geometry.bvh)); \
+                } \
+            } else { \
+                VUPDT_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
+            } \
+            if (tri) { \
+                if (g_renderer.geometry.changes.max_emissives != g_renderer.geometry.emissives.maxsize) { \
+                    g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize; \
+                    VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
+                    VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
+                } else { \
+                    VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
+                } \
+            } \
+        } \
     }
 
     // update render frame time;
     g_rft += GetFrameTime();
 
+    // ARAP pose saving
+    if (g_renderer.geometry.changes.update_triangles) SavePose();
+
     // detect changes in described data
     if (async_update) {
         // profile for stats
         BeginProfile(&(g_renderer.stats.profile));
-
-        // prep transfer commands
-        VUTIL_BeginTransferCommands();
 
         // recompute min/max
         if (g_renderer.geometry.changes.update_meshes || g_renderer.geometry.changes.update_vertices) {
@@ -647,114 +671,18 @@ void Render() {
             g_renderer.geometry.changes.update_meshes)
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH;
 
-        // update normals if needed
-        if (g_renderer.geometry.changes.update_normals) {
-            g_renderer.geometry.changes.update_normals = FALSE;
-            if (g_renderer.geometry.changes.max_normals != g_renderer.geometry.normals.maxsize) {
-                sync_transfer();
-                g_renderer.geometry.changes.max_normals = g_renderer.geometry.normals.maxsize;
-                VCLEAN_Normals(&(g_renderer.vulkan.core.geometry.normals));
-                VINIT_Normals(&(g_renderer.vulkan.core.geometry.normals));
-            } else {
-                VUPDT_Normals(&(g_renderer.vulkan.core.geometry.normals));
-            }
-        }
-
-        // update vertices if needed
-        if (g_renderer.geometry.changes.update_vertices) {
-            g_renderer.geometry.changes.update_vertices = FALSE;
-            if (g_renderer.geometry.changes.max_vertices != g_renderer.geometry.vertices.maxsize) {
-                sync_transfer();
-                g_renderer.geometry.changes.max_vertices = g_renderer.geometry.vertices.maxsize;
-                VCLEAN_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
-                VINIT_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
-            } else {
-                VUPDT_Vertices(&(g_renderer.vulkan.core.geometry.vertices));
-            }
-        }
-
-        // update triangles if needed
-        if (g_renderer.geometry.changes.update_triangles) {
-            g_renderer.geometry.changes.update_triangles = FALSE;
-            SavePose();
-            if (g_renderer.geometry.changes.max_triangles != g_renderer.geometry.triangles.maxsize) {
-                sync_transfer();
-                g_renderer.geometry.changes.max_triangles = g_renderer.geometry.triangles.maxsize;
-                VCLEAN_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
-                VINIT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
-                VCLEAN_BVH(&(g_renderer.vulkan.core.geometry.bvh));
-                VINIT_BVH(&(g_renderer.vulkan.core.geometry.bvh));
-            } else {
-                VUPDT_Triangles(&(g_renderer.vulkan.core.geometry.triangles));
-            }
-            if (g_renderer.geometry.changes.max_emissives != g_renderer.geometry.emissives.maxsize) {
-                sync_transfer();
-                g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize;
-                VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
-                VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
-            } else {
-                VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
-            }
-        }
-
-        // update materials if needed
-        if (g_renderer.geometry.changes.update_materials) {
-            g_renderer.geometry.changes.update_materials = FALSE;
-            if (g_renderer.geometry.changes.max_materials != g_renderer.geometry.materials.maxsize) {
-                sync_transfer();
-                g_renderer.geometry.changes.max_materials = g_renderer.geometry.materials.maxsize;
-                VCLEAN_Materials(&(g_renderer.vulkan.core.geometry.materials));
-                VINIT_Materials(&(g_renderer.vulkan.core.geometry.materials));
-            } else {
-                VUPDT_Materials(&(g_renderer.vulkan.core.geometry.materials));
-            }
-        }
-
-        // update lights if needed
-        if (g_renderer.geometry.changes.update_lights) {
-            g_renderer.geometry.changes.update_lights = FALSE;
-            if (g_renderer.geometry.changes.max_lights != g_renderer.geometry.lights.maxsize) {
-                sync_transfer();
-                g_renderer.geometry.changes.max_lights = g_renderer.geometry.lights.maxsize;
-                VCLEAN_Lights(&(g_renderer.vulkan.core.geometry.lights));
-                VINIT_Lights(&(g_renderer.vulkan.core.geometry.lights));
-            } else {
-                VUPDT_Lights(&(g_renderer.vulkan.core.geometry.lights));
-            }
-        }
-
-        // update simulation if needed
-        if (g_renderer.geometry.changes.update_simulation) {
-            g_renderer.geometry.changes.update_simulation = FALSE;
-            if (g_renderer.geometry.changes.max_sim_size != SimSize(g_renderer.geometry.fluid)) {
-                sync_transfer();
-                g_renderer.geometry.changes.max_sim_size = SimSize(g_renderer.geometry.fluid);
-                VCLEAN_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
-                VINIT_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
-            } else {
-                VUPDT_Simulation(&(g_renderer.vulkan.core.geometry.fluid));
-            }
-        }
-
-        // update transform requests if needed
-        if (g_renderer.geometry.changes.update_meshes) {
-            g_renderer.geometry.changes.update_meshes = FALSE;
-            if (g_renderer.geometry.changes.max_meshes != g_renderer.geometry.meshes.maxsize) {
-                sync_transfer();
-                g_renderer.geometry.changes.max_meshes = g_renderer.geometry.meshes.maxsize;
-                VCLEAN_Transforms(&(g_renderer.vulkan.core.geometry.transforms));
-                VINIT_Transforms(&(g_renderer.vulkan.core.geometry.transforms));
-            } else {
-                VUPDT_Transforms(&(g_renderer.vulkan.core.geometry.transforms));
-            }
-        }
-
-        // Submit transfer commands
-        VUTIL_EndTransferCommands();
+        // transfer updates
+        TRANSFER_UPDATE(normals, normals, g_renderer.geometry.normals.maxsize, normals, Normals, FALSE);
+        TRANSFER_UPDATE(vertices, vertices, g_renderer.geometry.vertices.maxsize, vertices, Vertices, FALSE);
+        TRANSFER_UPDATE(triangles, triangles, g_renderer.geometry.triangles.maxsize, triangles, Triangles, TRUE);
+        TRANSFER_UPDATE(materials, materials, g_renderer.geometry.materials.maxsize, materials, Materials, FALSE);
+        TRANSFER_UPDATE(lights, lights, g_renderer.geometry.lights.maxsize, lights, Lights, FALSE);
+        TRANSFER_UPDATE(simulation, sim_size, SimSize(g_renderer.geometry.fluid), fluid, Simulation, FALSE);
+        TRANSFER_UPDATE(meshes, meshes, g_renderer.geometry.meshes.maxsize, transforms, Transforms, FALSE);
 
         // update descriptor sets if needed
         if (resized_buffers) {
-            sync_transfer();
+            VUTIL_EndTransferCommands();
             VUPDT_DescriptorSetsAll(g_renderer.vulkan.core.context.renderdata.descriptors);
         }
 
@@ -810,6 +738,8 @@ void Render() {
     } else {
         async_update = FALSE;
     }
+
+    #undef TRANSFER_UPDATE
 }
 
 void DrawHelper(float x, float y, float w, float h, float maxw, float maxh) {

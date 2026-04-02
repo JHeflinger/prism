@@ -5,8 +5,6 @@
 #include "renderer/vulkan/vshaders.h"
 #include <GLFW/glfw3.h>
 
-#define INITIAL_TRANSFER_STAGE_SIZE (32 * 1024 * 1024)
-
 Renderer* g_vinit_renderer_ref = NULL;
 
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {

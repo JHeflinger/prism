@@ -108,33 +108,33 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
     // ownership aquisition
     VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vupdt_renderer_ref->vulkan.core.general.gpu);
-    if (g_vupdt_renderer_ref->vulkan.core.transfer.pending && families.transfer.value != families.graphics.value) {
-        VkBufferMemoryBarrier barriers[7] = { 0 };
-        uint32_t count = 0;
-        #define MAYBE_ACQUIRE(flag, buf) \
-            if (g_vupdt_renderer_ref->vulkan.core.transfer.pending & (flag)) { \
-                barriers[count++] = (VkBufferMemoryBarrier){ \
-                    .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, \
-                    .srcAccessMask       = 0, \
-                    .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT, \
-                    .srcQueueFamilyIndex = families.transfer.value, \
-                    .dstQueueFamilyIndex = families.graphics.value, \
-                    .buffer              = (buf), \
-                    .size                = VK_WHOLE_SIZE \
-                }; \
-            }
-        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_VERTICES, g_vupdt_renderer_ref->vulkan.core.geometry.vertices.original.buffer)
-        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_MATERIALS, g_vupdt_renderer_ref->vulkan.core.geometry.materials.buffer)
-        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_LIGHTS, g_vupdt_renderer_ref->vulkan.core.geometry.lights.buffer)
-        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_EMISSIVES, g_vupdt_renderer_ref->vulkan.core.geometry.emissives.buffer)
-        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRIANGLES, g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer)
-        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_NORMALS, g_vupdt_renderer_ref->vulkan.core.geometry.normals.buffer)
-        MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRANSFORMS, g_vupdt_renderer_ref->vulkan.core.geometry.transforms.buffer)
-        #undef MAYBE_ACQUIRE
-        if (count > 0) {
-            vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, count, barriers, 0, NULL);
-            g_vupdt_renderer_ref->vulkan.core.transfer.pending = 0;
+    if (g_vupdt_renderer_ref->vulkan.core.transfer.pending) {
+        if (families.transfer.value != families.graphics.value) {
+            VkBufferMemoryBarrier barriers[7] = { 0 };
+            uint32_t count = 0;
+            #define MAYBE_ACQUIRE(flag, buf) \
+                if (g_vupdt_renderer_ref->vulkan.core.transfer.pending & (flag)) { \
+                    barriers[count++] = (VkBufferMemoryBarrier){ \
+                        .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, \
+                        .srcAccessMask       = 0, \
+                        .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT, \
+                        .srcQueueFamilyIndex = families.transfer.value, \
+                        .dstQueueFamilyIndex = families.graphics.value, \
+                        .buffer              = (buf), \
+                        .size                = VK_WHOLE_SIZE \
+                    }; \
+                }
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_VERTICES, g_vupdt_renderer_ref->vulkan.core.geometry.vertices.original.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_MATERIALS, g_vupdt_renderer_ref->vulkan.core.geometry.materials.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_LIGHTS, g_vupdt_renderer_ref->vulkan.core.geometry.lights.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_EMISSIVES, g_vupdt_renderer_ref->vulkan.core.geometry.emissives.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRIANGLES, g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_NORMALS, g_vupdt_renderer_ref->vulkan.core.geometry.normals.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRANSFORMS, g_vupdt_renderer_ref->vulkan.core.geometry.transforms.buffer)
+            #undef MAYBE_ACQUIRE
+            if (count > 0) vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, count, barriers, 0, NULL);
         }
+        g_vupdt_renderer_ref->vulkan.core.transfer.pending = 0;
     }
 
     // bvh configuration

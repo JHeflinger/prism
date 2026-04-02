@@ -132,6 +132,15 @@ void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffe
     VkDeviceSize align  = 256;
     VkDeviceSize offset = (g_vutil_renderer_ref->vulkan.core.transfer.offset + align - 1) & ~(align - 1);
     if (offset + buffersize > g_vutil_renderer_ref->vulkan.core.transfer.size) {
+        if (g_vutil_renderer_ref->vulkan.core.transfer.signal > 0) {
+            uint64_t wait_for = g_vutil_renderer_ref->vulkan.core.transfer.signal;
+            VkSemaphoreWaitInfo wi = { 0 };
+            wi.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+            wi.semaphoreCount = 1;
+            wi.pSemaphores = &g_vutil_renderer_ref->vulkan.core.transfer.semaphore;
+            wi.pValues = &wait_for;
+            vkWaitSemaphores(g_vutil_renderer_ref->vulkan.core.general.interface, &wi, UINT64_MAX);
+        }
         vkDeviceWaitIdle(g_vutil_renderer_ref->vulkan.core.general.interface);
         vkUnmapMemory(g_vutil_renderer_ref->vulkan.core.general.interface, g_vutil_renderer_ref->vulkan.core.transfer.staging.memory);
         VUTIL_DestroyBuffer(g_vutil_renderer_ref->vulkan.core.transfer.staging);
