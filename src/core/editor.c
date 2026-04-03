@@ -47,8 +47,8 @@ void InitEditor() {
     ((UI*)((UI*)g_ui->left)->left)->divide = GetScreenHeight() - 420;
     ((UI*)((UI*)g_ui->left)->left)->vertical = TRUE;
     ((UI*)g_ui->left)->divide = 350;
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->right))->panels), GenerateDiagnosticsPanel());
     ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->right))->panels), GenerateSimulatePanel());
+    ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->right))->panels), GenerateDiagnosticsPanel());
     ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->left))->panels), GenerateOverviewPanel());
     ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->left))->panels), GenerateActionsPanel());
     ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->left)->right))->panels), GenerateViewportPanel());

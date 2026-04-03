@@ -48,6 +48,7 @@ Next:
     - triangle pass - for each triangle, if all vertices are marked with a +2, then disable triangle
     - restore pass - for every vertex with a +2, subtract 2 to restore to original value
     - in bvh, if screen space BVH turned on, any triangle just has 0,0,0 min/max
+13. early terminate - if toggled, then if a path bounce hits a location outside of the camera frustrum, just use scene lighting from that point and terminate there - that way we can get some minor color bleeding but on complex scenes not bounce too much out of screenspace
 
 1. make seperate tabs - preview - render - simulate and viewport changes based on that
 

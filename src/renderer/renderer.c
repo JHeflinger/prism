@@ -282,6 +282,7 @@ void InitializeRenderer() {
     g_renderer.geometry.fluid.dissipation = 0.005f;
     g_renderer.geometry.fluid.viscosity = 0.000001f;
     g_renderer.geometry.fluid.iterations = 20;
+    g_renderer.geometry.fluid.style = 0;
 
     // initialize min/max BB
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);

@@ -423,6 +423,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.maxBB[0] = (float)(g_vupdt_renderer_ref->geometry.fluid.width) * 0.5f;
         ubo.maxBB[1] = (float)(g_vupdt_renderer_ref->geometry.fluid.height) * 0.5f;
         ubo.maxBB[2] = (float)(g_vupdt_renderer_ref->geometry.fluid.length) * 0.5f;
+        ubo.style = g_vupdt_renderer_ref->geometry.fluid.style;
         memcpy(ubos->simulation_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(SimulationUniformBufferObject));
     }
 }

@@ -79,6 +79,7 @@ typedef struct {
 typedef struct {
     alignas(16) vec3 minBB;
     alignas(16) vec3 maxBB;
+    alignas(4) uint32_t style;
 } SimulationUniformBufferObject;
 
 typedef struct {

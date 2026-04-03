@@ -272,9 +272,10 @@ typedef struct {
     ARRLIST_FluidSource sources;
     ARRLIST_DynamicString forcenames;
     ARRLIST_DynamicString sourcenames;
+    uint32_t style;
 } FluidSimulation;
 #define SimSize(fs) (((fs).width+2)*((fs).length+2)*((fs).height+2))
-#define SimIndex(fs, x, y, z) ((x) + ((fs).length + 2)*(z) + ((fs).length + 2)*((fs).width + 2)*(y))
+#define SimIndex(fs, x, y, z) ((x) + ((fs).width + 2)*(y) + ((fs).width + 2)*((fs).height + 2)*(z))
 #define SimSwapV(fs) { vec3* t = (fs).velocity; (fs).velocity = (fs).vswap; (fs).vswap = t; }
 #define SimSwapD(fs) { float* t = (fs).density; (fs).density = (fs).dswap; (fs).dswap = t; }
 

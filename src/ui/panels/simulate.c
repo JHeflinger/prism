@@ -1,5 +1,6 @@
 #include "simulate.h"
 #include "renderer/renderer.h"
+#include "ui/shared.h"
 
 size_t g_simulate_steps = 0;
 BOOL g_simulation_running = FALSE;
@@ -88,6 +89,9 @@ void DrawSimulatePanel(float width, float height) {
     UIMoveCursor((width - 20.0f)/2.0f, -20);
     UIDragFloat(&(sim->dissipation), 0.0f, FLT_MAX, 0.001f, (width - 20.0f)/2.0f);
     UIMoveCursor(0, 5);
+    UIDrawText("Visualization");
+    UIMoveCursor((width - 20.0f)/2.0f, -20);
+    UIDropdownMenu((width - 20.0f)/2.0f, 4, SimVisualLabels(), DropdownSelectSimVisual, NULL);
     if (g_simulation_running) {
         StepSimulation();
         if (g_simulate_steps != (size_t)-1) {

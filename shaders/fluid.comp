@@ -2,6 +2,7 @@
 
 #define STEPSIZE 0.05
 #define EPS 0.0001
+#define RENDER_MODE 1
 
 struct Ray {
     vec3 position;
@@ -45,6 +46,7 @@ layout(binding = 0) uniform UniformBufferObject {
 layout(binding = 1) uniform SimulationUniformBufferObject { 
     vec3 minBB;
     vec3 maxBB;
+    uint style;
 } sim_ubo;
 
 layout(binding = 2, rgba8) uniform image2D outputImage;
@@ -52,6 +54,9 @@ layout(binding = 2, rgba8) uniform image2D outputImage;
 layout(binding = 3) uniform sampler3D densityImage;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+const vec3 default_light = normalize(vec3(1.0, 1.0, 0.5));
+const vec3 background_color = vec3(0.05);
 
 Ray create_ray(vec2 rg) {
 	float r = ubo.width / 2.0;
@@ -78,36 +83,244 @@ vec2 volume_intersect(Ray ray) {
     return vec2(tmin, tmax);
 }
 
-void main() {
-	// create ray generator coordinates
-	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
-    int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
-	
-    // create ray
-    Ray ray = create_ray(vec2(rx, ry));
+float henyey_greenstein(float cos_theta, float g) {
+    float g2 = g * g;
+    return (1.0 - g2) / pow(1.0 + g2 - 2.0 * g * cos_theta, 1.5);
+}
 
+vec3 sample_density(vec3 p) {
+    vec3 dmin = sim_ubo.minBB - vec3(1);
+    vec3 dmax = sim_ubo.maxBB + vec3(1);
+    vec3 uvw = (p - dmin) / (dmax - dmin);
+    return vec3(texture(densityImage, uvw).r);
+}
+
+vec3 density_normal(vec3 p) {
+    float eps = 0.08;
+    vec3 dmin = sim_ubo.minBB - vec3(1);
+    vec3 dmax = sim_ubo.maxBB + vec3(1);
+    #define S(o) texture(densityImage, ((p + (o) - dmin) / (dmax - dmin))).r
+    float dx = S(vec3(eps,0,0)) - S(vec3(-eps,0,0));
+    float dy = S(vec3(0,eps,0)) - S(vec3(0,-eps,0));
+    float dz = S(vec3(0,0,eps)) - S(vec3(0,0,-eps));
+    #undef S
+    vec3 n = vec3(dx, dy, dz);
+    float len = length(n);
+    return len > EPS ? n / len : vec3(0.0, 1.0, 0.0);
+}
+
+vec3 blackbody_ramp(float t) {
+    t = clamp(t, 0.0, 1.0);
+    vec3 c0 = vec3(0.0,  0.0,  0.0);
+    vec3 c1 = vec3(0.7,  0.05, 0.0);
+    vec3 c2 = vec3(1.0,  0.4,  0.0);
+    vec3 c3 = vec3(1.0,  0.9,  0.2);
+    vec3 c4 = vec3(0.3,  0.5,  1.0);
+    vec3 c5 = vec3(1.0,  1.0,  1.0);
+    if (t < 0.2) return mix(c0, c1, t / 0.2);
+    if (t < 0.4) return mix(c1, c2, (t - 0.2) / 0.2);
+    if (t < 0.6) return mix(c2, c3, (t - 0.4)  / 0.2);
+    if (t < 0.8) return mix(c3, c4, (t - 0.6) / 0.2);
+    return mix(c4, c5, (t - 0.8) / 0.2);
+}
+
+vec3 plasma_ramp(float t) {
+    t = clamp(t, 0.0, 1.0);
+    vec3 c0 = vec3(0.0,  0.0,  0.0);
+    vec3 c1 = vec3(0.0,  0.5,  0.8);
+    vec3 c2 = vec3(0.4,  0.1,  1.0);
+    vec3 c3 = vec3(1.0,  0.3,  1.0);
+    if (t < 0.33) return mix(c0, c1, t / 0.33);
+    if (t < 0.66) return mix(c1, c2, (t - 0.33) / 0.33);
+    return mix(c2, c3, (t - 0.66) / 0.34);
+}
+
+vec3 color_smoke(Ray ray, inout float transmit) {
     vec3 color = vec3(0.0);
-    vec2 raybounds = volume_intersect(ray);
-    float transmit = 1.0;
-    if (raybounds.x >= 0.0) {
-        float t = raybounds.x;
-        while (t < raybounds.y) {
-            vec3 p = ray.position + t * ray.direction;
-            vec3 dmin = sim_ubo.minBB - vec3(1);
-            vec3 dmax = sim_ubo.maxBB + vec3(1);
-            vec3 uvw = (p - dmin) / (dmax - dmin);
-            float d = texture(densityImage, uvw).r;
-            if (d > EPS) {
-                float extinction = d * 0.05; // TODO: replace 0.2 with absorbtion coeff
-                float steptrans = exp(-extinction * STEPSIZE);
-                color += transmit * (1.0 - steptrans) * vec3(1.0); // TODO: replace vec3 with smokecolor
-                transmit *= steptrans;
-                if (transmit < 0.001) break;
+    vec2 rb = volume_intersect(ray);
+    if (rb.x < 0.0) return color;
+    float cos_theta = dot(ray.direction, default_light);
+    float t = rb.x;
+    while (t < rb.y) {
+        vec3 p = ray.position + t * ray.direction;
+        float d = sample_density(p).r;
+        if (d > EPS) {
+            float extinction = d * 0.05;
+            float steptrans = exp(-extinction * STEPSIZE);
+            float phase = mix(1.0, henyey_greenstein(cos_theta, -0.4), 0.7);
+            color += transmit * (1.0 - steptrans) * vec3(0.85, 0.88, 0.92) * phase;
+            transmit *= steptrans;
+            if (transmit < 0.001) break;
+        }
+        t += STEPSIZE;
+    }
+    return color;
+}
+
+vec3 color_fire(Ray ray, inout float transmit) {
+    vec3 color = vec3(0.0);
+    vec2 rb = volume_intersect(ray);
+    if (rb.x < 0.0) return color;
+    float box_height = sim_ubo.maxBB.y - sim_ubo.minBB.y;
+    float t = rb.x;
+    while (t < rb.y) {
+        vec3 p = ray.position + t * ray.direction;
+        float d = sample_density(p).r;
+        if (d > EPS) {
+            float height_frac = clamp((p.y - sim_ubo.minBB.y) / box_height, 0.0, 1.0);
+            float heat = clamp(d * 2.0 - height_frac * 0.4, 0.0, 1.0);
+            vec3 fire_col = blackbody_ramp(heat);
+            float extinction = d * 0.15;
+            float steptrans = exp(-extinction * STEPSIZE);
+            color += transmit * (1.0 - steptrans) * fire_col * 2.5;
+            transmit *= steptrans;
+            if (transmit < 0.001) break;
+        }
+        t += STEPSIZE;
+    }
+    return color;
+}
+
+vec3 color_water(Ray ray, inout float transmit) {
+    vec3 color = vec3(0.0);
+    vec2 rb = volume_intersect(ray);
+    if (rb.x < 0.0) return color;
+    float t = rb.x;
+    bool inside = false;
+    while (t < rb.y) {
+        vec3 p = ray.position + t * ray.direction;
+        float d = sample_density(p).r;
+        if (d > 0.3) {
+            vec3 normal = density_normal(p);
+            float cos_i = abs(dot(-ray.direction, normal));
+            float R0 = 0.02;
+            float fresnel = R0 + (1.0 - R0) * pow(1.0 - cos_i, 5.0);
+            float ior = inside ? 1.33 : (1.0 / 1.33);
+            vec3 refr_dir = refract(ray.direction, normal, ior);
+            if (length(refr_dir) < EPS) refr_dir = reflect(ray.direction, normal);
+            vec3 refl_col = background_color + pow(max(dot(reflect(ray.direction, normal), default_light), 0.0), 64.0) * vec3(1.0);
+            vec3 refr_col = vec3(0.05, 0.25, 0.45);
+            color += transmit * mix(refr_col, refl_col, fresnel);
+            transmit = 0.0;
+            break;
+        }
+        t += STEPSIZE;
+    }
+    return color;
+}
+
+vec3 color_plasma(Ray ray, inout float transmit) {
+    vec3 color = vec3(0.0);
+    vec2 rb = volume_intersect(ray);
+    if (rb.x < 0.0) return color;
+    float box_height = sim_ubo.maxBB.y - sim_ubo.minBB.y;
+    float t = rb.x;
+    while (t < rb.y) {
+        vec3 p = ray.position + t * ray.direction;
+        float d = sample_density(p).r;
+        if (d > EPS) {
+            float height_frac = clamp((p.y - sim_ubo.minBB.y) / box_height, 0.0, 1.0);
+            float energy = clamp(d * 2.0 + height_frac * 0.3, 0.0, 1.0);
+            vec3 pcol = plasma_ramp(energy);
+            float extinction = d * 0.1;
+            float steptrans = exp(-extinction * STEPSIZE);
+            color += transmit * (1.0 - steptrans) * pcol * 3.0;
+            transmit *= steptrans;
+            if (transmit < 0.001) break;
+        }
+        t += STEPSIZE;
+    }
+    return color;
+}
+
+vec3 render_volume(Ray ray, inout float transmit) {
+    if (sim_ubo.style == 0) return color_smoke(ray, transmit);
+    else if (sim_ubo.style == 1) return color_fire(ray, transmit);
+    else if (sim_ubo.style == 2) return color_water(ray, transmit);
+    else if (sim_ubo.style == 3) return color_plasma(ray, transmit);
+    return vec3(1, 1, 0);
+}
+
+vec3 color_grid(Ray ray, vec3 background_color) {
+    float best_mix = 0.0;
+    float inverse_linewidth = 200;
+    {
+        vec3 normal = vec3(0, 1, 0);
+        float denom = dot(ray.direction, normal);
+        if (abs(denom) > EPS) {
+            vec3 plane_point = vec3(sim_ubo.minBB.x, sim_ubo.minBB.y, sim_ubo.minBB.z);
+            float dist = dot(plane_point - ray.position, normal) / denom;
+            if (dist > 0.0) {
+                vec3 p = ray.position + ray.direction * dist;
+                if (p.x >= sim_ubo.minBB.x && p.x <= sim_ubo.maxBB.x &&
+                    p.z >= sim_ubo.minBB.z && p.z <= sim_ubo.maxBB.z) {
+                    float tol = dist / inverse_linewidth;
+                    float xf = fract(p.x);
+                    float zf = fract(p.z);
+                    if (xf < tol || zf < tol) {
+                        float d = min(xf < zf ? xf : zf, xf > zf ? xf : zf);
+                        float alias = 1.0 - clamp(2.0 * abs(d - tol * 0.5) / tol, 0.0, 1.0);
+                        best_mix = max(best_mix, alias / dist);
+                    }
+                }
             }
-            t += STEPSIZE;
         }
     }
+    {
+        vec3 normal = vec3(0, 0, 1);
+        float denom = dot(ray.direction, normal);
+        if (abs(denom) > EPS) {
+            vec3 plane_point = vec3(sim_ubo.minBB.x, sim_ubo.minBB.y, sim_ubo.minBB.z);
+            float dist = dot(plane_point - ray.position, normal) / denom;
+            if (dist > 0.0) {
+                vec3 p = ray.position + ray.direction * dist;
+                if (p.x >= sim_ubo.minBB.x && p.x <= sim_ubo.maxBB.x &&
+                    p.y >= sim_ubo.minBB.y && p.y <= sim_ubo.maxBB.y) {
+                    float tol = dist / inverse_linewidth;
+                    float xf = fract(p.x);
+                    float yf = fract(p.y);
+                    if (xf < tol || yf < tol) {
+                        float d = min(xf < yf ? xf : yf, xf > yf ? xf : yf);
+                        float alias = 1.0 - clamp(2.0 * abs(d - tol * 0.5) / tol, 0.0, 1.0);
+                        best_mix = max(best_mix, alias / dist);
+                    }
+                }
+            }
+        }
+    }
+    {
+        vec3 normal = vec3(1, 0, 0);
+        float denom = dot(ray.direction, normal);
+        if (abs(denom) > EPS) {
+            vec3 plane_point = vec3(sim_ubo.minBB.x, sim_ubo.minBB.y, sim_ubo.minBB.z);
+            float dist = dot(plane_point - ray.position, normal) / denom;
+            if (dist > 0.0) {
+                vec3 p = ray.position + ray.direction * dist;
+                if (p.z >= sim_ubo.minBB.z && p.z <= sim_ubo.maxBB.z &&
+                    p.y >= sim_ubo.minBB.y && p.y <= sim_ubo.maxBB.y) {
+                    float tol = dist / inverse_linewidth;
+                    float zf = fract(p.z);
+                    float yf = fract(p.y);
+                    if (zf < tol || yf < tol) {
+                        float d = min(zf < yf ? zf : yf, zf > yf ? zf : yf);
+                        float alias = 1.0 - clamp(2.0 * abs(d - tol * 0.5) / tol, 0.0, 1.0);
+                        best_mix = max(best_mix, alias / dist);
+                    }
+                }
+            }
+        }
+    }
+    best_mix = clamp(best_mix, 0.0, 1.0);
+    return mix(background_color, vec3(1.5), best_mix);
+}
 
-    // write to image
-	imageStore(outputImage, ivec2(rx, ry), vec4(color, 1.0));
+void main() {
+    int rx = int(gl_GlobalInvocationID.x % int(ubo.width));
+    int ry = int(gl_GlobalInvocationID.x / int(ubo.width));
+    Ray ray = create_ray(vec2(rx, ry));
+    vec3 grid_color = ubo.grid != 0 ? color_grid(ray, background_color) : background_color;
+    float transmit = 1.0;
+    vec3 color = render_volume(ray, transmit);
+    vec3 final_color = color + transmit * grid_color;
+    imageStore(outputImage, ivec2(rx, ry), vec4(final_color, 1.0));
 }

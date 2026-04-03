@@ -9,7 +9,7 @@
 #include "ui/panels/edit.h"
 
 void LoadArmadillo() {
-    LoadOBJ("assets/models/OBJ/naked/bunny.obj");
+    LoadOBJ("assets/models/OBJ/naked/armadillo.obj");
     FitCamera();
 }
 

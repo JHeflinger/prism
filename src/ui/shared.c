@@ -3,6 +3,16 @@
 
 char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric" };
 char* g_arapmodel_labels[] = { "rigid", "cubic" };
+char* g_sim_visual_labels[] = { "smoke", "fire", "water", "plasma" };
+
+size_t DropdownSelectSimVisual(void* data, size_t index) {
+    if (index == (size_t)-1) {
+        return RendererGeometry()->fluid.style;
+    } else {
+        RendererGeometry()->fluid.style = index;
+    }
+    return index;
+}
 
 size_t DropdownSelectMaterial(void* data, size_t index) {
     Triangle* triref = (Triangle*)data;
@@ -46,6 +56,10 @@ size_t DropdownSelectARAPModel(void* data, size_t index) {
         RenderConfig()->arap.style = index;
     }
     return index;
+}
+
+char** SimVisualLabels() {
+    return g_sim_visual_labels;
 }
 
 char** LightModelLabels() {
