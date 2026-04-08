@@ -792,7 +792,7 @@ BOOL VINIT_General(VulkanGeneral* general) {
     deviceCreateInfo.queueCreateInfoCount = queueCount;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
     deviceCreateInfo.enabledExtensionCount = g_vinit_renderer_ref->vulkan.metadata.extensions.device.size;
-    deviceCreateInfo.ppEnabledExtensionNames  = g_vinit_renderer_ref->vulkan.metadata.extensions.device.data;
+    deviceCreateInfo.ppEnabledExtensionNames = g_vinit_renderer_ref->vulkan.metadata.extensions.device.data;
     if (ENABLE_VK_VALIDATION_LAYERS) {
         deviceCreateInfo.enabledLayerCount = g_vinit_renderer_ref->vulkan.metadata.validation.size;
         deviceCreateInfo.ppEnabledLayerNames = g_vinit_renderer_ref->vulkan.metadata.validation.data;

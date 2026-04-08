@@ -335,6 +335,15 @@ void InitializeRenderer() {
 
     // set overlay context
     SetOverlayContext(&g_renderer);
+
+    // TODO: remove
+    ConfigureSimulation(20, 20, 20, 0.016f);
+    SubmitForce((FluidForce){
+        FALSE, 2, 2, 2, 9, 0, 9, { 0, 35.0f, 0 }
+    }, "DELETE!!! ME!!!");
+    SubmitSource((FluidSource){
+        2, 2, 2, 9, 0, 9, 20.0f, 1000.0f, 0.0f
+    }, "KILL !!! ME!!!");
 }
 
 void DestroyRenderer() {
