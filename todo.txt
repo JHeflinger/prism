@@ -49,33 +49,7 @@ Next:
     - restore pass - for every vertex with a +2, subtract 2 to restore to original value
     - in bvh, if screen space BVH turned on, any triangle just has 0,0,0 min/max
 13. early terminate - if toggled, then if a path bounce hits a location outside of the camera frustrum, just use scene lighting from that point and terminate there - that way we can get some minor color bleeding but on complex scenes not bounce too much out of screenspace
-
-1. make seperate tabs - preview - render - simulate and viewport changes based on that
-
-13. uhh fwidth() is a think that may be useful for improving overlay
-
-
-1. fix loading multiple things breaks it
-
-ughhh triangles its the triangles that cause the crashfreeze
-
-
-NEXT:
-UI CONTROLLING SIM PARAMS
-FIX COORDINATE FRAME
-IMPROVE DIVERGENCE
-GPU IMPLEMENTATION
-FUN MOUSE CONTROLS FOR ADDING FORCES
-COOL VISUALIZATION
+14. uhh fwidth() is a think that may be useful for improving overlay
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything
-
-
-1. Rename and modulate all the updates in the render loop - DONE
-2. understand and diagnose the transfer buffers working or not working - DONE
-3. fix the transfer buffers - DONE
-4. screen space BVH
-5. simulation fixes
-6. simulation visualization
-7. turn in simulation
