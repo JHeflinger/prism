@@ -476,7 +476,7 @@ vec3 sample_scene_lights(vec3 outgoing, Hit h, Material material) {
         float ndotl = max(dot(incoming, h.normal), 0.0);
         if (ndotl <= 0) continue;
         if (ubo.scenelightshadows != 0) {
-            Ray sray = { h.position + (incoming * EPS), incoming };
+            Ray sray = { h.position + (incoming * (EPS * 100)), incoming };
             uint tid;
             Hit shit = trace(sray, tid);
             if (shit.distance > 0 && shit.distance < distance_to_light) continue;

@@ -20,6 +20,7 @@ void LoadBox() {
 
 void LoadPeter() {
     LoadOBJ("assets/models/OBJ/naked/peter.obj");
+    SubmitNamedLight((SceneLight){{0},{1,1,1},{0,-1,0},0,0}, "Peter Overhead Light");
     FitCamera();
 }
 
