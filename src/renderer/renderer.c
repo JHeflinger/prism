@@ -532,6 +532,8 @@ LightID SubmitLight(SceneLight light) {
 }
 
 LightID SubmitNamedLight(SceneLight light, const char* name) {
+    if (light.direction[0] != 0 || light.direction[1] != 0 || light.direction[2] != 0)
+        glm_vec3_normalize(light.direction);
     ARRLIST_SceneLight_add(&(g_renderer.geometry.lights), light);
     char* b = EZ_ALLOC(MAX_LIGHT_NAME_SIZE + 1, sizeof(char));
     strncpy(b, name, MAX_LIGHT_NAME_SIZE);
