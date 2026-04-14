@@ -201,6 +201,10 @@ BOOL ParseMTL_illum(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t nu
         EZ_ERROR("Invalid illumination model (illum) - expected a value from 0 to 10, and got \"%s\" instead", lineargs[1]);
         return FALSE;
     }
+    if (a != 2 && a != 5 && a != 7) {
+        EZ_WARN("Unhandled illumination model \"%d\" (illum) detected - defaulting to lambertian model instead (2)", a);
+        a = 2;
+    }
     SET_MTL_UINT_FIELD(model, a);
     return TRUE;
 }

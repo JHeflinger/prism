@@ -14,7 +14,7 @@ void LoadArmadillo() {
 }
 
 void LoadBox() {
-    LoadOBJ("assets/models/OBJ/dressed/CornellBox-Sphere.obj");
+    LoadOBJ("assets/models/OBJ/dressed/maze.obj");
     FitCamera();
 }
 

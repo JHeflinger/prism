@@ -621,7 +621,7 @@ void main() {
     vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id, hit_distance);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;
     raygenIn[gl_GlobalInvocationID.x].distance = hit_distance;
-    
+
     // failures
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);
 
