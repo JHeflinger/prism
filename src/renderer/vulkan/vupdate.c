@@ -340,9 +340,10 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     static int reset_count = 0;
     if (old_camera.fov == 0.0f) old_camera = g_vupdt_renderer_ref->camera;
     if (old_flags == 0) old_flags = g_vupdt_renderer_ref->config.flags;
-    if (old_flags != g_vupdt_renderer_ref->config.flags ||
-        memcmp(&old_camera, &(g_vupdt_renderer_ref->camera), sizeof(SimpleCamera)) != 0) 
+    if (g_vupdt_renderer_ref->config.reset || old_flags != g_vupdt_renderer_ref->config.flags ||
+        memcmp(&old_camera, &(g_vupdt_renderer_ref->camera), sizeof(SimpleCamera)) != 0)
         reset_count = CPUSWAP_LENGTH;
+    g_vupdt_renderer_ref->config.reset = FALSE;
     old_camera = g_vupdt_renderer_ref->camera;
     old_flags = g_vupdt_renderer_ref->config.flags;
     BOOL cam_reset = reset_count != 0;

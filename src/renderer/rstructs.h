@@ -334,6 +334,7 @@ typedef struct {
     BOOL scenelighting;
     BOOL scenelightingonly;
     BOOL scenelightshadows;
+    BOOL reset;
     PipelineFlags flags;
     ARAPConfig arap;
 } RendererConfig;
