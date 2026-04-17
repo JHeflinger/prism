@@ -37,8 +37,10 @@ ICEBOX:
 48. real spectral rendering maybe use hero rays and fix spectral aliasing
 49. simulation on GPU
 50. optimize memory bits and types
+51. detach from assimp
 
 Next:
+1. expose max path count
 2. open files via mini file explorer
 8. proper rendering/camera panel
 9. CPUswap greater than 2 breaks??
@@ -51,6 +53,7 @@ Next:
 13. early terminate - if toggled, then if a path bounce hits a location outside of the camera frustrum, just use scene lighting from that point and terminate there - that way we can get some minor color bleeding but on complex scenes not bounce too much out of screenspace
 14. uhh fwidth() is a think that may be useful for improving overlay
 15. fix the flashing and flickering that happens on just pathtrace no direct lighting components
+16. outline objects and select object mode
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

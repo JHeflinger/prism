@@ -10,7 +10,8 @@ typedef enum {
     DOTOBJ,
     DOTSPV,
     DOTMTL,
-    DOTXML
+    DOTXML,
+    DOTFBX
 } FileType;
 
 typedef struct {

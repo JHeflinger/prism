@@ -2,6 +2,10 @@
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
 #include "core/file.h"
+#include <assimp/postprocess.h>
+#include <assimp/material.h>
+#include <assimp/cimport.h>
+#include <assimp/scene.h>
 #include <raylib.h>
 #include <errno.h>
 #include <ctype.h>
@@ -662,4 +666,8 @@ BOOL LoadOBJ(const char* filepath) {
     CleanStateOBJ(&state);
     FreeFile(file);
     return TRUE;
+}
+
+BOOL LoadFBX(const char* filepath) {
+    return FALSE;
 }

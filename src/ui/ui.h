@@ -58,6 +58,8 @@ UI* GetRightUI(UI* ui);
 
 void SetPrimaryUI(UI* ui);
 
+void ResizeUI(UI* ui);
+
 UI* GenerateUI();
 
 void SetupPanel(Panel* panel, const char* name);

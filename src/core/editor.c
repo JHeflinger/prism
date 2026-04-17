@@ -20,10 +20,11 @@
 #include <easylogger.h>
 
 UI* g_ui = NULL;
+Vector2 g_windowsize = { -1.0f, -1.0f };
 
 void InitEditor() {
 	SetTraceLogLevel(LOG_NONE);
-    SetConfigFlags(FLAG_VSYNC_HINT /*| FLAG_WINDOW_RESIZABLE*/);
+    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
     Image icon = LoadImage("assets/images/appico.png");
     SetWindowIcon(icon);
@@ -73,6 +74,15 @@ void DrawEditor() {
     DrawUI(g_ui, 0, 0, GetScreenWidth(), GetScreenHeight());
 }
 
+void EditorResized() {
+    if ((g_windowsize.x == -1.0f && g_windowsize.y == -1.0f) ||
+        (g_windowsize.x != GetScreenWidth() || g_windowsize.y != GetScreenHeight())) {
+        g_windowsize.x = GetScreenWidth();
+        g_windowsize.y = GetScreenHeight();
+        ResizeUI(g_ui);
+    }
+}
+
 void CleanEditor() {
     CleanBinds();
     DestroyUI(g_ui);
@@ -108,6 +118,9 @@ void RunEditor() {
         BeginDrawing();
         DrawEditor();
         EndDrawing();
+
+        // resize callback
+        EditorResized();
     }
 
     // Close game

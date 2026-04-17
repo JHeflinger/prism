@@ -64,6 +64,17 @@ void SetPrimaryUI(UI* ui) {
     g_primary_ui = ui;
 }
 
+void ResizeUI(UI* ui) {
+    for (size_t i = 0; i < ui->panels.size; i++) {
+        UnloadRenderTexture(ui->panels.data[i].texture);
+        ui->panels.data[i].texture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
+    }
+    if (ui->left && ui->right) {
+        ResizeUI((UI*)(ui->left));
+        ResizeUI((UI*)(ui->right));
+    }
+}
+
 UI* GenerateUI() {
     UI* ui = EZ_ALLOC(1, sizeof(UI));
     return ui;

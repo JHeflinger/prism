@@ -1,6 +1,7 @@
 PROJECT src
 MAIN main.c
 LIB vendor/raylib/lib
+LIB vendor/assimp/lib
 WINDOWS LIB platform/windows/vulkan/libs
 WINDOWS LIB platform/windows/GLFW
 INCLUDE vendor/raylib/include
@@ -8,8 +9,11 @@ INCLUDE vendor/stb_image/include
 INCLUDE vendor/cglm/include
 INCLUDE vendor/EasyC/include
 INCLUDE vendor/suitesparse/include
+INCLUDE vendor/assimp/include
 WINDOWS INCLUDE platform/windows/vulkan/include
 WINDOWS INCLUDE platform/windows/GLFW/include
+LINK stdc++
+LINUX LINK :libassimp.a
 LINUX LINK vulkan
 LINUX LINK glfw
 LINUX LINK GLU

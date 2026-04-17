@@ -14,7 +14,7 @@ void LoadArmadillo() {
 }
 
 void LoadBox() {
-    LoadOBJ("assets/models/OBJ/dressed/maze.obj");
+    LoadFBX("assets/models/FBX/dancing.fbx");
     FitCamera();
 }
 

@@ -781,8 +781,10 @@ void Render() {
 void DrawHelper(float x, float y, float w, float h, float maxw, float maxh) {
     ClearBackground(BLACK);
     BeginBlendMode(BLEND_ADDITIVE);
-	float psuedo_w = w * (g_renderer.dimensions.x / maxw);
-	float psuedo_h = h * (g_renderer.dimensions.y / maxh);
+    float diffw = w - g_renderer.dimensions.x;
+    float diffh = h - g_renderer.dimensions.y;
+    float psuedo_w = diffw > diffh ? g_renderer.dimensions.x : g_renderer.dimensions.y * (w / h);
+    float psuedo_h = diffh > diffw ? g_renderer.dimensions.y : g_renderer.dimensions.x * (h / w);
     if (g_renderer.config.flags & PATHTRACE_SHADER_FLAG) {
         for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
             DrawTexturePro(
@@ -792,7 +794,7 @@ void DrawHelper(float x, float y, float w, float h, float maxw, float maxh) {
                     (g_renderer.swapchain.target[i].texture.height / 2.0f) - (psuedo_h/2.0f),
                     psuedo_w,
                     psuedo_h },
-                (Rectangle){ x, y, w, h},
+                (Rectangle){ x, y, w, h },
                 (Vector2){ 0, 0 },
                 0.0f,
                 WHITE);

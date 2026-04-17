@@ -26,6 +26,8 @@ FileType GetFileType(const char* path) {
         return DOTMTL;
     } else if (strcmp(extension, "xml") == 0 || strcmp(extension, "XML") == 0) {
         return DOTXML;
+    } else if (strcmp(extension, "fbx") == 0 || strcmp(extension, "FBX") == 0) {
+        return DOTFBX;
     }
     return UNKNOWN;
 }

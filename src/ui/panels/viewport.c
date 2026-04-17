@@ -209,6 +209,10 @@ void UpdateViewportPanel(float width, float height) {
     }
 
     // render
+    if (g_viewport_target.texture.width != GetScreenWidth() || g_viewport_target.texture.height != GetScreenHeight()) {
+        UnloadRenderTexture(g_viewport_target);
+        g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
+    }
     Render();
     BeginTextureMode(g_viewport_target);
     Draw(0, 0, width, height);

@@ -327,12 +327,23 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 	// relative mouse coords
     Rectangle viewport_rec = GetViewportRec();
     Vector2 renderer_dimensions = g_vupdt_renderer_ref->dimensions;
-    Vector2 offset = {
-        viewport_rec.x + (viewport_rec.width / 2.0f) - (GetScreenWidth() / 2.0f),
-        viewport_rec.y + (viewport_rec.height / 2.0f) - (GetScreenHeight() / 2.0f)
+    float diffw = GetScreenWidth() - renderer_dimensions.x;
+    float diffh = GetScreenHeight() - renderer_dimensions.y;
+    float scale = diffh > diffw ? GetScreenHeight() / renderer_dimensions.y : GetScreenWidth() / renderer_dimensions.x;
+    Vector2 scaled_rdims = {
+        renderer_dimensions.x * scale,
+        renderer_dimensions.y * scale
     };
-    uint32_t mx = (GetMouseX() - offset.x) * (renderer_dimensions.x / GetScreenWidth());
-    uint32_t my = (GetMouseY() - offset.y) * (renderer_dimensions.y / GetScreenHeight());
+    Vector2 offset = {
+        viewport_rec.x + (viewport_rec.width / 2.0f) - (scaled_rdims.x / 2.0f),
+        viewport_rec.y + (viewport_rec.height / 2.0f) - (scaled_rdims.y / 2.0f)
+    };
+    Vector2 relm = {
+        GetMouseX() - offset.x,
+        GetMouseY() - offset.y
+    };
+    uint32_t mx = (relm.x / scaled_rdims.x) * renderer_dimensions.x;
+    uint32_t my = (relm.y / scaled_rdims.y) * renderer_dimensions.y;
 
     // check for camera reset
     static SimpleCamera old_camera = { 0 };

@@ -5,4 +5,6 @@
 
 BOOL LoadOBJ(const char* filepath);
 
+BOOL LoadFBX(const char* filepath);
+
 #endif
