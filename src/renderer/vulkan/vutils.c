@@ -247,6 +247,15 @@ void VUTIL_BeginTransferCommands() {
         wi.pValues = &wait_for;
         vkWaitSemaphores(g_vutil_renderer_ref->vulkan.core.general.interface, &wi, UINT64_MAX);
     }
+    if (g_vutil_renderer_ref->vulkan.core.scheduler.signal >= CPUSWAP_LENGTH) {
+        uint64_t wait_for = g_vutil_renderer_ref->vulkan.core.scheduler.signal - (CPUSWAP_LENGTH - 1);
+        VkSemaphoreWaitInfo wi = { 0 };
+        wi.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+        wi.semaphoreCount = 1;
+        wi.pSemaphores = &g_vutil_renderer_ref->vulkan.core.scheduler.semaphore;
+        wi.pValues = &wait_for;
+        vkWaitSemaphores(g_vutil_renderer_ref->vulkan.core.general.interface, &wi, UINT64_MAX);
+    }
     vkResetCommandBuffer(cmd, 0);
     VkCommandBufferBeginInfo bi = { 0 };
     bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

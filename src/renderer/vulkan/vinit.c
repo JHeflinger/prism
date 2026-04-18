@@ -369,10 +369,23 @@ BOOL VINIT_Scheduler(VulkanScheduler* scheduler) {
 	if (!VINIT_Syncro(&(scheduler->syncro))) return FALSE;
 
 	// create commands
-	if (!VINIT_Commands(&(scheduler->commands))) return FALSE;	
+	if (!VINIT_Commands(&(scheduler->commands))) return FALSE;
 
 	// create queue
-	return VINIT_Queue(&(scheduler->queue));
+	if (!VINIT_Queue(&(scheduler->queue))) return FALSE;
+
+    // create semaphore
+    VkSemaphoreTypeCreateInfo typeInfo = { 0 };
+    typeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+    typeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    typeInfo.initialValue = 0;
+    VkSemaphoreCreateInfo sci = { 0 };
+    sci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    sci.pNext = &typeInfo;
+    vkCreateSemaphore(g_vinit_renderer_ref->vulkan.core.general.interface, &sci, NULL, &scheduler->semaphore);
+    scheduler->signal = 0;
+
+    return TRUE;
 }
 
 BOOL VINIT_Transfer(VulkanTransfer* transfer) {

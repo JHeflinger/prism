@@ -598,6 +598,7 @@ void Render() {
                 g_renderer.geometry.changes.max_##sname = gname; \
                 if (!resized_buffers) { \
                     resized_buffers = TRUE; \
+                    if (is_transferring) VUTIL_EndTransferCommands(); \
                     is_transferring = TRUE; \
                     VUTIL_BeginTransferCommands(); \
                     vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, \
@@ -735,10 +736,14 @@ void Render() {
         // submit command buffer
         uint64_t waitVal = g_renderer.vulkan.core.transfer.signal;
         VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+        g_renderer.vulkan.core.scheduler.signal++;
+        uint64_t graphicsSignalVal = g_renderer.vulkan.core.scheduler.signal;
         VkTimelineSemaphoreSubmitInfo tsi = { 0 };
         tsi.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
         tsi.waitSemaphoreValueCount = 1;
         tsi.pWaitSemaphoreValues = &waitVal;
+        tsi.signalSemaphoreValueCount = 1;
+        tsi.pSignalSemaphoreValues = &graphicsSignalVal;
         VkSubmitInfo submitInfo = { 0 };
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.pNext = &tsi;
@@ -747,7 +752,8 @@ void Render() {
         submitInfo.pWaitDstStageMask = &waitStage;
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &(g_renderer.vulkan.core.scheduler.commands.commands[g_renderer.swapchain.index]);
-        submitInfo.signalSemaphoreCount = 0;
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &g_renderer.vulkan.core.scheduler.semaphore; 
         VkResult result = vkQueueSubmit(g_renderer.vulkan.core.scheduler.queue, 1, &submitInfo, g_renderer.vulkan.core.scheduler.syncro.fences[g_renderer.swapchain.index]);
         EZ_ASSERT(result == VK_SUCCESS, "failed to submit draw command buffer!");
     }

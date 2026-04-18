@@ -143,6 +143,8 @@ typedef struct {
     VulkanSyncro syncro;
     VulkanCommands commands;
     VkQueue queue;
+    VkSemaphore semaphore;
+    uint64_t signal;
 } VulkanScheduler;
 
 typedef struct {

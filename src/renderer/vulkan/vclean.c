@@ -136,6 +136,7 @@ void VCLEAN_Scheduler(VulkanScheduler* scheduler) {
     for (int i = 0; i < CPUSWAP_LENGTH; i++)
         vkDestroyFence(g_vclean_renderer_ref->vulkan.core.general.interface, scheduler->syncro.fences[i], NULL);
     vkDestroyCommandPool(g_vclean_renderer_ref->vulkan.core.general.interface, scheduler->commands.pool, NULL);
+    vkDestroySemaphore(g_vclean_renderer_ref->vulkan.core.general.interface, scheduler->semaphore, NULL);
 }
 
 void VCLEAN_Transfer(VulkanTransfer* transfer) {
