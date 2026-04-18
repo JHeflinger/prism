@@ -40,6 +40,7 @@ ICEBOX:
 51. detach from assimp
 
 Next:
+0. FUCK LOADING SHIT MULTIPLE TIMES IS FUCKLING UP AGIAN
 1. expose max path count
 2. open files via mini file explorer
 8. proper rendering/camera panel
