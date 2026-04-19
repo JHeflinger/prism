@@ -795,31 +795,51 @@ Animation* LoadFBXAnimations(const struct aiScene* scene, size_t* out_count) {
         strncpy(anim->name, ai_anim->mName.data, sizeof(anim->name) - 1);
         anim->duration = ai_anim->mDuration;
         anim->tps = ai_anim->mTicksPerSecond > 0.0f ? ai_anim->mTicksPerSecond : 25.0f;
-        ARRLIST_BoneChannel_zero(&anim->channels, ai_anim->mNumChannels);
+        ARRLIST_BoneChannel_zero(&anim->channels, ai_anim->mNumChannels); // upper bound
+        anim->channels.size = 0;
         for (size_t c = 0; c < ai_anim->mNumChannels; c++) {
             const struct aiNodeAnim* ch = ai_anim->mChannels[c];
-            BoneChannel* bone = &anim->channels.data[c];
-            strncpy(bone->name, ch->mNodeName.data, sizeof(bone->name) - 1);
-
-            // Position keys
-            ARRLIST_Vec3Key_zero(&bone->positions, ch->mNumPositionKeys);
-            for (unsigned int k = 0; k < ch->mNumPositionKeys; k++) {
-                bone->positions.data[k].time = (float)ch->mPositionKeys[k].mTime;
-                _aiv32v3(ch->mPositionKeys[k].mValue, bone->positions.data[k].value);
+            char base[256];
+            strncpy(base, ch->mNodeName.data, sizeof(base) - 1);
+            base[sizeof(base) - 1] = '\0';
+            char* suffix = strstr(base, "_$AssimpFbx$_");
+            if (suffix) *suffix = '\0';
+            BoneChannel* bone = NULL;
+            for (size_t i = 0; i < anim->channels.size; i++) {
+                if (strcmp(anim->channels.data[i].name, base) == 0) {
+                    bone = &anim->channels.data[i];
+                    break;
+                }
             }
-
-            // Rotation keys
-            ARRLIST_QuatKey_zero(&bone->rotations, ch->mNumRotationKeys);
-            for (unsigned int k = 0; k < ch->mNumRotationKeys; k++) {
-                bone->rotations.data[k].time = (float)ch->mRotationKeys[k].mTime;
-                _aiq2v(ch->mRotationKeys[k].mValue, bone->rotations.data[k].value);
+            if (!bone) {
+                BoneChannel new_ch = { 0 };
+                strncpy(new_ch.name, base, sizeof(new_ch.name) - 1);
+                ARRLIST_BoneChannel_add(&anim->channels, new_ch);
+                bone = &anim->channels.data[anim->channels.size - 1];
             }
-
-            // Scale keys
-            ARRLIST_Vec3Key_zero(&bone->scales, ch->mNumScalingKeys);
-            for (unsigned int k = 0; k < ch->mNumScalingKeys; k++) {
-                bone->scales.data[k].time = (float)ch->mScalingKeys[k].mTime;
-                _aiv32v3(ch->mScalingKeys[k].mValue, bone->scales.data[k].value);
+            if (ch->mNumPositionKeys > bone->positions.size) {
+                ARRLIST_Vec3Key_clear(&bone->positions);
+                ARRLIST_Vec3Key_zero(&bone->positions, ch->mNumPositionKeys);
+                for (unsigned int k = 0; k < ch->mNumPositionKeys; k++) {
+                    bone->positions.data[k].time = (float)ch->mPositionKeys[k].mTime;
+                    _aiv32v3(ch->mPositionKeys[k].mValue, bone->positions.data[k].value);
+                }
+            }
+            if (ch->mNumRotationKeys > bone->rotations.size) {
+                ARRLIST_QuatKey_clear(&bone->rotations);
+                ARRLIST_QuatKey_zero(&bone->rotations, ch->mNumRotationKeys);
+                for (unsigned int k = 0; k < ch->mNumRotationKeys; k++) {
+                    bone->rotations.data[k].time = (float)ch->mRotationKeys[k].mTime;
+                    _aiq2v(ch->mRotationKeys[k].mValue, bone->rotations.data[k].value);
+                }
+            }
+            if (ch->mNumScalingKeys > bone->scales.size) {
+                ARRLIST_Vec3Key_clear(&bone->scales);
+                ARRLIST_Vec3Key_zero(&bone->scales, ch->mNumScalingKeys);
+                for (unsigned int k = 0; k < ch->mNumScalingKeys; k++) {
+                    bone->scales.data[k].time = (float)ch->mScalingKeys[k].mTime;
+                    _aiv32v3(ch->mScalingKeys[k].mValue, bone->scales.data[k].value);
+                }
             }
         }
     }
@@ -874,11 +894,13 @@ BOOL TraverseFBXNode(Skeleton* skeleton, const struct aiNode* node, const struct
 }
 
 BOOL LoadFBX(const char* filepath) {
-    unsigned int flags = aiProcess_Triangulate        // ensure all faces are tris
-                       | aiProcess_GenSmoothNormals   // generate normals if missing
+    unsigned int flags = aiProcess_Triangulate          // ensure all faces are tris
+                       | aiProcess_GenSmoothNormals     // generate normals if missing
                        | aiProcess_JoinIdenticalVertices
-                       | aiProcess_LimitBoneWeights   // cap bone influences per vertex
-                       | aiProcess_FlipUVs;           // match your UV convention
+                       | aiProcess_LimitBoneWeights     // cap bone influences per vertex
+                       | aiProcess_FlipUVs              // match your UV convention
+                       | aiProcess_PopulateArmatureData // reconstruct skeleton hierarchy, converting world-space animation channels to local-space
+                       | aiProcess_GlobalScale;         // apply FBX unit scale factor
     const struct aiScene* scene = aiImportFile(filepath, flags);
     if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !scene->mRootNode) {
         EZ_ERROR("Failed to load FBX file \"%s\": %s", filepath, aiGetErrorString());
