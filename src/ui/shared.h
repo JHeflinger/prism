@@ -11,6 +11,8 @@ size_t DropdownSelectLightModel(void* data, size_t index);
 
 size_t DropdownSelectARAPModel(void* data, size_t index);
 
+size_t DropdownSelectAnimation(void* data, size_t index);
+
 char** SimVisualLabels();
 
 char** LightModelLabels();

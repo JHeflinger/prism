@@ -78,6 +78,17 @@ typedef struct {
 typedef BOOL (*ParseFuncOBJ)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
 typedef BOOL (*ParseFuncMTL)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
 
+typedef struct {
+    const char* filepath;
+    VertexID vstart;
+    ARRLIST_Animation animations;
+} StateFBX;
+
+void _aiv32v3(struct aiVector3D ai, vec3 out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; }
+void _aiq2v(struct aiQuaternion ai, versor out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; out[3] = ai.w; }
+void _aic2v(struct aiColor3D ai, vec3 out) { out[0] = ai.r; out[1] = ai.g; out[2] = ai.b; }
+struct aiColor3D _4d23d(struct aiColor4D c) { return (struct aiColor3D){ c.r, c.g, c.b }; }
+
 void CleanStateOBJ(StateOBJ* state) {
     ARRLIST_vec3_clear(&(state->vertices));
     ARRLIST_vec3_clear(&(state->normals));
@@ -660,7 +671,7 @@ BOOL LoadOBJ(const char* filepath) {
         glm_vec3_sub(max, min, extent);
         glm_vec3_scale(extent, 0.5f, extent);
         SubmitMeshDescriptor((MeshDescriptor){
-            FALSE, startv, NumVertices() - 1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
+            FALSE, startv, NumVertices() - 1, 0, (uint32_t)-1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
             { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, StripFilename(filepath));
     }
     CleanStateOBJ(&state);
@@ -668,6 +679,246 @@ BOOL LoadOBJ(const char* filepath) {
     return TRUE;
 }
 
+MaterialID LoadFBXMaterial(const struct aiMaterial* mat) {
+    SurfaceMaterial m = { 0 };
+    struct aiColor4D color;
+    float fval;
+    int ival;
+    if (aiGetMaterialColor(mat, AI_MATKEY_COLOR_DIFFUSE, &color) == AI_SUCCESS) _aic2v(_4d23d(color), m.diffuse);
+    if (aiGetMaterialColor(mat, AI_MATKEY_COLOR_SPECULAR, &color) == AI_SUCCESS) _aic2v(_4d23d(color), m.specular);
+    if (aiGetMaterialColor(mat, AI_MATKEY_COLOR_AMBIENT, &color) == AI_SUCCESS) _aic2v(_4d23d(color), m.ambient);
+    if (aiGetMaterialColor(mat, AI_MATKEY_COLOR_EMISSIVE, &color) == AI_SUCCESS) _aic2v(_4d23d(color), m.emission);
+    if (aiGetMaterialColor(mat, AI_MATKEY_COLOR_TRANSPARENT, &color) == AI_SUCCESS) _aic2v(_4d23d(color), m.absorbtion);
+    if (aiGetMaterialFloat(mat, AI_MATKEY_SHININESS, &fval) == AI_SUCCESS) m.shiny = fval;
+    if (aiGetMaterialFloat(mat, AI_MATKEY_REFRACTI, &fval) == AI_SUCCESS) m.ior = fval;
+    if (aiGetMaterialInteger(mat, AI_MATKEY_SHADING_MODEL, &ival) == AI_SUCCESS) {
+        switch (ival) {
+            case aiShadingMode_Phong:
+            case aiShadingMode_Blinn: m.model = 2; break;
+            case aiShadingMode_CookTorrance:
+            case aiShadingMode_Fresnel: m.model = 7; break;
+            default: m.model = 2; break;
+        }
+    } else {
+        m.model = 2;
+    }
+    struct aiString matname;
+    const char* namestr = "Untitled FBXMaterial";
+    if (aiGetMaterialString(mat, AI_MATKEY_NAME, &matname) == AI_SUCCESS) namestr = matname.data;
+    return SubmitNamedMaterial(m, namestr);
+}
+
+uint32_t LookupOrRegisterBone(Skeleton* sk, const char* name, const struct aiMatrix4x4* offset) {
+    for (size_t i = 0; i < sk->bonecount; i++) {
+        if (strcmp(sk->bones[i].name, name) == 0)
+            return (uint32_t)i;
+    }
+    if (sk->bonecount >= MAX_BONES) {
+        EZ_WARN("Skeleton exceeds MAX_BONES (%d) — bone \"%s\" skipped", MAX_BONES, name);
+        return 0;
+    }
+    Bone* b = &sk->bones[sk->bonecount];
+    strncpy(b->name, name, sizeof(b->name) - 1);
+    struct aiMatrix4x4 t = *offset;
+    aiTransposeMatrix4(&t);
+    memcpy(b->inversebind, &t, sizeof(mat4));
+    b->parent = (size_t)-1;
+    return (uint32_t)(sk->bonecount++);
+}
+
+BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialID mat_id, size_t vertices_start, size_t normals_start) {
+    if (!(mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)) {
+        EZ_WARN("Non-triangle FBX mesh detected - skipping \"%s\"", mesh->mName.data);
+        return TRUE;
+    }
+    BOOL has_normals = mesh->mNormals != NULL;
+    for (size_t i = 0; i < mesh->mNumVertices; i++) {
+        vec3 v;
+        _aiv32v3(mesh->mVertices[i], v);
+        SubmitVertex(v);
+    }
+    VertexSkin* skins = EZ_ALLOC(mesh->mNumVertices, sizeof(VertexSkin));
+    uint32_t* influence_count = EZ_ALLOC(mesh->mNumVertices, sizeof(uint32_t));
+    for (size_t b = 0; b < mesh->mNumBones; b++) {
+        struct aiBone* bone = mesh->mBones[b];
+        uint32_t bone_idx = LookupOrRegisterBone(skeleton, bone->mName.data, &bone->mOffsetMatrix);
+        for (size_t w = 0; w < bone->mNumWeights; w++) {
+            uint32_t vi = bone->mWeights[w].mVertexId;
+            uint32_t slot = influence_count[vi];
+            if (slot < MAX_BONE_INFLUENCES) {
+                skins[vi].indices[slot] = bone_idx;
+                skins[vi].weights[slot] = bone->mWeights[w].mWeight;
+                influence_count[vi]++;
+            }
+        }
+    }
+    for (size_t i = 0; i < mesh->mNumVertices; i++) SubmitVertexSkin(skins[i]);
+    EZ_FREE(skins);
+    EZ_FREE(influence_count);
+    if (has_normals) {
+        for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
+            vec3 n;
+            _aiv32v3(mesh->mNormals[i], n);
+            SubmitNormal(n);
+        }
+    }
+    for (size_t i = 0; i < mesh->mNumFaces; i++) {
+        const struct aiFace* face = &mesh->mFaces[i];
+        if (face->mNumIndices != 3) {
+            EZ_WARN("FBX face is a non-triangle - skipping");
+            continue;
+        }
+        unsigned int ia = face->mIndices[0];
+        unsigned int ib = face->mIndices[1];
+        unsigned int ic = face->mIndices[2];
+        Triangle tri = {
+            vertices_start + ia,
+            vertices_start + ib,
+            vertices_start + ic,
+            has_normals ? (normals_start + ia) : (VertexID)-1,
+            has_normals ? (normals_start + ib) : (VertexID)-1,
+            has_normals ? (normals_start + ic) : (VertexID)-1,
+            mat_id
+        };
+        SubmitTriangle(tri);
+    }
+    return TRUE;
+}
+
+Animation* LoadFBXAnimations(const struct aiScene* scene, size_t* out_count) {
+    *out_count = scene->mNumAnimations;
+    if (scene->mNumAnimations == 0) return NULL;
+    Animation* anims = EZ_ALLOC(scene->mNumAnimations, sizeof(Animation));
+    for (size_t a = 0; a < scene->mNumAnimations; a++) {
+        const struct aiAnimation* ai_anim = scene->mAnimations[a];
+        Animation* anim = &anims[a];
+        strncpy(anim->name, ai_anim->mName.data, sizeof(anim->name) - 1);
+        anim->duration = ai_anim->mDuration;
+        anim->tps = ai_anim->mTicksPerSecond > 0.0f ? ai_anim->mTicksPerSecond : 25.0f;
+        ARRLIST_BoneChannel_zero(&anim->channels, ai_anim->mNumChannels);
+        for (size_t c = 0; c < ai_anim->mNumChannels; c++) {
+            const struct aiNodeAnim* ch = ai_anim->mChannels[c];
+            BoneChannel* bone = &anim->channels.data[c];
+            strncpy(bone->name, ch->mNodeName.data, sizeof(bone->name) - 1);
+
+            // Position keys
+            ARRLIST_Vec3Key_zero(&bone->positions, ch->mNumPositionKeys);
+            for (unsigned int k = 0; k < ch->mNumPositionKeys; k++) {
+                bone->positions.data[k].time = (float)ch->mPositionKeys[k].mTime;
+                _aiv32v3(ch->mPositionKeys[k].mValue, bone->positions.data[k].value);
+            }
+
+            // Rotation keys
+            ARRLIST_QuatKey_zero(&bone->rotations, ch->mNumRotationKeys);
+            for (unsigned int k = 0; k < ch->mNumRotationKeys; k++) {
+                bone->rotations.data[k].time = (float)ch->mRotationKeys[k].mTime;
+                _aiq2v(ch->mRotationKeys[k].mValue, bone->rotations.data[k].value);
+            }
+
+            // Scale keys
+            ARRLIST_Vec3Key_zero(&bone->scales, ch->mNumScalingKeys);
+            for (unsigned int k = 0; k < ch->mNumScalingKeys; k++) {
+                bone->scales.data[k].time = (float)ch->mScalingKeys[k].mTime;
+                _aiv32v3(ch->mScalingKeys[k].mValue, bone->scales.data[k].value);
+            }
+        }
+    }
+    return anims;
+}
+
+size_t FindBoneIndex(Skeleton* skeleton, const char* name) {
+    for (size_t i = 0; i < skeleton->bonecount; i++)
+        if (strcmp(skeleton->bones[i].name, name) == 0) return i;
+    return (size_t)-1;
+}
+
+void ResolveParents(Skeleton* skeleton, const struct aiNode* node, size_t parent_bone_idx) {
+    size_t my_idx = FindBoneIndex(skeleton, node->mName.data);
+    size_t next_parent = (my_idx != (size_t)-1) ? my_idx : parent_bone_idx;
+    if (my_idx != (size_t)-1) {
+        skeleton->bones[my_idx].parent = parent_bone_idx;
+        struct aiMatrix4x4 t = node->mTransformation;
+        aiTransposeMatrix4(&t);
+        memcpy(skeleton->bones[my_idx].localbind, &t, sizeof(mat4));
+    }
+    for (size_t i = 0; i < node->mNumChildren; i++) ResolveParents(skeleton, node->mChildren[i], next_parent);
+}
+
+BOOL TraverseFBXNode(Skeleton* skeleton, const struct aiNode* node, const struct aiScene* scene, MaterialID* mat_ids, vec3* aabb_min, vec3* aabb_max, BOOL* aabb_init) {
+    for (unsigned int m = 0; m < node->mNumMeshes; m++) {
+        unsigned int mesh_idx = node->mMeshes[m];
+        const struct aiMesh* mesh = scene->mMeshes[mesh_idx];
+        MaterialID mat_id = mat_ids[mesh->mMaterialIndex];
+        size_t vstart = NumVertices();
+        size_t nstart = NumNormals();
+        if (!LoadFBXMesh(skeleton, mesh, mat_id, vstart, nstart))
+            return FALSE;
+        for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
+            vec3 vtx;
+            _aiv32v3(mesh->mVertices[v], vtx);
+            if (!(*aabb_init)) {
+                glm_vec3_copy(vtx, *aabb_min);
+                glm_vec3_copy(vtx, *aabb_max);
+                *aabb_init = TRUE;
+            } else {
+                glm_vec3_minv(vtx, *aabb_min, *aabb_min);
+                glm_vec3_maxv(vtx, *aabb_max, *aabb_max);
+            }
+        }
+    }
+    for (unsigned int c = 0; c < node->mNumChildren; c++) {
+        if (!TraverseFBXNode(skeleton, node->mChildren[c], scene, mat_ids, aabb_min, aabb_max, aabb_init))
+            return FALSE;
+    }
+    return TRUE;
+}
+
 BOOL LoadFBX(const char* filepath) {
-    return FALSE;
+    unsigned int flags = aiProcess_Triangulate        // ensure all faces are tris
+                       | aiProcess_GenSmoothNormals   // generate normals if missing
+                       | aiProcess_JoinIdenticalVertices
+                       | aiProcess_LimitBoneWeights   // cap bone influences per vertex
+                       | aiProcess_FlipUVs;           // match your UV convention
+    const struct aiScene* scene = aiImportFile(filepath, flags);
+    if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !scene->mRootNode) {
+        EZ_ERROR("Failed to load FBX file \"%s\": %s", filepath, aiGetErrorString());
+        return FALSE;
+    }
+    uint32_t starts = NumSkins();
+    VertexID startv = NumVertices();
+    MaterialID* mat_ids = EZ_ALLOC(scene->mNumMaterials, sizeof(MaterialID));
+    for (unsigned int i = 0; i < scene->mNumMaterials; i++) mat_ids[i] = LoadFBXMaterial(scene->mMaterials[i]);
+    vec3 aabb_min = GLM_VEC3_ZERO_INIT;
+    vec3 aabb_max = GLM_VEC3_ZERO_INIT;
+    BOOL aabb_init = FALSE;
+    Skeleton skeleton = { 0 };
+    if (!TraverseFBXNode(&skeleton, scene->mRootNode, scene, mat_ids, &aabb_min, &aabb_max, &aabb_init)) {
+        EZ_ERROR("Failed to traverse scene graph for \"%s\"", filepath);
+        EZ_FREE(mat_ids);
+        aiReleaseImport(scene);
+        return FALSE;
+    }
+    ResolveParents(&skeleton, scene->mRootNode, (size_t)-1);
+    EZ_FREE(mat_ids);
+    if (aabb_init) {
+        vec3 center, extent;
+        glm_vec3_add(aabb_max, aabb_min, center);
+        glm_vec3_scale(center, 0.5f, center);
+        glm_vec3_sub(aabb_max, aabb_min, extent);
+        glm_vec3_scale(extent, 0.5f, extent);
+        SubmitMeshDescriptor((MeshDescriptor){
+            FALSE, startv, NumVertices() - 1,
+            starts, (uint32_t)-1,
+            INLINEV3(center), INLINEV3(extent),
+            { 0 }, { 0 },
+            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT
+        }, StripFilename(filepath));
+        size_t num_anims = 0;
+        Animation* anims = LoadFBXAnimations(scene, &num_anims);
+        for (size_t i = 0; i < num_anims; i++) SubmitAnimation(NumMeshes() - 1, skeleton, anims[i]);
+        EZ_FREE(anims);
+        if (num_anims > 0) MeshReference(NumMeshes() - 1)->pose = (NumAnimations() - 1) * MAX_BONES;
+    }
+    aiReleaseImport(scene);
+    return TRUE;
 }

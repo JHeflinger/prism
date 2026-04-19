@@ -161,6 +161,22 @@ void UpdateObjectTransform(size_t i);
 
 void UpdateMeshes();
 
+void SubmitAnimation(size_t meshid, Skeleton skeleton, Animation animation);
+
+void SubmitVertexSkin(VertexSkin skin);
+
+size_t NumSkins();
+
+size_t NumAnimations();
+
+MeshAnimation* AnimationReference(size_t animid);
+
+void ClearAnimations();
+
+void UpdateSkins();
+
+void UpdatePoses();
+
 void SaveRender(const char* filepath);
 
 char* GPUModel();

@@ -33,6 +33,7 @@ void ClearScene() {
     ClearVertices();
     ClearNormals();
     ClearMeshDescriptors();
+    ClearAnimations();
     DeselectEditTarget();
 }
 

@@ -7,6 +7,10 @@ void VUPDT_Simulation(VulkanFluidSimulation* vfs);
 
 void VUPDT_Transforms(VulkanDataBuffer* transforms);
 
+void VUPDT_Skins(VulkanDataBuffer* skins);
+
+void VUPDT_Poses(VulkanDataBuffer* poses);
+
 void VUPDT_Lights(VulkanDataBuffer* lights);
 
 void VUPDT_Normals(VulkanDataBuffer* normals);

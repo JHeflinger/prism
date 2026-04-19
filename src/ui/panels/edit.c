@@ -517,6 +517,30 @@ void DrawEditPanel(float width, float height) {
             UICheckbox(&disabled);
             edited |= disabled != (md->disabled != 0);
             md->disabled = disabled;
+            if (md->pose != (uint32_t)-1) {
+                MeshAnimation* anim = AnimationReference(md->pose);
+                float sboxwidth = width - 20 - 140;
+                UIMoveCursor(0, 15);
+                UIDrawText("Animation");
+                UIMoveCursor(140, -20);
+                UIDropdownMenu(sboxwidth, anim->animations.size, anim->names.data, DropdownSelectAnimation, anim);
+                UIMoveCursor(0, 5);
+                UIDrawText("Time");
+                UIMoveCursor(140, -20);
+                UIDragFloat(&(anim->time), 0, FLT_MAX, 0.01f, sboxwidth);
+                UIMoveCursor(0, 5);
+                UIDrawText("Loop");
+                UIMoveCursor(140, -20);
+                UICheckbox(&(anim->looping));
+                UIMoveCursor(0, 5);
+                UIDrawText("Play");
+                UIMoveCursor(140, -20);
+                UICheckbox(&(anim->playing));
+                UIMoveCursor(0, 5);
+                UIDrawText("Enable");
+                UIMoveCursor(140, -20);
+                UICheckbox(&(anim->enable));
+            }
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Translation") / 2) - 10, 0);
             UIDrawText("Translation");

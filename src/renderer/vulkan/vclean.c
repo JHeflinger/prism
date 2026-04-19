@@ -17,6 +17,14 @@ void VCLEAN_Transforms(VulkanDataBuffer* transforms) {
     VUTIL_DestroyBuffer(*transforms);
 }
 
+void VCLEAN_Skins(VulkanDataBuffer* skins) {
+    VUTIL_DestroyBuffer(*skins);
+}
+
+void VCLEAN_Poses(VulkanDataBuffer* poses) {
+    VUTIL_DestroyBuffer(*poses);
+}
+
 void VCLEAN_Lights(VulkanDataBuffer* lights) {
     VUTIL_DestroyBuffer(*lights);
 }
@@ -67,8 +75,10 @@ void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Emissives(&(geometry->emissives));
     VCLEAN_Materials(&(geometry->materials));
     VCLEAN_Lights(&(geometry->lights));
-    VCLEAN_Lights(&(geometry->transforms));
+    VCLEAN_Transforms(&(geometry->transforms));
     VCLEAN_Simulation(&(geometry->fluid));
+    VCLEAN_Poses(&(geometry->poses));
+    VCLEAN_Skins(&(geometry->skins));
 }
 
 void VCLEAN_Metadata(VulkanMetadata* metadata) {

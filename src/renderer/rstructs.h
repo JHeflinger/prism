@@ -33,6 +33,7 @@ DECLARE_ARR_ARRLIST(vec4);
 DECLARE_ARR_ARRLIST(vec3);
 DECLARE_HASHMAP(VertexID, BOOL, Locks);
 DECLARE_HASHMAP(Edge, EdgeMeta, EdgeGlue);
+DECLARE_ARR_ARRLIST(mat4);
 
 #define PREVIEW_PIPELINE_FLAGS    0b11000111111111
 #define SIMULATE_PIPELINE_FLAGS   0b00010000000000
@@ -128,6 +129,8 @@ typedef struct {
     size_t max_lights;
     size_t max_sim_size;
     size_t max_meshes;
+    size_t max_skins;
+    size_t max_poses;
     size_t num_normals;
     size_t num_vertices;
     size_t num_triangles;
@@ -136,6 +139,8 @@ typedef struct {
     size_t num_lights;
     size_t num_sim_size;
     size_t num_meshes;
+    size_t num_skins;
+    size_t num_poses;
     BOOL update_normals;
     BOOL update_vertices;
     BOOL update_triangles;
@@ -143,6 +148,8 @@ typedef struct {
     BOOL update_lights;
     BOOL update_simulation;
     BOOL update_meshes;
+    BOOL update_skins;
+    BOOL update_poses;
     size_t update_bvh;
 } ChangeSet;
 
@@ -283,6 +290,8 @@ typedef struct {
     alignas(4) uint32_t disabled;
     alignas(4) VertexID start;
     alignas(4) VertexID end;
+    alignas(4) VertexID skinstart;
+    alignas(4) uint32_t pose;
     alignas(16) vec3 center;
     alignas(16) vec3 extents;
     alignas(16) vec3 translate;
@@ -291,6 +300,70 @@ typedef struct {
     alignas(16) mat4 transform;
 } MeshDescriptor;
 DECLARE_ARRLIST(MeshDescriptor);
+
+#define MAX_BONE_INFLUENCES 4
+#define MAX_BONES 256
+
+typedef struct {
+    alignas(4) VertexID indices[MAX_BONE_INFLUENCES];
+    alignas(4) float weights[MAX_BONE_INFLUENCES];
+} VertexSkin;
+DECLARE_ARRLIST(VertexSkin);
+
+typedef struct {
+    char name[256];
+    mat4 inversebind;
+    mat4 localbind;
+    size_t parent;
+} Bone;
+
+typedef struct {
+    Bone bones[MAX_BONES];
+    size_t bonecount;
+} Skeleton;
+DECLARE_ARRLIST(Skeleton);
+
+typedef struct {
+    float time; // keyframe time in ticks
+    vec3 value;
+} Vec3Key;
+DECLARE_ARRLIST(Vec3Key);
+
+typedef struct {
+    float time;
+    versor value; // quaternion (cglm: vec4 xyzw)
+} QuatKey;
+DECLARE_ARRLIST(QuatKey);
+
+typedef struct {
+    char name[256];
+    ARRLIST_Vec3Key positions;
+    ARRLIST_QuatKey rotations;
+    ARRLIST_Vec3Key scales;
+} BoneChannel;
+DECLARE_ARRLIST(BoneChannel);
+
+typedef struct {
+    char name[256];
+    float duration;
+    float tps;
+    ARRLIST_BoneChannel channels;
+} Animation;
+DECLARE_ARRLIST(Animation);
+
+typedef struct {
+    size_t meshid;
+    Skeleton skeleton;
+    ARRLIST_Animation animations;
+    ARRLIST_DynamicString names;
+    size_t current;
+    float time;
+    BOOL looping;
+    BOOL playing;
+    BOOL enable;
+    BOOL _enable;
+} MeshAnimation;
+DECLARE_ARRLIST(MeshAnimation);
 
 typedef struct {
     ManifoldMesh manifold;
@@ -302,6 +375,10 @@ typedef struct {
     ARRLIST_TriangleID emissives;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;
+    ARRLIST_Skeleton skeletons;
+    ARRLIST_MeshAnimation animations;
+    ARRLIST_VertexSkin skins;
+    ARRLIST_mat4 poses;
     HASHMAP_Locks locks;
     HASHMAP_EdgeGlue glue;
     ARRLIST_Edge edges;

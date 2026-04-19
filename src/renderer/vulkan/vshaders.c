@@ -214,6 +214,36 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 				sizeof(MeshDescriptor)
 			}
 		};
+	} else if (strcmp(name, "PoseSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.poses.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.poses.size)
+				}, 0.0f,
+				sizeof(mat4)
+			}
+		};
+	} else if (strcmp(name, "SkinSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.skins.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.skins.size)
+				}, 0.0f,
+				sizeof(VertexSkin)
+			}
+		};
 	} else if (strcmp(name, "WorkGroupOffsetSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,

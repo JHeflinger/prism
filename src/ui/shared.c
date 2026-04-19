@@ -58,6 +58,12 @@ size_t DropdownSelectARAPModel(void* data, size_t index) {
     return index;
 }
 
+size_t DropdownSelectAnimation(void* data, size_t index) {
+    MeshAnimation* animation = (MeshAnimation*)data;
+    if (index != (size_t)-1) animation->current = index;
+    return animation->current;
+}
+
 char** SimVisualLabels() {
     return g_sim_visual_labels;
 }

@@ -3,6 +3,7 @@
 #include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vclean.h"
+#include "renderer/animation.h"
 #include "renderer/processor.h"
 #include "renderer/simulator.h"
 #include "renderer/overlay.h"
@@ -349,6 +350,7 @@ void DestroyRenderer() {
     CleanARAP();
     ClearSimulation();
     ClearMeshDescriptors();
+    ClearAnimations();
 
     // destroy cholmod
     cholmod_finish(&g_cholmod);
@@ -590,6 +592,9 @@ void Render() {
     BOOL resized_buffers = FALSE;
     BOOL is_transferring = FALSE;
 
+    // animations
+    g_renderer.geometry.changes.update_poses |= PlayAnimations(&(g_renderer.geometry));
+
     // helpers for readability
     #define TRANSFER_UPDATE(cname, sname, gname, gsname, oname, vname, tri) { \
         if (g_renderer.geometry.changes.update_##cname) { \
@@ -693,7 +698,8 @@ void Render() {
         // set bvh reconstruction
         if (g_renderer.geometry.changes.update_vertices ||
             g_renderer.geometry.changes.update_triangles ||
-            g_renderer.geometry.changes.update_meshes)
+            g_renderer.geometry.changes.update_meshes ||
+            g_renderer.geometry.changes.update_poses)
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH;
 
         // transfer updates
@@ -704,6 +710,8 @@ void Render() {
         TRANSFER_UPDATE(lights, lights, g_renderer.geometry.lights.maxsize, g_renderer.geometry.lights.size, lights, Lights, FALSE);
         TRANSFER_UPDATE(simulation, sim_size, SimSize(g_renderer.geometry.fluid), SimSize(g_renderer.geometry.fluid), fluid, Simulation, FALSE);
         TRANSFER_UPDATE(meshes, meshes, g_renderer.geometry.meshes.maxsize, g_renderer.geometry.meshes.size, transforms, Transforms, FALSE);
+        TRANSFER_UPDATE(skins, skins, g_renderer.geometry.skins.maxsize, g_renderer.geometry.skins.size, skins, Skins, FALSE);
+        TRANSFER_UPDATE(poses, poses, g_renderer.geometry.poses.maxsize, g_renderer.geometry.poses.size, poses, Poses, FALSE);
 
         // dispatch transfer commands
         if (is_transferring) VUTIL_EndTransferCommands();
@@ -1305,6 +1313,81 @@ void UpdateObjectTransform(size_t i) {
 
 void UpdateMeshes() {
     g_renderer.geometry.changes.update_meshes = TRUE;
+}
+
+void SubmitAnimation(size_t meshid, Skeleton skeleton, Animation animation) {
+    char* name = EZ_ALLOC(strlen(animation.name), sizeof(char));
+    strcpy(name, animation.name);
+    for (size_t i = 0; i < g_renderer.geometry.animations.size; i++) {
+        if (g_renderer.geometry.animations.data[i].meshid == meshid) {
+            ARRLIST_Animation_add(&(g_renderer.geometry.animations.data[i].animations), animation);
+            ARRLIST_DynamicString_add(&(g_renderer.geometry.animations.data[i].names), name);
+            return;
+        }
+    }
+    ARRLIST_Animation a = { 0 };
+    ARRLIST_DynamicString n = { 0 };
+    ARRLIST_Animation_add(&a, animation);
+    ARRLIST_DynamicString_add(&n, name);
+    ARRLIST_MeshAnimation_add(&(g_renderer.geometry.animations), (MeshAnimation){
+        meshid, skeleton, a, n,
+        0, 0.0f, TRUE, FALSE, TRUE, TRUE
+    });
+    for (size_t i = 0; i < MAX_BONES; i++) {
+        mat4 m = GLM_MAT4_IDENTITY_INIT;
+        ARRLIST_mat4_add(&(g_renderer.geometry.poses), m);
+    }
+    UpdatePoses();
+}
+
+void SubmitVertexSkin(VertexSkin skin) {
+    ARRLIST_VertexSkin_add(&(g_renderer.geometry.skins), skin);
+    UpdateSkins();
+}
+
+size_t NumSkins() {
+    return g_renderer.geometry.skins.size;
+}
+
+size_t NumAnimations() {
+    return g_renderer.geometry.animations.size;
+}
+
+MeshAnimation* AnimationReference(size_t animid) {
+    return &(g_renderer.geometry.animations.data[animid]);
+}
+
+void ClearAnimations() {
+    for (size_t i = 0; i < g_renderer.geometry.animations.size; i++) {
+        ARRLIST_Animation alist = g_renderer.geometry.animations.data[i].animations;
+        ARRLIST_DynamicString nlist = g_renderer.geometry.animations.data[i].names;
+        for (size_t j = 0; j < alist.size; j++) {
+            ARRLIST_BoneChannel blist = alist.data[j].channels;
+            for (size_t k = 0; k < blist.size; k++) {
+                BoneChannel bc = blist.data[k];
+                ARRLIST_Vec3Key_clear(&(bc.positions));
+                ARRLIST_QuatKey_clear(&(bc.rotations));
+                ARRLIST_Vec3Key_clear(&(bc.scales));
+            }
+            ARRLIST_BoneChannel_clear(&blist);
+            EZ_FREE(nlist.data[i]);
+        }
+        ARRLIST_Animation_clear(&alist);
+        ARRLIST_DynamicString_clear(&nlist);
+    }
+    ARRLIST_MeshAnimation_clear(&(g_renderer.geometry.animations));
+    ARRLIST_VertexSkin_clear(&(g_renderer.geometry.skins));
+    ARRLIST_mat4_clear(&(g_renderer.geometry.poses));
+    UpdateSkins();
+    UpdatePoses();
+}
+
+void UpdateSkins() {
+    g_renderer.geometry.changes.update_skins = TRUE;
+}
+
+void UpdatePoses() {
+    g_renderer.geometry.changes.update_poses = TRUE;
 }
 
 void SaveRender(const char* filepath) {

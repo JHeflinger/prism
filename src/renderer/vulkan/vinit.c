@@ -90,6 +90,30 @@ BOOL VINIT_Transforms(VulkanDataBuffer* transforms) {
     return TRUE;
 }
 
+BOOL VINIT_Skins(VulkanDataBuffer* skins) {
+    size_t arrsize = sizeof(VertexSkin) * g_vinit_renderer_ref->geometry.skins.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        skins);
+    VUPDT_Skins(skins);
+    return TRUE;
+}
+
+BOOL VINIT_Poses(VulkanDataBuffer* poses) {
+    size_t arrsize = sizeof(mat4) * g_vinit_renderer_ref->geometry.poses.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        poses);
+    VUPDT_Poses(poses);
+    return TRUE;
+}
+
 BOOL VINIT_Lights(VulkanDataBuffer* lights) {
     size_t arrsize = sizeof(SceneLight) * g_vinit_renderer_ref->geometry.lights.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
@@ -831,6 +855,8 @@ BOOL VINIT_Geometry(VulkanGeometry* geometry) {
 	if (!VINIT_Lights(&(geometry->lights))) return FALSE;
 	if (!VINIT_Simulation(&(geometry->fluid))) return FALSE;
 	if (!VINIT_Transforms(&(geometry->transforms))) return FALSE;
+	if (!VINIT_Poses(&(geometry->poses))) return FALSE;
+	if (!VINIT_Skins(&(geometry->skins))) return FALSE;
     return TRUE;
 }
 

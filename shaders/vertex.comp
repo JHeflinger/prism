@@ -1,15 +1,24 @@
 #version 450
 
+#define MAX_BONE_INFLUENCES 4
+
 struct MeshDescriptor {
     uint disabled;
     uint start;
     uint end;
+    uint skinstart;
+    uint pose;
     vec3 center;
     vec3 extents;
     vec3 translate;
     vec3 rotate;
     vec3 scale;
     mat4 transform;
+};
+
+struct VertexSkin {
+    uint indices[MAX_BONE_INFLUENCES];
+    float weights[MAX_BONE_INFLUENCES];
 };
 
 layout(binding = 0) readonly buffer VertexSSBOIn {
@@ -22,6 +31,14 @@ layout(binding = 1) buffer TransformedVertexSSBOIn {
 
 layout(binding = 2) readonly buffer TransformsSSBOIn {
     MeshDescriptor transformsIn[ ];
+};
+
+layout(binding = 3) readonly buffer PoseSSBOIn {
+    mat4 poseIn[ ];
+};
+
+layout(binding = 4) readonly buffer SkinSSBOIn {
+    VertexSkin skinIn[ ];
 };
 
 layout(push_constant) uniform PushConstants {
@@ -44,11 +61,19 @@ uint find_transform(uint i) {
     return -1;
 }
 
+void animate_vertex(inout vec4 vertex, uint poffset, VertexSkin skin) {
+    mat4 skin_mat = mat4(0);
+    for (int i = 0; i < MAX_BONE_INFLUENCES; i++)
+        skin_mat += skin.weights[i] * poseIn[poffset + skin.indices[i]];
+    vertex = skin_mat * vec4(vertex.xyz, 1.0);
+}
+
 void main() {
     if (pc.elements == 0) return;
+    vec4 vertex = vertexIn[gl_GlobalInvocationID.x];
     uint mi = find_transform(gl_GlobalInvocationID.x);
     if (mi == -1) {
-        transformedIn[gl_GlobalInvocationID.x] = vertexIn[gl_GlobalInvocationID.x];
+        transformedIn[gl_GlobalInvocationID.x] = vertex;
         return;
     }
     MeshDescriptor md = transformsIn[mi];
@@ -56,6 +81,8 @@ void main() {
         transformedIn[gl_GlobalInvocationID.x] = vec4(0);
         return;
     }
-    vec3 newpos = (md.transform * vec4(vertexIn[gl_GlobalInvocationID.x].xyz, 1.0)).xyz;
+    if (md.pose != -1)
+        animate_vertex(vertex, md.pose, skinIn[(gl_GlobalInvocationID.x - md.start) + md.skinstart]);
+    vec3 newpos = (md.transform * vec4(vertex.xyz, 1.0)).xyz;
     transformedIn[gl_GlobalInvocationID.x] = vec4(newpos, vertexIn[gl_GlobalInvocationID.x].w);
 }

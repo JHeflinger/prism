@@ -14,6 +14,8 @@
 #define TRANSFER_ACQUIRE_MATERIALS  (1 << 4)
 #define TRANSFER_ACQUIRE_LIGHTS     (1 << 5)
 #define TRANSFER_ACQUIRE_TRANSFORMS (1 << 6)
+#define TRANSFER_ACQUIRE_POSES      (1 << 7)
+#define TRANSFER_ACQUIRE_SKINS      (1 << 8)
 #define PENDING(x) g_vupdt_renderer_ref->vulkan.core.transfer.pending |= x
 
 Renderer* g_vupdt_renderer_ref = NULL;
@@ -38,6 +40,26 @@ void VUPDT_Transforms(VulkanDataBuffer* transforms) {
         sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.maxsize,
         transforms->buffer);
     PENDING(TRANSFER_ACQUIRE_TRANSFORMS);
+}
+
+void VUPDT_Skins(VulkanDataBuffer* skins) {
+    if (sizeof(VertexSkin) * g_vupdt_renderer_ref->geometry.skins.maxsize == 0) return;
+    VUTIL_AsyncCopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.skins.data,
+        sizeof(VertexSkin) * g_vupdt_renderer_ref->geometry.skins.size,
+        sizeof(VertexSkin) * g_vupdt_renderer_ref->geometry.skins.maxsize,
+        skins->buffer);
+    PENDING(TRANSFER_ACQUIRE_SKINS);
+}
+
+void VUPDT_Poses(VulkanDataBuffer* poses) {
+    if (sizeof(mat4) * g_vupdt_renderer_ref->geometry.poses.maxsize == 0) return;
+    VUTIL_AsyncCopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.poses.data,
+        sizeof(mat4) * g_vupdt_renderer_ref->geometry.poses.size,
+        sizeof(mat4) * g_vupdt_renderer_ref->geometry.poses.maxsize,
+        poses->buffer);
+    PENDING(TRANSFER_ACQUIRE_POSES);
 }
 
 void VUPDT_Lights(VulkanDataBuffer* lights) {
@@ -131,6 +153,8 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRIANGLES, g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_NORMALS, g_vupdt_renderer_ref->vulkan.core.geometry.normals.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRANSFORMS, g_vupdt_renderer_ref->vulkan.core.geometry.transforms.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_POSES, g_vupdt_renderer_ref->vulkan.core.geometry.poses.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_SKINS, g_vupdt_renderer_ref->vulkan.core.geometry.skins.buffer)
             #undef MAYBE_ACQUIRE
             if (count > 0) vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, count, barriers, 0, NULL);
         }

@@ -199,6 +199,8 @@ typedef struct {
     VulkanDataBuffer lights;
     VulkanFluidSimulation fluid;
     VulkanDataBuffer transforms;
+    VulkanDataBuffer poses;
+    VulkanDataBuffer skins;
 } VulkanGeometry;
 
 typedef struct {

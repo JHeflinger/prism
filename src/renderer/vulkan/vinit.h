@@ -9,6 +9,10 @@ BOOL VINIT_OverlaySSBOs(VulkanDataBuffer* ssbo_array);
 
 BOOL VINIT_Transforms(VulkanDataBuffer* transforms);
 
+BOOL VINIT_Skins(VulkanDataBuffer* skins);
+
+BOOL VINIT_Poses(VulkanDataBuffer* poses);
+
 BOOL VINIT_Lights(VulkanDataBuffer* lights);
 
 BOOL VINIT_Queue(VkQueue* queue);
