@@ -60,6 +60,7 @@ Next:
 18. smooth mesh normals
 19. show normals option in preview
 20. make a unique animations panel with controls over like duration tps name etc and i guess the ability to actually make animations
+21. implement marcuses features with like resizing renderer size and whatnot
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

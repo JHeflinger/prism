@@ -9,6 +9,8 @@
 #include <raylib.h>
 #include <errno.h>
 #include <ctype.h>
+#include <math.h>
+#include <stdio.h>
 
 #define MAX_MTLLIB_PATH_SIZE 1024
 #define MAX_OBJ_PATH_SIZE 1024
@@ -795,8 +797,9 @@ Animation* LoadFBXAnimations(const struct aiScene* scene, size_t* out_count) {
         strncpy(anim->name, ai_anim->mName.data, sizeof(anim->name) - 1);
         anim->duration = ai_anim->mDuration;
         anim->tps = ai_anim->mTicksPerSecond > 0.0f ? ai_anim->mTicksPerSecond : 25.0f;
-        ARRLIST_BoneChannel_zero(&anim->channels, ai_anim->mNumChannels); // upper bound
+        ARRLIST_BoneChannel_zero(&anim->channels, ai_anim->mNumChannels);
         anim->channels.size = 0;
+
         for (size_t c = 0; c < ai_anim->mNumChannels; c++) {
             const struct aiNodeAnim* ch = ai_anim->mChannels[c];
             char base[256];
@@ -852,16 +855,23 @@ size_t FindBoneIndex(Skeleton* skeleton, const char* name) {
     return (size_t)-1;
 }
 
-void ResolveParents(Skeleton* skeleton, const struct aiNode* node, size_t parent_bone_idx) {
+void ResolveParents(Skeleton* skeleton, const struct aiNode* node, size_t parent_bone_idx, struct aiMatrix4x4 parent_accum) {
     size_t my_idx = FindBoneIndex(skeleton, node->mName.data);
-    size_t next_parent = (my_idx != (size_t)-1) ? my_idx : parent_bone_idx;
+    struct aiMatrix4x4 accum = parent_accum;
+    aiMultiplyMatrix4(&accum, &node->mTransformation);
     if (my_idx != (size_t)-1) {
         skeleton->bones[my_idx].parent = parent_bone_idx;
-        struct aiMatrix4x4 t = node->mTransformation;
+        struct aiMatrix4x4 t = accum;
         aiTransposeMatrix4(&t);
         memcpy(skeleton->bones[my_idx].localbind, &t, sizeof(mat4));
+        struct aiMatrix4x4 identity;
+        aiIdentityMatrix4(&identity);
+        for (size_t i = 0; i < node->mNumChildren; i++)
+            ResolveParents(skeleton, node->mChildren[i], my_idx, identity);
+    } else {
+        for (size_t i = 0; i < node->mNumChildren; i++)
+            ResolveParents(skeleton, node->mChildren[i], parent_bone_idx, accum);
     }
-    for (size_t i = 0; i < node->mNumChildren; i++) ResolveParents(skeleton, node->mChildren[i], next_parent);
 }
 
 BOOL TraverseFBXNode(Skeleton* skeleton, const struct aiNode* node, const struct aiScene* scene, MaterialID* mat_ids, vec3* aabb_min, vec3* aabb_max, BOOL* aabb_init) {
@@ -920,7 +930,9 @@ BOOL LoadFBX(const char* filepath) {
         aiReleaseImport(scene);
         return FALSE;
     }
-    ResolveParents(&skeleton, scene->mRootNode, (size_t)-1);
+    struct aiMatrix4x4 identity;
+    aiIdentityMatrix4(&identity);
+    ResolveParents(&skeleton, scene->mRootNode, (size_t)-1, identity);
     EZ_FREE(mat_ids);
     if (aabb_init) {
         vec3 center, extent;
