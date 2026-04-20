@@ -13,8 +13,8 @@ INCLUDE vendor/assimp/include
 WINDOWS INCLUDE platform/windows/vulkan/include
 WINDOWS INCLUDE platform/windows/GLFW/include
 LINK stdc++
-LINUX LINK :libassimp.a
-LINUX LINK z
+LINK z
+LINUX LINK :linux_libassimp.a
 LINUX LINK vulkan
 LINUX LINK glfw
 LINUX LINK GLU
@@ -23,6 +23,7 @@ LINUX LINK pthread
 LINUX LINK m
 LINUX LINK cholmod
 LINUX LINK :linux_amdx64_libraylib.a
+WINDOWS LINK :win_libassimp.a
 WINDOWS LINK vulkan-1
 WINDOWS LINK shell32
 WINDOWS LINK user32
