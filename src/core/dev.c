@@ -14,7 +14,7 @@ void LoadArmadillo() {
 }
 
 void LoadBox() {
-    LoadFBX("assets/models/FBX/dancing.fbx");
+    LoadFBX("assets/models/FBX/dragon.fbx");
     FitCamera();
 }
 

@@ -1316,7 +1316,7 @@ void UpdateMeshes() {
 }
 
 void SubmitAnimation(size_t meshid, Skeleton skeleton, Animation animation) {
-    char* name = EZ_ALLOC(strlen(animation.name), sizeof(char));
+    char* name = EZ_ALLOC(strlen(animation.name) + 1, sizeof(char));
     strcpy(name, animation.name);
     for (size_t i = 0; i < g_renderer.geometry.animations.size; i++) {
         if (g_renderer.geometry.animations.data[i].meshid == meshid) {
@@ -1341,6 +1341,10 @@ void SubmitAnimation(size_t meshid, Skeleton skeleton, Animation animation) {
 }
 
 void SubmitVertexSkin(VertexSkin skin) {
+    float total = 0.0f;
+    for (size_t i = 0; i < MAX_BONE_INFLUENCES; i++) total += skin.weights[i];
+    EZ_ASSERT(total != 0.0f, "Zero skin weight detected");
+    for (size_t i = 0; i < MAX_BONE_INFLUENCES; i++) skin.weights[i] /= total;
     ARRLIST_VertexSkin_add(&(g_renderer.geometry.skins), skin);
     UpdateSkins();
 }
@@ -1370,7 +1374,7 @@ void ClearAnimations() {
                 ARRLIST_Vec3Key_clear(&(bc.scales));
             }
             ARRLIST_BoneChannel_clear(&blist);
-            EZ_FREE(nlist.data[i]);
+            EZ_FREE(nlist.data[j]);
         }
         ARRLIST_Animation_clear(&alist);
         ARRLIST_DynamicString_clear(&nlist);
