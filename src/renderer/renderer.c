@@ -17,9 +17,13 @@
 Renderer g_renderer = { 0 };
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
+
+#ifndef NO_MESH_MANIPULATION_SUPPORT
 cholmod_common g_cholmod = { 0 };
+#endif
 
 void CleanARAP() {
+    #ifndef NO_MESH_MANIPULATION_SUPPORT
     if (g_renderer.geometry.arap.values != NULL) {
         EZ_FREE(g_renderer.geometry.arap.values);
         EZ_FREE(g_renderer.geometry.arap.cindices);
@@ -64,6 +68,7 @@ void CleanARAP() {
     g_renderer.geometry.arap.nnz = 0;
     g_renderer.geometry.arap.max_nnz = 0;
     g_renderer.geometry.arap.max_rows = 0;
+    #endif
 }
 
 float EdgeWeight(Edge e) {
@@ -100,6 +105,7 @@ float EdgeWeight(Edge e) {
 }
 
 void ReconstructARAP() {
+    #ifndef NO_MESH_MANIPULATION_SUPPORT
     inline BOOL isunlocked(size_t i) { return g_renderer.geometry.arap.v2f[i] != (size_t)-1; }
     inline void saferealloc(void** ptr, size_t x, size_t y) {
         if (*ptr == NULL) *ptr = EZ_ALLOC(x, y);
@@ -231,6 +237,7 @@ void ReconstructARAP() {
     }
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++)
         glm_vec3_normalize(g_renderer.geometry.arap.normals[i]);
+    #endif
 }
 
 PipelineFlags GetPipelineFlags() {
@@ -256,7 +263,9 @@ void InitializeRenderer() {
 	srand(time(NULL));
 
     // init cholmod
+    #ifndef NO_MESH_MANIPULATION_SUPPORT
     cholmod_start(&g_cholmod);
+    #endif
 
     // initialize config
     g_renderer.config.whitepoint = 20.0f;
@@ -353,7 +362,9 @@ void DestroyRenderer() {
     ClearAnimations();
 
     // destroy cholmod
+    #ifndef NO_MESH_MANIPULATION_SUPPORT
     cholmod_finish(&g_cholmod);
+    #endif
 
     // destroy vulkan resources
     VCLEAN_Vulkan(&(g_renderer.vulkan));
@@ -1014,6 +1025,7 @@ void SavePose() {
 }
 
 void RigidDeform() {
+    #ifndef NO_MESH_MANIPULATION_SUPPORT
     inline BOOL isunlocked(size_t i) { return g_renderer.geometry.arap.v2f[i] != (size_t)-1; }
     inline void outer(vec3 a, vec3 b, mat3 result) {
         for (int col = 0; col < 3; col++) for (int row = 0; row < 3; row++) result[col][row] = a[row] * b[col];
@@ -1148,6 +1160,7 @@ void RigidDeform() {
         cholmod_free_dense(&b_dense, &g_cholmod);
         cholmod_free_dense(&x_dense, &g_cholmod);
     }
+    #endif
 }
 
 void UpdateSimulation() {

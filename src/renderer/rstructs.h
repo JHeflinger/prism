@@ -8,7 +8,10 @@
 #include <cglm/cglm.h>
 #include <vulkan/vulkan.h>
 #include <raylib.h>
+
+#ifndef NO_MESH_MANIPULATION_SUPPORT
 #include <cholmod.h>
+#endif
 
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
@@ -226,8 +229,10 @@ typedef struct {
     mat3* covariance;
     size_t max_nnz;
     size_t max_rows;
+    #ifndef NO_MESH_MANIPULATION_SUPPORT
     cholmod_sparse* A;
     cholmod_factor* L;
+    #endif
     int* Ai_back;
     vec3* z;
     vec3* u;
