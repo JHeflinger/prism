@@ -1331,7 +1331,8 @@ void SubmitAnimation(size_t meshid, Skeleton skeleton, Animation animation) {
     ARRLIST_DynamicString_add(&n, name);
     ARRLIST_MeshAnimation_add(&(g_renderer.geometry.animations), (MeshAnimation){
         meshid, skeleton, a, n,
-        0, 0.0f, TRUE, FALSE, TRUE, TRUE
+        0, 0.0f, TRUE, FALSE, TRUE, TRUE,
+        0, 0.0f, 1.0f, 0.5f, FALSE
     });
     for (size_t i = 0; i < MAX_BONES; i++) {
         mat4 m = GLM_MAT4_IDENTITY_INIT;
@@ -1359,6 +1360,16 @@ size_t NumAnimations() {
 
 MeshAnimation* AnimationReference(size_t animid) {
     return &(g_renderer.geometry.animations.data[animid]);
+}
+
+void SwitchAnimation(MeshAnimation* anim, size_t newind) {
+    if (anim->current == newind) return;
+    anim->previous = anim->current;
+    anim->ptime = anim->time;
+    anim->current = newind;
+    anim->time = 0.0f;
+    anim->bweight = 0.0f;
+    anim->blending = TRUE;
 }
 
 void ClearAnimations() {

@@ -171,6 +171,8 @@ size_t NumAnimations();
 
 MeshAnimation* AnimationReference(size_t animid);
 
+void SwitchAnimation(MeshAnimation* anim, size_t newind);
+
 void ClearAnimations();
 
 void UpdateSkins();

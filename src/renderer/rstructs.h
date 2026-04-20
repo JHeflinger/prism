@@ -362,6 +362,11 @@ typedef struct {
     BOOL playing;
     BOOL enable;
     BOOL _enable;
+    size_t previous;
+    float ptime;
+    float bweight;
+    float bduration;
+    BOOL blending;
 } MeshAnimation;
 DECLARE_ARRLIST(MeshAnimation);
 

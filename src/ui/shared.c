@@ -60,7 +60,7 @@ size_t DropdownSelectARAPModel(void* data, size_t index) {
 
 size_t DropdownSelectAnimation(void* data, size_t index) {
     MeshAnimation* animation = (MeshAnimation*)data;
-    if (index != (size_t)-1) animation->current = index;
+    if (index != (size_t)-1) SwitchAnimation(animation, index);
     return animation->current;
 }
 

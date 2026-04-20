@@ -525,6 +525,10 @@ void DrawEditPanel(float width, float height) {
                 UIMoveCursor(140, -20);
                 UIDropdownMenu(sboxwidth, anim->animations.size, anim->names.data, DropdownSelectAnimation, anim);
                 UIMoveCursor(0, 5);
+                UIDrawText("Transition");
+                UIMoveCursor(140, -20);
+                UIDragFloat(&(anim->bduration), 0, FLT_MAX, 0.01f, sboxwidth);
+                UIMoveCursor(0, 5);
                 UIDrawText("Time");
                 UIMoveCursor(140, -20);
                 UIDragFloat(&(anim->time), 0, FLT_MAX, 0.01f, sboxwidth);
