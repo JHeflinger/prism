@@ -57,32 +57,46 @@ static void ProcessBone(MeshAnimation* animation, Animation* clip, mat4* global,
     BoneChannel* channel = FindChannel(clip, animation->skeleton.bones[b].name);
     mat4 local, global_b, invbind, pose_b;
     if (channel) {
-        vec3 trans = { animation->skeleton.bones[b].localbind[3][0],
-                       animation->skeleton.bones[b].localbind[3][1],
-                       animation->skeleton.bones[b].localbind[3][2] };
-        if (channel->positions.size > 1)
+        int full_channel = (channel->positions.size > 1 &&
+                            channel->rotations.size > 1 &&
+                            channel->scales.size > 1);
+        vec3 trans, scl;
+        versor rot;
+        if (full_channel) {
             SampleVec3Keys(&(channel->positions), animation->time, trans);
-        vec3 scl = { 1.0f, 1.0f, 1.0f };
-        if (channel->scales.size > 1)
-            SampleVec3Keys(&(channel->scales), animation->time, scl);
-        mat4 prerot;
-        memcpy(prerot, animation->skeleton.bones[b].localbind, sizeof(mat4));
-        prerot[3][0] = 0.0f; prerot[3][1] = 0.0f; prerot[3][2] = 0.0f;
-        mat4 anim_rot;
-        if (channel->rotations.size >= 1) {
-            versor rot;
             SampleQuatKeys(&(channel->rotations), animation->time, rot);
-            glm_mat4_identity(anim_rot);
-            glm_quat_rotate(anim_rot, rot, anim_rot);
+            SampleVec3Keys(&(channel->scales), animation->time, scl);
+            glm_mat4_identity(local);
+            glm_translate(local, trans);
+            glm_quat_rotate(local, rot, local);
+            glm_scale(local, scl);
         } else {
-            glm_mat4_identity(anim_rot);
+            trans[0] = animation->skeleton.bones[b].localbind[3][0];
+            trans[1] = animation->skeleton.bones[b].localbind[3][1];
+            trans[2] = animation->skeleton.bones[b].localbind[3][2];
+            if (channel->positions.size > 1)
+                SampleVec3Keys(&(channel->positions), animation->time, trans);
+            scl[0] = 1.0f; scl[1] = 1.0f; scl[2] = 1.0f;
+            if (channel->scales.size > 1)
+                SampleVec3Keys(&(channel->scales), animation->time, scl);
+            mat4 prerot;
+            memcpy(prerot, animation->skeleton.bones[b].localbind, sizeof(mat4));
+            prerot[3][0] = 0.0f; prerot[3][1] = 0.0f; prerot[3][2] = 0.0f;
+            mat4 anim_rot;
+            if (channel->rotations.size >= 1) {
+                SampleQuatKeys(&(channel->rotations), animation->time, rot);
+                glm_mat4_identity(anim_rot);
+                glm_quat_rotate(anim_rot, rot, anim_rot);
+            } else {
+                glm_mat4_identity(anim_rot);
+            }
+            mat4 prerot_anim;
+            glm_mat4_mul(prerot, anim_rot, prerot_anim);
+            glm_mat4_identity(local);
+            glm_translate(local, trans);
+            glm_mat4_mul(local, prerot_anim, local);
+            glm_scale(local, scl);
         }
-        mat4 prerot_anim;
-        glm_mat4_mul(prerot, anim_rot, prerot_anim);
-        glm_mat4_identity(local);
-        glm_translate(local, trans);
-        glm_mat4_mul(local, prerot_anim, local);
-        glm_scale(local, scl);
     } else {
         memcpy(local, animation->skeleton.bones[b].localbind, sizeof(mat4));
     }

@@ -797,9 +797,8 @@ Animation* LoadFBXAnimations(const struct aiScene* scene, size_t* out_count) {
         strncpy(anim->name, ai_anim->mName.data, sizeof(anim->name) - 1);
         anim->duration = ai_anim->mDuration;
         anim->tps = ai_anim->mTicksPerSecond > 0.0f ? ai_anim->mTicksPerSecond : 25.0f;
-        ARRLIST_BoneChannel_zero(&anim->channels, ai_anim->mNumChannels);
+        ARRLIST_BoneChannel_zero(&anim->channels, ai_anim->mNumChannels); // upper bound
         anim->channels.size = 0;
-
         for (size_t c = 0; c < ai_anim->mNumChannels; c++) {
             const struct aiNodeAnim* ch = ai_anim->mChannels[c];
             char base[256];
@@ -857,11 +856,16 @@ size_t FindBoneIndex(Skeleton* skeleton, const char* name) {
 
 void ResolveParents(Skeleton* skeleton, const struct aiNode* node, size_t parent_bone_idx, struct aiMatrix4x4 parent_accum) {
     size_t my_idx = FindBoneIndex(skeleton, node->mName.data);
+    int is_pivot = strstr(node->mName.data, "_$AssimpFbx$_") != NULL;
     struct aiMatrix4x4 accum = parent_accum;
-    aiMultiplyMatrix4(&accum, &node->mTransformation);
+    if (is_pivot)
+        aiMultiplyMatrix4(&accum, &node->mTransformation);
+
     if (my_idx != (size_t)-1) {
         skeleton->bones[my_idx].parent = parent_bone_idx;
-        struct aiMatrix4x4 t = accum;
+        struct aiMatrix4x4 full = accum;
+        aiMultiplyMatrix4(&full, &node->mTransformation);
+        struct aiMatrix4x4 t = full;
         aiTransposeMatrix4(&t);
         memcpy(skeleton->bones[my_idx].localbind, &t, sizeof(mat4));
         struct aiMatrix4x4 identity;
@@ -909,8 +913,7 @@ BOOL LoadFBX(const char* filepath) {
                        | aiProcess_JoinIdenticalVertices
                        | aiProcess_LimitBoneWeights     // cap bone influences per vertex
                        | aiProcess_FlipUVs              // match your UV convention
-                       | aiProcess_PopulateArmatureData // reconstruct skeleton hierarchy, converting world-space animation channels to local-space
-                       | aiProcess_GlobalScale;         // apply FBX unit scale factor
+                       | aiProcess_PopulateArmatureData; // reconstruct skeleton hierarchy, converting world-space animation channels to local-space
     const struct aiScene* scene = aiImportFile(filepath, flags);
     if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !scene->mRootNode) {
         EZ_ERROR("Failed to load FBX file \"%s\": %s", filepath, aiGetErrorString());
