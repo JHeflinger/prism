@@ -26,11 +26,11 @@ typedef struct {
     size_t cursor;
 } LineParser;
 
-FileType GetFileType(const char* path);
+FileType GetSimpleFileType(const char* path);
 
 const char* StripFilename(const char* path);
 
-SimpleFile* ReadFile(const char* filename);
+SimpleFile* ReadSimpleFile(const char* filename);
 
 void FreeFile(SimpleFile* file);
 

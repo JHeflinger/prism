@@ -384,7 +384,7 @@ BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t n
     if (fnstart) fnstart[0] = 0;
     else mtlloc[0] = 0;
     sprintf(mtlpath, "%s%s", mtlloc, lineargs[1]);
-    SimpleFile* file = ReadFile(mtlpath);
+    SimpleFile* file = ReadSimpleFile(mtlpath);
     if (!file) {
         EZ_ERROR("Unable to load invalid filepath to mtllib \"%s\"", mtlpath);
         return FALSE;
@@ -632,7 +632,7 @@ BOOL ConstructOBJ(const StateOBJ state) {
 }
 
 BOOL LoadOBJ(const char* filepath) {
-    SimpleFile* file = ReadFile(filepath);
+    SimpleFile* file = ReadSimpleFile(filepath);
     VertexID startv = NumVertices();
     if (!file) {
         EZ_ERROR("Unable to load invalid filepath \"%s\"", filepath);

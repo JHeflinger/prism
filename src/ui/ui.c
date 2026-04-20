@@ -97,7 +97,7 @@ void UpdateUI(UI* ui) {
         UpdateUI((UI*)(ui->right));
 
         // handle hovering and active dragging
-        if (UIRequestsBlockInput()) BlockInput();
+        if (UIRequestsBlockInput()) BlockInputs();
         size_t buffer = 5;
         if (!g_divider_active) {
             if (ui->vertical) {
@@ -134,10 +134,10 @@ void UpdateUI(UI* ui) {
     }
 
     // update panel
-    if (UIRequestsBlockInput()) BlockInput();
+    if (UIRequestsBlockInput()) BlockInputs();
 	for (size_t i = 0; i < ui->panels.size; i++)
 	    if (ui->panels.data[i].update) ui->panels.data[i].update(ui->w, ui->h);
-    UnblockInput();
+    UnblockInputs();
 }
 
 void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
@@ -309,18 +309,18 @@ void HandleTextInput() {
 
 void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     if (InputButtonUp(IK_MOUSELEFT)) g_active_ui_element = NULL;
-    if (UIRequestsBlockInput()) BlockInput();
+    if (UIRequestsBlockInput()) BlockInputs();
     DrawUI_helper(ui, x, y, w, h);
     if (g_popup != NULL) {
-        UnblockInput();
+        UnblockInputs();
         DrawPopup(x, y, w, h);
     }
     if (g_dropdownmenu_data.active) {
-        UnblockInput();
+        UnblockInputs();
         DrawDropdownMenu();
     }
     if (g_textinput_data.active) {
-        UnblockInput();
+        UnblockInputs();
         HandleTextInput();
     }
 }
@@ -343,9 +343,9 @@ void PreRenderUI_helper(UI* ui) {
 }
 
 void PreRenderUI(UI* ui) {
-    if (UIRequestsBlockInput()) BlockInput();
+    if (UIRequestsBlockInput()) BlockInputs();
     PreRenderUI_helper(ui);
-    UnblockInput();
+    UnblockInputs();
 }
 
 void DestroyUI(UI* ui) {

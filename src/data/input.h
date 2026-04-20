@@ -52,9 +52,9 @@ typedef struct {
 
 void InitializeInput();
 
-void BlockInput();
+void BlockInputs();
 
-void UnblockInput();
+void UnblockInputs();
 
 const char* InputKeyRepresentation(InputKey key);
 

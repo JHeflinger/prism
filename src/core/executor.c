@@ -25,7 +25,7 @@ void CleanExecutor() {
 }
 
 void ImportExecuteScene(const char* scenefile) {
-    FileType ft = GetFileType(scenefile);
+    FileType ft = GetSimpleFileType(scenefile);
     switch (ft) {
         case DOTOBJ:
             LoadOBJ(scenefile);

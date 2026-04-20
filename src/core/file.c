@@ -14,7 +14,7 @@ const char* FileExtension(const char* path) {
     return dot + 1;
 }
 
-FileType GetFileType(const char* path) {
+FileType GetSimpleFileType(const char* path) {
     const char* extension = FileExtension(path);
     if (strcmp(extension, "obj") == 0 || strcmp(extension, "OBJ") == 0) {
         return DOTOBJ;
@@ -42,9 +42,9 @@ const char* StripFilename(const char* path) {
     return NULL;
 }
 
-SimpleFile* ReadFile(const char* filename) {
+SimpleFile* ReadSimpleFile(const char* filename) {
 	SimpleFile* sfile = EZ_ALLOC(1, sizeof(SimpleFile));
-    sfile->type = GetFileType(filename);
+    sfile->type = GetSimpleFileType(filename);
 	FILE* file = fopen(filename, "rb");
     if (file == NULL) {
         EZ_ERROR("Unable to open file \"%s\"", filename);

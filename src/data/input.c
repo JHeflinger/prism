@@ -67,11 +67,11 @@ void InitializeInput() {
     g_input_map.initialized = TRUE;
 }
 
-void BlockInput() {
+void BlockInputs() {
     g_input_map.blocked = TRUE;
 }
 
-void UnblockInput() {
+void UnblockInputs() {
     g_input_map.blocked = FALSE;
 }
 
