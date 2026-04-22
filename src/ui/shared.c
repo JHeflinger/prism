@@ -4,6 +4,7 @@
 char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric" };
 char* g_arapmodel_labels[] = { "rigid", "cubic" };
 char* g_sim_visual_labels[] = { "smoke", "fire", "water", "plasma" };
+char* g_debugmode_labels[] = { "none", "normals", "bvh", "bounces" };
 
 size_t DropdownSelectSimVisual(void* data, size_t index) {
     if (index == (size_t)-1) {
@@ -64,6 +65,11 @@ size_t DropdownSelectAnimation(void* data, size_t index) {
     return animation->current;
 }
 
+size_t DropdownSelectDebugMode(void* data, size_t index) {
+    if (index != (size_t)-1) RenderConfig()->debug = (DebugConfig)index;
+    return RenderConfig()->debug;
+}
+
 char** SimVisualLabels() {
     return g_sim_visual_labels;
 }
@@ -74,4 +80,8 @@ char** LightModelLabels() {
 
 char** ARAPModelLabels() {
     return g_arapmodel_labels;
+}
+
+char** DebugModeLabels() {
+    return g_debugmode_labels;
 }

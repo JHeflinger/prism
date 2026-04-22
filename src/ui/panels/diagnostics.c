@@ -2,6 +2,7 @@
 #include "renderer/renderer.h"
 #include "data/assets.h"
 #include "data/input.h"
+#include "ui/shared.h"
 #include "renderer/loader.h"
 #include <easymemory.h>
 
@@ -73,6 +74,10 @@ void DrawDevPanel(float width, float height) {
     UICheckboxLabeled("Scene Light Sampling:", &(RenderConfig()->scenelighting));
     UICheckboxLabeled("Scene Light Only:", &(RenderConfig()->scenelightingonly));
     UICheckboxLabeled("Scene Light Shadows:", &(RenderConfig()->scenelightshadows));
+    UIDrawText("Debug mode:");
+    UIMoveCursor(UITextWidth("Debug mode:") + 10, -20.0f);
+    UIDropdownMenu(width - UITextWidth("Debug mode:") - 30, 4, DebugModeLabels(), DropdownSelectDebugMode, NULL);
+    UIDragSizeLabeled("Max Bounces:", &(RenderConfig()->maxbounces), 0, 999999999, 1, width - 20);
 
     UIMoveCursor(0, 20.0f);
     UIDragFloatLabeled("Whitepoint:", &(RenderConfig()->whitepoint), 0.01f, 999999999.0f, 0.1f, width - 20);

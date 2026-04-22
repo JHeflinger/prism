@@ -76,6 +76,8 @@ layout(binding = 5) uniform UniformBufferObject {
     uint scenelighting;
     uint scenelightingonly;
     uint scenelightshadows;
+    uint debugmode;
+    uint maxbounces;
     float fov;
     float width;
     float height;

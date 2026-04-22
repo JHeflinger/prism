@@ -9,7 +9,7 @@
 #include "ui/panels/edit.h"
 
 void LoadArmadillo() {
-    LoadOBJ("assets/models/OBJ/naked/diamond.obj");
+    LoadOBJ("assets/models/OBJ/dressed/CornellBox-Sphere.obj");
     FitCamera();
 }
 

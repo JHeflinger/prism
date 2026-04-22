@@ -178,8 +178,13 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i], \
             VK_SHADER_STAGE_COMPUTE_BIT, \
             0, sizeof(VulkanPushConstants), &pc);}
+    PipelineFlags pflags = g_vupdt_renderer_ref->config.flags;
+    if (g_vupdt_renderer_ref->config.debug == DEBUG_BOUNCES) {
+        pflags |= (PATHTRACE_SHADER_FLAG | TONEMAP_SHADER_FLAG);
+        pflags &= ~OVERLAY_SHADER_FLAG;
+    }
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
-        if (!(g_vupdt_renderer_ref->config.flags & (1u << i))) continue;
+        if (!(pflags & (1u << i))) continue;
         uint32_t invocations = (uint32_t)g_vupdt_renderer_ref->dimensions.x * (uint32_t)g_vupdt_renderer_ref->dimensions.y;
 
         if ((1u << i) & VERTEX_SHADER_FLAG) {
@@ -425,6 +430,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.scenelighting = g_vupdt_renderer_ref->config.scenelighting;
         ubo.scenelightingonly = g_vupdt_renderer_ref->config.scenelightingonly;
         ubo.scenelightshadows = g_vupdt_renderer_ref->config.scenelightshadows;
+        ubo.debugmode = (uint32_t)g_vupdt_renderer_ref->config.debug;
+        ubo.maxbounces = (uint32_t)g_vupdt_renderer_ref->config.maxbounces;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

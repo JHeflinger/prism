@@ -270,6 +270,7 @@ void InitializeRenderer() {
     // initialize config
     g_renderer.config.whitepoint = 20.0f;
     g_renderer.config.gamma = 2.2f;
+    g_renderer.config.maxbounces = 10;
     g_renderer.config.direct = TRUE;
     g_renderer.config.grid = TRUE;
     g_renderer.config.async = TRUE;
@@ -280,6 +281,7 @@ void InitializeRenderer() {
     g_renderer.config.scenelightshadows = FALSE;
     g_renderer.config.normals = TRUE;
     g_renderer.config.reset = FALSE;
+    g_renderer.config.debug = DEBUG_NONE;
     g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
     g_renderer.config.arap.iterations = 10;
     g_renderer.config.arap.style = 0;

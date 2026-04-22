@@ -409,9 +409,17 @@ typedef struct {
     size_t addm;
 } ARAPConfig;
 
+typedef enum {
+    DEBUG_NONE = 0,
+    DEBUG_NORMALS = 1,
+    DEBUG_BVH = 2,
+    DEBUG_BOUNCES = 3
+} DebugConfig;
+
 typedef struct {
     float whitepoint;
     float gamma;
+    size_t maxbounces;
     BOOL normals;
     BOOL direct;
     BOOL grid;
@@ -422,6 +430,7 @@ typedef struct {
     BOOL scenelightingonly;
     BOOL scenelightshadows;
     BOOL reset;
+    DebugConfig debug;
     PipelineFlags flags;
     ARAPConfig arap;
 } RendererConfig;

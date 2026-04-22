@@ -3,6 +3,9 @@
 #define MAX_RECURSIVE_DEPTH 500
 #define AO_DIST 0.5
 #define EPS 0.000001
+#define DEBUG_NONE 0
+#define DEBUG_NORMALS 1
+#define DEBUG_BVH 2
 
 struct BVHNode {
     vec3 minBB;
@@ -61,6 +64,8 @@ layout(binding = 0) uniform UniformBufferObject {
     uint scenelighting;
     uint scenelightingonly;
     uint scenelightshadows;
+    uint debugmode;
+    uint maxbounces;
     float fov;
     float width;
     float height;
@@ -102,6 +107,7 @@ vec3 key_light = vec3(0.408248, 0.408248, 0.816497);
 vec3 fill_light = vec3(-0.440225, 0.17609, 0.880451);
 vec3 back_light = vec3(0, -0.447214, 0.894427);
 vec3 background_color = vec3(0.12);
+uint bvh_counter = 0;
 
 bool cut_viewport(int rx, int ry) {
     if (ubo.viewport.x != 0 &&
@@ -170,6 +176,7 @@ Hit trace(Ray ray, inout uint hit_id) {
     int stack_ptr = 0;
     stack[stack_ptr++] = 0;
     while (stack_ptr > 0) {
+        bvh_counter++;
         uint node_index = stack[--stack_ptr];
         BVHNode node = nodeIn[node_index];
         if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
@@ -197,6 +204,7 @@ float lambert(vec3 n, vec3 l) {
 }
 
 vec3 shade(Ray ray, Hit hit) {
+    if (ubo.debugmode == DEBUG_NORMALS) return hit.normal;
     float ambient = 0.08;
     float rim = 1.0 - lambert(hit.normal, normalize(ubo.position - hit.position));
     rim = pow(rim, 2.0) * 0.15;
@@ -252,7 +260,11 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
     } else if (gridhit) {
         color = mix(background_color, vec3(0.7), gridmix);
     }
-    hit_distance = hit.distance;	
+    hit_distance = hit.distance;
+    if (ubo.debugmode == DEBUG_BVH) {
+        float bvhmix = float(bvh_counter) / 100.0;
+        color = mix(color, vec3(0, 1, 0), pow(bvhmix, 3.0));
+    }
 	return color;
 }
 

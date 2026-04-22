@@ -1,13 +1,14 @@
 #version 450
 
 #define MAX_RECURSIVE_DEPTH 2000
-#define MAX_BOUNCES 100
 #define EPS 0.000001
 #define FLTMAX 3.402823466e+38
 
 #define LAMBERTIAN_MODEL 2
 #define MIRROR_MODEL 5
 #define DIELECTRIC_MODEL 7
+
+#define DEBUG_BVH 3
 
 struct BVHNode {
     vec3 minBB;
@@ -95,6 +96,8 @@ layout(binding = 0) uniform UniformBufferObject {
     uint scenelighting;
     uint scenelightingonly;
     uint scenelightshadows;
+    uint debugmode;
+    uint maxbounces;
     float fov;
     float width;
     float height;
@@ -560,7 +563,8 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     uint medium = -1;
     bool count_emission = true;
     int wavelength = -1;
-    for (uint i = 0; i < MAX_BOUNCES; i++) {
+    uint i = 0;
+    for (; i < ubo.maxbounces; i++) {
         Hit h = trace(ray, hid);
         if (firsthit) {
             firsthit = false;
@@ -598,6 +602,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         if (material.model != LAMBERTIAN_MODEL) count_emission = true;
         else count_emission = ubo.direct == 0;
     }
+    if (ubo.debugmode == DEBUG_BVH) return vec3(pow(float(i) / float(ubo.maxbounces), 2.0), 0, 0);
     return radiance;
 }
 
