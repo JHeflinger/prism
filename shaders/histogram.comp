@@ -1,23 +1,9 @@
-#version 450
+#import Boilerplate
 
-layout(binding = 0) buffer MortonSSBOIn {
-   uint mortonIn[ ];
-};
-
-layout(binding = 1) buffer MortonSwapSSBOIn {
-   uint mortonSwap[ ];
-};
-
-layout(binding = 2) buffer WorkGroupHistorySSBOIn {
-    uint wgHist[ ][16];
-};
-
-layout(push_constant) uniform PushConstants {
-    uint elements;
-    uint bitstart;
-} pc;
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) #import MortonSSBODef;
+layout(binding = 1) #import MortonSSBOSwapDef;
+layout(binding = 2) #import WorkGroupHistorySSBODef;
+layout(push_constant) #import PushConstantDef pc;
 
 shared uint local_history[16];
 

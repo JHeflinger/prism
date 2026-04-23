@@ -1,60 +1,16 @@
-#version 450
+#import Boilerplate
 
-struct BVHNode {
-    vec3 minBB;
-    vec3 maxBB;
-    uint left;
-    uint right; // 0xFFFFFFFF if leaf
-    uint parent;
-    uint counter;
-};
+#import BVHNodeDef;
+#import TriangleDef;
+#import BoundingBoxDef;
 
-struct Triangle {
-    uint a;
-    uint b;
-    uint c;
-    uint an;
-    uint bn;
-    uint cn;
-    uint material;
-};
-
-struct BoundingBox {
-    vec3 minBB;
-    vec3 maxBB;
-};
-
-layout(binding = 0) uniform GeometryUniformBufferObject { 
-    vec3 minBB;
-    vec3 maxBB;
-} ubo;
-
-layout(binding = 1) buffer MortonSSBOIn {
-   uint mortonIn[ ];
-};
-
-layout(binding = 2) readonly buffer TriangleSSBOIn {
-    Triangle triangleIn[ ];
-};
-
-layout(binding = 3) readonly buffer TransformedVertexSSBOIn {
-    vec3 vertexIn[ ];
-};
-
-layout(binding = 4) buffer IndexSSBOIn {
-    uint indexIn[ ];
-};
-
-layout(binding = 5) buffer BoundingBoxSSBOIn {
-    BoundingBox bbIn[ ];
-};
-
-layout(push_constant) uniform PushConstants {
-    uint elements;
-    uint bitstart;
-} pc;
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) #import GeometryUniformBufferObjectDef ubo;
+layout(binding = 1) #import MortonSSBODef;
+layout(binding = 2) readonly #import TriangleSSBODef;
+layout(binding = 3) readonly #import TransformedVertexSSBODef;
+layout(binding = 4) #import IndexSSBODef;
+layout(binding = 5) #import BoundingBoxSSBODef;
+layout(push_constant) #import PushConstantDef pc;
 
 uint expandBits(uint v) {
     v = (v * 0x00010001u) & 0xFF0000FFu;
@@ -73,9 +29,9 @@ void main() {
     if (triID >= pc.elements) return;
     indexIn[triID] = triID;
     Triangle tri = triangleIn[triID];
-    vec3 a = vertexIn[tri.a];
-    vec3 b = vertexIn[tri.b];
-    vec3 c = vertexIn[tri.c];
+    vec3 a = vertexIn[tri.a].xyz;
+    vec3 b = vertexIn[tri.b].xyz;
+    vec3 c = vertexIn[tri.c].xyz;
     vec3 center = (a + b + c) / 3.0;
     vec3 normalized_center = (center - ubo.minBB) / (ubo.maxBB - ubo.minBB);
     uint x = uint(clamp(normalized_center.x * 1024.0, 0.0, 1023.0));

@@ -1,12 +1,15 @@
 if [ -d "build/cache" ]; then
-	rm -rf build/cache
+    rm -rf build/cache
 fi
 if [ -d "build/vendor" ]; then
-	rm -rf build/vendor
+    rm -rf build/vendor
 fi
 if [ -d "build/shaders" ]; then
-	rm -rf build/shaders
+    rm -rf build/shaders
+fi
+if [ -d "build/expanded" ]; then
+    rm -rf build/expanded
 fi
 if [ -f "build/bin.exe" ]; then
-	rm build/bin.exe
+    rm build/bin.exe
 fi

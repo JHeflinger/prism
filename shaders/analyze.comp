@@ -1,110 +1,18 @@
-#version 450
+#import Boilerplate
+#import Definitions
 
-#define NO_SELECT 0
-#define TRIANGLE_SELECT 1
-#define VERTEX_SELECT 2
-#define EPS 0.000001
+#import RayGeneratorDef;
+#import RayDef;
+#import TriangleDef;
 
-struct RayGenerator {
-    uint tid;
-    float distance;
-};
+layout(binding = 0) #import RayGeneratorSSBODef;
+layout(binding = 1) #import OverlaySSBODef;
+layout(binding = 2) readonly #import TriangleSSBODef;
+layout(binding = 3) readonly #import TransformedVertexSSBODef;
+layout(binding = 4) #import OverlayUniformBufferObjectDef o_ubo;
+layout(binding = 5) #import UniformBufferObjectDef ubo;
 
-struct Ray {
-    vec3 position;
-    vec3 direction;
-};
-
-struct Triangle {
-    uint a;
-    uint b;
-    uint c;
-    uint an;
-    uint bn;
-    uint cn;
-    uint material;
-};
-
-layout(binding = 0) buffer RayGeneratorSSBOIn {
-   RayGenerator raygenIn[ ];
-};
-
-layout(binding = 1) buffer OverlaySSBO {
-	uint hovered_tid;
-    vec2 vertex_position;
-    vec2 selected_vertex_position;
-};
-
-layout(binding = 2) readonly buffer TriangleSSBOIn {
-    Triangle triangleIn[ ];
-};
-
-layout(binding = 3) readonly buffer TransformedVertexSSBOIn {
-    vec3 vertexIn[ ];
-};
-
-layout(binding = 4) uniform OverlayUniformBufferObject {
-	uint mouse_x;
-    uint mouse_y;
-	uint image_width;
-	uint image_height;
-	uint single_selected_tid;
-    uint single_selected_vid;
-    uint divisor;
-    uint mode;
-} o_ubo;
-
-layout(binding = 5) uniform UniformBufferObject {
-    vec3 look;
-    vec3 position;
-    vec3 up;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    vec2 viewport;
-    uint triangles;
-    uint emissives;
-    uint lights;
-    uint samples;
-	uint seed;
-    uint grid;
-    uint reset;
-    uint direct;
-    uint directonly;
-    uint showdof;
-    uint normals;
-    uint scenelighting;
-    uint scenelightingonly;
-    uint scenelightshadows;
-    uint debugmode;
-    uint maxbounces;
-    float fov;
-    float width;
-    float height;
-    float swap;
-	float frametime;
-    float whitepoint;
-    float gamma;
-    float lightarea;
-    float aperature;
-    float focus;
-} ubo;
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-
-Ray create_ray(vec2 rg) {
-	float r = ubo.width / 2.0;
-	float b = ubo.height / 2.0;
-	float l = -1.0 * r;
-	float t = -1.0 * b;
-    float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
-    float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
-	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
-    Ray ray;
-    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
-    ray.position = ubo.position;
-    return ray;
-}
+#import CreateSimpleRay
 
 vec2 project_vertex(vec3 vertex) {
     vec3 rel = vertex - ubo.position;
@@ -123,7 +31,7 @@ vec2 project_vertex(vec3 vertex) {
 
 void main() {
     if (gl_GlobalInvocationID.x == 0 && o_ubo.single_selected_vid != -1)
-        selected_vertex_position = project_vertex(vertexIn[o_ubo.single_selected_vid]);
+        selected_vertex_position = project_vertex(vertexIn[o_ubo.single_selected_vid].xyz);
 	int rx = int(gl_GlobalInvocationID.x%int(o_ubo.image_width));
     int ry = int(gl_GlobalInvocationID.x/int(o_ubo.image_width));
     if (rx == o_ubo.mouse_x && ry == o_ubo.mouse_y) {
@@ -133,9 +41,9 @@ void main() {
             hovered_tid = -1;
             Ray ray = create_ray(vec2(rx, ry));
             Triangle tri = triangleIn[raygenIn[gl_GlobalInvocationID.x].tid];
-            vec3 _a = vertexIn[tri.a];
-            vec3 _b = vertexIn[tri.b];
-            vec3 _c = vertexIn[tri.c];
+            vec3 _a = vertexIn[tri.a].xyz;
+            vec3 _b = vertexIn[tri.b].xyz;
+            vec3 _c = vertexIn[tri.c].xyz;
             vec3 e1 = _b - _a;
             vec3 e2 = _c - _a;
             vec3 h = cross(ray.direction, e2);
@@ -150,7 +58,7 @@ void main() {
             if (v < 0.0 || u + v > 1.0) return;
             float w = 1.0f - u - v;
             hovered_tid = (u > v && u > w) ? tri.b : (v > w ? tri.c : tri.a);
-            vertex_position = project_vertex(vertexIn[hovered_tid]);
+            vertex_position = project_vertex(vertexIn[hovered_tid].xyz);
         }
     }
 }

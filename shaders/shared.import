@@ -1,0 +1,445 @@
+export Boilerplate {
+    #version 450
+    layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+}
+
+export Definitions {
+    #define MAX_RECURSIVE_DEPTH 500
+    #define NO_SELECT 0
+    #define TRIANGLE_SELECT 1
+    #define VERTEX_SELECT 2
+    #define EPS 0.000001
+    #define DEBUG_NONE 0
+    #define DEBUG_NORMALS 1
+    #define DEBUG_BVH 2
+    #define DEBUG_BOUNCES 3
+    #define FLTMAX 3.402823466e+38
+    #define LAMBERTIAN_MODEL 2
+    #define MIRROR_MODEL 5
+    #define DIELECTRIC_MODEL 7
+    #define PI 3.14159265358979323846
+    #define MAX_BONE_INFLUENCES 4
+}
+
+export RayGeneratorDef {
+    struct RayGenerator {
+        uint tid;
+        float distance;
+    }
+}
+
+export RayDef {
+    struct Ray {
+        vec3 position;
+        vec3 direction;
+    }
+}
+
+export TriangleDef {
+    struct Triangle {
+        uint a;
+        uint b;
+        uint c;
+        uint an;
+        uint bn;
+        uint cn;
+        uint material;
+    }
+}
+
+export RayGeneratorSSBODef {
+    buffer RayGeneratorSSBOIn {
+        RayGenerator raygenIn[ ];
+    }
+}
+
+export OverlaySSBODef {
+    buffer OverlaySSBO {
+    	uint hovered_tid;
+        vec2 vertex_position;
+        vec2 selected_vertex_position;
+    }
+}
+
+export TriangleSSBODef {
+    buffer TriangleSSBOIn {
+        Triangle triangleIn[ ];
+    }
+}
+
+export TransformedVertexSSBODef {
+    buffer TransformedVertexSSBOIn {
+        vec4 vertexIn[ ];
+    }
+}
+
+export OverlayUniformBufferObjectDef {
+    uniform OverlayUniformBufferObject {
+    	uint mouse_x;
+        uint mouse_y;
+    	uint image_width;
+    	uint image_height;
+    	uint single_selected_tid;
+        uint single_selected_vid;
+        uint divisor;
+        uint mode;
+    }
+}
+
+export UniformBufferObjectDef {
+    uniform UniformBufferObject {
+        vec3 look;
+        vec3 position;
+        vec3 up;
+        vec3 u;
+        vec3 v;
+        vec3 w;
+        vec2 viewport;
+        uint triangles;
+        uint emissives;
+        uint lights;
+        uint samples;
+    	uint seed;
+        uint grid;
+        uint reset;
+        uint direct;
+        uint directonly;
+        uint showdof;
+        uint normals;
+        uint scenelighting;
+        uint scenelightingonly;
+        uint scenelightshadows;
+        uint debugmode;
+        uint maxbounces;
+        float fov;
+        float width;
+        float height;
+        float swap;
+    	float frametime;
+        float whitepoint;
+        float gamma;
+        float lightarea;
+        float aperature;
+        float focus;
+    }
+}
+
+export BVHNodeDef {
+    struct BVHNode {
+        vec3 minBB;
+        vec3 maxBB;
+        uint left;
+        uint right; // 0xFFFFFFFF if leaf
+        uint parent;
+        uint counter;
+    }
+}
+
+export BVHNodeSSBODef {
+    buffer BVHNodeSSBOIn {
+        BVHNode nodeIn[ ];
+    }
+}
+
+export MortonSSBODef {
+    buffer MortonSSBOIn {
+        uint mortonIn[ ];
+    }
+}
+
+export PushConstantDef {
+    uniform PushConstants {
+        uint elements;
+        uint bitstart;
+    }
+}
+
+export BoundingBoxDef {
+    struct BoundingBox {
+        vec3 minBB;
+        vec3 maxBB;
+    }
+}
+
+export GeometryUniformBufferObjectDef {
+    uniform GeometryUniformBufferObject { 
+        vec3 minBB;
+        vec3 maxBB;
+    }
+}
+
+export IndexSSBODef {
+    buffer IndexSSBOIn {
+        uint indexIn[ ];
+    }
+}
+
+export BoundingBoxSSBODef {
+    buffer BoundingBoxSSBOIn {
+        BoundingBox bbIn[ ];
+    }
+}
+
+export HitDef {
+    struct Hit {
+        float distance;
+        uint material;
+        vec3 normal;
+        vec3 position;
+    }
+}
+
+export OutputImageDef {
+    uniform image2D outputImage
+}
+
+export NormalSSBODef {
+    buffer NormalSSBOIn {
+        vec3 normalIn[ ];
+    }
+}
+
+export SimulationUniformBufferObjectDef {
+    uniform SimulationUniformBufferObject { 
+        vec3 minBB;
+        vec3 maxBB;
+        uint style;
+    }
+}
+
+export DensityImageDef {
+    uniform sampler3D densityImage
+}
+
+export MortonSSBOSwapDef {
+    buffer MortonSwapSSBOIn {
+       uint mortonSwap[ ];
+    }
+}
+
+export WorkGroupHistorySSBODef {
+    buffer WorkGroupHistorySSBOIn {
+        uint wgHist[ ][16];
+    }
+}
+
+export WorkGroupOffsetSSBODef {
+    buffer WorkGroupOffsetSSBOIn {
+        uint globalOffset[ ][16];
+    }
+}
+
+export BucketBaseSSBODef {
+    buffer BucketBaseSSBOIn {
+        uint bucketIn[16];
+    }
+}
+
+export MaterialDef {
+    struct Material {
+        vec3 emission;
+        vec3 ambient;
+        vec3 diffuse;
+        vec3 specular;
+        vec3 absorbtion;
+        vec3 dispersion;
+        float ior;
+        float shiny;
+        uint model;
+    }
+}
+
+export NodeBVHDef {
+    struct NodeBVH {
+        vec3 min;
+        vec3 max;
+        uint config;
+        uint left;
+        uint right;
+    }
+}
+
+export SceneLightDef {
+    struct SceneLight {
+        vec3 position;
+        vec3 color;
+        vec3 direction;
+        float penumbra;
+        float angle;
+    }
+}
+
+export HDRImageDef {
+    uniform image2D hdrImage
+}
+
+export MaterialSSBODef {
+    buffer MaterialSSBOIn {
+        Material materialIn[ ];
+    }
+}
+
+export EmissiveSSBODef {
+    buffer EmissiveSSBOIn {
+        uint emissiveIn[ ];
+    }
+}
+
+export LightSSBODef {
+    buffer LightSSBOIn {
+        SceneLight lightIn[ ];
+    }
+}
+
+export IndexSwapSSBODef {
+    buffer IndexSwapSSBOIn {
+        uint triSwap[ ];
+    }
+}
+
+export MeshDescriptorDef {
+    struct MeshDescriptor {
+        uint disabled;
+        uint start;
+        uint end;
+        uint skinstart;
+        uint pose;
+        vec3 center;
+        vec3 extents;
+        vec3 translate;
+        vec3 rotate;
+        vec3 scale;
+        mat4 transform;
+    }
+}
+
+export VertexSkinDef {
+    struct VertexSkin {
+        uint indices[MAX_BONE_INFLUENCES];
+        float weights[MAX_BONE_INFLUENCES];
+    }
+}
+
+export VertexSSBODef {
+    buffer VertexSSBOIn {
+        vec4 originalVertexIn[ ];
+    }
+}
+
+export TransformsSSBODef {
+    buffer TransformsSSBOIn {
+        MeshDescriptor transformsIn[ ];
+    }
+}
+
+export PoseSSBODef {
+    buffer PoseSSBOIn {
+        mat4 poseIn[ ];
+    }
+}
+
+export SkinSSBODef {
+    buffer SkinSSBOIn {
+        VertexSkin skinIn[ ];
+    }
+}
+
+export CreateSimpleRay {
+    Ray create_ray(vec2 rg) {
+    	float r = ubo.width / 2.0;
+    	float b = ubo.height / 2.0;
+    	float l = -1.0 * r;
+    	float t = -1.0 * b;
+        float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
+        float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
+    	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
+        Ray ray;
+        ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+        ray.position = ubo.position;
+        return ray;
+    }
+}
+
+export CutViewport {
+    bool cut_viewport(int rx, int ry) {
+        if (ubo.viewport.x != 0 &&
+            (rx < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
+            (rx > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return true;
+        if (ubo.viewport.y != 0 &&
+            (ry < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
+            (ry > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return true;
+        return false;
+    }
+}
+
+export TriangleIntersectSuite {
+    bool stack_failure = false;
+    uint bvh_counter = 0;
+
+    bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
+        Triangle tri = triangleIn[triangle_ind];
+        vec3 _a = vertexIn[tri.a].xyz;
+        vec3 _b = vertexIn[tri.b].xyz;
+        vec3 _c = vertexIn[tri.c].xyz;
+        vec3 e1 = _b - _a;
+        vec3 e2 = _c - _a;
+        vec3 h = cross(ray.direction, e2);
+        float a = dot(e1, h);
+        if (abs(a) < EPS) return false;
+        float f = 1.0 / a;
+        vec3 s = ray.position - _a;
+        float u = f*dot(s, h);
+        if (u < 0.0 || u > 1.0) return false;
+        vec3 q = cross(s, e1);
+        float v = f*dot(ray.direction, q);
+        if (v < 0.0 || u + v > 1.0) return false;
+        hit.distance = f * dot(e2, q);
+        if (hit.distance <= EPS) return false;
+        hit.material = tri.material;
+        hit.position = ray.position + (ray.direction * hit.distance);
+        if (ubo.normals != 0 && tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
+        else hit.normal = normalize(cross(e1, e2));
+        if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
+        return true;
+    }
+
+    bool aabb_intersect(Ray ray, uint node_ind) {
+    	vec3 dfrac = 1.0 / ray.direction;
+        vec3 mindif = (nodeIn[node_ind].minBB - ray.position)*dfrac;
+        vec3 maxdif = (nodeIn[node_ind].maxBB - ray.position)*dfrac;
+    	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
+    	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
+        return tmax >= 0 && tmin <= tmax;
+    }
+
+    Hit trace(Ray ray, inout uint hit_id) {
+        Hit hit;
+        hit.distance = -1.0;
+        if (ubo.triangles == 0) return hit;
+        uint stack[MAX_RECURSIVE_DEPTH];
+        int stack_ptr = 0;
+        stack[stack_ptr++] = 0;
+        while (stack_ptr > 0) {
+            bvh_counter++;
+            uint node_index = stack[--stack_ptr];
+            BVHNode node = nodeIn[node_index];
+            if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
+            if (!aabb_intersect(ray, node_index)) continue;
+            if (node.right == 0xFFFFFFFF) {
+                Hit trihit;
+                if (triangle_intersect(ray, node.left, trihit)) {
+                    if (hit.distance == -1.0 || trihit.distance < hit.distance) {
+                        hit = trihit;
+    					hit_id = node.left;
+                    }
+                }
+            } else {
+                uint left = node.left;
+                uint right = node.right;
+                stack[stack_ptr++] = left;
+                stack[stack_ptr++] = right;
+            }
+        }
+        return hit;
+    }
+}

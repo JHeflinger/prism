@@ -1,43 +1,18 @@
-#version 450
+#import Boilerplate
 
-struct BVHNode {
-    vec3 minBB;
-    vec3 maxBB;
-    uint left;
-    uint right; // 0xFFFFFFFF if leaf
-    uint parent;
-    uint counter;
-};
+#import BVHNodeDef;
+#import BoundingBoxDef;
 
-struct BoundingBox {
-    vec3 minBB;
-    vec3 maxBB;
-};
-
-layout(binding = 0) readonly buffer IndexSSBOIn {
-    uint triIn[ ];
-};
-
-layout(binding = 1) readonly buffer BoundingBoxSSBOIn {
-    BoundingBox bbIn[ ];
-};
-
-layout(binding = 2) buffer BVHNodeSSBOIn {
-    BVHNode nodeIn[ ];
-};
-
-layout(push_constant) uniform PushConstants {
-    uint elements;
-    uint bitstart;
-} pc;
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) readonly #import IndexSSBODef;
+layout(binding = 1) readonly #import BoundingBoxSSBODef;
+layout(binding = 2) #import BVHNodeSSBODef;
+layout(push_constant) #import PushConstantDef pc;
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
     if (id >= pc.elements) return;
     uint leaf_index = pc.elements - 1 + id;
-    uint primID = triIn[id];
+    uint primID = indexIn[id];
     nodeIn[leaf_index].minBB = bbIn[primID].minBB;
     nodeIn[leaf_index].maxBB = bbIn[primID].maxBB;
     nodeIn[leaf_index].left = primID;

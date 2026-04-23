@@ -1,24 +1,9 @@
-#version 450
+#import Boilerplate
 
-struct BVHNode {
-    vec3 minBB;
-    vec3 maxBB;
-    uint left;
-    uint right; // 0xFFFFFFFF if leaf
-    uint parent;
-    uint counter;
-};
+#import BVHNodeDef;
 
-layout(binding = 0) buffer BVHNodeSSBOIn {
-    BVHNode nodeIn[ ];
-};
-
-layout(push_constant) uniform PushConstants {
-    uint elements;
-    uint bitstart;
-} pc;
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) #import BVHNodeSSBODef;
+layout(push_constant) #import PushConstantDef pc;
 
 void main() {
     uint id = gl_GlobalInvocationID.x;

@@ -1,47 +1,14 @@
-#version 450
+#import Boilerplate
+#import Definitions
 
-#define NO_SELECT 0
-#define TRIANGLE_SELECT 1
-#define VERTEX_SELECT 2
+#import RayGeneratorDef;
 
-struct RayGenerator {
-    uint tid;
-    float distance;
-};
-
-layout(binding = 0) readonly buffer RayGeneratorSSBOIn {
-   RayGenerator raygenIn[ ];
-};
-
-layout(binding = 1, rgba8) uniform image2D outputImage;
-
-layout(binding = 2) uniform OverlayUniformBufferObject {
-	uint mouse_x;
-    uint mouse_y;
-	uint image_width;
-	uint image_height;
-	uint single_selected_tid;
-    uint single_selected_vid;
-    uint divisor;
-    uint mode;
-} o_ubo;
-
-layout(binding = 3) uniform GeometryUniformBufferObject { 
-    vec3 minBB;
-    vec3 maxBB;
-} g_ubo;
-
-layout(binding = 4) buffer OverlaySSBO {
-	uint hovered_tid;
-    vec2 vertex_position;
-    vec2 selected_vertex_position;
-};
-
-layout(binding = 5) readonly buffer TransformedVertexSSBOIn {
-    vec4 vertexIn[ ];
-};
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) readonly #import RayGeneratorSSBODef; 
+layout(binding = 1, rgba8) #import OutputImageDef;
+layout(binding = 2) #import OverlayUniformBufferObjectDef o_ubo;
+layout(binding = 3) #import GeometryUniformBufferObjectDef g_ubo;
+layout(binding = 4) #import OverlaySSBODef;
+layout(binding = 5) readonly #import TransformedVertexSSBODef;
 
 const float vhighlight_radius = 50.0;
 const float mixfactor = 0.2;

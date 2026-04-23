@@ -1,203 +1,28 @@
-#version 450
+#import Boilerplate
+#import Definitions
 
-#define MAX_RECURSIVE_DEPTH 500
-#define AO_DIST 0.5
-#define EPS 0.000001
-#define DEBUG_NONE 0
-#define DEBUG_NORMALS 1
-#define DEBUG_BVH 2
+#import BVHNodeDef;
+#import RayGeneratorDef;
+#import RayDef;
+#import TriangleDef;
+#import HitDef;
 
-struct BVHNode {
-    vec3 minBB;
-    vec3 maxBB;
-    uint left;
-    uint right; // 0xFFFFFFFF if leaf
-    uint parent;
-    uint counter;
-};
+layout(binding = 0) #import UniformBufferObjectDef ubo;
+layout(binding = 1) #import RayGeneratorSSBODef;
+layout(binding = 2, rgba8) #import OutputImageDef;
+layout(binding = 3) readonly #import TriangleSSBODef;
+layout(binding = 4) readonly #import TransformedVertexSSBODef;
+layout(binding = 5) readonly #import NormalSSBODef;
+layout(binding = 6) readonly #import BVHNodeSSBODef;
 
-struct RayGenerator {
-    uint tid;
-    float distance;
-};
+#import CreateSimpleRay
+#import CutViewport
+#import TriangleIntersectSuite
 
-struct Ray {
-    vec3 position;
-    vec3 direction;
-};
-
-struct Hit {
-    float distance;
-    vec3 normal;
-    vec3 position;
-};
-
-struct Triangle {
-    uint a;
-    uint b;
-    uint c;
-    uint an;
-    uint bn;
-    uint cn;
-    uint material;
-};
-
-layout(binding = 0) uniform UniformBufferObject {
-    vec3 look;
-    vec3 position;
-    vec3 up;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    vec2 viewport;
-    uint triangles;
-    uint emissives;
-    uint lights;
-    uint samples;
-	uint seed;
-    uint grid;
-    uint reset;
-    uint direct;
-    uint directonly;
-    uint showdof;
-    uint normals;
-    uint scenelighting;
-    uint scenelightingonly;
-    uint scenelightshadows;
-    uint debugmode;
-    uint maxbounces;
-    float fov;
-    float width;
-    float height;
-    float swap;
-	float frametime;
-    float whitepoint;
-    float gamma;
-    float lightarea;
-    float aperature;
-    float focus;
-} ubo;
-
-layout(binding = 1) buffer RayGeneratorSSBOIn {
-   RayGenerator raygenIn[ ];
-};
-
-layout(binding = 2, rgba8) uniform image2D outputImage;
-
-layout(binding = 3) readonly buffer TriangleSSBOIn {
-    Triangle triangleIn[ ];
-};
-
-layout(binding = 4) readonly buffer TransformedVertexSSBOIn {
-    vec3 vertexIn[ ];
-};
-
-layout(binding = 5) readonly buffer NormalSSBOIn {
-    vec3 normalIn[ ];
-};
-
-layout(binding = 6) buffer BVHNodeSSBOIn {
-    BVHNode nodeIn[ ];
-};
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-
-bool stack_failure = false;
 vec3 key_light = vec3(0.408248, 0.408248, 0.816497);
 vec3 fill_light = vec3(-0.440225, 0.17609, 0.880451);
 vec3 back_light = vec3(0, -0.447214, 0.894427);
 vec3 background_color = vec3(0.12);
-uint bvh_counter = 0;
-
-bool cut_viewport(int rx, int ry) {
-    if (ubo.viewport.x != 0 &&
-        (rx < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
-        (rx > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return true;
-    if (ubo.viewport.y != 0 &&
-        (ry < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
-        (ry > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return true;
-    return false;
-}
-
-Ray create_ray(vec2 rg) {
-	float r = ubo.width / 2.0;
-	float b = ubo.height / 2.0;
-	float l = -1.0 * r;
-	float t = -1.0 * b;
-    float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
-    float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
-	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
-    Ray ray;
-    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
-    ray.position = ubo.position;
-    return ray;
-}
-
-bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
-    Triangle tri = triangleIn[triangle_ind];
-    vec3 _a = vertexIn[tri.a];
-    vec3 _b = vertexIn[tri.b];
-    vec3 _c = vertexIn[tri.c];
-    vec3 e1 = _b - _a;
-    vec3 e2 = _c - _a;
-    vec3 h = cross(ray.direction, e2);
-    float a = dot(e1, h);
-    if (abs(a) < EPS) return false;
-    float f = 1.0 / a;
-    vec3 s = ray.position - _a;
-    float u = f*dot(s, h);
-    if (u < 0.0 || u > 1.0) return false;
-    vec3 q = cross(s, e1);
-    float v = f*dot(ray.direction, q);
-    if (v < 0.0 || u + v > 1.0) return false;
-    hit.distance = f * dot(e2, q);
-    if (hit.distance <= EPS) return false;
-    hit.position = ray.position + (ray.direction * hit.distance);
-    if (ubo.normals != 0 && tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
-    else hit.normal = normalize(cross(e1, e2));
-    if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
-    return true;
-}
-
-bool aabb_intersect(Ray ray, uint node_ind) {
-	vec3 dfrac = 1.0 / ray.direction;
-    vec3 mindif = (nodeIn[node_ind].minBB - ray.position)*dfrac;
-    vec3 maxdif = (nodeIn[node_ind].maxBB - ray.position)*dfrac;
-	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
-	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
-    return tmax >= 0 && tmin <= tmax;
-}
-
-Hit trace(Ray ray, inout uint hit_id) {
-    Hit hit;
-    hit.distance = -1.0;
-    if (ubo.triangles == 0) return hit;
-    uint stack[MAX_RECURSIVE_DEPTH];
-    int stack_ptr = 0;
-    stack[stack_ptr++] = 0;
-    while (stack_ptr > 0) {
-        bvh_counter++;
-        uint node_index = stack[--stack_ptr];
-        BVHNode node = nodeIn[node_index];
-        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
-        if (!aabb_intersect(ray, node_index)) continue;
-        if (node.right == 0xFFFFFFFF) {
-            Hit trihit;
-            if (triangle_intersect(ray, node.left, trihit)) {
-                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
-                    hit = trihit;
-					hit_id = node.left;
-                }
-            }
-        } else {
-            uint left = node.left;
-            uint right = node.right;
-            stack[stack_ptr++] = left;
-            stack[stack_ptr++] = right;
-        }
-    }
-    return hit;
-}
 
 float lambert(vec3 n, vec3 l) {
     return max(dot(n, l), 0.0);

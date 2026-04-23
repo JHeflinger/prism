@@ -1,52 +1,15 @@
-#version 450
+#import Boilerplate
+#import Definitions
 
-#define MAX_BONE_INFLUENCES 4
+#import MeshDescriptorDef;
+#import VertexSkinDef;
 
-struct MeshDescriptor {
-    uint disabled;
-    uint start;
-    uint end;
-    uint skinstart;
-    uint pose;
-    vec3 center;
-    vec3 extents;
-    vec3 translate;
-    vec3 rotate;
-    vec3 scale;
-    mat4 transform;
-};
-
-struct VertexSkin {
-    uint indices[MAX_BONE_INFLUENCES];
-    float weights[MAX_BONE_INFLUENCES];
-};
-
-layout(binding = 0) readonly buffer VertexSSBOIn {
-    vec4 vertexIn[ ];
-};
-
-layout(binding = 1) buffer TransformedVertexSSBOIn {
-    vec4 transformedIn[ ];
-};
-
-layout(binding = 2) readonly buffer TransformsSSBOIn {
-    MeshDescriptor transformsIn[ ];
-};
-
-layout(binding = 3) readonly buffer PoseSSBOIn {
-    mat4 poseIn[ ];
-};
-
-layout(binding = 4) readonly buffer SkinSSBOIn {
-    VertexSkin skinIn[ ];
-};
-
-layout(push_constant) uniform PushConstants {
-    uint elements;
-    uint bitstart;
-} pc;
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) readonly #import VertexSSBODef;
+layout(binding = 1) #import TransformedVertexSSBODef;
+layout(binding = 2) readonly #import TransformsSSBODef;
+layout(binding = 3) readonly #import PoseSSBODef;
+layout(binding = 4) readonly #import SkinSSBODef;
+layout(push_constant) #import PushConstantDef pc;
 
 uint find_transform(uint i) {
     float pct = float(i) / float(transformsIn[pc.elements - 1].end + 1);
@@ -70,19 +33,19 @@ void animate_vertex(inout vec4 vertex, uint poffset, VertexSkin skin) {
 
 void main() {
     if (pc.elements == 0) return;
-    vec4 vertex = vertexIn[gl_GlobalInvocationID.x];
+    vec4 vertex = originalVertexIn[gl_GlobalInvocationID.x];
     uint mi = find_transform(gl_GlobalInvocationID.x);
     if (mi == -1) {
-        transformedIn[gl_GlobalInvocationID.x] = vertex;
+        vertexIn[gl_GlobalInvocationID.x] = vertex;
         return;
     }
     MeshDescriptor md = transformsIn[mi];
     if (md.disabled != 0) {
-        transformedIn[gl_GlobalInvocationID.x] = vec4(0);
+        vertexIn[gl_GlobalInvocationID.x] = vec4(0);
         return;
     }
     if (md.pose != -1)
         animate_vertex(vertex, md.pose, skinIn[(gl_GlobalInvocationID.x - md.start) + md.skinstart]);
     vec3 newpos = (md.transform * vec4(vertex.xyz, 1.0)).xyz;
-    transformedIn[gl_GlobalInvocationID.x] = vec4(newpos, vertexIn[gl_GlobalInvocationID.x].w);
+    vertexIn[gl_GlobalInvocationID.x] = vec4(newpos, originalVertexIn[gl_GlobalInvocationID.x].w);
 }

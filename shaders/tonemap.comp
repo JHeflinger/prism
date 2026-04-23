@@ -1,46 +1,8 @@
-#version 450
+#import Boilerplate
 
-layout(binding = 0) uniform UniformBufferObject {
-    vec3 look;
-    vec3 position;
-    vec3 up;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    vec2 viewport;
-    uint triangles;
-    uint emissives;
-    uint lights;
-    uint samples;
-	uint seed;
-    uint grid;
-    uint reset;
-    uint direct;
-    uint directonly;
-    uint showdof;
-    uint normals;
-    uint scenelighting;
-    uint scenelightingonly;
-    uint scenelightshadows;
-    uint debugmode;
-    uint maxbounces;
-    float fov;
-    float width;
-    float height;
-    float swap;
-	float frametime;
-    float whitepoint;
-    float gamma;
-    float lightarea;
-    float aperature;
-    float focus;
-} ubo;
-
-layout(binding = 1, rgba8) uniform image2D outputImage;
-
-layout(binding = 2, rgba16f) uniform image2D hdrImage;
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) #import UniformBufferObjectDef ubo;
+layout(binding = 1, rgba8) #import OutputImageDef;
+layout(binding = 2, rgba16f) #import HDRImageDef;
 
 void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));

@@ -1,154 +1,30 @@
-#version 450
+#import Boilerplate
+#import Definitions
 
-#define MAX_RECURSIVE_DEPTH 2000
-#define EPS 0.000001
-#define FLTMAX 3.402823466e+38
+#import BVHNodeDef;
+#import RayGeneratorDef;
+#import RayDef;
+#import HitDef;
+#import TriangleDef;
+#import MaterialDef;
+#import NodeBVHDef;
+#import SceneLightDef;
 
-#define LAMBERTIAN_MODEL 2
-#define MIRROR_MODEL 5
-#define DIELECTRIC_MODEL 7
+layout(binding = 0) readonly #import UniformBufferObjectDef ubo;
+layout(binding = 1) #import RayGeneratorSSBODef;
+layout(binding = 2, rgba16f) #import HDRImageDef;
+layout(binding = 3) readonly #import TriangleSSBODef;
+layout(binding = 4) readonly #import MaterialSSBODef;
+layout(binding = 5) readonly #import BVHNodeSSBODef;
+layout(binding = 6) readonly #import EmissiveSSBODef;
+layout(binding = 7) readonly #import TransformedVertexSSBODef;
+layout(binding = 8) readonly #import NormalSSBODef;
+layout(binding = 9) readonly #import LightSSBODef;
 
-#define DEBUG_BVH 3
-
-struct BVHNode {
-    vec3 minBB;
-    vec3 maxBB;
-    uint left;
-    uint right; // 0xFFFFFFFF if leaf
-    uint parent;
-    uint counter;
-};
-
-struct RayGenerator {
-    uint tid;
-    float distance;
-};
-
-struct Ray {
-    vec3 position;
-    vec3 direction;
-};
-
-struct Hit {
-    float distance;
-    uint material;
-    vec3 normal;
-    vec3 position;
-};
-
-struct Triangle {
-    uint a;
-    uint b;
-    uint c;
-    uint an;
-    uint bn;
-    uint cn;
-    uint material;
-};
-
-struct Material {
-    vec3 emission;
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-    vec3 absorbtion;
-    vec3 dispersion;
-    float ior;
-    float shiny;
-    uint model;
-};
-
-struct NodeBVH {
-    vec3 min;
-    vec3 max;
-    uint config;
-    uint left;
-    uint right;
-};
-
-struct SceneLight {
-    vec3 position;
-    vec3 color;
-    vec3 direction;
-    float penumbra;
-    float angle;
-};
-
-layout(binding = 0) uniform UniformBufferObject {
-    vec3 look;
-    vec3 position;
-    vec3 up;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    vec2 viewport;
-    uint triangles;
-    uint emissives;
-    uint lights;
-    uint samples;
-	uint seed;
-    uint grid;
-    uint reset;
-    uint direct;
-    uint directonly;
-    uint showdof;
-    uint normals;
-    uint scenelighting;
-    uint scenelightingonly;
-    uint scenelightshadows;
-    uint debugmode;
-    uint maxbounces;
-    float fov;
-    float width;
-    float height;
-    float swap;
-	float frametime;
-    float whitepoint;
-    float gamma;
-    float lightarea;
-    float aperature;
-    float focus;
-} ubo;
-
-layout(binding = 1) buffer RayGeneratorSSBOIn {
-   RayGenerator raygenIn[ ];
-};
-
-layout(binding = 2, rgba16f) uniform image2D hdrImage;
-
-layout(binding = 3) readonly buffer TriangleSSBOIn {
-    Triangle triangleIn[ ];
-};
-
-layout(binding = 4) readonly buffer MaterialSSBOIn {
-    Material materialIn[ ];
-};
-
-layout(binding = 5) buffer BVHNodeSSBOIn {
-    BVHNode nodeIn[ ];
-};
-
-layout(binding = 6) readonly buffer EmissiveSSBOIn {
-    uint emissiveIn[ ];
-};
-
-layout(binding = 7) readonly buffer TransformedVertexSSBOIn {
-    vec3 vertexIn[ ];
-};
-
-layout(binding = 8) readonly buffer NormalSSBOIn {
-    vec3 normalIn[ ];
-};
-
-layout(binding = 9) readonly buffer LightSSBOIn {
-    SceneLight lightIn[ ];
-};
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+#import CutViewport
+#import TriangleIntersectSuite
 
 const float max_contribution = 10;
-const float PI = 3.14159265358979323846;
-bool stack_failure = false;
 uvec4 seed = uvec4(0);
 const uint SOBOL_DIRS[2][32] = uint[2][32](
     uint[32](
@@ -260,16 +136,6 @@ vec3 beer_lambert(uint material, float dist) {
     return exp(-materialIn[material].absorbtion * dist);
 }
 
-bool cut_viewport(int rx, int ry) {
-    if (ubo.viewport.x != 0 &&
-        (rx < ceil(((ubo.width - ubo.viewport.x) / 2.0)) ||
-        (rx > ceil(((ubo.width + ubo.viewport.x) / 2.0))))) return true;
-    if (ubo.viewport.y != 0 &&
-        (ry < ceil(((ubo.height - ubo.viewport.y) / 2.0)) ||
-        (ry > ceil(((ubo.height + ubo.viewport.y) / 2.0))))) return true;
-    return false;
-}
-
 Ray create_ray(vec2 rg) {
     uint rayseed = uint(rg.x) * 1973u + uint(rg.y) * 9277u + ubo.samples * 26699u;
     vec2 jitter = vec2(sobol_owen(ubo.samples, 0, rayseed), sobol_owen(ubo.samples, 1, rayseed));
@@ -295,72 +161,6 @@ Ray create_ray(vec2 rg) {
         ray.position = ubo.position;
     }
     return ray;
-}
-
-bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
-    Triangle tri = triangleIn[triangle_ind];
-    vec3 _a = vertexIn[tri.a];
-    vec3 _b = vertexIn[tri.b];
-    vec3 _c = vertexIn[tri.c];
-    vec3 e1 = _b - _a;
-    vec3 e2 = _c - _a;
-    vec3 h = cross(ray.direction, e2);
-    float a = dot(e1, h);
-    if (abs(a) < EPS) return false;
-    float f = 1.0 / a;
-    vec3 s = ray.position - _a;
-    float u = f*dot(s, h);
-    if (u < 0.0 || u > 1.0) return false;
-    vec3 q = cross(s, e1);
-    float v = f*dot(ray.direction, q);
-    if (v < 0.0 || u + v > 1.0) return false;
-    hit.distance = f * dot(e2, q);
-    if (hit.distance <= EPS) return false;
-    hit.material = tri.material;
-    hit.position = ray.position + (ray.direction * hit.distance);
-    if (ubo.normals != 0 && tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
-    else hit.normal = normalize(cross(e1, e2));
-    if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
-    return true;
-}
-
-bool aabb_intersect(Ray ray, uint node_ind) {
-	vec3 dfrac = 1.0 / ray.direction;
-    vec3 mindif = (nodeIn[node_ind].minBB - ray.position)*dfrac;
-    vec3 maxdif = (nodeIn[node_ind].maxBB - ray.position)*dfrac;
-	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
-	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
-    return tmax >= 0 && tmin <= tmax;
-}
-
-Hit trace(Ray ray, inout uint hit_id) {
-    Hit hit;
-    hit.distance = -1.0;
-    if (ubo.triangles == 0) return hit;
-    uint stack[MAX_RECURSIVE_DEPTH];
-    int stack_ptr = 0;
-    stack[stack_ptr++] = 0;
-    while (stack_ptr > 0) {
-        uint node_index = stack[--stack_ptr];
-        BVHNode node = nodeIn[node_index];
-        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
-        if (!aabb_intersect(ray, node_index)) continue;
-        if (node.right == 0xFFFFFFFF) {
-            Hit trihit;
-            if (triangle_intersect(ray, node.left, trihit)) {
-                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
-                    hit = trihit;
-					hit_id = node.left;
-                }
-            }
-        } else {
-            uint left = node.left;
-            uint right = node.right;
-            stack[stack_ptr++] = left;
-            stack[stack_ptr++] = right;
-        }
-    }
-    return hit;
 }
 
 float russian_roulette(vec3 throughput) {
@@ -395,9 +195,9 @@ vec3 sample_specular_phong_lobe(float shiny) {
 vec3 sample_direct_light_point(inout uint tid, inout float area) {
     tid = emissiveIn[uint(random()*float(ubo.emissives))];
     Triangle tri = triangleIn[tid];
-    vec3 _a = vertexIn[tri.a];
-    vec3 _b = vertexIn[tri.b];
-    vec3 _c = vertexIn[tri.c];
+    vec3 _a = vertexIn[tri.a].xyz;
+    vec3 _b = vertexIn[tri.b].xyz;
+    vec3 _c = vertexIn[tri.c].xyz;
     area = length(cross(_b - _a, _c - _a)) * 0.5;
     float r1 = sqrt(random());
     float r2 = random();
@@ -602,7 +402,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         if (material.model != LAMBERTIAN_MODEL) count_emission = true;
         else count_emission = ubo.direct == 0;
     }
-    if (ubo.debugmode == DEBUG_BVH) return vec3(pow(float(i) / float(ubo.maxbounces), 2.0), 0, 0);
+    if (ubo.debugmode == DEBUG_BOUNCES) return vec3(pow(float(i) / float(ubo.maxbounces), 2.0), 0, 0);
     return radiance;
 }
 

@@ -10,59 +10,59 @@ Renderer* g_vinit_renderer_ref = NULL;
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/vertex.comp",
+        "build/expanded/vertex.comp",
         "build/shaders/vertex.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/centroids.comp",
+        "build/expanded/centroids.comp",
         "build/shaders/centroids.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/histogram.comp",
+        "build/expanded/histogram.comp",
         "build/shaders/histogram.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/history.comp",
+        "build/expanded/history.comp",
         "build/shaders/history.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/scatter.comp",
+        "build/expanded/scatter.comp",
         "build/shaders/scatter.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/leaves.comp",
+        "build/expanded/leaves.comp",
         "build/shaders/leaves.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/bvh.comp",
+        "build/expanded/bvh.comp",
         "build/shaders/bvh.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/rebind.comp",
+        "build/expanded/rebind.comp",
         "build/shaders/rebind.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/default.comp",
+        "build/expanded/default.comp",
         "build/shaders/default.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/path.comp",
+        "build/expanded/path.comp",
         "build/shaders/path.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/fluid.comp",
+        "build/expanded/fluid.comp",
         "build/shaders/fluid.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/tonemap.comp",
+        "build/expanded/tonemap.comp",
         "build/shaders/tonemap.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/analyze.comp",
+        "build/expanded/analyze.comp",
         "build/shaders/analyze.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
-        "shaders/overlay.comp",
+        "build/expanded/overlay.comp",
         "build/shaders/overlay.comp.spv"));
 	return TRUE;
 }

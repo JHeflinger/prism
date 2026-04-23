@@ -1,35 +1,12 @@
-#version 450
+#import Boilerplate
 
-layout(binding = 0) buffer MortonSSBOIn {
-    uint mortonIn[ ];
-};
-
-layout(binding = 1) buffer IndexSSBOIn {
-    uint triIn[ ];
-};
-
-layout(binding = 2) buffer MortonSwapSSBOIn {
-    uint mortonSwap[ ];
-};
-
-layout(binding = 3) buffer IndexSwapSSBOIn {
-    uint triSwap[ ];
-};
-
-layout(binding = 4) buffer WorkGroupOffsetSSBOIn {
-    uint globalOffset[ ][16];
-};
-
-layout(binding = 5) buffer BucketBaseSSBOIn {
-    uint bucketIn[16];
-};
-
-layout(push_constant) uniform PushConstants {
-    uint elements;
-    uint bitstart;
-} pc;
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) #import MortonSSBODef;
+layout(binding = 1) #import IndexSSBODef;
+layout(binding = 2) #import MortonSSBOSwapDef;
+layout(binding = 3) #import IndexSwapSSBODef;
+layout(binding = 4) #import WorkGroupOffsetSSBODef;
+layout(binding = 5) #import BucketBaseSSBODef;
+layout(push_constant) #import PushConstantDef pc;
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
@@ -50,7 +27,7 @@ void main() {
         for (uint i = 0; i < bucket; i++) base += bucketIn[i];
         uint out_index = base + globalOffset[wgID][bucket] + local_count;
         mortonSwap[out_index] = mortonIn[idx];
-        triSwap[out_index] = triIn[idx];
+        triSwap[out_index] = indexIn[idx];
     } else {
         uint bucket = (mortonSwap[idx] >> pc.bitstart) & 0xFu;
         for(uint i = 0; i < tid; i++) {
@@ -64,6 +41,6 @@ void main() {
         for (uint i = 0; i < bucket; i++) base += bucketIn[i];
         uint out_index = base + globalOffset[wgID][bucket] + local_count;
         mortonIn[out_index] = mortonSwap[idx];
-        triIn[out_index] = triSwap[idx];
+        indexIn[out_index] = triSwap[idx];
     }
 }

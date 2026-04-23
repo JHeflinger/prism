@@ -1,78 +1,20 @@
-#version 450
+#import Boilerplate
 
 #define STEPSIZE 0.05
 #define EPS 0.0001
 #define RENDER_MODE 1
 
-struct Ray {
-    vec3 position;
-    vec3 direction;
-};
+#import RayDef;
 
-layout(binding = 0) uniform UniformBufferObject {
-    vec3 look;
-    vec3 position;
-    vec3 up;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    vec2 viewport;
-    uint triangles;
-    uint emissives;
-    uint lights;
-    uint samples;
-	uint seed;
-    uint grid;
-    uint reset;
-    uint direct;
-    uint directonly;
-    uint showdof;
-    uint normals;
-    uint scenelighting;
-    uint scenelightingonly;
-    uint scenelightshadows;
-    uint debugmode;
-    uint maxbounces;
-    float fov;
-    float width;
-    float height;
-    float swap;
-	float frametime;
-    float whitepoint;
-    float gamma;
-    float lightarea;
-    float aperature;
-    float focus;
-} ubo;
+layout(binding = 0) #import UniformBufferObjectDef ubo;
+layout(binding = 1) #import SimulationUniformBufferObjectDef sim_ubo;
+layout(binding = 2, rgba8) #import OutputImageDef;
+layout(binding = 3) #import DensityImageDef;
 
-layout(binding = 1) uniform SimulationUniformBufferObject { 
-    vec3 minBB;
-    vec3 maxBB;
-    uint style;
-} sim_ubo;
-
-layout(binding = 2, rgba8) uniform image2D outputImage;
-
-layout(binding = 3) uniform sampler3D densityImage;
-
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+#import CreateSimpleRay
 
 const vec3 default_light = normalize(vec3(1.0, 1.0, 0.5));
 const vec3 background_color = vec3(0.05);
-
-Ray create_ray(vec2 rg) {
-	float r = ubo.width / 2.0;
-	float b = ubo.height / 2.0;
-	float l = -1.0 * r;
-	float t = -1.0 * b;
-    float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
-    float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
-	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
-    Ray ray;
-    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
-    ray.position = ubo.position;
-    return ray;
-}
 
 vec2 volume_intersect(Ray ray) {
 	vec3 dfrac = 1.0 / ray.direction;
