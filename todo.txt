@@ -41,6 +41,7 @@ ICEBOX:
 52. unique views - when you switch a view the entire ui layout changes
 
 Next:
+-1. improve direct lighting to include dielectric material bouncing
 0. diamonds on a floor do not cast shadows when lit with a directional light, but they defintely should
 1. expose max path count
 2. open files via mini file explorer

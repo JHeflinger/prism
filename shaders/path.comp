@@ -289,7 +289,46 @@ vec3 sample_scene_lights(vec3 outgoing, Hit h, Material material) {
     return intensity;
 }
 
-void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout int wavelength) {
+float interpolated_ior(in Material material, in float wavelength) {
+    float lambdaR = 610.0;
+    float lambdaG = 550.0;
+    float lambdaB = 460.0;
+    if (wavelength >= lambdaG) {
+        return mix(material.dispersion.g, material.dispersion.r, (wavelength - lambdaG) / (lambdaR - lambdaG));
+    } else {
+        return mix(material.dispersion.b, material.dispersion.g, (wavelength - lambdaB) / (lambdaG - lambdaB));
+    }
+}
+
+vec3 cheap_wavelength_to_rgb(float lambda) {
+    float r = 0.0, g = 0.0, b = 0.0;
+    if (lambda >= 380.0 && lambda < 440.0) {
+        r = -(lambda - 440.0) / (440.0 - 380.0);
+        b = 1.0;
+    } else if (lambda < 490.0) {
+        g = (lambda - 440.0) / (490.0 - 440.0);
+        b = 1.0;
+    } else if (lambda < 510.0) {
+        g = 1.0;
+        b = -(lambda - 510.0) / (510.0 - 490.0);
+    } else if (lambda < 580.0) {
+        r = (lambda - 510.0) / (580.0 - 510.0);
+        g = 1.0;
+    } else if (lambda < 645.0) {
+        r = 1.0;
+        g = -(lambda - 645.0) / (645.0 - 580.0);
+    } else if (lambda <= 780.0) {
+        r = 1.0;
+    }
+    float s = 1.0;
+    if (lambda > 700.0)
+        s = 0.3 + 0.7 * (780.0 - lambda) / (780.0 - 700.0);
+    else if (lambda < 420.0)
+        s = 0.3 + 0.7 * (lambda - 380.0) / (420.0 - 380.0);
+    return vec3(r, g, b) * s;
+}
+
+void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout float wavelength) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             float ks = luminance(material.specular);
@@ -318,14 +357,13 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
             float pdf_mod = 1.0;
             uint mat_t = h.material;
             vec3 absorb = beer_lambert(medium, length(previous - h.position));
-            vec3 dmask = vec3(1.0);
+            vec3 wavemask = vec3(1.0);
             if (wavelength < 0 && material.dispersion != vec3(0)) {
-                pdf_mod = 0.33333333; // 1/3 chance to choose wavelength
-                wavelength = int(max(0, (random() - EPS))*3);
-                dmask = vec3(0.0);
-                dmask[wavelength] = 1.0;
+                wavelength = mix(380.0, 780.0, random());
+                pdf_mod = 1.0 / (780.0 - 380.0);
+                wavemask = cheap_wavelength_to_rgb(wavelength);
             }
-            if (wavelength >= 0 && material.dispersion != vec3(0)) eta_t *= material.dispersion[wavelength];
+            if (wavelength >= 0 && material.dispersion != vec3(0)) eta_t *= interpolated_ior(material, wavelength);
             if (medium == mat_t) {
                 eta_t = 1.0;
                 mat_t = -1;
@@ -333,18 +371,18 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
             float F = fresnel_dielectric(cosi, eta_i, eta_t);
             if (random() < F) {
                 incoming = reflect(-outgoing, h.normal);
-                throughput = vec3(F) * absorb * dmask;
+                throughput = vec3(F) * absorb * cheap_wavelength_to_rgb(wavelength) * wavemask;
                 pdf = F * pdf_mod;
             } else {
                 float eta = (cosi > 0.0) ? eta_i / eta_t : eta_t / eta_i;
                 vec3 Nt = (cosi > 0.0) ? h.normal : -h.normal;
                 if (!refract_ray(-outgoing, Nt, eta, incoming)) {
                     incoming = reflect(-outgoing, h.normal);
-                    throughput = vec3(1.0) * absorb * dmask;
+                    throughput = vec3(1.0) * absorb * wavemask;
                     pdf = F * pdf_mod;
                     return;
                 }
-                throughput = vec3(1.0 - F) * absorb * dmask;
+                throughput = vec3(1.0 - F) * absorb * wavemask;
                 pdf = (1.0 - F) * pdf_mod;
                 ior = eta_t;
                 medium = mat_t;
@@ -362,7 +400,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     float ior = 1.0;
     uint medium = -1;
     bool count_emission = true;
-    int wavelength = -1;
+    float wavelength = -1.0;
     uint i = 0;
     for (; i < ubo.maxbounces; i++) {
         Hit h = trace(ray, hid);

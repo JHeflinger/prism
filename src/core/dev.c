@@ -9,12 +9,12 @@
 #include "ui/panels/edit.h"
 
 void LoadArmadillo() {
-    LoadOBJ("assets/models/OBJ/dressed/CornellBox-Sphere.obj");
+    LoadOBJ("assets/models/OBJ/dressed/gems.obj");
     FitCamera();
 }
 
 void LoadBox() {
-    LoadFBX("assets/models/FBX/dragon.fbx");
+    LoadOBJ("assets/models/OBJ/dressed/CornellBox-Sphere.obj");
     FitCamera();
 }
 
