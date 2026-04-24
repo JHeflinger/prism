@@ -88,7 +88,7 @@ float fresnel_dielectric(float cosi, float ior_i, float ior_t) {
         float tmp = ior_i;
         ior_i = ior_t;
         ior_t = tmp;
-        cosi != -1.0;
+        cosi *= -1.0;
     }
     float sint = ior_i / ior_t * sqrt(max(0.0, 1.0 - cosi * cosi));
     if (sint >= 1.0) return 1.0; // total internal reflection
