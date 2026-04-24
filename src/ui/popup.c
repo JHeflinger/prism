@@ -1,4 +1,5 @@
 #include "popup.h"
+#include "renderer/loader.h"
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
 #include "data/colors.h"
@@ -7,6 +8,7 @@
 #include "ui/ui.h"
 #include <easymemory.h>
 #include <easylogger.h>
+#include <nfd.h>
 
 SceneLight g_scene_light = { 0 };
 SurfaceMaterial g_material = { 0 };
@@ -38,9 +40,24 @@ int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     if (UIButton("Scene Light", button_width)) return 1;
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
     if (UIButton("Cube", button_width)) return 2;
+    UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
+    if (UIButton(".OBJ", button_width)) return 3;
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
-    if (UIButton("Cancel", button_width)) return 3;
+    if (UIButton("Cancel", button_width)) return 4;
     return -1;
+}
+
+int add_obj_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+    nfdchar_t* outpath = NULL;
+    nfdresult_t result = NFD_OpenDialog("obj", NULL, &outpath);
+    if (result == NFD_OKAY) {
+        if (!LoadOBJ(outpath)) EZ_ERROR("Unable to load obj file \"%s\"", outpath);
+    } else if (result == NFD_CANCEL) {
+
+    } else {
+        EZ_ERROR("Unable to open file due to NFD error: %s", NFD_GetError());
+    }
+    return 0;
 }
 
 int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
@@ -587,10 +604,10 @@ void CleanPopup(Popup* popup) {
 
 Popup* GenerateAddObjectPopup() {
     Popup* popup = GenerateEmptyPopup();
-    popup->options = 3;
+    popup->options = 4;
     popup->behavior = add_object_popup_stage_0;
     popup->results = EZ_ALLOC(popup->options, sizeof(Popup*));
-    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0};
+    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0, add_obj_popup_stage_0};
     for (size_t i = 0; i < popup->options; i++) {
         Popup* next = GenerateEmptyPopup();
         next->options = 0;

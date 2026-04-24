@@ -2,6 +2,7 @@ PROJECT src
 MAIN main.c
 LIB vendor/raylib/lib
 LIB vendor/assimp/lib
+LIB vendor/nfd/lib
 WINDOWS LIB platform/windows/vulkan/libs
 WINDOWS LIB platform/windows/GLFW
 INCLUDE vendor/raylib/include
@@ -10,6 +11,7 @@ INCLUDE vendor/cglm/include
 INCLUDE vendor/EasyC/include
 INCLUDE vendor/suitesparse/include
 INCLUDE vendor/assimp/include
+INCLUDE vendor/nfd/include
 WINDOWS INCLUDE platform/windows/vulkan/include
 WINDOWS INCLUDE platform/windows/GLFW/include
 LINK stdc++
@@ -23,6 +25,7 @@ LINUX LINK pthread
 LINUX LINK m
 LINUX LINK cholmod
 LINUX LINK :linux_amdx64_libraylib.a
+LINUX LINK :linux_libnfd.a
 WINDOWS LINK :win_libassimp.a
 WINDOWS LINK vulkan-1
 WINDOWS LINK shell32
@@ -36,3 +39,4 @@ WINDOWS LINK :win_x64_libraylib.a
 SOURCE vendor/EasyC/include
 FLAG audit
 WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
+LINUX RAW $(pkg-config --cflags --libs gtk+-3.0)
