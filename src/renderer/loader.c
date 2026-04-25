@@ -634,6 +634,7 @@ BOOL ConstructOBJ(const StateOBJ state) {
 BOOL LoadOBJ(const char* filepath) {
     SimpleFile* file = ReadSimpleFile(filepath);
     VertexID startv = NumVertices();
+    TriangleID startt = NumTriangles();
     if (!file) {
         EZ_ERROR("Unable to load invalid filepath \"%s\"", filepath);
         return FALSE;
@@ -673,7 +674,7 @@ BOOL LoadOBJ(const char* filepath) {
         glm_vec3_sub(max, min, extent);
         glm_vec3_scale(extent, 0.5f, extent);
         SubmitMeshDescriptor((MeshDescriptor){
-            FALSE, startv, NumVertices() - 1, 0, (uint32_t)-1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
+            FALSE, startv, NumVertices() - 1, startt, NumTriangles() - 1, 0, (uint32_t)-1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
             { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, StripFilename(filepath));
     }
     CleanStateOBJ(&state);
@@ -921,6 +922,7 @@ BOOL LoadFBX(const char* filepath) {
     }
     uint32_t starts = NumSkins();
     VertexID startv = NumVertices();
+    TriangleID startt = NumTriangles();
     MaterialID* mat_ids = EZ_ALLOC(scene->mNumMaterials, sizeof(MaterialID));
     for (unsigned int i = 0; i < scene->mNumMaterials; i++) mat_ids[i] = LoadFBXMaterial(scene->mMaterials[i]);
     vec3 aabb_min = GLM_VEC3_ZERO_INIT;
@@ -945,6 +947,7 @@ BOOL LoadFBX(const char* filepath) {
         glm_vec3_scale(extent, 0.5f, extent);
         SubmitMeshDescriptor((MeshDescriptor){
             FALSE, startv, NumVertices() - 1,
+            startt, NumTriangles() - 1,
             starts, (uint32_t)-1,
             INLINEV3(center), INLINEV3(extent),
             { 0 }, { 0 },

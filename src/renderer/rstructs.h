@@ -295,6 +295,8 @@ typedef struct {
     alignas(4) uint32_t disabled;
     alignas(4) VertexID start;
     alignas(4) VertexID end;
+    alignas(4) TriangleID tstart;
+    alignas(4) TriangleID tend;
     alignas(4) VertexID skinstart;
     alignas(4) uint32_t pose;
     alignas(16) vec3 center;

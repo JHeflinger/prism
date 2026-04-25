@@ -302,6 +302,8 @@ export MeshDescriptorDef {
         uint disabled;
         uint start;
         uint end;
+        uint tstart;
+        uint tend;
         uint skinstart;
         uint pose;
         vec3 center;

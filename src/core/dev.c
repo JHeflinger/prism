@@ -10,6 +10,7 @@
 
 void LoadArmadillo() {
     LoadOBJ("assets/models/OBJ/dressed/gems.obj");
+    SubmitNamedLight((SceneLight){{0},{1,1,1},{0,-1,0},0,0}, "Gems Overhead Light");
     FitCamera();
 }
 

@@ -341,6 +341,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
         size_t vertex_base = NumVertices();
+        size_t triangle_base = NumTriangles();
         vec3 v1 = {
             g_cube_position[0] - g_cube_scale[0]/2.0f,
             g_cube_position[1] - g_cube_scale[1]/2.0f,
@@ -397,7 +398,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
         vec3 extent;
         glm_vec3_scale(g_cube_scale, 0.5f, extent);
         SubmitMeshDescriptor((MeshDescriptor){
-            FALSE, vertex_base, NumVertices() - 1, 0, (uint32_t)-1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
+            FALSE, vertex_base, NumVertices() - 1, triangle_base, NumTriangles() - 1, 0, (uint32_t)-1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
             { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, g_object_name);
         memset(g_object_name, 0, MAX_MESH_NAME_SIZE);
         strcpy(g_object_name, "Untitled Object");

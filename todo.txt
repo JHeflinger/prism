@@ -40,11 +40,14 @@ ICEBOX:
 51. detach from assimp
 52. unique views - when you switch a view the entire ui layout changes
 53. implement in house file dialogue system
+54. animation panel
 
 Next:
+-2. make path.comp truly spectral
 -1. improve direct lighting to include dielectric material bouncing
 0. diamonds on a floor do not cast shadows when lit with a directional light, but they defintely should
-1. expose max path count
+    0a. make it so scene lights and direct lights affect more than just lambertian
+    0b. why do diamonds not cast shadows
 2. open files via mini file explorer
 8. proper rendering/camera panel
 9. CPUswap greater than 2 breaks??
@@ -54,16 +57,12 @@ Next:
     - triangle pass - for each triangle, if all vertices are marked with a +2, then disable triangle
     - restore pass - for every vertex with a +2, subtract 2 to restore to original value
     - in bvh, if screen space BVH turned on, any triangle just has 0,0,0 min/max
-13. early terminate - if toggled, then if a path bounce hits a location outside of the camera frustrum, just use scene lighting from that point and terminate there - that way we can get some minor color bleeding but on complex scenes not bounce too much out of screenspace
 14. uhh fwidth() is a think that may be useful for improving overlay
 15. fix the flashing and flickering that happens on just pathtrace no direct lighting components
 16. outline objects and select object mode
 17. add a toggle orientation thing to see the coordinate system orientation
 18. smooth mesh normals
-19. show normals option in preview
-20. make a unique animations panel with controls over like duration tps name etc and i guess the ability to actually make animations
 21. implement marcuses features with like resizing renderer size and whatnot
-22. Adaptive convergence sampling - basically if paths coming in are more stable, sample them less. This will work best when you're doing 1 bounce per dispatch - at the very least, we can then display a buffer of overall unstable variance in the image
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything
