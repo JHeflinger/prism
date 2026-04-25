@@ -13,7 +13,7 @@ if NOT exist "cache\" (
     mkdir cache
 )
 if NOT exist "expanded\" (
-    mkdir cache
+    mkdir expanded
 )
 cd cache
 if NOT exist "shaders\" (
