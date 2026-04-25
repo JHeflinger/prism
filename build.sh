@@ -87,7 +87,7 @@ if [ ! -f "build/tiny_linux.bin" ] || [ "$1" == "-u" ] || [ "$2" == "-u" ]; then
         echo "Downloading tiny builder..."
     fi
     cd build
-    curl -L -s -o "simp_linux.bin" "https://github.com/JHeflinger/tiny/raw/refs/heads/main/bin/tiny_linux.bin"
+    curl -L -s -o "tiny_linux.bin" "https://github.com/JHeflinger/tiny/raw/refs/heads/main/bin/tiny_linux.bin"
     chmod +x tiny_linux.bin
     cd ..
 fi
