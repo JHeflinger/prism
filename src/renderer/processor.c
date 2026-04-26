@@ -533,11 +533,11 @@ void ReformatFromManifold(Geometry* geometry) {
 void SerialSubdivide(ManifoldMesh* manifold) {
     size_t original_edges_size = manifold->edges.size;
     size_t original_vertices_size = manifold->vertices.size;
-    constexpr float one_eighth = (1.0f/8.0f);
-    constexpr float three_eighths = (3.0f/8.0f);
-    constexpr float one_fourth = 0.25f;
-    constexpr float three_sixteenths = (3.0f/16.0f);
-    constexpr float five_eights = (5.0f/8.0f);
+    const float one_eighth = (1.0f/8.0f);
+    const float three_eighths = (3.0f/8.0f);
+    const float one_fourth = 0.25f;
+    const float three_sixteenths = (3.0f/16.0f);
+    const float five_eights = (5.0f/8.0f);
 
     // subdivide triangles
     for (size_t i = 0; i < original_edges_size; i++) {

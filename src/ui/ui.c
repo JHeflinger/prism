@@ -705,7 +705,7 @@ void UIDropdownMenu_(PersistantUIData* data, size_t width, size_t num_items, cha
 }
 
 void UITextInput_(PersistantUIData* data, const char* label, char* buffer, size_t size, size_t width) {
-    constexpr float s_cursor_limit = 0.5f;
+    const float s_cursor_limit = 0.5f;
     DrawTextEx(FontAsset(), label, g_ui_cursor, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
     Vector2 text_size = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0);
     float box_width = width - text_size.x - 10;
