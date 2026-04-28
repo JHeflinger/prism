@@ -269,6 +269,13 @@ typedef struct {
 } VulkanObject;
 
 typedef struct {
+    StaticString location;
+    StaticString binary;
+} ShaderLocation;
+DECLARE_ARRLIST(ShaderLocation);
+
+typedef struct {
+    ARRLIST_ShaderLocation externals;
     RendererStats stats;
     VulkanObject vulkan;
     CPUSwap swapchain;

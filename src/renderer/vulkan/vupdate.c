@@ -183,8 +183,9 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
         pflags |= (PATHTRACE_SHADER_FLAG | TONEMAP_SHADER_FLAG);
         pflags &= ~OVERLAY_SHADER_FLAG;
     }
+    size_t nativeshaders = g_vupdt_renderer_ref->vulkan.core.shaders.size - g_vupdt_renderer_ref->externals.size;
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
-        if (!(pflags & (1u << i))) continue;
+        if (i < nativeshaders && !(pflags & (1u << i))) continue;
         uint32_t invocations = (uint32_t)g_vupdt_renderer_ref->dimensions.x * (uint32_t)g_vupdt_renderer_ref->dimensions.y;
 
         if ((1u << i) & VERTEX_SHADER_FLAG) {

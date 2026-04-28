@@ -64,6 +64,13 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
         g_vinit_renderer_ref,
         "build/expanded/overlay.comp",
         "build/shaders/overlay.comp.spv"));
+    for (size_t i = 0; i < g_vinit_renderer_ref->externals.size; i++) {
+        ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+            g_vinit_renderer_ref,
+            g_vinit_renderer_ref->externals.data[i].location,
+            g_vinit_renderer_ref->externals.data[i].binary
+        ));
+    }
 	return TRUE;
 }
 

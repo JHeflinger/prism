@@ -43,6 +43,7 @@ ICEBOX:
 54. animation panel
 
 Next:
+-3. smooth normals isn't working anymore somehow? maybe just for shadow hits it isn't? idk
 -2. make path.comp truly spectral
 -1. improve direct lighting to include dielectric material bouncing
 0. diamonds on a floor do not cast shadows when lit with a directional light, but they defintely should

@@ -17,6 +17,7 @@
 Renderer g_renderer = { 0 };
 Vector2 g_override_resolution = { 0 };
 float g_rft = 0.0f;
+BOOL g_renderer_init = FALSE;
 
 #ifndef NO_MESH_MANIPULATION_SUPPORT
 cholmod_common g_cholmod = { 0 };
@@ -259,6 +260,8 @@ void OverrideResolution(size_t x, size_t y) {
 }
 
 void InitializeRenderer() {
+    g_renderer_init = TRUE;
+
 	// init rand
 	srand(time(NULL));
 
@@ -1481,4 +1484,9 @@ const char* GPUHeapType(size_t i) {
     if (g_renderer.stats.cache.heap_props.memoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_MULTI_INSTANCE_BIT)
         return "MULTI";
     return "SHARE";
+}
+
+void SubmitExternalShader(const char* location, const char* binary) {
+    EZ_ASSERT(!g_renderer_init, "Cannot submit external shaders after renderer has been initialized");
+    ARRLIST_ShaderLocation_add(&(g_renderer.externals), (ShaderLocation){ location, binary });
 }

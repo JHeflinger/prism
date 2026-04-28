@@ -378,7 +378,7 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
             float F = fresnel_dielectric(cosi, eta_i, eta_t);
             if (random() < F) {
                 incoming = reflect(-outgoing, h.normal);
-                throughput = vec3(F) * absorb * cheap_wavelength_to_rgb(wavelength) * wavemask;
+                throughput = vec3(F) * absorb * wavemask;
                 pdf = F * pdf_mod;
             } else {
                 float eta = (cosi > 0.0) ? eta_i / eta_t : eta_t / eta_i;
