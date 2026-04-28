@@ -1486,7 +1486,7 @@ const char* GPUHeapType(size_t i) {
     return "SHARE";
 }
 
-void SubmitExternalShader(const char* location, const char* binary) {
+void SubmitExternalShader(const char* location, const char* binary, size_t invocations) {
     EZ_ASSERT(!g_renderer_init, "Cannot submit external shaders after renderer has been initialized");
-    ARRLIST_ShaderLocation_add(&(g_renderer.externals), (ShaderLocation){ location, binary });
+    ARRLIST_ShaderLocation_add(&(g_renderer.externals), (ShaderLocation){ location, binary, invocations });
 }

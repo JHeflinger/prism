@@ -271,6 +271,7 @@ typedef struct {
 typedef struct {
     StaticString location;
     StaticString binary;
+    size_t invocations;
 } ShaderLocation;
 DECLARE_ARRLIST(ShaderLocation);
 

@@ -187,6 +187,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (i < nativeshaders && !(pflags & (1u << i))) continue;
         uint32_t invocations = (uint32_t)g_vupdt_renderer_ref->dimensions.x * (uint32_t)g_vupdt_renderer_ref->dimensions.y;
+        if (i >= nativeshaders) invocations = g_vupdt_renderer_ref->externals.data[i - nativeshaders].invocations;
 
         if ((1u << i) & VERTEX_SHADER_FLAG) {
             invocations = (uint32_t)g_vupdt_renderer_ref->geometry.vertices.size;

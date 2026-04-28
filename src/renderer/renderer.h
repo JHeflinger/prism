@@ -193,6 +193,6 @@ size_t GPUHeapBudget(size_t i);
 
 const char* GPUHeapType(size_t i);
 
-void SubmitExternalShader(const char* location, const char* binary);
+void SubmitExternalShader(const char* location, const char* binary, size_t invocations);
 
 #endif
