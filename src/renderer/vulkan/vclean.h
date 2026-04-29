@@ -5,6 +5,8 @@
 
 void VCLEAN_Shaders(ARRLIST_VulkanShaderPtr* shaders);
 
+void VCLEAN_ExtendedBuffers(ARRLIST_ShaderBuffer* ebuffers);
+
 void VCLEAN_Transforms(VulkanDataBuffer* transforms);
 
 void VCLEAN_Skins(VulkanDataBuffer* skins);

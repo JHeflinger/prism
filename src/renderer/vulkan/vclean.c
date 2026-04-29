@@ -13,6 +13,11 @@ void VCLEAN_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	ARRLIST_VulkanShaderPtr_clear(shaders);
 }
 
+void VCLEAN_ExtendedBuffers(ARRLIST_ShaderBuffer* ebuffers) {
+    for (size_t i = 0; i < ebuffers->size; i++)
+        VUTIL_DestroyBuffer(ebuffers->data[i].vbuffer);
+}
+
 void VCLEAN_Transforms(VulkanDataBuffer* transforms) {
     VUTIL_DestroyBuffer(*transforms);
 }
@@ -169,6 +174,7 @@ void VCLEAN_Core(VulkanCore* core) {
 
 void VCLEAN_Vulkan(VulkanObject* vulkan) {
     vkDeviceWaitIdle(g_vclean_renderer_ref->vulkan.core.general.interface);
+    VCLEAN_ExtendedBuffers(&(g_vclean_renderer_ref->ebuffers));
     VCLEAN_Metadata(&(vulkan->metadata));
     VCLEAN_Core(&(vulkan->core));
 }

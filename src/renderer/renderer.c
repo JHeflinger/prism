@@ -377,6 +377,10 @@ void DestroyRenderer() {
     // unload cpu swap textures
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++)
 	    UnloadRenderTexture(g_renderer.swapchain.target[i]);
+
+    // clean externals
+    ARRLIST_ShaderLocation_clear(&(g_renderer.externals));
+    ARRLIST_ShaderBuffer_clear(&(g_renderer.ebuffers));
 }
 
 SimpleCamera GetCamera() {
@@ -1489,4 +1493,12 @@ const char* GPUHeapType(size_t i) {
 void SubmitExternalShader(const char* location, const char* binary, size_t invocations) {
     EZ_ASSERT(!g_renderer_init, "Cannot submit external shaders after renderer has been initialized");
     ARRLIST_ShaderLocation_add(&(g_renderer.externals), (ShaderLocation){ location, binary, invocations });
+}
+
+ShaderBuffer* CreateExternalBuffer(const char* bindname) {
+    EZ_ASSERT(!g_renderer_init, "Cannot create external buffers after renderer has been initialized");
+    ShaderBuffer sb = { 0 };
+    sb.bindname = bindname;
+    ARRLIST_ShaderBuffer_add(&(g_renderer.ebuffers), sb);
+    return &(g_renderer.ebuffers.data[g_renderer.ebuffers.size - 1]);
 }

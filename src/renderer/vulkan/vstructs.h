@@ -276,7 +276,16 @@ typedef struct {
 DECLARE_ARRLIST(ShaderLocation);
 
 typedef struct {
+    void* data;
+    size_t size;
+    VulkanDataBuffer vbuffer;
+    const char* bindname;
+} ShaderBuffer;
+DECLARE_ARRLIST(ShaderBuffer);
+
+typedef struct {
     ARRLIST_ShaderLocation externals;
+    ARRLIST_ShaderBuffer ebuffers;
     RendererStats stats;
     VulkanObject vulkan;
     CPUSwap swapchain;

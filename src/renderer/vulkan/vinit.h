@@ -5,6 +5,8 @@
 
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders);
 
+BOOL VINIT_ExtendedBuffers(ARRLIST_ShaderBuffer* ebuffers);
+
 BOOL VINIT_OverlaySSBOs(VulkanDataBuffer* ssbo_array);
 
 BOOL VINIT_Transforms(VulkanDataBuffer* transforms);

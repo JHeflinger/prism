@@ -74,6 +74,24 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	return TRUE;
 }
 
+BOOL VINIT_ExtendedBuffers(ARRLIST_ShaderBuffer* ebuffers) {
+    for (size_t i = 0; i < ebuffers->size; i++) {
+        size_t arrsize = ebuffers->data[i].size;
+        VUTIL_CreateBuffer(
+            arrsize > 0 ? arrsize : 1,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &(ebuffers->data[i].vbuffer));
+        if (arrsize > 0) {
+            VUTIL_CopyHostToBuffer(
+                ebuffers->data[i].data,
+                arrsize, arrsize,
+                ebuffers->data[i].vbuffer.buffer);
+        }
+    }
+    return TRUE;
+}
+
 BOOL VINIT_OverlaySSBOs(VulkanDataBuffer* ssbo_array) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
 	    VUTIL_CreateBuffer(
@@ -884,6 +902,7 @@ BOOL VINIT_Core(VulkanCore* core) {
 	if (!VINIT_General(&(core->general))) return FALSE;
     if (!VINIT_Transfer(&(core->transfer))) return FALSE;
 	if (!VINIT_Scheduler(&(core->scheduler))) return FALSE;
+    if (!VINIT_ExtendedBuffers(&g_vinit_renderer_ref->ebuffers)) return FALSE;
 	if (!VINIT_Geometry(&(core->geometry))) return FALSE;
 	if (!VINIT_Bridge(&(core->bridge))) return FALSE;
 	if (!VINIT_RenderContext(&(core->context))) return FALSE;

@@ -249,16 +249,6 @@ export MaterialDef {
     }
 }
 
-export NodeBVHDef {
-    struct NodeBVH {
-        vec3 min;
-        vec3 max;
-        uint config;
-        uint left;
-        uint right;
-    }
-}
-
 export SceneLightDef {
     struct SceneLight {
         vec3 position;

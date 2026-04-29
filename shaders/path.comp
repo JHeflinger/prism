@@ -7,7 +7,6 @@
 #import HitDef;
 #import TriangleDef;
 #import MaterialDef;
-#import NodeBVHDef;
 #import SceneLightDef;
 
 layout(binding = 0) readonly #import UniformBufferObjectDef ubo;

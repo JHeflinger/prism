@@ -1,7 +1,7 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "renderer/rstructs.h"
+#include "renderer/vulkan/vstructs.h"
 
 PipelineFlags GetPipelineFlags();
 
@@ -194,5 +194,7 @@ size_t GPUHeapBudget(size_t i);
 const char* GPUHeapType(size_t i);
 
 void SubmitExternalShader(const char* location, const char* binary, size_t invocations);
+
+ShaderBuffer* CreateExternalBuffer(const char* bindname);
 
 #endif

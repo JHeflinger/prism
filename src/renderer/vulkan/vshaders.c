@@ -422,9 +422,26 @@ VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, siz
 					(void*)1
 				}, 0.0f,
 				sizeof(OverlaySSBO)
-			},
+			}
 		};
-	}
+	} else {
+        for (size_t i = 0; i < renderer->ebuffers.size; i++)
+            if (strcmp(name, renderer->ebuffers.data[i].bindname) == 0)
+                return (VulkanBoundVariable) {
+                    STORAGE_BUFFER,
+                    (SchrodingRef) {
+                        TRUE,
+                        &(renderer->ebuffers.data[i].vbuffer.buffer)
+                    },
+                    (SchrodingSize) {
+                        (SchrodingRef) {
+                            TRUE,
+                            &(renderer->ebuffers.data[i].size)
+                        }, 0.0f,
+                        sizeof(char)
+                    }
+                };
+    }
 	EZ_WARN("Unable to automatically identify source references of shader variable \"%s\"", name);
 	return (VulkanBoundVariable){ 0 };
 }
