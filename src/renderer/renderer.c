@@ -380,6 +380,9 @@ void DestroyRenderer() {
 
     // clean externals
     ARRLIST_ShaderLocation_clear(&(g_renderer.externals));
+    for (size_t i = 0; i < g_renderer.ebuffers.size; i++)
+        if (g_renderer.ebuffers.data[i].size != 0)
+            EZ_FREE(g_renderer.ebuffers.data[i].data);
     ARRLIST_ShaderBuffer_clear(&(g_renderer.ebuffers));
 }
 
@@ -611,6 +614,14 @@ void Render() {
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
     BOOL resized_buffers = FALSE;
     BOOL is_transferring = FALSE;
+
+    // update external buffers
+    for (size_t i = 0; i < g_renderer.ebuffers.size; i++) {
+        if (g_renderer.ebuffers.data[i].update) {
+            g_renderer.ebuffers.data[i].update = FALSE;
+            VUPDT_ExternalBuffer(&(g_renderer.ebuffers.data[i]));
+        }
+    }
 
     // animations
     g_renderer.geometry.changes.update_poses |= PlayAnimations(&(g_renderer.geometry));
@@ -1495,10 +1506,16 @@ void SubmitExternalShader(const char* location, const char* binary, size_t invoc
     ARRLIST_ShaderLocation_add(&(g_renderer.externals), (ShaderLocation){ location, binary, invocations });
 }
 
-ShaderBuffer* CreateExternalBuffer(const char* bindname) {
+ShaderBuffer* CreateExternalBuffer(const char* bindname, size_t size) {
     EZ_ASSERT(!g_renderer_init, "Cannot create external buffers after renderer has been initialized");
     ShaderBuffer sb = { 0 };
     sb.bindname = bindname;
+    sb.size = size;
+    if (size != 0) sb.data = EZ_ALLOC(size, sizeof(char));
     ARRLIST_ShaderBuffer_add(&(g_renderer.ebuffers), sb);
     return &(g_renderer.ebuffers.data[g_renderer.ebuffers.size - 1]);
+}
+
+void UpdateShaderBuffer(ShaderBuffer* buffer) {
+    buffer->update = TRUE;
 }

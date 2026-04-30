@@ -77,6 +77,7 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 BOOL VINIT_ExtendedBuffers(ARRLIST_ShaderBuffer* ebuffers) {
     for (size_t i = 0; i < ebuffers->size; i++) {
         size_t arrsize = ebuffers->data[i].size;
+        ebuffers->data[i].vbuffersize = arrsize;
         VUTIL_CreateBuffer(
             arrsize > 0 ? arrsize : 1,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,

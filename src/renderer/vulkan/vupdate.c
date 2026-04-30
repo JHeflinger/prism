@@ -20,6 +20,25 @@
 
 Renderer* g_vupdt_renderer_ref = NULL;
 
+void VUPDT_ExternalBuffer(ShaderBuffer* ebuffer) {
+    vkDeviceWaitIdle(g_vupdt_renderer_ref->vulkan.core.general.interface);
+    if (ebuffer->vbuffersize != ebuffer->size) {
+        VUTIL_DestroyBuffer(ebuffer->vbuffer);
+        VUTIL_CreateBuffer(
+            ebuffer->size > 0 ? ebuffer->size : 1,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &(ebuffer->vbuffer));
+        ebuffer->vbuffersize = ebuffer->size;
+    }
+    if (ebuffer->size > 0) { 
+        VUTIL_CopyHostToBuffer(
+            ebuffer->data,
+            ebuffer->size, ebuffer->size,
+            ebuffer->vbuffer.buffer);
+    }
+}
+
 void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
     float temp[8] = { 0 };
     size_t ss = SimSize(g_vupdt_renderer_ref->geometry.fluid);

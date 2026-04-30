@@ -279,7 +279,9 @@ typedef struct {
     void* data;
     size_t size;
     VulkanDataBuffer vbuffer;
+    size_t vbuffersize;
     const char* bindname;
+    BOOL update;
 } ShaderBuffer;
 DECLARE_ARRLIST(ShaderBuffer);
 
