@@ -111,6 +111,7 @@ export UniformBufferObjectDef {
         uint scenelightshadows;
         uint debugmode;
         uint maxbounces;
+        uint spectral;
         float fov;
         float width;
         float height;

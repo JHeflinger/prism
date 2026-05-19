@@ -74,6 +74,7 @@ void DrawDevPanel(float width, float height) {
     UICheckboxLabeled("Scene Light Sampling:", &(RenderConfig()->scenelighting));
     UICheckboxLabeled("Scene Light Only:", &(RenderConfig()->scenelightingonly));
     UICheckboxLabeled("Scene Light Shadows:", &(RenderConfig()->scenelightshadows));
+    UICheckboxLabeled("Spectral Coloring:", &(RenderConfig()->spectral));
     UIDrawText("Debug mode:");
     UIMoveCursor(UITextWidth("Debug mode:") + 10, -20.0f);
     UIDropdownMenu(width - UITextWidth("Debug mode:") - 30, 4, DebugModeLabels(), DropdownSelectDebugMode, NULL);

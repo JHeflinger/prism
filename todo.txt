@@ -45,9 +45,6 @@ ICEBOX:
 Next:
 -4. ohhhh the funky shadows is because the normal sometimes points into the surface due to the way we calculate it, meaning that adding it as the epsilon definitely causes those shadow fucks - we should be using the incoming direction as an epsilon
 -3. smooth normals isn't working anymore somehow? maybe just for shadow hits it isn't? idk
--2. make path.comp truly spectral
--1. improve direct lighting to include dielectric material bouncing
-1. make it so scene lights and direct lights affect more than just lambertian
 2. open files via mini file explorer
 8. proper rendering/camera panel
 9. CPUswap greater than 2 breaks??

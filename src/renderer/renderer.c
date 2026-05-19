@@ -282,6 +282,7 @@ void InitializeRenderer() {
     g_renderer.config.scenelighting = TRUE;
     g_renderer.config.scenelightingonly = TRUE;
     g_renderer.config.scenelightshadows = FALSE;
+    g_renderer.config.spectral = FALSE;
     g_renderer.config.normals = TRUE;
     g_renderer.config.reset = FALSE;
     g_renderer.config.debug = DEBUG_NONE;
