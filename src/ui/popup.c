@@ -16,14 +16,14 @@ FluidForce g_fluid_force = { 0 };
 FluidSource g_fluid_source = { 0 };
 vec3 g_cube_position = { 0 };
 vec3 g_cube_scale = { 1.0, 1.0, 1.0 };
-char g_material_name[MAX_MATERIAL_NAME_SIZE] = "Untitled Material";
-char g_light_name[MAX_LIGHT_NAME_SIZE] = "Untitled Light";
-char g_force_name[MAX_FORCE_NAME_SIZE] = "Untitled Force";
-char g_source_name[MAX_SOURCE_NAME_SIZE] = "Untitled Source";
-char g_object_name[MAX_MESH_NAME_SIZE] = "Untitled Object";
+static char g_material_name[MAX_MATERIAL_NAME_SIZE] = "Untitled Material";
+static char g_light_name[MAX_LIGHT_NAME_SIZE] = "Untitled Light";
+static char g_force_name[MAX_FORCE_NAME_SIZE] = "Untitled Force";
+static char g_source_name[MAX_SOURCE_NAME_SIZE] = "Untitled Source";
+static char g_object_name[MAX_MESH_NAME_SIZE] = "Untitled Object";
 Triangle g_dummy_triangle = { 0 };
 
-int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+static int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 250;
     float height = 280;
     float xpos = x + ((w - width) / 2.0f);
@@ -47,7 +47,7 @@ int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     return -1;
 }
 
-int add_obj_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+static int add_obj_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     nfdchar_t* outpath = NULL;
     nfdresult_t result = NFD_OpenDialog("obj", NULL, &outpath);
     if (result == NFD_OKAY) {
@@ -60,7 +60,7 @@ int add_obj_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     return 0;
 }
 
-int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+static int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     if (g_material.model == 0) g_material.model = 2;
     float width = 385;
     float height = 650;
@@ -200,7 +200,7 @@ int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     return -1;
 }
 
-int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+static int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 385;
     float height = 400;
     float xpos = x + ((w - width) / 2.0f);
@@ -286,7 +286,7 @@ int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     return -1;
 }
 
-int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+static int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 385;
     float height = 340;
     float xpos = x + ((w - width) / 2.0f);
@@ -409,7 +409,7 @@ int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     return -1;
 }
 
-int add_sim_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+static int add_sim_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 250;
     float height = 220;
     float xpos = x + ((w - width) / 2.0f);
@@ -429,7 +429,7 @@ int add_sim_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     return -1;
 }
 
-int add_fluid_force_stage_0(size_t x, size_t y, size_t w, size_t h) {
+static int add_fluid_force_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 385;
     float height = 450;
     float xpos = x + ((w - width) / 2.0f);
@@ -517,7 +517,7 @@ int add_fluid_force_stage_0(size_t x, size_t y, size_t w, size_t h) {
     return -1;
 }
 
-int add_fluid_source_stage_0(size_t x, size_t y, size_t w, size_t h) {
+static int add_fluid_source_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 385;
     float height = 450;
     float xpos = x + ((w - width) / 2.0f);

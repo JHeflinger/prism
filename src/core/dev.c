@@ -8,28 +8,28 @@
 #include "core/binds.h"
 #include "ui/panels/edit.h"
 
-void LoadArmadillo() {
+static void LoadArmadillo() {
     LoadOBJ("assets/models/OBJ/dressed/gems.obj");
     SubmitNamedLight((SceneLight){{0},{1,1,1},{0,-1,0},0,0}, "Gems Overhead Light");
     FitCamera();
 }
 
-void LoadBox() {
+static void LoadBox() {
     LoadOBJ("assets/models/OBJ/dressed/CornellBox-Sphere.obj");
     FitCamera();
 }
 
-void LoadPeter() {
+static void LoadPeter() {
     LoadOBJ("assets/models/OBJ/naked/peter.obj");
     SubmitNamedLight((SceneLight){{0},{1,1,1},{0,-1,0},0,0}, "Peter Overhead Light");
     FitCamera();
 }
 
-void Screenshot() {
+static void Screenshot() {
     SaveRender("out.png");
 }
 
-void ClearScene() {
+static void ClearScene() {
     ClearTriangles();
     ClearVertices();
     ClearNormals();

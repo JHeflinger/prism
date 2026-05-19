@@ -3,7 +3,7 @@
 #include <easyobjects.h>
 #include <easybasics.h>
 
-char* last_relevant_word(char* str, int len) {
+static char* last_relevant_word(char* str, int len) {
 	for (int i = len - 1; i >= 0; i--) {
 		if (str[i] == ' ') {
 			if (!((str[i + 1] >= 'A' && str[i + 1] <= 'Z') ||
@@ -17,11 +17,11 @@ char* last_relevant_word(char* str, int len) {
 	return str;
 }
 
-BOOL is_alphanumeric(char c) {
+static BOOL is_alphanumeric(char c) {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
-VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, size_t i) {
+static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* name, size_t i) {
 	if (strcmp(name, "OverlayUniformBufferObject") == 0) {
 		return (VulkanBoundVariable) {
 			UNIFORM_BUFFER,

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stddef.h>
 
-BoneChannel* FindChannel(Animation* clip, const char* name) {
+static BoneChannel* FindChannel(Animation* clip, const char* name) {
     for (size_t i = 0; i < clip->channels.size; i++) {
         if (strcmp(clip->channels.data[i].name, name) == 0)
             return &(clip->channels.data[i]);
@@ -10,7 +10,7 @@ BoneChannel* FindChannel(Animation* clip, const char* name) {
     return NULL;
 }
 
-void SampleVec3Keys(ARRLIST_Vec3Key* keys, float time, vec3 out) {
+static void SampleVec3Keys(ARRLIST_Vec3Key* keys, float time, vec3 out) {
     if (keys->size == 0) {
         glm_vec3_zero(out);
         return;
@@ -29,7 +29,7 @@ void SampleVec3Keys(ARRLIST_Vec3Key* keys, float time, vec3 out) {
     glm_vec3_lerp(keys->data[i].value, keys->data[i + 1].value, t, out);
 }
 
-void SampleQuatKeys(ARRLIST_QuatKey* keys, float time, versor out) {
+static void SampleQuatKeys(ARRLIST_QuatKey* keys, float time, versor out) {
     if (keys->size == 0) {
         glm_quat_identity(out);
         return;
@@ -53,7 +53,7 @@ void SampleQuatKeys(ARRLIST_QuatKey* keys, float time, versor out) {
     glm_quat_slerp(ti, tip1, t, out);
 }
 
-void SampleBone(MeshAnimation* animation, Animation* clip, float time, size_t b, mat4 local) {
+static void SampleBone(MeshAnimation* animation, Animation* clip, float time, size_t b, mat4 local) {
     BoneChannel* channel = FindChannel(clip, animation->skeleton.bones[b].name);
     if (channel) {
         int full_channel = (channel->positions.size > 1 &&
@@ -152,7 +152,7 @@ void BlendBone(MeshAnimation* animation,
     }
 }
 
-void ProcessBone(MeshAnimation* animation, Animation* clip, mat4* global, mat4* pose, size_t b, mat4 parent_global) {
+static void ProcessBone(MeshAnimation* animation, Animation* clip, mat4* global, mat4* pose, size_t b, mat4 parent_global) {
     mat4 local, global_b, invbind, pose_b;
     SampleBone(animation, clip, animation->time, b, local);
     glm_mat4_mul(parent_global, local, global_b);

@@ -1,7 +1,7 @@
 #include "input.h"
 #include <easylogger.h>
 
-InputMap g_input_map = { 0 };
+static InputMap g_input_map = { 0 };
 
 void InitializeInput() {
     g_input_map.keymap[IK_DEV] = KEY_D;

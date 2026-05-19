@@ -1,7 +1,7 @@
 #include "vutils.h"
 #include <easylogger.h>
 
-Renderer* g_vutil_renderer_ref = NULL;
+static Renderer* g_vutil_renderer_ref = NULL;
 
 void VUTIL_SetVulkanUtilsContext(Renderer* renderer) {
     g_vutil_renderer_ref = renderer;

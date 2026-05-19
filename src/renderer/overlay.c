@@ -2,22 +2,22 @@
 #include "core/binds.h"
 #include <easylogger.h>
 
-Renderer* g_overlay_renderer_ref = NULL;
+static Renderer* g_overlay_renderer_ref = NULL;
 Rectangle g_viewport_dims = { 0 };
 OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (TriangleID)-1, { 0, 0 }, { 0, 0 } };
-TriangleID g_single_selected_triangle = -1;
-VertexID g_single_selected_vertex = -1;
-OverlayMode g_overlay_mode = NO_SELECT_MODE;
+static TriangleID g_single_selected_triangle = -1;
+static VertexID g_single_selected_vertex = -1;
+static OverlayMode g_overlay_mode = NO_SELECT_MODE;
 
-void SelectNoneMode() {
+static void SelectNoneMode() {
     g_overlay_mode = NO_SELECT_MODE;
 }
 
-void SelectTriangleMode() {
+static void SelectTriangleMode() {
     g_overlay_mode = TRIANGLE_SELECT_MODE;
 }
 
-void SelectVertexMode() {
+static void SelectVertexMode() {
     g_overlay_mode = VERTEX_SELECT_MODE;
 }
 

@@ -2,7 +2,7 @@
 #include "renderer/renderer.h"
 #include "ui/shared.h"
 
-void DrawMeshPanel(float width, float height) {
+static void DrawMeshPanel(float width, float height) {
     UIMoveCursor((width - 20 - UITextWidth("Edit Mesh")) / 2.0f, 0);
     UIDrawText("Edit Mesh");
     UIMoveCursor(0, 15);

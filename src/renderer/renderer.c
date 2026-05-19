@@ -16,14 +16,14 @@
 
 Renderer g_renderer = { 0 };
 Vector2 g_override_resolution = { 0 };
-float g_rft = 0.0f;
-BOOL g_renderer_init = FALSE;
+static float g_rft = 0.0f;
+static BOOL g_renderer_init = FALSE;
 
 #ifndef NO_MESH_MANIPULATION_SUPPORT
 cholmod_common g_cholmod = { 0 };
 #endif
 
-void CleanARAP() {
+static void CleanARAP() {
     #ifndef NO_MESH_MANIPULATION_SUPPORT
     if (g_renderer.geometry.arap.values != NULL) {
         EZ_FREE(g_renderer.geometry.arap.values);
@@ -72,7 +72,7 @@ void CleanARAP() {
     #endif
 }
 
-float EdgeWeight(Edge e) {
+static float EdgeWeight(Edge e) {
     EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), e);
     TriangleID tris[2] = { em.a, em.b };
     size_t cp = 0;
@@ -105,7 +105,7 @@ float EdgeWeight(Edge e) {
     return em.weight;
 }
 
-void ReconstructARAP() {
+static void ReconstructARAP() {
     #ifndef NO_MESH_MANIPULATION_SUPPORT
     inline BOOL isunlocked(size_t i) { return g_renderer.geometry.arap.v2f[i] != (size_t)-1; }
     inline void saferealloc(void** ptr, size_t x, size_t y) {
@@ -824,7 +824,7 @@ void Render() {
     #undef TRANSFER_UPDATE
 }
 
-void DrawHelper(float x, float y, float w, float h, float maxw, float maxh) {
+static void DrawHelper(float x, float y, float w, float h, float maxw, float maxh) {
     ClearBackground(BLACK);
     BeginBlendMode(BLEND_ADDITIVE);
     float diffw = w - g_renderer.dimensions.x;

@@ -43,5 +43,6 @@ WINDOWS LINK :win_x64_libraylib.a
 WINDOWS LINK :windows_libnfd.a
 SOURCE vendor/EasyC/include
 FLAG audit
+FLAG fast
 WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
 LINUX RAW $(pkg-config --cflags --libs gtk+-3.0)

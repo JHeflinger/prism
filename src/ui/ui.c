@@ -32,22 +32,22 @@ typedef struct {
     float width;
 } TextInputData;
 
-UI* g_primary_ui = NULL;
-UI* g_divider_instance = NULL;
-BOOL g_divider_active = FALSE;
-Vector2 g_ui_cursor = { 0 };
-Vector2 g_ui_position = { 0 };
-char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
-Popup* g_popup = NULL;
-Popup* g_popup_origin = NULL;
-PersistantUIData* g_active_ui_element = NULL;
-DropdownMenuData g_dropdownmenu_data = { 0 };
-TextInputData g_textinput_data = { 0 };
-BOOL g_was_ui_element_just_used = FALSE;
-RenderTexture2D g_ui_scratch_target = { 0 };
-RenderTexture2D g_current_ui_target = { 0 };
-BOOL g_scratch_target_in_use = FALSE;
-BOOL g_ui_disabled = FALSE;
+static UI* g_primary_ui = NULL;
+static UI* g_divider_instance = NULL;
+static BOOL g_divider_active = FALSE;
+static Vector2 g_ui_cursor = { 0 };
+static Vector2 g_ui_position = { 0 };
+static char g_ui_text_buffer[MAX_LINE_WIDTH] = { 0 };
+static Popup* g_popup = NULL;
+static Popup* g_popup_origin = NULL;
+static PersistantUIData* g_active_ui_element = NULL;
+static DropdownMenuData g_dropdownmenu_data = { 0 };
+static TextInputData g_textinput_data = { 0 };
+static BOOL g_was_ui_element_just_used = FALSE;
+static RenderTexture2D g_ui_scratch_target = { 0 };
+static RenderTexture2D g_current_ui_target = { 0 };
+static BOOL g_scratch_target_in_use = FALSE;
+static BOOL g_ui_disabled = FALSE;
 
 #define LINE_HEIGHT 20
 #define NAMEBAR_HEIGHT 25
@@ -140,7 +140,7 @@ void UpdateUI(UI* ui) {
     UnblockInputs();
 }
 
-void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
+static void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     EZ_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
     ui->w = w;
     ui->h = h;
@@ -214,7 +214,7 @@ void DrawUI_helper(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     }
 }
 
-void DrawPopup(size_t x, size_t y, size_t w, size_t h) {
+static void DrawPopup(size_t x, size_t y, size_t w, size_t h) {
     EZ_ASSERT(g_popup != NULL, "Cannot draw a null popup!");
     g_current_ui_target = (RenderTexture2D){ 0 };
     DrawRectangle(x, y, w, h, (Color){ 255, 255, 255, 100 });
@@ -230,7 +230,7 @@ void DrawPopup(size_t x, size_t y, size_t w, size_t h) {
     }
 }
 
-void DrawDropdownMenu() {
+static void DrawDropdownMenu() {
     Vector2 cursor = g_dropdownmenu_data.origin;
     cursor.y += LINE_HEIGHT - 2;
     for (size_t i = 0; i < g_dropdownmenu_data.count; i++) {
@@ -252,7 +252,7 @@ void DrawDropdownMenu() {
     else if (InputButtonReleased(IK_MOUSELEFT)) g_dropdownmenu_data.active = 2;
 }
 
-void HandleTextInput() {
+static void HandleTextInput() {
     int c;
     size_t pre_cursor = g_textinput_data.cursor;
     static float backspace_timer = 0.0f;
@@ -325,7 +325,7 @@ void DrawUI(UI* ui, size_t x, size_t y, size_t w, size_t h) {
     }
 }
 
-void PreRenderUI_helper(UI* ui) {
+static void PreRenderUI_helper(UI* ui) {
     EZ_ASSERT((ui->left && ui->right) || (!ui->left && !ui->right), "UI branches must be split evenly");
     if (ui->left && ui->right) {
         PreRenderUI_helper((UI*)(ui->left));
@@ -369,7 +369,7 @@ void DestroyPanel(Panel* panel) {
     if (panel->clean) panel->clean();
 }
 
-const char* HoveredPanelHelper(UI* ui) {
+static const char* HoveredPanelHelper(UI* ui) {
     if (!ui) return NULL;
     if (!ui->left && !ui->right) {
         if (GetMousePosition().x > ui->x &&

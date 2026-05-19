@@ -11,15 +11,15 @@
 #include <math.h>
 
 RenderTexture2D g_viewport_target;
-BOOL g_show_hints = FALSE;
-BOOL g_rfocused = FALSE;
-BOOL g_lfocused = FALSE;
-BOOL g_zfocused = FALSE;
+static BOOL g_show_hints = FALSE;
+static BOOL g_rfocused = FALSE;
+static BOOL g_lfocused = FALSE;
+static BOOL g_zfocused = FALSE;
 vec2 g_mousepoint = { 0 };
 Vector2 g_viewport_position = { 0 };
 Vector2 g_viewport_dimensions = { 0 };
 
-void ResetViewportCamera() {
+static void ResetViewportCamera() {
     SimpleCamera camera = GetCamera();
     SETVEC3(camera.position, 0.0f, 2.133f, 2.11f);
     SETVEC3(camera.look, 0.0f, 0.0f, 0.0f);
@@ -30,11 +30,11 @@ void ResetViewportCamera() {
     MoveCamera(camera);
 }
 
-void ToggleHints() {
+static void ToggleHints() {
     g_show_hints = !g_show_hints;
 }
 
-void RotateCameraControls() {
+static void RotateCameraControls() {
     if (g_rfocused) {
         SimpleCamera camera = GetCamera();
         vec3 offset;
@@ -52,7 +52,7 @@ void RotateCameraControls() {
     }
 }
 
-void ZoomCameraControls() {
+static void ZoomCameraControls() {
     if (g_zfocused) {
         vec2 mousedelta = { GetMouseDelta().x, GetMouseDelta().y };
         vec2 prev = { GetMousePosition().x, GetMousePosition().y };
@@ -78,7 +78,7 @@ void ZoomCameraControls() {
     }
 }
 
-void PanCameraControls() {
+static void PanCameraControls() {
     if (g_lfocused) {
         SimpleCamera camera = GetCamera();
         vec3 offset;
@@ -109,7 +109,7 @@ void PanCameraControls() {
     }
 }
 
-void PanSelectedObject() {
+static void PanSelectedObject() {
     if (g_lfocused) {
         vec3 selected, offset, u, v, w, _w;
         if (GetSelectedVertex() != (VertexID)-1) {
@@ -142,7 +142,7 @@ void PanSelectedObject() {
     }
 }
 
-void DrawViewportPanel(float width, float height) {
+static void DrawViewportPanel(float width, float height) {
     DrawTexturePro(
         g_viewport_target.texture,
         (Rectangle){ 0, 0, g_viewport_target.texture.width, -g_viewport_target.texture.height },
@@ -155,7 +155,7 @@ void DrawViewportPanel(float width, float height) {
     g_viewport_position = UIGetPosition();
 }
 
-void UpdateViewportPanel(float width, float height) {
+static void UpdateViewportPanel(float width, float height) {
     const char* hpanel = HoveredPanel();
     BOOL hovered = hpanel && strcmp(hpanel, "Viewport") == 0;
     if (InputButtonReleased(IK_MOUSERIGHT)) g_rfocused = FALSE;

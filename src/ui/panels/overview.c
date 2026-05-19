@@ -3,7 +3,7 @@
 #include "data/strings.h"
 #include "ui/panels/edit.h"
 
-void DrawOverviewPanel(float width, float height) {
+static void DrawOverviewPanel(float width, float height) {
     UIDrawText("Add To Scene...");
     UIMoveCursor(width - 45, -20);
     if (UIButton("+", 0)) {

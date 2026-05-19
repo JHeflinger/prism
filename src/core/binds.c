@@ -2,17 +2,17 @@
 #include "ui/ui.h"
 #include <easymemory.h>
 
-BindNode g_root_bind = { 0 };
+static BindNode g_root_bind = { 0 };
 
-BOOL IsActionEndpoint(BindAction action) {
+static BOOL IsActionEndpoint(BindAction action) {
     return !(action == BIND_KEY_DOWN || action == BIND_BUTTON_DOWN);
 }
 
-BOOL IsActionKey(BindAction action) {
+static BOOL IsActionKey(BindAction action) {
     return (action == BIND_KEY_DOWN || action == BIND_KEY_PRESSED || action == BIND_KEY_RELEASED || action == BIND_KEY_END);
 }
 
-void AddBindPath(BindNode** root, const char* name, BindFunc func, BindCommand command) {
+static void AddBindPath(BindNode** root, const char* name, BindFunc func, BindCommand command) {
     for (size_t i = 0; i < (*root)->nodes.size; i++) {
         BindCommand bc = ((BindNode*)((*root)->nodes.data[i]))->command;
         if (memcmp(&bc, &command, sizeof(BindCommand)) == 0) {
@@ -31,7 +31,7 @@ void AddBindPath(BindNode** root, const char* name, BindFunc func, BindCommand c
     *root = node;
 }
 
-BindNode* GetBindSet(BindNode* node) {
+static BindNode* GetBindSet(BindNode* node) {
     for (size_t i = 0; i < node->nodes.size; i++) {
         BindCommand bc = ((BindNode*)(node->nodes.data[i]))->command;
         if (!IsActionEndpoint(bc.action) &&
@@ -87,7 +87,7 @@ void ListenBinds() {
     }
 }
 
-void CleanBindNode(BindNode* node) {
+static void CleanBindNode(BindNode* node) {
     for (size_t i = 0; i < node->nodes.size; i++) {
         CleanBindNode((BindNode*)node->nodes.data[i]);
         EZ_FREE(node->nodes.data[i]);

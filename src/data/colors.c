@@ -1,7 +1,7 @@
 #include "colors.h"
 #include <easylogger.h>
 
-ColorMap g_color_map = { 0 };
+static ColorMap g_color_map = { 0 };
 
 void InitializeColors() {
     g_color_map.colors[PANEL_BG_COLOR] = (Color){ 30, 30, 30, 255 };

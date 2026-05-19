@@ -1,6 +1,6 @@
 #include "actions.h"
 
-void DrawActionsPanel(float width, float height) {
+static void DrawActionsPanel(float width, float height) {
     UIDrawText("Render Mode: realtime or offline");
 	UIDrawText("Render Technique: raytracing or pathtracing");
 	UIDrawText("Have a popup warning if attempt pathtracing while realtime");

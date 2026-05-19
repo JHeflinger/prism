@@ -1,7 +1,7 @@
 #include "vclean.h"
 #include "renderer/vulkan/vutils.h"
 
-Renderer* g_vclean_renderer_ref = NULL;
+static Renderer* g_vclean_renderer_ref = NULL;
 
 void VCLEAN_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
     for (size_t i = 0; i < shaders->size; i++) {

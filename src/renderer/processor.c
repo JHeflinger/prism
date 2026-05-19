@@ -18,7 +18,7 @@ typedef struct {
     vec3 position;
 } CollapseTarget;
 
-uint64_t hash_indexpair(IndexPair ip) {
+static uint64_t hash_indexpair(IndexPair ip) {
     return ez_hash_uint64_t(((uint64_t)ip.v1 << 32) | ip.v2);
 }
 
@@ -31,7 +31,7 @@ IMPL_PQUEUE(CollapseTarget);
 DECLARE_ARRLIST(PQPAIR_CollapseTarget);
 IMPL_ARRLIST(PQPAIR_CollapseTarget);
 
-size_t VertexDegree(ManifoldMesh* manifold, uint32_t vertex) {
+static size_t VertexDegree(ManifoldMesh* manifold, uint32_t vertex) {
     uint32_t start = manifold->vertices.data[vertex].halfedge;
     uint32_t curr = start;
     size_t degree = 0;
@@ -42,7 +42,7 @@ size_t VertexDegree(ManifoldMesh* manifold, uint32_t vertex) {
     return degree;
 }
 
-BOOL IsValidCollapse(ManifoldMesh* manifold, uint32_t edge) {
+static BOOL IsValidCollapse(ManifoldMesh* manifold, uint32_t edge) {
     uint32_t he = manifold->edges.data[edge].halfedge;
     if (he == (uint32_t)-1) return FALSE;
     uint32_t v1 = manifold->halfedges.data[he].vertex;

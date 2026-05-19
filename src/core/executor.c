@@ -8,7 +8,7 @@
 #include <easyobjects.h>
 #include <time.h>
 
-void InitializeExecutor(int w, int h) {
+static void InitializeExecutor(int w, int h) {
 	OverrideResolution(w, h);
 	SetViewportSlice(w, h);
 	SetTraceLogLevel(LOG_NONE);
@@ -20,11 +20,11 @@ void InitializeExecutor(int w, int h) {
     printf("\nEnvironment configuration:\n\tGPU: %s\n\tResolution: %dx%d\n\tOperating System: %s\n\n", GPUModel(), w, h, OPSYS);
 }
 
-void CleanExecutor() {
+static void CleanExecutor() {
     DestroyRenderer();
 }
 
-void ImportExecuteScene(const char* scenefile) {
+static void ImportExecuteScene(const char* scenefile) {
     FileType ft = GetSimpleFileType(scenefile);
     switch (ft) {
         case DOTOBJ:

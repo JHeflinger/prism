@@ -2,11 +2,11 @@
 #include "renderer/renderer.h"
 #include "ui/shared.h"
 
-size_t g_simulate_steps = 0;
-BOOL g_simulation_running = FALSE;
-BOOL g_simulation_started = FALSE;
+static size_t g_simulate_steps = 0;
+static BOOL g_simulation_running = FALSE;
+static BOOL g_simulation_started = FALSE;
 
-void DrawSimulatePanel(float width, float height) {
+static void DrawSimulatePanel(float width, float height) {
     static size_t s_simwidth = 1;
     static size_t s_simheight = 1;
     static size_t s_simlength = 1;

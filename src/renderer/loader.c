@@ -91,7 +91,7 @@ void _aiq2v(struct aiQuaternion ai, versor out) { out[0] = ai.x; out[1] = ai.y; 
 void _aic2v(struct aiColor3D ai, vec3 out) { out[0] = ai.r; out[1] = ai.g; out[2] = ai.b; }
 struct aiColor3D _4d23d(struct aiColor4D c) { return (struct aiColor3D){ c.r, c.g, c.b }; }
 
-void CleanStateOBJ(StateOBJ* state) {
+static void CleanStateOBJ(StateOBJ* state) {
     ARRLIST_vec3_clear(&(state->vertices));
     ARRLIST_vec3_clear(&(state->normals));
     ARRLIST_UV_clear(&(state->uvs));
@@ -103,11 +103,11 @@ void CleanStateOBJ(StateOBJ* state) {
     ARRLIST_UseMaterialMarker_clear(&(state->markers));
 }
 
-BOOL IsWhitespace(char c) {
+static BOOL IsWhitespace(char c) {
     return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
-size_t ParseLineArgsOBJ(const char line[MAX_OBJ_LINE_SIZE], char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE]) {
+static size_t ParseLineArgsOBJ(const char line[MAX_OBJ_LINE_SIZE], char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE]) {
     int numargs = 0;
     int cursor = 0;
     while (IsWhitespace(line[cursor])) cursor++;
@@ -127,7 +127,7 @@ size_t ParseLineArgsOBJ(const char line[MAX_OBJ_LINE_SIZE], char lineargs[MAX_OB
     return numargs;
 }
 
-BOOL ParseFloat(const char* str, float* value) {
+static BOOL ParseFloat(const char* str, float* value) {
     char *end;
     float result;
     errno = 0;
@@ -140,7 +140,7 @@ BOOL ParseFloat(const char* str, float* value) {
     return TRUE;
 }
 
-BOOL ParseUInt(const char* str, uint32_t* value) {
+static BOOL ParseUInt(const char* str, uint32_t* value) {
     char *end;
     unsigned long result;
     errno = 0;
@@ -153,7 +153,7 @@ BOOL ParseUInt(const char* str, uint32_t* value) {
     return TRUE;
 }
 
-BOOL ParseLInt(const char* str, int64_t* value) {
+static BOOL ParseLInt(const char* str, int64_t* value) {
     char *end;
     long long result;
     errno = 0;
@@ -166,7 +166,7 @@ BOOL ParseLInt(const char* str, int64_t* value) {
     return TRUE;
 }
 
-BOOL ParseTriplet(const char* str, int64_t* a, int64_t* b, int64_t* c, size_t* count) {
+static BOOL ParseTriplet(const char* str, int64_t* a, int64_t* b, int64_t* c, size_t* count) {
     char abuff[MAX_OBJ_ARG_SIZE] = { 0 };
     char bbuff[MAX_OBJ_ARG_SIZE] = { 0 };
     char cbuff[MAX_OBJ_ARG_SIZE] = { 0 };
@@ -204,7 +204,7 @@ BOOL ParseTriplet(const char* str, int64_t* a, int64_t* b, int64_t* c, size_t* c
     return success;
 }
 
-BOOL ParseMTL_illum(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_illum(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
         EZ_ERROR("Cannot parse illumination model (illum) without exactly 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -226,7 +226,7 @@ BOOL ParseMTL_illum(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t nu
     return TRUE;
 }
 
-BOOL ParseMTL_Ni(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_Ni(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
         EZ_ERROR("Cannot parse index of refraction field (Ni) without exactly 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -240,7 +240,7 @@ BOOL ParseMTL_Ni(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseMTL_Ns(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_Ns(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
         EZ_ERROR("Cannot parse specular shininess field (Ns) without exactly 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -254,7 +254,7 @@ BOOL ParseMTL_Ns(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseMTL_Ke(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_Ke(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
         EZ_ERROR("Cannot parse an emission field (Ke) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -268,7 +268,7 @@ BOOL ParseMTL_Ke(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseMTL_Ka(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_Ka(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
         EZ_ERROR("Cannot parse an ambience field (Ka) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -282,7 +282,7 @@ BOOL ParseMTL_Ka(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseMTL_Kd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_Kd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
         EZ_ERROR("Cannot parse a diffuse field (Kd) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -296,7 +296,7 @@ BOOL ParseMTL_Kd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseMTL_Ks(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_Ks(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
         EZ_ERROR("Cannot parse a specular field (Ks) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -310,7 +310,7 @@ BOOL ParseMTL_Ks(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseMTL_Tf(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_Tf(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
         EZ_ERROR("Cannot parse an absorbtion field (Tf) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -324,7 +324,7 @@ BOOL ParseMTL_Tf(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseMTL_Rd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_Rd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
         EZ_ERROR("Cannot parse a dispersion field (Rd) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -338,12 +338,12 @@ BOOL ParseMTL_Rd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseMTL_d(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_d(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     // Not useful for prism right now, implement later if needed
     return TRUE;
 }
 
-BOOL ParseMTL_newmtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseMTL_newmtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
         EZ_ERROR("Invalid format for newmtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -355,7 +355,7 @@ BOOL ParseMTL_newmtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t n
     return TRUE;
 }
 
-ParseFuncMTL GetParserFromArgMTL(const char* header) {
+static ParseFuncMTL GetParserFromArgMTL(const char* header) {
     #define GETPARSER(h) if (strcmp(header, #h) == 0) return ParseMTL_##h;
     GETPARSER(newmtl);
     GETPARSER(illum);
@@ -372,7 +372,7 @@ ParseFuncMTL GetParserFromArgMTL(const char* header) {
     return NULL;
 }
 
-BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
         EZ_ERROR("Invalid format for mtllib arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -410,7 +410,7 @@ BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t n
     return !failure;
 }
 
-BOOL ParseOBJ_usemtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseOBJ_usemtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
         EZ_ERROR("Invalid format for usemtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -429,7 +429,7 @@ BOOL ParseOBJ_usemtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t n
     return TRUE;
 }
 
-BOOL ParseOBJ_v(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseOBJ_v(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
         EZ_ERROR("Cannot parse a vertex field without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -443,7 +443,7 @@ BOOL ParseOBJ_v(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numarg
     return TRUE;
 }
 
-BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
         EZ_ERROR("Cannot parse a vertex normal field without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -457,7 +457,7 @@ BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseOBJ_vt(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseOBJ_vt(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 3 && numargs != 4) {
         EZ_ERROR("Cannot parse a vertex texture field without 2-3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -471,7 +471,7 @@ BOOL ParseOBJ_vt(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numar
     return TRUE;
 }
 
-BOOL ParseOBJ_f(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseOBJ_f(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4 && numargs != 5) {
         EZ_ERROR("Cannot parse a face field without exactly 3 or 4 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
@@ -541,22 +541,22 @@ BOOL ParseOBJ_f(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numarg
     return TRUE;
 }
 
-BOOL ParseOBJ_g(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseOBJ_g(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     // Not useful for prism right now, implement later if needed
     return TRUE;
 }
 
-BOOL ParseOBJ_o(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseOBJ_o(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     // Not useful for prism right now, implement later if needed
     return TRUE;
 }
 
-BOOL ParseOBJ_s(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
+static BOOL ParseOBJ_s(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     // Not useful for prism right now, implement later if needed
     return TRUE;
 }
 
-ParseFuncOBJ GetParserFromArgOBJ(const char* header) {
+static ParseFuncOBJ GetParserFromArgOBJ(const char* header) {
     #define GETPARSER(h) if (strcmp(header, #h) == 0) return ParseOBJ_##h;
     GETPARSER(mtllib);
     GETPARSER(usemtl);
@@ -571,7 +571,7 @@ ParseFuncOBJ GetParserFromArgOBJ(const char* header) {
     return NULL;
 }
 
-BOOL ConstructOBJ(const StateOBJ state) {
+static BOOL ConstructOBJ(const StateOBJ state) {
     BOOL failure = FALSE;
     for (size_t i = 0; i < state.faces.size; i++) {
         if (state.faces.data[i].a >= state.vertices.size) {
@@ -682,7 +682,7 @@ BOOL LoadOBJ(const char* filepath) {
     return TRUE;
 }
 
-MaterialID LoadFBXMaterial(const struct aiMaterial* mat) {
+static MaterialID LoadFBXMaterial(const struct aiMaterial* mat) {
     SurfaceMaterial m = { 0 };
     struct aiColor4D color;
     float fval;
@@ -711,7 +711,7 @@ MaterialID LoadFBXMaterial(const struct aiMaterial* mat) {
     return SubmitNamedMaterial(m, namestr);
 }
 
-uint32_t LookupOrRegisterBone(Skeleton* sk, const char* name, const struct aiMatrix4x4* offset) {
+static uint32_t LookupOrRegisterBone(Skeleton* sk, const char* name, const struct aiMatrix4x4* offset) {
     for (size_t i = 0; i < sk->bonecount; i++) {
         if (strcmp(sk->bones[i].name, name) == 0)
             return (uint32_t)i;
@@ -729,7 +729,7 @@ uint32_t LookupOrRegisterBone(Skeleton* sk, const char* name, const struct aiMat
     return (uint32_t)(sk->bonecount++);
 }
 
-BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialID mat_id, size_t vertices_start, size_t normals_start) {
+static BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialID mat_id, size_t vertices_start, size_t normals_start) {
     if (!(mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)) {
         EZ_WARN("Non-triangle FBX mesh detected - skipping \"%s\"", mesh->mName.data);
         return TRUE;
@@ -788,7 +788,7 @@ BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialID mat_i
     return TRUE;
 }
 
-Animation* LoadFBXAnimations(const struct aiScene* scene, size_t* out_count) {
+static Animation* LoadFBXAnimations(const struct aiScene* scene, size_t* out_count) {
     *out_count = scene->mNumAnimations;
     if (scene->mNumAnimations == 0) return NULL;
     Animation* anims = EZ_ALLOC(scene->mNumAnimations, sizeof(Animation));
@@ -849,13 +849,13 @@ Animation* LoadFBXAnimations(const struct aiScene* scene, size_t* out_count) {
     return anims;
 }
 
-size_t FindBoneIndex(Skeleton* skeleton, const char* name) {
+static size_t FindBoneIndex(Skeleton* skeleton, const char* name) {
     for (size_t i = 0; i < skeleton->bonecount; i++)
         if (strcmp(skeleton->bones[i].name, name) == 0) return i;
     return (size_t)-1;
 }
 
-void ResolveParents(Skeleton* skeleton, const struct aiNode* node, size_t parent_bone_idx, struct aiMatrix4x4 parent_accum) {
+static void ResolveParents(Skeleton* skeleton, const struct aiNode* node, size_t parent_bone_idx, struct aiMatrix4x4 parent_accum) {
     size_t my_idx = FindBoneIndex(skeleton, node->mName.data);
     int is_pivot = strstr(node->mName.data, "_$AssimpFbx$_") != NULL;
     struct aiMatrix4x4 accum = parent_accum;
@@ -879,7 +879,7 @@ void ResolveParents(Skeleton* skeleton, const struct aiNode* node, size_t parent
     }
 }
 
-BOOL TraverseFBXNode(Skeleton* skeleton, const struct aiNode* node, const struct aiScene* scene, MaterialID* mat_ids, vec3* aabb_min, vec3* aabb_max, BOOL* aabb_init) {
+static BOOL TraverseFBXNode(Skeleton* skeleton, const struct aiNode* node, const struct aiScene* scene, MaterialID* mat_ids, vec3* aabb_min, vec3* aabb_max, BOOL* aabb_init) {
     for (unsigned int m = 0; m < node->mNumMeshes; m++) {
         unsigned int mesh_idx = node->mMeshes[m];
         const struct aiMesh* mesh = scene->mMeshes[mesh_idx];

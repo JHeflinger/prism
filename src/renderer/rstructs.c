@@ -1,7 +1,7 @@
 #include "rstructs.h"
 #include <easyhash.h>
 
-uint64_t hash_edge(Edge edge) {
+static uint64_t hash_edge(Edge edge) {
     return ez_hash_uint64_t(((uint64_t)edge.a << 32) | edge.b);
 }
 

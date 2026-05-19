@@ -5,7 +5,7 @@
 #include "renderer/vulkan/vshaders.h"
 #include <GLFW/glfw3.h>
 
-Renderer* g_vinit_renderer_ref = NULL;
+static Renderer* g_vinit_renderer_ref = NULL;
 
 BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <easymemory.h>
 
-const char* FileExtension(const char* path) {
+static const char* FileExtension(const char* path) {
     const char* dot = strrchr(path, '.');
     const char* slash1 = strrchr(path, '/');
     const char* slash2 = strrchr(path, '\\');

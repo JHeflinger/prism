@@ -3,7 +3,7 @@
 
 #define IND(x, y, z) SimIndex(*fsim, x, y, z)
 
-void SetDensityBoundary(float* d, FluidSimulation* fsim) {
+static void SetDensityBoundary(float* d, FluidSimulation* fsim) {
     for (size_t k = 1; k <= fsim->length; k++) {
         for (size_t j = 1; j <= fsim->height; j++) {
             d[IND(0,j, k)] = d[IND(1,j,k)];
@@ -50,7 +50,7 @@ void SetDensityBoundary(float* d, FluidSimulation* fsim) {
     d[IND(fsim->width+1, fsim->height+1, fsim->length+1)] = (1.0f/3.0f) * (d[IND(fsim->width, fsim->height+1, fsim->length+1)] + d[IND(fsim->width+1, fsim->height,fsim->length+1)] + d[IND(fsim->width+1, fsim->height+1, fsim->length )]);
 }
 
-void SetVelocityBoundary(vec3 *v, FluidSimulation* fsim) {
+static void SetVelocityBoundary(vec3 *v, FluidSimulation* fsim) {
     for (size_t k = 1; k <= fsim->length; k++) {
         for (size_t j = 1; j <= fsim->height; j++) {
             v[IND(0, j, k)][0] = -v[IND(1, j, k)][0];
@@ -127,7 +127,7 @@ void SetVelocityBoundary(vec3 *v, FluidSimulation* fsim) {
     #undef CORNER3
 }
 
-void AddForce(vec3* v, FluidForce f, FluidSimulation* fsim) {
+static void AddForce(vec3* v, FluidForce f, FluidSimulation* fsim) {
     if (f.global) {
         size_t ss = SimSize(*fsim);
         for (size_t i = 0; i < ss; i++) {
@@ -154,7 +154,7 @@ void AddForce(vec3* v, FluidForce f, FluidSimulation* fsim) {
     }
 }
 
-void AddSource(float* d, FluidSource* s, FluidSimulation* fsim) {
+static void AddSource(float* d, FluidSource* s, FluidSimulation* fsim) {
     if (s->timer > 0) {
         s->timer -= fsim->timestep;
         size_t minx = MIN(s->x + 1, fsim->width - 1);
@@ -173,7 +173,7 @@ void AddSource(float* d, FluidSource* s, FluidSimulation* fsim) {
     }
 }
 
-void TransportVelocity(vec3* dest, vec3* src, FluidSimulation* fsim) {
+static void TransportVelocity(vec3* dest, vec3* src, FluidSimulation* fsim) {
     float dtx = fsim->timestep * (float)fsim->width;
     float dty = fsim->timestep * (float)fsim->height;
     float dtz = fsim->timestep * (float)fsim->length;
@@ -209,7 +209,7 @@ void TransportVelocity(vec3* dest, vec3* src, FluidSimulation* fsim) {
     SetVelocityBoundary(dest, fsim);
 }
 
-void DiffuseVelocity(vec3* dest, vec3* src, FluidSimulation* fsim) {
+static void DiffuseVelocity(vec3* dest, vec3* src, FluidSimulation* fsim) {
     float hx  = 1.0f / fsim->width;
     float hy  = 1.0f / fsim->height;
     float hz  = 1.0f / fsim->length;
@@ -238,7 +238,7 @@ void DiffuseVelocity(vec3* dest, vec3* src, FluidSimulation* fsim) {
     }
 }
 
-void Project(vec3* dest, FluidSimulation* fsim) {
+static void Project(vec3* dest, FluidSimulation* fsim) {
     float hx = 1.0f / fsim->width;
     float hy = 1.0f / fsim->height;
     float hz = 1.0f / fsim->length;
@@ -287,7 +287,7 @@ void Project(vec3* dest, FluidSimulation* fsim) {
     SetVelocityBoundary(dest, fsim);
 }
 
-void DiffuseDensity(float* dest, float* src, FluidSimulation* fsim) {
+static void DiffuseDensity(float* dest, float* src, FluidSimulation* fsim) {
     float hx  = 1.0f / fsim->width;
     float hy  = 1.0f / fsim->height;
     float hz  = 1.0f / fsim->length;
@@ -313,7 +313,7 @@ void DiffuseDensity(float* dest, float* src, FluidSimulation* fsim) {
     }
 }
 
-void TransportDensity(float* dest, float* src, FluidSimulation* fsim) {
+static void TransportDensity(float* dest, float* src, FluidSimulation* fsim) {
     float dtx = fsim->timestep * (float)fsim->width;
     float dty = fsim->timestep * (float)fsim->height;
     float dtz = fsim->timestep * (float)fsim->length;
@@ -347,7 +347,7 @@ void TransportDensity(float* dest, float* src, FluidSimulation* fsim) {
     SetDensityBoundary(dest, fsim);
 }
 
-void StepVelocity(FluidSimulation* fsim) {
+static void StepVelocity(FluidSimulation* fsim) {
     for (size_t i = 0; i < fsim->forces.size; i++)
         AddForce(fsim->velocity, fsim->forces.data[i], fsim);
     SimSwapV(*fsim);
@@ -357,7 +357,7 @@ void StepVelocity(FluidSimulation* fsim) {
     Project(fsim->velocity, fsim);
 }
 
-void StepDensity(FluidSimulation* fsim) {
+static void StepDensity(FluidSimulation* fsim) {
     for (size_t i = 0; i < fsim->sources.size; i++)
         AddSource(fsim->density, &(fsim->sources.data[i]), fsim);
     SimSwapD(*fsim);

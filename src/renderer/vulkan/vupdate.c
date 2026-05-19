@@ -18,7 +18,7 @@
 #define TRANSFER_ACQUIRE_SKINS      (1 << 8)
 #define PENDING(x) g_vupdt_renderer_ref->vulkan.core.transfer.pending |= x
 
-Renderer* g_vupdt_renderer_ref = NULL;
+static Renderer* g_vupdt_renderer_ref = NULL;
 
 void VUPDT_ExternalBuffer(ShaderBuffer* ebuffer) {
     vkDeviceWaitIdle(g_vupdt_renderer_ref->vulkan.core.general.interface);

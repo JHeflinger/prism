@@ -16,9 +16,9 @@ typedef enum {
     EDIT_MESH,
 } EditType;
 
-size_t g_edit_item_index = 0;
-BOOL g_item_selected = FALSE;
-EditType g_edit_type = EDIT_MATERIAL;
+static size_t g_edit_item_index = 0;
+static BOOL g_item_selected = FALSE;
+static EditType g_edit_type = EDIT_MATERIAL;
 const char* g_light_types[] = { "Directional", "Spot", "Point" };
 
 void SetEditMaterial(size_t index) {
@@ -83,7 +83,7 @@ void DeselectEditTarget() {
     SetSelectedVertex((VertexID)-1);
 }
 
-void DrawEditPanel(float width, float height) {
+static void DrawEditPanel(float width, float height) {
     if (g_item_selected) {
         if (g_edit_type == EDIT_MATERIAL) {
             BOOL edited = FALSE;
@@ -441,6 +441,7 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor((2*component_width) + 65, -20);
             edited |= UIDragSize(&(sourceref->z), 0, fsim->length - sourceref->length, 1, component_width);
             UIMoveCursor(0, 5);
+            if (edited) UpdateSimulation();
         } else if (g_edit_type == EDIT_SINGLE_FORCE) {
             BOOL edited = FALSE;
             FluidSimulation* fsim = &(RendererGeometry()->fluid);
@@ -502,6 +503,7 @@ void DrawEditPanel(float width, float height) {
             UIMoveCursor((2*component_width) + 65, -20);
             edited |= UIDragFloat(&(forceref->force[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             UIMoveCursor(0, 15);
+            if (edited) UpdateSimulation();
         } else if (g_edit_type == EDIT_MESH) {
             MeshDescriptor* md = MeshReference(g_edit_item_index);
             BOOL edited = FALSE;

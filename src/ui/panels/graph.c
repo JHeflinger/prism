@@ -8,39 +8,39 @@
 IMPL_ARRLIST(DataHistory);
 
 ARRLIST_DataHistory g_histories = { 0 };
-float g_yscale = 0.0f;
-float g_currscale = DEFAULT_GRAPH_HEIGHT;
-float g_ticks = 0.0f;
+static float g_yscale = 0.0f;
+static float g_currscale = DEFAULT_GRAPH_HEIGHT;
+static float g_ticks = 0.0f;
 
-float GPUMemory100Mb() {
+static float GPUMemory100Mb() {
     size_t numheaps = GPUHeapCount();
     size_t allocated = 0;
     for (size_t i = 0; i < numheaps; i++) allocated += GPUHeapUsage(i);
     return (float)allocated / 100000000.0f;
 }
 
-float CPUMemoryMB() {
+static float CPUMemoryMB() {
     return (float)EZ_ALLOCATED() / 1000000.0f;
 }
 
-float FrameTimeMilli() {
+static float FrameTimeMilli() {
     return 1000.0f * GetFrameTime();
 }
 
-void AddHistory(const char* name, Color color, DataFunc updater) {
+static void AddHistory(const char* name, Color color, DataFunc updater) {
     ARRLIST_DataHistory_add(&g_histories, (DataHistory) {
         name, { 0 }, DEFAULT_GRAPH_HEIGHT, 0.0f, 0, 0, HISTORY_SIZE - 1, color, updater, TRUE
     });
 }
 
-void InitializeGraphPanel() {
+static void InitializeGraphPanel() {
     AddHistory("Render time (ms)", RED, RenderTime);
     AddHistory("Application time (ms)", BLUE, FrameTimeMilli);
     AddHistory("GPU Memory (100 MB)", GREEN, GPUMemory100Mb);
     AddHistory("CPU Memory (MB)", YELLOW, CPUMemoryMB);
 }
 
-void UpdateGraphPanel(float width, float height) {
+static void UpdateGraphPanel(float width, float height) {
     if (g_histories.size == 0) InitializeGraphPanel();
     g_yscale = 0.0f;
     g_ticks += 1.0f;
@@ -74,7 +74,7 @@ void UpdateGraphPanel(float width, float height) {
     if (g_currscale > g_yscale - 0.1f && g_currscale < g_yscale + 0.1f) g_currscale = g_yscale;
 }
 
-void DrawGraphPanel(float width, float height) {
+static void DrawGraphPanel(float width, float height) {
     float gwidth = width - 20;
     float gheight = gwidth * 0.75f;
     float stepsize = (float)HISTORY_SIZE / (gwidth / GRAPH_FIDELITY);
@@ -130,7 +130,7 @@ void DrawGraphPanel(float width, float height) {
     // 4. add toggle modes and key at bottom
 }
 
-void CleanGraphPanel() {
+static void CleanGraphPanel() {
     ARRLIST_DataHistory_clear(&g_histories);
 }
 
