@@ -421,6 +421,8 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
             radiance += throughput * material.emission;
             break;
         }
+        bool same_medium = medium == h.material;
+        uint b4medium = medium;
         if (ubo.scenelighting != 0 && ubo.lights > 0 && material.model == LAMBERTIAN_MODEL) {
             vec3 light = sample_scene_lights(-ray.direction, h, material);
             radiance += min(throughput * light, max_contribution);
@@ -435,6 +437,19 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         vec3 color;
         float pdf;
         brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, ior, medium, wavelength);
+        if (ubo.scenelighting != 0) {
+            if (material.model == DIELECTRIC_MODEL && b4medium == -1 && b4medium == medium) {
+                vec3 light = sample_scene_lights(-ray.direction, h, material);
+                radiance += min(throughput * light, max_contribution);
+            }
+            if (same_medium && medium != h.material) {
+                Hit h2 = h;
+                h2.position += EPS * incoming;
+                h2.normal *= -1;
+                vec3 light = sample_scene_lights(incoming, h2, material);
+                radiance += min(throughput * light, max_contribution);
+            }
+        }
         if (pdf <= 0) break;
         throughput *= color / pdf;
         throughput = min(throughput, max_contribution);

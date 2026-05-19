@@ -47,9 +47,7 @@ Next:
 -3. smooth normals isn't working anymore somehow? maybe just for shadow hits it isn't? idk
 -2. make path.comp truly spectral
 -1. improve direct lighting to include dielectric material bouncing
-0. diamonds on a floor do not cast shadows when lit with a directional light, but they defintely should
-    0a. make it so scene lights and direct lights affect more than just lambertian
-    0b. why do diamonds not cast shadows
+1. make it so scene lights and direct lights affect more than just lambertian
 2. open files via mini file explorer
 8. proper rendering/camera panel
 9. CPUswap greater than 2 breaks??
