@@ -6,6 +6,7 @@
 #include "ui/panels/edit.h"
 #include "data/input.h"
 #include "core/binds.h"
+#include "core/extender.h"
 #include <easylogger.h>
 #include <rlgl.h>
 #include <math.h>
@@ -217,6 +218,9 @@ static void UpdateViewportPanel(float width, float height) {
     BeginTextureMode(g_viewport_target);
     Draw(0, 0, width, height);
     EndTextureMode();
+    #ifdef EXTEND_PRISM_VIEWPORT
+    ExtendViewportUpdate(g_viewport_target, width, height);
+    #endif
 }
 
 Panel GenerateViewportPanel() {

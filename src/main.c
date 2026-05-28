@@ -1,4 +1,4 @@
-#ifndef EXTEND_PRISM
+#ifndef OVERRIDE_PRISM
 
 #include "core/editor.h"
 #include "core/executor.h"

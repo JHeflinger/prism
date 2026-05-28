@@ -15,6 +15,7 @@
 #include "renderer/renderer.h"
 #include "core/dev.h"
 #include "core/binds.h"
+#include "core/extender.h"
 #include <raylib.h>
 #include <easymemory.h>
 #include <easylogger.h>
@@ -56,6 +57,9 @@ static void InitEditor() {
     ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_ui)))->panels), GenerateEditPanel());
     ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_ui)))->panels), GenerateMeshPanel());
     ARRLIST_Panel_add(&(GetRightUI(GetLeftUI(GetLeftUI(g_ui)))->panels), GenerateGraphPanel());
+    #ifdef EXTEND_PRISM_PANELS
+    ExtendPanelCreation(g_ui);
+    #endif
     g_ui->divide = 1250;
     SetPrimaryUI(g_ui);
     DevInitialize();
@@ -101,7 +105,7 @@ void RunEditor() {
     InitEditor();
 
     // Run editor
-    while(!WindowShouldClose()) {
+    while (!WindowShouldClose()) {
         // dev overrides
         DevUpdate();
 

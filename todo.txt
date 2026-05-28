@@ -45,7 +45,6 @@ ICEBOX:
 Next:
 -4. ohhhh the funky shadows is because the normal sometimes points into the surface due to the way we calculate it, meaning that adding it as the epsilon definitely causes those shadow fucks - we should be using the incoming direction as an epsilon
 -3. smooth normals isn't working anymore somehow? maybe just for shadow hits it isn't? idk
-2. open files via mini file explorer
 8. proper rendering/camera panel
 9. CPUswap greater than 2 breaks??
 11. change overlay edge highlighting to just use barycentric coordinates
@@ -60,6 +59,7 @@ Next:
 17. add a toggle orientation thing to see the coordinate system orientation
 18. smooth mesh normals
 21. implement marcuses features with like resizing renderer size and whatnot
+22. simulate aperature shape
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything
