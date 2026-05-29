@@ -3,7 +3,7 @@
 #include "renderer/rmath.h"
 #include <math.h>
 
-static void CreateD20(void) {
+static void IcosaFaceCentroid(int face_index, vec3 out) {
     const float phi = (1.0f + sqrtf(5.0f)) / 2.0f;
     const float a = 0.5f;
     const float b = phi * 0.5f;
@@ -13,50 +13,83 @@ static void CreateD20(void) {
         {  b,  0, -a }, {  b,  0,  a }, { -b,  0, -a }, { -b,  0,  a },
     };
     uint32_t faces[20][3] = {
-        { 0,  11,  5 }, { 0,  5,  1 }, { 0,  1,  7 }, { 0,  7, 10 }, { 0, 10, 11 },
+        { 0, 11,  5 }, { 0,  5,  1 }, { 0,  1,  7 }, { 0,  7, 10 }, { 0, 10, 11 },
         { 1,  5,  9 }, { 5, 11,  4 }, { 11, 10,  2 }, { 10,  7,  6 }, { 7,  1,  8 },
         { 3,  9,  4 }, { 3,  4,  2 }, {  3,  2,  6 }, {  3,  6,  8 }, { 3,  8,  9 },
         { 4,  9,  5 }, { 2,  4, 11 }, {  6,  2, 10 }, {  8,  6,  7 }, { 9,  8,  1 },
     };
-    VertexID vstart = (VertexID)NumVertices();
-    TriangleID tstart = (TriangleID)NumTriangles();
-    for (int i = 0; i < 12; i++) SubmitVertex(verts[i]);
-    for (int i = 0; i < 20; i++) {
-        Triangle tri = {
-            vstart + faces[i][0],
-            vstart + faces[i][1],
-            vstart + faces[i][2],
-            (uint32_t)-1,
-            (uint32_t)-1,
-            (uint32_t)-1,
-            0,
-        };
-        SubmitTriangle(tri);
-    }
-    vec3 min, max, center, extent;
-    glm_vec3_copy(verts[0], min);
-    glm_vec3_copy(verts[0], max);
-    for (int i = 1; i < 12; i++) {
-        glm_vec3_minv(verts[i], min, min);
-        glm_vec3_maxv(verts[i], max, max);
-    }
-    glm_vec3_add(max, min, center);
-    glm_vec3_scale(center, 0.5f, center);
-    glm_vec3_sub(max, min, extent);
-    glm_vec3_scale(extent, 0.5f, extent);
-    SubmitMeshDescriptor((MeshDescriptor) {
-        FALSE,
-        vstart, (VertexID)(NumVertices() - 1),
-        tstart, (TriangleID)(NumTriangles() - 1),
-        0, (uint32_t)-1,
-        INLINEV3(center), INLINEV3(extent),
-        { 0 }, { 0 },
-        { 1.0f, 1.0f, 1.0f },
-        GLM_MAT4_IDENTITY_INIT
-    }, "D20");
+    uint32_t* f = faces[face_index];
+    out[0] = (verts[f[0]][0] + verts[f[1]][0] + verts[f[2]][0]) / 3.0f;
+    out[1] = (verts[f[0]][1] + verts[f[1]][1] + verts[f[2]][1]) / 3.0f;
+    out[2] = (verts[f[0]][2] + verts[f[1]][2] + verts[f[2]][2]) / 3.0f;
 }
 
-static void ImportDesign(const char* path) {
+static void IcosaFaceNormal(int face_index, vec3 out) {
+    const float phi = (1.0f + sqrtf(5.0f)) / 2.0f;
+    const float a = 0.5f;
+    const float b = phi * 0.5f;
+    vec3 verts[12] = {
+        { -a,  b,  0 }, {  a,  b,  0 }, { -a, -b,  0 }, {  a, -b,  0 },
+        {  0, -a,  b }, {  0,  a,  b }, {  0, -a, -b }, {  0,  a, -b },
+        {  b,  0, -a }, {  b,  0,  a }, { -b,  0, -a }, { -b,  0,  a },
+    };
+    uint32_t faces[20][3] = {
+        { 0, 11,  5 }, { 0,  5,  1 }, { 0,  1,  7 }, { 0,  7, 10 }, { 0, 10, 11 },
+        { 1,  5,  9 }, { 5, 11,  4 }, { 11, 10,  2 }, { 10,  7,  6 }, { 7,  1,  8 },
+        { 3,  9,  4 }, { 3,  4,  2 }, {  3,  2,  6 }, {  3,  6,  8 }, { 3,  8,  9 },
+        { 4,  9,  5 }, { 2,  4, 11 }, {  6,  2, 10 }, {  8,  6,  7 }, { 9,  8,  1 },
+    };
+    uint32_t* f = faces[face_index];
+    vec3 ab, ac;
+    glm_vec3_sub(verts[f[1]], verts[f[0]], ab);
+    glm_vec3_sub(verts[f[2]], verts[f[0]], ac);
+    glm_vec3_cross(ab, ac, out);
+    glm_vec3_normalize(out);
+}
+
+static void D20FaceTransform(int face_index, mat4 out) {
+    vec3 face_normal;
+    IcosaFaceNormal(face_index, face_normal);
+    const float phi = (1.0f + sqrtf(5.0f)) / 2.0f;
+    const float a = 0.5f;
+    const float b = phi * 0.5f;
+    vec3 verts[12] = {
+        { -a,  b,  0 }, {  a,  b,  0 }, { -a, -b,  0 }, {  a, -b,  0 },
+        {  0, -a,  b }, {  0,  a,  b }, {  0, -a, -b }, {  0,  a, -b },
+        {  b,  0, -a }, {  b,  0,  a }, { -b,  0, -a }, { -b,  0,  a },
+    };
+    uint32_t faces[20][3] = {
+        { 0, 11,  5 }, { 0,  5,  1 }, { 0,  1,  7 }, { 0,  7, 10 }, { 0, 10, 11 },
+        { 1,  5,  9 }, { 5, 11,  4 }, { 11, 10,  2 }, { 10,  7,  6 }, { 7,  1,  8 },
+        { 3,  9,  4 }, { 3,  4,  2 }, {  3,  2,  6 }, {  3,  6,  8 }, { 3,  8,  9 },
+        { 4,  9,  5 }, { 2,  4, 11 }, {  6,  2, 10 }, {  8,  6,  7 }, { 9,  8,  1 },
+    };
+    uint32_t* f = faces[face_index];
+    vec3 edge, dot_n, face_tangent;
+    glm_vec3_sub(verts[f[1]], verts[f[0]], edge);
+    glm_vec3_scale(face_normal, glm_vec3_dot(edge, face_normal), dot_n);
+    glm_vec3_sub(edge, dot_n, face_tangent);
+    glm_vec3_normalize(face_tangent);
+    vec3 face_bitangent;
+    glm_vec3_cross(face_normal, face_tangent, face_bitangent);
+    mat4 R = GLM_MAT4_IDENTITY_INIT;
+    R[0][0] = face_tangent[0];
+    R[0][1] = face_tangent[1];
+    R[0][2] = face_tangent[2];
+    R[1][0] = face_bitangent[0];
+    R[1][1] = face_bitangent[1];
+    R[1][2] = face_bitangent[2];
+    R[2][0] = face_normal[0];
+    R[2][1] = face_normal[1];
+    R[2][2] = face_normal[2];
+    vec3 centroid;
+    IcosaFaceCentroid(face_index, centroid);
+    mat4 T = GLM_MAT4_IDENTITY_INIT;
+    glm_translate(T, centroid);
+    glm_mat4_mul(T, R, out);
+}
+
+static void ImportDesign(const char* path, size_t face) {
     Texture2D tex = LoadTexture(path);
     Image image = LoadImageFromTexture(tex);
     Color* colors = LoadImageColors(image);
@@ -129,12 +162,14 @@ static void ImportDesign(const char* path) {
                 (uint32_t)-1, 0 });
         }
     }
-    SubmitMeshDescriptor((MeshDescriptor) {
+    MeshDescriptor md = (MeshDescriptor) {
         FALSE, vstart, NumVertices() - 1,
         tstart, NumTriangles() - 1,
         0, (uint32_t)-1, {0, 0, 0}, {1, 1, 1},
         { 0 }, { 0 }, { 1, 1, 1 }, GLM_MAT4_IDENTITY_INIT
-    }, "Design");
+    };
+    D20FaceTransform(face, md.transform); // NOTE: this does not update the vec3 translate, scale, and rotate values of the md
+    SubmitMeshDescriptor(md, "Design");
     EZ_FREE(welded);
     EZ_FREE(stacks);
     UnloadImageColors(colors);
@@ -144,12 +179,8 @@ static void ImportDesign(const char* path) {
 
 static void DrawDicePanel(float width, float height) {
     if (UIButton("Reset", width - 20)) {
-        //CreateD20();
-        ImportDesign("extensions/dice/assets/png/test.png");
+        for (size_t i = 0; i < 20; i++) ImportDesign("extensions/dice/assets/png/test.png", i);
     }
-}
-
-void DiceCanvasUpdate(RenderTexture2D canvas, float width, float height) {
 }
 
 Panel GenerateDicePanel() {

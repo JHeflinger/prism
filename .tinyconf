@@ -51,4 +51,3 @@ INCLUDE extensions/dice/src
 SOURCE extensions/dice/src
 FLAG recompile_vendors
 DEFINE EXTEND_PRISM_PANELS
-DEFINE EXTEND_PRISM_VIEWPORT
