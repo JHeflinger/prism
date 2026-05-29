@@ -199,4 +199,6 @@ ShaderBuffer* CreateExternalBuffer(const char* bindname, size_t size);
 
 void UpdateShaderBuffer(ShaderBuffer* buffer);
 
+void ClearScene(BOOL hard);
+
 #endif

@@ -1,7 +1,15 @@
 #include "dice.h"
+#include "aseprite/parser.h"
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
 #include <math.h>
+#include <sys/stat.h>
+
+typedef struct {
+    const char* path;
+    float timer;
+    time_t timestamp;
+} WatchedFile;
 
 static void IcosaFaceCentroid(int face_index, vec3 out) {
     const float phi = (1.0f + sqrtf(5.0f)) / 2.0f;
@@ -89,15 +97,17 @@ static void D20FaceTransform(int face_index, mat4 out) {
     glm_mat4_mul(T, R, out);
 }
 
-static void ImportDesign(const char* path, size_t face) {
-    Texture2D tex = LoadTexture(path);
-    Image image = LoadImageFromTexture(tex);
-    Color* colors = LoadImageColors(image);
+static void ImportDesign(ase_color_t* pixels, int cellw, int cellh, int offsetx, int offsety, int width, int height, size_t face) {
     const float depth = 0.5f;
     const float standard = 1.0f;
-    const float sidelen = standard / tex.height;
-    const size_t vcount = ((tex.height + 1) * (tex.height + 2)) / 2;
-    inline Color pixel(int x, int y) { return colors[y * image.width + x]; }
+    const float sidelen = standard / height;
+    const size_t vcount = ((height + 1) * (height + 2)) / 2;
+    const size_t cellsize = cellw * cellh;
+    inline float getalpha(int x, int y) {
+        size_t coord = (y - offsety) * width + (x - offsetx);
+        if (coord >= cellsize) return 0.0f;
+        return ((float)pixels[coord].a)/255.0f;
+    }
     vec3* welded = EZ_ALLOC(vcount, sizeof(vec3));
     size_t* stacks = EZ_ALLOC(vcount, sizeof(size_t));
     vec3 startpoint, leftstep, rightstep;
@@ -109,7 +119,7 @@ static void ImportDesign(const char* path, size_t face) {
     glm_vec3_scale(rightstep, sidelen, rightstep);
     VertexID vstart = (VertexID)NumVertices();
     TriangleID tstart = (TriangleID)NumTriangles();
-    for (size_t row = 0, mc = 1; row < (size_t)tex.height; row++, mc += 2) {
+    for (size_t row = 0, mc = 1; row < (size_t)height; row++, mc += 2) {
         vec3 rowpoint;
         glm_vec3_scale(leftstep, row, rowpoint);
         glm_vec3_add(rowpoint, startpoint, rowpoint);
@@ -128,7 +138,7 @@ static void ImportDesign(const char* path, size_t face) {
             glm_vec3_add(a, leftstep, b);
             glm_vec3_add(b, rightstep, c);
             if (!rounded) glm_vec3_add(a, rightstep, b);
-            float alpha = (((float)pixel(tex.height - row + col - 1, row).a) * depth) / -255.0f;
+            float alpha = getalpha(height - row + col - 1, row) * -depth;
             float* zvals[3] = { &(VERTA[2]), &(VERTB[2]), &(VERTC[2]) };
             size_t* stackvals[3] = { &(STACKA), &(STACKB), &(STACKC) };
             for (int i = 0; i < 3; i++) {
@@ -149,7 +159,7 @@ static void ImportDesign(const char* path, size_t face) {
         }
     }
     for (size_t i = 0; i < vcount; i++) SubmitVertex(welded[i]);
-    for (size_t row = 0, mc = 1; row < (size_t)tex.height; row++, mc += 2) {
+    for (size_t row = 0, mc = 1; row < (size_t)height; row++, mc += 2) {
         for (size_t col = 0; col < mc; col++) {
             const BOOL rounded = col%2 == 0;
             const size_t roundcol = rounded ? col : col - 1;
@@ -172,15 +182,46 @@ static void ImportDesign(const char* path, size_t face) {
     SubmitMeshDescriptor(md, "Design");
     EZ_FREE(welded);
     EZ_FREE(stacks);
-    UnloadImageColors(colors);
-    UnloadImage(image);
-    UnloadTexture(tex);
+}
+
+static void ConstructDice(const char* path) {
+    ase_t* ase = cute_aseprite_load_from_file(path, NULL); 
+    EZ_ASSERT(ase, "Unable to load aseprite file");
+    ase_frame_t* frame = &ase->frames[0];
+    ase_layer_t* top_layer = &ase->layers[ase->layer_count - 1];
+    ase_cel_t* target_cel = NULL;
+    for (int i = 0; i < frame->cel_count; ++i) {
+        if (frame->cels[i].layer == top_layer) {
+            target_cel = &frame->cels[i];
+            break;
+        }
+    }
+    EZ_ASSERT(target_cel, "Unable to find mesh cell");
+    ase_color_t* pixels = (ase_color_t*)target_cel->pixels;
+    for (size_t i = 0; i < 20; i++) ImportDesign(pixels, target_cel->w, target_cel->h, target_cel->x, target_cel->y, ase->w, ase->h, i);
+    cute_aseprite_free(ase);
+}
+
+static void PrimalFileWatcher(WatchedFile* file) {
+    file->timer += GetFrameTime();
+    if (file->timer > 0.2f && file->path) {
+        file->timer = 0.0f;
+        time_t t;
+        struct stat st;
+        if (stat(file->path, &st) != 0) t = 0;
+        else t = st.st_mtime;
+        if (t != 0 && file->timestamp != t) {
+            file->timestamp = t;
+            ClearScene(FALSE);
+            ConstructDice(file->path);
+        }
+    }
 }
 
 static void DrawDicePanel(float width, float height) {
-    if (UIButton("Reset", width - 20)) {
-        for (size_t i = 0; i < 20; i++) ImportDesign("extensions/dice/assets/png/test.png", i);
-    }
+    static WatchedFile file = { 0 };
+    file.path = "extensions/dice/assets/test.aseprite";
+    PrimalFileWatcher(&file);
 }
 
 Panel GenerateDicePanel() {

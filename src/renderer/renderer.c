@@ -8,6 +8,7 @@
 #include "renderer/simulator.h"
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
+#include "ui/panels/edit.h"
 #include <easylogger.h>
 #include <GLFW/glfw3.h>
 #include <easymemory.h>
@@ -356,16 +357,9 @@ void InitializeRenderer() {
 
 void DestroyRenderer() {
     // clean geometry
-    ClearNormals();
-    ClearVertices();
-    ClearTriangles();
-    ClearMaterials();
-    ClearLights();
+    ClearScene(TRUE);
     CleanManifoldMesh(&(g_renderer.geometry.manifold));
     CleanARAP();
-    ClearSimulation();
-    ClearMeshDescriptors();
-    ClearAnimations();
 
     // destroy cholmod
     #ifndef NO_MESH_MANIPULATION_SUPPORT
@@ -1519,4 +1513,16 @@ ShaderBuffer* CreateExternalBuffer(const char* bindname, size_t size) {
 
 void UpdateShaderBuffer(ShaderBuffer* buffer) {
     buffer->update = TRUE;
+}
+
+void ClearScene(BOOL hard) {
+    ClearTriangles();
+    ClearVertices();
+    ClearNormals();
+    if (hard) ClearMaterials();
+    ClearLights();
+    ClearMeshDescriptors();
+    ClearAnimations();
+    ClearSimulation();
+    DeselectEditTarget();
 }

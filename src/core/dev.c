@@ -29,13 +29,8 @@ static void Screenshot() {
     SaveRender("out.png");
 }
 
-static void ClearScene() {
-    ClearTriangles();
-    ClearVertices();
-    ClearNormals();
-    ClearMeshDescriptors();
-    ClearAnimations();
-    DeselectEditTarget();
+static void ClearSoftScene() {
+    ClearScene(FALSE);
 }
 
 void DevInitialize() {
@@ -51,7 +46,7 @@ void DevInitialize() {
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_P_OVERRIDE, BIND_KEY_PRESSED });
-    AddBind("clear scene", ClearScene,
+    AddBind("clear scene", ClearSoftScene,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_C_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("screenshot", Screenshot,
