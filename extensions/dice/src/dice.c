@@ -98,7 +98,7 @@ static void D20FaceTransform(int face_index, mat4 out) {
 }
 
 static void ImportDesign(ase_color_t* pixels, int cellw, int cellh, int offsetx, int offsety, int width, int height, size_t face) {
-    const float depth = 0.5f;
+    const float depth = 0.1f;
     const float standard = 1.0f;
     const float sidelen = standard / height;
     const size_t vcount = ((height + 1) * (height + 2)) / 2;
@@ -220,7 +220,7 @@ static void PrimalFileWatcher(WatchedFile* file) {
 
 static void DrawDicePanel(float width, float height) {
     static WatchedFile file = { 0 };
-    file.path = "extensions/dice/assets/test.aseprite";
+    file.path = "extensions/dice/assets/equal.aseprite";
     PrimalFileWatcher(&file);
 }
 
