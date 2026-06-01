@@ -104,19 +104,35 @@ static void ImportDesign(ase_color_t* pixels, int cellw, int cellh, int offsetx,
     const size_t vcount = ((height + 1) * (height + 2)) / 2;
     const size_t cellsize = cellw * cellh;
     inline float getalpha(int x, int y) {
-        size_t coord = (y - offsety) * width + (x - offsetx);
+        if (x < offsetx || y < offsety || x >= offsetx + cellw || y >= offsety + cellh) return 0.0f;
+        size_t coord = (y - offsety) * cellw + (x - offsetx);
         if (coord >= cellsize) return 0.0f;
         return ((float)pixels[coord].a)/255.0f;
+    }
+    inline float uvalpha(vec3 center) {
+        if (!pixels) return 0.0f;
+        float u = center[0] + (standard / 2.0f);
+        float v = center[1] + (standard / (2.0f * sqrt(3.0f)));
+        u /= standard;
+        v /= (3.0f * standard) / (2.0f * sqrt(3.0f));
+        u = CLAMP(u, 0.0f, 1.0f);
+        v = CLAMP(v, 0.0f, 1.0f);
+        v = 1.0f - v;
+        u *= (float)width;
+        v *= (float)height;
+        return getalpha((int)u, (int)v);
     }
     vec3* welded = EZ_ALLOC(vcount, sizeof(vec3));
     size_t* stacks = EZ_ALLOC(vcount, sizeof(size_t));
     vec3 startpoint, leftstep, rightstep;
+    vec3 middlestep = { 0, sqrt(0.75f), 0 };
     vec3 verts[3] = {{0, standard / sqrt(3.0f), 0}, {-standard / 2.0f, -standard / (2.0f * sqrt(3.0f)), 0}, {standard / 2.0f, -standard / (2.0f * sqrt(3.0f)), 0}};
     glm_vec3_copy(verts[0], startpoint);
     glm_vec3_sub(verts[1], verts[0], leftstep);
     glm_vec3_sub(verts[2], verts[1], rightstep);
     glm_vec3_scale(leftstep, sidelen, leftstep);
     glm_vec3_scale(rightstep, sidelen, rightstep);
+    glm_vec3_scale(middlestep, sidelen, middlestep);
     VertexID vstart = (VertexID)NumVertices();
     TriangleID tstart = (TriangleID)NumTriangles();
     for (size_t row = 0, mc = 1; row < (size_t)height; row++, mc += 2) {
@@ -132,13 +148,14 @@ static void ImportDesign(ase_color_t* pixels, int cellw, int cellh, int offsetx,
             #define STACKC stacks[(((row+1)*(row+2))/2) + (roundcol/2) + 1]
             const BOOL rounded = col%2 == 0;
             const size_t roundcol = rounded ? col : col - 1;
-            vec3 a, b, c;
+            vec3 a, b, c, center;
             glm_vec3_scale(rightstep, roundcol / 2.0f, a);
             glm_vec3_add(a, rowpoint, a);
             glm_vec3_add(a, leftstep, b);
             glm_vec3_add(b, rightstep, c);
+            glm_vec3_add(a, middlestep, center);
             if (!rounded) glm_vec3_add(a, rightstep, b);
-            float alpha = getalpha(height - row + col - 1, row) * -depth;
+            float alpha = uvalpha(center) * -depth;
             float* zvals[3] = { &(VERTA[2]), &(VERTB[2]), &(VERTC[2]) };
             size_t* stackvals[3] = { &(STACKA), &(STACKB), &(STACKC) };
             for (int i = 0; i < 3; i++) {
@@ -196,9 +213,18 @@ static void ConstructDice(const char* path) {
             break;
         }
     }
-    EZ_ASSERT(target_cel, "Unable to find mesh cell");
-    ase_color_t* pixels = (ase_color_t*)target_cel->pixels;
-    for (size_t i = 0; i < 20; i++) ImportDesign(pixels, target_cel->w, target_cel->h, target_cel->x, target_cel->y, ase->w, ase->h, i);
+    ase_color_t* pixels = target_cel ? (ase_color_t*)target_cel->pixels : NULL;
+    int cellw = 0;
+    int cellh = 0;
+    int offsetx = 0;
+    int offsety = 0;
+    if (target_cel) {
+        cellw = target_cel->w;
+        cellh = target_cel->h;
+        offsetx = target_cel->x;
+        offsety = target_cel->y;
+    }
+    for (size_t i = 0; i < 20; i++) ImportDesign(pixels, cellw, cellh, offsetx, offsety, ase->w, ase->h, i);
     cute_aseprite_free(ase);
 }
 
