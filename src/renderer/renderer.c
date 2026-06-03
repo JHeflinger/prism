@@ -73,6 +73,7 @@ static void CleanARAP() {
     #endif
 }
 
+#ifndef NO_MESH_MANIPULATION_SUPPORT
 static float EdgeWeight(Edge e) {
     EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), e);
     TriangleID tris[2] = { em.a, em.b };
@@ -105,6 +106,7 @@ static float EdgeWeight(Edge e) {
     HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), e, em);
     return em.weight;
 }
+#endif
 
 static void ReconstructARAP() {
     #ifndef NO_MESH_MANIPULATION_SUPPORT

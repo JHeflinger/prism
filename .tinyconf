@@ -47,7 +47,7 @@ FLAG fast
 WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
 LINUX RAW $(pkg-config --cflags --libs gtk+-3.0)
 
-INCLUDE extensions/dice/src
-SOURCE extensions/dice/src
-FLAG recompile_vendors
-DEFINE EXTEND_PRISM_PANELS
+#INCLUDE extensions/dice/src
+#SOURCE extensions/dice/src
+#FLAG recompile_vendors
+#DEFINE EXTEND_PRISM_PANELS
