@@ -7,7 +7,7 @@
 
 IMPL_ARRLIST(DataHistory);
 
-ARRLIST_DataHistory g_histories = { 0 };
+static ARRLIST_DataHistory g_histories = { 0 };
 static float g_yscale = 0.0f;
 static float g_currscale = DEFAULT_GRAPH_HEIGHT;
 static float g_ticks = 0.0f;

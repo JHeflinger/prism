@@ -15,13 +15,13 @@
 #include <string.h>
 #include <time.h>
 
-Renderer g_renderer = { 0 };
-Vector2 g_override_resolution = { 0 };
+static Renderer g_renderer = { 0 };
+static Vector2 g_override_resolution = { 0 };
 static float g_rft = 0.0f;
 static BOOL g_renderer_init = FALSE;
 
 #ifndef NO_MESH_MANIPULATION_SUPPORT
-cholmod_common g_cholmod = { 0 };
+static cholmod_common g_cholmod = { 0 };
 #endif
 
 static void CleanARAP() {

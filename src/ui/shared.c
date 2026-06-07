@@ -1,10 +1,10 @@
 #include "shared.h"
 #include "renderer/renderer.h"
 
-char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric" };
-char* g_arapmodel_labels[] = { "rigid", "cubic" };
-char* g_sim_visual_labels[] = { "smoke", "fire", "water", "plasma" };
-char* g_debugmode_labels[] = { "none", "normals", "bvh", "bounces" };
+static char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric" };
+static char* g_arapmodel_labels[] = { "rigid", "cubic" };
+static char* g_sim_visual_labels[] = { "smoke", "fire", "water", "plasma" };
+static char* g_debugmode_labels[] = { "none", "normals", "bvh", "bounces" };
 
 size_t DropdownSelectSimVisual(void* data, size_t index) {
     if (index == (size_t)-1) {

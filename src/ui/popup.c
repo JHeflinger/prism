@@ -10,18 +10,18 @@
 #include <easylogger.h>
 #include <nfd.h>
 
-SceneLight g_scene_light = { 0 };
-SurfaceMaterial g_material = { 0 };
-FluidForce g_fluid_force = { 0 };
-FluidSource g_fluid_source = { 0 };
-vec3 g_cube_position = { 0 };
-vec3 g_cube_scale = { 1.0, 1.0, 1.0 };
+static SceneLight g_scene_light = { 0 };
+static SurfaceMaterial g_material = { 0 };
+static FluidForce g_fluid_force = { 0 };
+static FluidSource g_fluid_source = { 0 };
+static vec3 g_cube_position = { 0 };
+static vec3 g_cube_scale = { 1.0, 1.0, 1.0 };
 static char g_material_name[MAX_MATERIAL_NAME_SIZE] = "Untitled Material";
 static char g_light_name[MAX_LIGHT_NAME_SIZE] = "Untitled Light";
 static char g_force_name[MAX_FORCE_NAME_SIZE] = "Untitled Force";
 static char g_source_name[MAX_SOURCE_NAME_SIZE] = "Untitled Source";
 static char g_object_name[MAX_MESH_NAME_SIZE] = "Untitled Object";
-Triangle g_dummy_triangle = { 0 };
+static Triangle g_dummy_triangle = { 0 };
 
 static int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 250;

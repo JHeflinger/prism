@@ -3,8 +3,8 @@
 #include <easylogger.h>
 
 static Renderer* g_overlay_renderer_ref = NULL;
-Rectangle g_viewport_dims = { 0 };
-OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (TriangleID)-1, { 0, 0 }, { 0, 0 } };
+static Rectangle g_viewport_dims = { 0 };
+static OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (TriangleID)-1, { 0, 0 }, { 0, 0 } };
 static TriangleID g_single_selected_triangle = -1;
 static VertexID g_single_selected_vertex = -1;
 static OverlayMode g_overlay_mode = NO_SELECT_MODE;

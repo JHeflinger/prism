@@ -11,14 +11,14 @@
 #include <rlgl.h>
 #include <math.h>
 
-RenderTexture2D g_viewport_target;
+static RenderTexture2D g_viewport_target;
 static BOOL g_show_hints = FALSE;
 static BOOL g_rfocused = FALSE;
 static BOOL g_lfocused = FALSE;
 static BOOL g_zfocused = FALSE;
-vec2 g_mousepoint = { 0 };
-Vector2 g_viewport_position = { 0 };
-Vector2 g_viewport_dimensions = { 0 };
+static vec2 g_mousepoint = { 0 };
+static Vector2 g_viewport_position = { 0 };
+static Vector2 g_viewport_dimensions = { 0 };
 
 static void ResetViewportCamera() {
     SimpleCamera camera = GetCamera();
