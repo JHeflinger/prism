@@ -856,12 +856,6 @@ BOOL VINIT_General(VulkanGeneral* general) {
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
     deviceCreateInfo.enabledExtensionCount = g_vinit_renderer_ref->vulkan.metadata.extensions.device.size;
     deviceCreateInfo.ppEnabledExtensionNames = g_vinit_renderer_ref->vulkan.metadata.extensions.device.data;
-    if (ENABLE_VK_VALIDATION_LAYERS) {
-        deviceCreateInfo.enabledLayerCount = g_vinit_renderer_ref->vulkan.metadata.validation.size;
-        deviceCreateInfo.ppEnabledLayerNames = g_vinit_renderer_ref->vulkan.metadata.validation.data;
-    } else {
-        deviceCreateInfo.enabledLayerCount = 0;
-    }
     result = vkCreateDevice(general->gpu, &deviceCreateInfo, NULL, &(general->interface));
 	if (result != VK_SUCCESS) {
 		EZ_FATAL("Failed to create logical device");
