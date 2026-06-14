@@ -432,6 +432,7 @@ typedef struct {
     BOOL scenelightingonly;
     BOOL scenelightshadows;
     BOOL spectral;
+    BOOL screenspace;
     BOOL reset;
     DebugConfig debug;
     PipelineFlags flags;

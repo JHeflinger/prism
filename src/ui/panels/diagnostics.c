@@ -69,6 +69,7 @@ static void DrawDevPanel(float width, float height) {
     BOOL preview = !(RenderConfig()->flags & PATHTRACE_SHADER_FLAG);
     UICheckboxLabeled("Preview:", &preview);
     SetPipelineFlags(preview ? PREVIEW_PIPELINE_FLAGS : PATHTRACE_PIPELINE_FLAGS);
+    UICheckboxLabeled("Screenspace BVH:", &(RenderConfig()->screenspace));
     UICheckboxLabeled("Direct Light Sampling:", &(RenderConfig()->direct));
     UICheckboxLabeled("Direct Light Only:", &(RenderConfig()->directonly));
     UICheckboxLabeled("Scene Light Sampling:", &(RenderConfig()->scenelighting));

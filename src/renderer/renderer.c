@@ -286,6 +286,7 @@ void InitializeRenderer() {
     g_renderer.config.scenelightingonly = TRUE;
     g_renderer.config.scenelightshadows = FALSE;
     g_renderer.config.spectral = FALSE;
+    g_renderer.config.screenspace = TRUE;
     g_renderer.config.normals = TRUE;
     g_renderer.config.reset = FALSE;
     g_renderer.config.debug = DEBUG_NONE;
@@ -729,6 +730,8 @@ void Render() {
             g_renderer.geometry.changes.update_meshes ||
             g_renderer.geometry.changes.update_poses)
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH;
+        if (g_renderer.config.screenspace)
+            g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH * 2; // double, so if we turn off itll update bvh back to original
 
         // transfer updates
         TRANSFER_UPDATE(normals, normals, g_renderer.geometry.normals.maxsize, g_renderer.geometry.normals.size, normals, Normals, FALSE);

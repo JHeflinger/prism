@@ -48,11 +48,6 @@ Next:
 8. proper rendering/camera panel
 9. CPUswap greater than 2 breaks??
 11. change overlay edge highlighting to just use barycentric coordinates
-12. screen space BVH - if toggled, then in vertex shader just pass in vertices (or flag them and process triangles as a whole later), and then reconstruct bvh such that it only uses triangles in screenspace basically. Works great for scenes that don't NEED thorough GI or off-screen shadows
-    - vertex pass - if vertex is in screen space, mark the .w value as the original value + 2;
-    - triangle pass - for each triangle, if all vertices are marked with a +2, then disable triangle
-    - restore pass - for every vertex with a +2, subtract 2 to restore to original value
-    - in bvh, if screen space BVH turned on, any triangle just has 0,0,0 min/max
 14. uhh fwidth() is a think that may be useful for improving overlay
 15. fix the flashing and flickering that happens on just pathtrace no direct lighting components
 16. outline objects and select object mode
@@ -60,6 +55,7 @@ Next:
 18. smooth mesh normals
 21. implement marcuses features with like resizing renderer size and whatnot
 22. simulate aperature shape
+23. denoising!
 
 ideas:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything

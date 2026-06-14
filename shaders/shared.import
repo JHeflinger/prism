@@ -112,6 +112,7 @@ export UniformBufferObjectDef {
         uint debugmode;
         uint maxbounces;
         uint spectral;
+        uint screenspace;
         float fov;
         float width;
         float height;

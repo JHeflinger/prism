@@ -454,6 +454,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.debugmode = (uint32_t)g_vupdt_renderer_ref->config.debug;
         ubo.maxbounces = (uint32_t)g_vupdt_renderer_ref->config.maxbounces;
         ubo.spectral = (uint32_t)g_vupdt_renderer_ref->config.spectral;
+        ubo.screenspace = (uint32_t)g_vupdt_renderer_ref->config.screenspace;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 
