@@ -40,7 +40,7 @@ static void InitEditor() {
     g_ui->right = GenerateUI();
     ((UI*)g_ui->right)->right = GenerateUI();
     ((UI*)g_ui->right)->left = GenerateUI();
-    ((UI*)g_ui->right)->divide = GetScreenHeight() - 560;
+    ((UI*)g_ui->right)->divide = GetScreenHeight() - 680;
     ((UI*)g_ui->right)->vertical = TRUE;
     ((UI*)g_ui->left)->right = GenerateUI();
     ((UI*)g_ui->left)->left = GenerateUI();

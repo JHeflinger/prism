@@ -422,6 +422,7 @@ typedef struct {
     float whitepoint;
     float gamma;
     size_t maxbounces;
+    size_t multiplier;
     BOOL normals;
     BOOL direct;
     BOOL grid;

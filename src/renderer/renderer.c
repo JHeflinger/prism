@@ -277,6 +277,7 @@ void InitializeRenderer() {
     g_renderer.config.whitepoint = 20.0f;
     g_renderer.config.gamma = 2.2f;
     g_renderer.config.maxbounces = 10;
+    g_renderer.config.multiplier = 1;
     g_renderer.config.direct = TRUE;
     g_renderer.config.grid = TRUE;
     g_renderer.config.async = TRUE;
@@ -798,7 +799,7 @@ void Render() {
     }
 
     // wait for and reset rendering fence
-    if (!g_renderer.config.async)
+    if (!g_renderer.config.async || g_renderer.config.multiplier > 1)
         vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]), VK_TRUE, UINT64_MAX);
     if (vkGetFenceStatus(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]) == VK_SUCCESS) {
         // copy overlay results to host

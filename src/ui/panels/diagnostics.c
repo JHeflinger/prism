@@ -80,6 +80,7 @@ static void DrawDevPanel(float width, float height) {
     UIMoveCursor(UITextWidth("Debug mode:") + 10, -20.0f);
     UIDropdownMenu(width - UITextWidth("Debug mode:") - 30, 4, DebugModeLabels(), DropdownSelectDebugMode, NULL);
     UIDragSizeLabeled("Max Bounces:", &(RenderConfig()->maxbounces), 0, 999999999, 1, width - 20);
+    UIDragSizeLabeled("Frame Multiplier:", &(RenderConfig()->multiplier), 1, 999999999, 1, width - 20);
 
     UIMoveCursor(0, 20.0f);
     UIDragFloatLabeled("Whitepoint:", &(RenderConfig()->whitepoint), 0.01f, 999999999.0f, 0.1f, width - 20);

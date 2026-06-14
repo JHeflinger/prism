@@ -43,6 +43,8 @@ ICEBOX:
 54. animation panel
 
 Next:
+    DENOISING AND MULTIFRAME IN ONE AND APPLY PENUMBRA TO DIRECTIONAL LIGHTS
+
 -4. ohhhh the funky shadows is because the normal sometimes points into the surface due to the way we calculate it, meaning that adding it as the epsilon definitely causes those shadow fucks - we should be using the incoming direction as an epsilon
 -3. smooth normals isn't working anymore somehow? maybe just for shadow hits it isn't? idk
 8. proper rendering/camera panel

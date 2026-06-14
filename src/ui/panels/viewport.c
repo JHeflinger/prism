@@ -214,7 +214,7 @@ static void UpdateViewportPanel(float width, float height) {
         UnloadRenderTexture(g_viewport_target);
         g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
     }
-    Render();
+    for (size_t i = 0; i < RenderConfig()->multiplier; i++) Render();
     BeginTextureMode(g_viewport_target);
     Draw(0, 0, width, height);
     EndTextureMode();
