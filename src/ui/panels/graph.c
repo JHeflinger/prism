@@ -126,8 +126,6 @@ static void DrawGraphPanel(float width, float height) {
         UISetCursor(gwidth - 15, llevel);
         UICheckbox(&(g_histories.data[i].enabled));
     }
-    // next:
-    // 4. add toggle modes and key at bottom
 }
 
 static void CleanGraphPanel() {
