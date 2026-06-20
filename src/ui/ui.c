@@ -1,5 +1,4 @@
 #include "ui.h"
-#include <easylogger.h>
 #include "data/input.h"
 #include "data/colors.h"
 #include "data/assets.h"
@@ -7,6 +6,7 @@
 #include "renderer/overlay.h"
 #include "core/binds.h"
 #include <easymemory.h>
+#include <easylogger.h>
 #include <string.h>
 
 IMPL_ARRLIST(Panel);

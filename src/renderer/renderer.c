@@ -680,7 +680,7 @@ void Render() {
     }
 
     // update render frame time;
-    g_rft += GetFrameTime();
+    g_rft += GetFrameTime() / ((float)(g_renderer.config.multiplier));
 
     // ARAP pose saving
     if (g_renderer.geometry.changes.update_triangles) SavePose();

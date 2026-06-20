@@ -87,8 +87,8 @@ static void DrawDevPanel(float width, float height) {
     UIDragFloatLabeled("Gamma:", &(RenderConfig()->gamma), 0.01f, 999999999.0f, 0.01f, width - 20);
 
     UIMoveCursor(0, 20.0f);
-    UIDrawText("Renderer FPS: %d", (int)(1.0f / ((float)RenderTime() / 1000.0f)));
-    UIDrawText("Render time: %.6f ms", (float)RenderTime());
+    UIDrawText("Renderer FPS: %d", (int)(1.0f / ((float)RenderTime() * RenderConfig()->multiplier / 1000.0f)));
+    UIDrawText("Render time: %.6f ms", (float)RenderTime() * RenderConfig()->multiplier);
     UIDrawText("Triangles: %d", (int)NumTriangles());
     UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
 
