@@ -168,7 +168,7 @@ static void UpdateViewportPanel(float width, float height) {
     }
     if (InputButtonPressed(IK_MOUSERIGHT) && hovered) g_rfocused = TRUE;
     if (InputButtonPressed(IK_MOUSELEFT) && hovered) g_lfocused = TRUE;
-    if (InputKeyPressed(IK_ZOOM)) g_zfocused = TRUE;
+    if (InputKeyPressed(IK_ZOOM) && hovered) g_zfocused = TRUE;
     SetViewportSlice(width, height);
 
     // camera scroll zoom

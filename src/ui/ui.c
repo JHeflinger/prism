@@ -276,7 +276,7 @@ static void HandleTextInput() {
     if (InputKeyPressed(IK_DOWN)) g_textinput_data.cursor = strlen(g_textinput_data.buffer);
     if ((backspace_timer > 0.5f || InputKeyPressed(IK_BACKSPACE)) && g_textinput_data.cursor > 0) {
         g_textinput_data.buffer[g_textinput_data.cursor - 1] = '\0';
-        for (size_t i = g_textinput_data.cursor; i < g_textinput_data.size - 1; i++)
+        for (size_t i = g_textinput_data.cursor - 1; i < g_textinput_data.size - 1; i++)
             g_textinput_data.buffer[i] = g_textinput_data.buffer[i+1];
         g_textinput_data.cursor--;
     }
