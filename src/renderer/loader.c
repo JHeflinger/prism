@@ -86,10 +86,10 @@ typedef struct {
     ARRLIST_Animation animations;
 } StateFBX;
 
-void _aiv32v3(struct aiVector3D ai, vec3 out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; }
-void _aiq2v(struct aiQuaternion ai, versor out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; out[3] = ai.w; }
-void _aic2v(struct aiColor3D ai, vec3 out) { out[0] = ai.r; out[1] = ai.g; out[2] = ai.b; }
-struct aiColor3D _4d23d(struct aiColor4D c) { return (struct aiColor3D){ c.r, c.g, c.b }; }
+static void _aiv32v3(struct aiVector3D ai, vec3 out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; }
+static void _aiq2v(struct aiQuaternion ai, versor out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; out[3] = ai.w; }
+static void _aic2v(struct aiColor3D ai, vec3 out) { out[0] = ai.r; out[1] = ai.g; out[2] = ai.b; }
+static struct aiColor3D _4d23d(struct aiColor4D c) { return (struct aiColor3D){ c.r, c.g, c.b }; }
 
 static void CleanStateOBJ(StateOBJ* state) {
     ARRLIST_vec3_clear(&(state->vertices));
