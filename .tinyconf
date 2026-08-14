@@ -1,53 +1,21 @@
 PROJECT src
 MAIN main.c
-LIB vendor/raylib/lib
-LIB vendor/assimp/lib
-LIB vendor/nfd/lib
-WINDOWS LIB platform/windows/vulkan/libs
-WINDOWS LIB platform/windows/GLFW
-INCLUDE vendor/raylib/include
-INCLUDE vendor/stb_image/include
-INCLUDE vendor/cglm/include
-INCLUDE vendor/EasyC/include
-INCLUDE vendor/suitesparse/include
-INCLUDE vendor/assimp/include
-INCLUDE vendor/nfd/include
-WINDOWS INCLUDE platform/windows/vulkan/include
-WINDOWS INCLUDE platform/windows/GLFW/include
-LINK stdc++
-LINK z
-LINUX LINK :linux_libassimp.a
+
 LINUX LINK vulkan
-LINUX LINK glfw
-LINUX LINK GLU
-LINUX LINK GL
-LINUX LINK pthread
-LINUX LINK m
-LINUX LINK cholmod
-LINUX LINK :linux_amdx64_libraylib.a
-LINUX LINK :linux_libnfd.a
-WINDOWS LINK :win_libassimp.a
-WINDOWS LINK vulkan-1
-WINDOWS LINK shell32
-WINDOWS LINK user32
-WINDOWS LINK opengl32
-WINDOWS LINK gdi32
-WINDOWS LINK winmm
-WINDOWS LINK winpthread
-WINDOWS LINK ws2_32
-WINDOWS LINK ole32
-WINDOWS LINK uuid
-WINDOWS LINK shell32
-WINDOWS LINK comdlg32
-WINDOWS LINK :win_x64_libraylib.a
-WINDOWS LINK :windows_libnfd.a
-SOURCE vendor/EasyC/include
+
+MODULE raylib https://github.com/JHeflinger/minis.git raylib
+MODULE nfd https://github.com/JHeflinger/minis.git nfd
+MODULE easyc https://github.com/JHeflinger/EasyC.git include
+MODULE assimp https://github.com/JHeflinger/minis.git assimp
+MODULE stb_image https://github.com/JHeflinger/minis.git stb_image
+MODULE suitesparse https://github.com/JHeflinger/minis.git suitesparse
+MODULE cglm https://github.com/JHeflinger/minis.git cglm
+
+WINDOWS MODULE vulkan https://github.com/JHeflinger/minis.git vulkan
+WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
+
+PORT build/shaders
+PORT assets
+
 FLAG audit
 FLAG fast
-WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
-LINUX RAW $(pkg-config --cflags --libs gtk+-3.0)
-
-#INCLUDE extensions/dice/src
-#SOURCE extensions/dice/src
-#FLAG recompile_vendors
-#DEFINE EXTEND_PRISM_PANELS

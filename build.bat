@@ -42,6 +42,23 @@ if "%1"=="-u" (
 :: expand shaders
 "./build/simp_windows.exe" shaders build/expanded
 
+:: download glslc
+if NOT exist "build\glslc.exe" (
+    echo Downloading glslc importer...
+    cd build
+    PowerShell -Command "Invoke-WebRequest -Uri 'https://github.com/JHeflinger/minis/blob/main/vulkan/windows/glslc/glslc.exe' -OutFile 'glslc.exe'"
+    cd ..
+)
+if "%1"=="-u" (
+    if exist "build\glslc.exe" (
+        del \f \q build\glslc.exe
+    )
+    echo Updating glslc importer...
+    cd build
+    PowerShell -Command "Invoke-WebRequest -Uri 'https://github.com/JHeflinger/minis/blob/main/vulkan/windows/glslc/glslc.exe' -OutFile 'glslc.exe'"
+    cd ..
+)
+
 :: compile shaders
 echo Building shaders...
 set SHADERS_DIR="build/expanded"
@@ -51,7 +68,7 @@ for /r %SHADERS_DIR% %%f in (*.vert *.frag *.comp) do (
     if NOT exist "build/cache/shaders/%%~nxf" (
         set SHADERS_UP_TO_DATE="false"
         echo - [%%~nxf] [33m^(compiling...^)[0m
-        "platform/windows/glslc/glslc.exe" %%f -o "build/shaders/%%~nxf.spv"
+        "build/glslc.exe" %%f -o "build/shaders/%%~nxf.spv"
         if !ERRORLEVEL! NEQ 0 (
             echo Building shader [31mFailed[0m with error code !ERRORLEVEL!
             exit /b !ERRORLEVEL!
@@ -63,7 +80,7 @@ for /r %SHADERS_DIR% %%f in (*.vert *.frag *.comp) do (
         if !ERRORLEVEL! NEQ 0 (
             set SHADERS_UP_TO_DATE="false"
             echo - [%%~nxf] [33m^(compiling...^)[0m
-            "platform/windows/glslc/glslc.exe" %%f -o "build/shaders/%%~nxf.spv"
+            "build/glslc.exe" %%f -o "build/shaders/%%~nxf.spv"
             if !ERRORLEVEL! NEQ 0 (
                 echo Building shader [31mFailed[0m with error code !ERRORLEVEL!
                 exit /b !ERRORLEVEL!
