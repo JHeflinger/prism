@@ -15,7 +15,5 @@ WINDOWS MODULE vulkan https://github.com/JHeflinger/minis.git vulkan
 WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
 
 PORT build/shaders
+PORT build/expanded
 PORT assets
-
-FLAG audit
-FLAG fast

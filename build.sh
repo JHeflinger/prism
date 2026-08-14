@@ -97,7 +97,7 @@ PROD=""
 if [ "$1" == "-p" ] || [ "$2" == "-p" ] || [ "$3" == "-p" ]; then
     PROD="-prod"
 fi
-./build/tiny_linux.bin $PROD
+./build/tiny_linux.bin -a -f $PROD
 if [ $? -ne 0 ]; then
     exit 1
 fi

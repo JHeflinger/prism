@@ -2,4 +2,4 @@
 if [ $? -ne 0 ]; then
     exit 1
 fi
-./build/bin.exe
+./build/tiny_linux.bin -r
