@@ -1,7 +1,7 @@
 #ifndef VCONFIG_H
 #define VCONFIG_H
 
-#include "data/config.h"
+#include "data/defaults.h"
 
 #define CPUSWAP_LENGTH 2
 #define IMAGE_FORMAT VK_FORMAT_R8G8B8A8_SRGB

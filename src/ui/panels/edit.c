@@ -92,7 +92,7 @@ static void DrawEditPanel(float width, float height) {
             UIMoveCursor((width - 20 - UITextWidth("Edit Material")) / 2.0f, 0);
             UIDrawText("Edit Material");
             UIMoveCursor(0, 15);
-            UITextInput("Name", MaterialName(g_edit_item_index), MAX_MATERIAL_NAME_SIZE, width - 20);
+            UITextInput("Name", MaterialName(g_edit_item_index), MAX_MATERIAL_NAME_SIZE, width - 20, FALSE);
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Emission") / 2) - 10, 0);
             UIDrawText("Emission");
@@ -217,7 +217,7 @@ static void DrawEditPanel(float width, float height) {
             UIMoveCursor((width - 20 - UITextWidth("Edit Light (%s)", g_light_types[light_type])) / 2.0f, 0);
             UIDrawText("Edit Light (%s)", g_light_types[light_type]);
             UIMoveCursor(0, 15);
-            UITextInput("Name", LightName(g_edit_item_index), MAX_LIGHT_NAME_SIZE, width - 20);
+            UITextInput("Name", LightName(g_edit_item_index), MAX_LIGHT_NAME_SIZE, width - 20, FALSE);
             UIMoveCursor(0, 15);
             UIMoveCursor((width / 2) - (UITextWidth("Position") / 2) - 10, 0);
             UIDrawText("Position");
@@ -400,7 +400,7 @@ static void DrawEditPanel(float width, float height) {
             UIMoveCursor((width - 20 - UITextWidth("Edit Source")) / 2.0f, 0);
             UIDrawText("Edit Source");
             UIMoveCursor(0, 15);
-            UITextInput("Name", *(SourceNameReference(g_edit_item_index)), MAX_SOURCE_NAME_SIZE, width - 20);
+            UITextInput("Name", *(SourceNameReference(g_edit_item_index)), MAX_SOURCE_NAME_SIZE, width - 20, FALSE);
             UIMoveCursor(0, 15);
             float sboxwidth = width - 20 - 140;
             UIDrawText("Density");
@@ -450,7 +450,7 @@ static void DrawEditPanel(float width, float height) {
             UIMoveCursor((width - 20 - UITextWidth("Edit Force")) / 2.0f, 0);
             UIDrawText("Edit Force");
             UIMoveCursor(0, 15);
-            UITextInput("Name", *(ForceNameReference(g_edit_item_index)), MAX_FORCE_NAME_SIZE, width - 20);
+            UITextInput("Name", *(ForceNameReference(g_edit_item_index)), MAX_FORCE_NAME_SIZE, width - 20, FALSE);
             UIMoveCursor(0, 15);
             UIDrawText("Global Force");
             UIMoveCursor(140, -20);
@@ -511,7 +511,7 @@ static void DrawEditPanel(float width, float height) {
             UIMoveCursor((width - 20 - UITextWidth("Edit Object")) / 2.0f, 0);
             UIDrawText("Edit Object");
             UIMoveCursor(0, 15);
-            UITextInput("Name", *(MeshNameReference(g_edit_item_index)), MAX_MESH_NAME_SIZE, width - 20);
+            UITextInput("Name", *(MeshNameReference(g_edit_item_index)), MAX_MESH_NAME_SIZE, width - 20, FALSE);
             UIMoveCursor(0, 15);
             UIDrawText("Disable");
             UIMoveCursor(140, -20);

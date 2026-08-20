@@ -2,6 +2,7 @@
 #include "renderer/renderer.h"
 #include "data/strings.h"
 #include "ui/panels/edit.h"
+#include "ui/shared.h"
 
 static void DrawOverviewPanel(float width, float height) {
     UIDrawText("Add To Scene...");

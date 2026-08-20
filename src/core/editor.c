@@ -1,10 +1,12 @@
 #include "editor.h"
-#include "data/config.h"
+#include <core/config.h>
+#include "data/defaults.h"
 #include "data/input.h"
 #include "data/colors.h"
-#include "data/assets.h"
+#include "data/fonts.h"
 #include "ui/ui.h"
 #include "ui/panels/diagnostics.h"
+#include "ui/panels/console.h"
 #include "ui/panels/simulate.h"
 #include "ui/panels/viewport.h"
 #include "ui/panels/overview.h"
@@ -22,6 +24,7 @@
 
 static UI* g_ui = NULL;
 static Vector2 g_windowsize = { -1.0f, -1.0f };
+static ARRLIST_Panel g_shared_panels = { 0 };
 
 static void InitEditor() {
 	SetTraceLogLevel(LOG_NONE);
@@ -32,36 +35,33 @@ static void InitEditor() {
     UnloadImage(icon);
     InitializeInput();
     InitializeColors();
-    InitializeAssets();
+    InitializeFonts();
     InitializeRenderer();
     printf("\nEnvironment configuration:\n\tGPU: %s\n\tOperating System: %s\n\n", GPUModel(), OPSYS);
-    g_ui = GenerateUI();
-    g_ui->left = GenerateUI();
-    g_ui->right = GenerateUI();
-    ((UI*)g_ui->right)->right = GenerateUI();
-    ((UI*)g_ui->right)->left = GenerateUI();
-    ((UI*)g_ui->right)->divide = GetScreenHeight() - 680;
-    ((UI*)g_ui->right)->vertical = TRUE;
-    ((UI*)g_ui->left)->right = GenerateUI();
-    ((UI*)g_ui->left)->left = GenerateUI();
-    ((UI*)((UI*)g_ui->left)->left)->left = GenerateUI();
-    ((UI*)((UI*)g_ui->left)->left)->right = GenerateUI();
-    ((UI*)((UI*)g_ui->left)->left)->divide = GetScreenHeight() - 420;
-    ((UI*)((UI*)g_ui->left)->left)->vertical = TRUE;
-    ((UI*)g_ui->left)->divide = 350;
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->right))->panels), GenerateDiagnosticsPanel());
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->right))->panels), GenerateSimulatePanel());
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->left))->panels), GenerateOverviewPanel());
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->right)->left))->panels), GenerateActionsPanel());
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_ui->left)->right))->panels), GenerateViewportPanel());
-    ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_ui)))->panels), GenerateEditPanel());
-    ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_ui)))->panels), GenerateMeshPanel());
-    ARRLIST_Panel_add(&(GetRightUI(GetLeftUI(GetLeftUI(g_ui)))->panels), GenerateGraphPanel());
-    #ifdef EXTEND_PRISM_PANELS
-    ExtendPanelCreation(g_ui);
-    #endif
-    g_ui->divide = 1250;
-    SetPrimaryUI(g_ui);
+    ARRLIST_Panel_add(&g_shared_panels, GenerateDiagnosticsPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateSimulatePanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateOverviewPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateActionsPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateViewportPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateEditPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateMeshPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateGraphPanel());
+    ARRLIST_UIConfig default_config = { 0 };
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, 1250.0f, FALSE, TRUE, TRUE, FALSE}); // root
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, 350.0f, FALSE, TRUE, TRUE, FALSE}); // [ scenes + assets + scripts | graph ] | viewport container
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, GetScreenHeight() - 420.0f, TRUE, TRUE, TRUE, FALSE}); // scenes + assets + ascripts | graph container
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Edit Selected", 0.0f, FALSE, FALSE, FALSE, TRUE}); // scenes +
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Mesh", 0.0f, FALSE, FALSE, FALSE, TRUE}); // + assets +
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE}); // + scripts
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Profiling", 0.0f, FALSE, FALSE, FALSE, FALSE}); // graph
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Viewport", 0.0f, FALSE, FALSE, FALSE, FALSE}); // viewport
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, GetScreenHeight() - 360.0f, TRUE, TRUE, TRUE, FALSE}); // edit | console container
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, FALSE}); // edit
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, FALSE}); // console
+    SetUIConfig(&default_config);
+    ARRLIST_UIConfig_clear(&default_config);
+    LoadUIConfig(&g_ui, g_shared_panels);
+    EZ_INFO("ugh");
     DevInitialize();
 }
 
@@ -89,9 +89,15 @@ static void EditorResized() {
 
 static void CleanEditor() {
     CleanBinds();
+    SaveUIConfig(g_ui);
     DestroyUI(g_ui);
-    DestroyAssets();
+    DestroyFonts();
     DestroyRenderer();
+    CleanConfig();
+	for (size_t i = 0; i < g_shared_panels.size; i++) DestroyPanel(&(g_shared_panels.data[i]));
+    ARRLIST_Panel_clear(&g_shared_panels);
+    CleanConsoleLogs();
+    CleanNotifications();
     CloseWindow();
 }
 

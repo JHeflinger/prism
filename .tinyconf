@@ -10,6 +10,7 @@ MODULE assimp https://github.com/JHeflinger/minis.git assimp
 MODULE stb_image https://github.com/JHeflinger/minis.git stb_image
 MODULE suitesparse https://github.com/JHeflinger/minis.git suitesparse
 MODULE cglm https://github.com/JHeflinger/minis.git cglm
+MODULE gooey https://github.com/JHeflinger/gooey.git .
 
 WINDOWS MODULE vulkan https://github.com/JHeflinger/minis.git vulkan
 WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
@@ -17,3 +18,5 @@ WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
 PORT build/shaders
 PORT build/expanded
 PORT assets
+
+DEFINE PRISM

@@ -1,6 +1,6 @@
 #include "diagnostics.h"
 #include "renderer/renderer.h"
-#include "data/assets.h"
+#include "data/fonts.h"
 #include "data/input.h"
 #include "ui/shared.h"
 #include "renderer/loader.h"
