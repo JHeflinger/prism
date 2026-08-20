@@ -46,7 +46,7 @@ if "%1"=="-u" (
 if NOT exist "build\glslc.exe" (
     echo Downloading glslc importer...
     cd build
-    PowerShell -Command "Invoke-WebRequest -Uri 'https://github.com/JHeflinger/minis/blob/main/vulkan/windows/glslc/glslc.exe' -OutFile 'glslc.exe'"
+    PowerShell -Command "Invoke-WebRequest -Uri 'https://github.com/JHeflinger/minis/raw/refs/heads/main/vulkan/windows/glslc/glslc.exe' -OutFile 'glslc.exe'"
     cd ..
 )
 if "%1"=="-u" (
@@ -55,7 +55,7 @@ if "%1"=="-u" (
     )
     echo Updating glslc importer...
     cd build
-    PowerShell -Command "Invoke-WebRequest -Uri 'https://github.com/JHeflinger/minis/blob/main/vulkan/windows/glslc/glslc.exe' -OutFile 'glslc.exe'"
+    PowerShell -Command "Invoke-WebRequest -Uri 'https://github.com/JHeflinger/minis/raw/refs/heads/main/vulkan/windows/glslc/glslc.exe' -OutFile 'glslc.exe'"
     cd ..
 )
 
