@@ -1,8 +1,8 @@
 #ifndef VUTILS_H
 #define VUTILS_H
 
-#include "core/file.h"
 #include "renderer/vulkan/vstructs.h"
+#include <easyfile.h>
 
 void VUTIL_SetVulkanUtilsContext(Renderer* renderer);
 
@@ -18,7 +18,7 @@ BOOL VUTIL_CheckGPUExtensionSupport(VkPhysicalDevice device);
 
 VulkanFamilyGroup VUTIL_FindQueueFamilies(VkPhysicalDevice gpu);
 
-VkShaderModule VUTIL_CreateShader(SimpleFile* file);
+VkShaderModule VUTIL_CreateShader(ez_File* file);
 
 void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer);
 

@@ -102,7 +102,7 @@ VulkanFamilyGroup VUTIL_FindQueueFamilies(VkPhysicalDevice gpu) {
     return group;
 }
 
-VkShaderModule VUTIL_CreateShader(SimpleFile* file) {
+VkShaderModule VUTIL_CreateShader(ez_File* file) {
 	VkShaderModuleCreateInfo createInfo = { 0 };
 	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	createInfo.codeSize = file->size;

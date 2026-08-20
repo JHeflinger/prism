@@ -1,11 +1,11 @@
 #include "loader.h"
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
-#include "core/file.h"
 #include <assimp/postprocess.h>
 #include <assimp/material.h>
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
+#include <easyfile.h>
 #include <raylib.h>
 #include <errno.h>
 #include <ctype.h>
@@ -380,24 +380,24 @@ static BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], s
     char mtlloc[MAX_MTLLIB_PATH_SIZE] = { 0 };
     char mtlpath[MAX_MTLLIB_PATH_SIZE] = { 0 };
     strcpy(mtlloc, state->filepath);
-    char* fnstart = (char*)StripFilename(mtlloc);
+    char* fnstart = (char*)ez_strip_filename(mtlloc);
     if (fnstart) fnstart[0] = 0;
     else mtlloc[0] = 0;
     sprintf(mtlpath, "%s%s", mtlloc, lineargs[1]);
-    SimpleFile* file = ReadSimpleFile(mtlpath);
+    ez_File* file = ez_load_file(mtlpath);
     if (!file) {
         EZ_ERROR("Unable to load invalid filepath to mtllib \"%s\"", mtlpath);
         return FALSE;
     }
     if (file->type != DOTMTL) {
         EZ_ERROR("\"%s\" is not a .mtl file. Unable to open it with the MTL loader", mtlpath);
-        FreeFile(file);
+        ez_free_file(file);
         return FALSE;
     }
-    LineParser parser = Parser(file);
+    ez_FileParser parser = ez_parser(file);
     char line[MAX_MTL_LINE_SIZE] = { 0 };
     BOOL failure = FALSE;
-    while (NextLine(&parser, line, MAX_MTL_LINE_SIZE)) {
+    while (ez_next_line(&parser, line, MAX_MTL_LINE_SIZE)) {
         char lineargs[MAX_MTL_NUM_ARGS][MAX_MTL_ARG_SIZE] = { 0 };
         size_t numargs = ParseLineArgsOBJ(line, lineargs);
         if (numargs > 0 && lineargs[0][0] != '#') {
@@ -406,7 +406,7 @@ static BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], s
             } else EZ_WARN("%s:%d - Unknown MTL property detected: \"%s\", skipping parsing this field...", mtlpath, (int)parser.line, lineargs[0]);
         }
     }
-    FreeFile(file);
+    ez_free_file(file);
     return !failure;
 }
 
@@ -632,7 +632,7 @@ static BOOL ConstructOBJ(const StateOBJ state) {
 }
 
 BOOL LoadOBJ(const char* filepath) {
-    SimpleFile* file = ReadSimpleFile(filepath);
+    ez_File* file = ez_load_file(filepath);
     VertexID startv = NumVertices();
     TriangleID startt = NumTriangles();
     if (!file) {
@@ -641,25 +641,25 @@ BOOL LoadOBJ(const char* filepath) {
     }
     if (file->type != DOTOBJ) {
         EZ_ERROR("\"%s\" is not a .obj file. Unable to open it with the OBJ loader", filepath);
-        FreeFile(file);
+        ez_free_file(file);
         return FALSE;
     }
-    LineParser parser = Parser(file);
+    ez_FileParser parser = ez_parser(file);
     StateOBJ state = { 0 };
     state.filepath = filepath;
     char line[MAX_OBJ_LINE_SIZE] = { 0 };
-    while (NextLine(&parser, line, MAX_OBJ_LINE_SIZE)) {
+    while (ez_next_line(&parser, line, MAX_OBJ_LINE_SIZE)) {
         char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE] = { 0 };
         size_t numargs = ParseLineArgsOBJ(line, lineargs);
         if (numargs > 0 && lineargs[0][0] != '#') {
             ParseFuncOBJ p = GetParserFromArgOBJ(lineargs[0]);
-            if (p) { if (!p(lineargs, numargs, &state)) { EZ_ERROR("%s:%d - Unable to parse this OBJ field due to an error", filepath, (int)parser.line); CleanStateOBJ(&state); FreeFile(file); return FALSE; }
+            if (p) { if (!p(lineargs, numargs, &state)) { EZ_ERROR("%s:%d - Unable to parse this OBJ field due to an error", filepath, (int)parser.line); CleanStateOBJ(&state); ez_free_file(file); return FALSE; }
             } else EZ_WARN("%s:%d - Unknown OBJ property detected: \"%s\", skipping parsing this field...", filepath, (int)parser.line, lineargs[0]);
         }
     }
     if (!ConstructOBJ(state)) {
         EZ_ERROR("Unable to construct .obj \"%s\" due to an error", filepath);
-        FreeFile(file);
+        ez_free_file(file);
         return FALSE;
     } else {
         vec3 min, max, center, extent;
@@ -675,10 +675,10 @@ BOOL LoadOBJ(const char* filepath) {
         glm_vec3_scale(extent, 0.5f, extent);
         SubmitMeshDescriptor((MeshDescriptor){
             FALSE, startv, NumVertices() - 1, startt, NumTriangles() - 1, 0, (uint32_t)-1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
-            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, StripFilename(filepath));
+            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, ez_strip_filename(filepath));
     }
     CleanStateOBJ(&state);
-    FreeFile(file);
+    ez_free_file(file);
     return TRUE;
 }
 
@@ -952,7 +952,7 @@ BOOL LoadFBX(const char* filepath) {
             INLINEV3(center), INLINEV3(extent),
             { 0 }, { 0 },
             { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT
-        }, StripFilename(filepath));
+        }, ez_strip_filename(filepath));
         size_t num_anims = 0;
         Animation* anims = LoadFBXAnimations(scene, &num_anims);
         for (size_t i = 0; i < num_anims; i++) SubmitAnimation(NumMeshes() - 1, skeleton, anims[i]);

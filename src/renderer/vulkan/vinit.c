@@ -363,9 +363,9 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
     VkComputePipelineCreateInfo* pipelineInfos = EZ_ALLOC(num_shaders, sizeof(VkComputePipelineCreateInfo));
     for (size_t i = 0; i < num_shaders; i++) {
         VulkanShader* shader = g_vinit_renderer_ref->vulkan.core.shaders.data[i];
-        SimpleFile* shadercode = ReadSimpleFile(shader->filename);
+        ez_File* shadercode = ez_load_file(shader->filename);
         shadermodules[i] = VUTIL_CreateShader(shadercode);
-        FreeFile(shadercode);
+        ez_free_file(shadercode);
 
         VkPipelineShaderStageCreateInfo createInfo = { 0 };
         createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

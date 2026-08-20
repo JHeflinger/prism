@@ -61,7 +61,6 @@ static void InitEditor() {
     SetUIConfig(&default_config);
     ARRLIST_UIConfig_clear(&default_config);
     LoadUIConfig(&g_ui, g_shared_panels);
-    EZ_INFO("ugh");
     DevInitialize();
 }
 

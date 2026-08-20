@@ -2,10 +2,10 @@
 #include "renderer/processor.h"
 #include "renderer/renderer.h"
 #include "renderer/loader.h"
-#include "core/file.h"
 #include <easylogger.h>
 #include <raylib.h>
 #include <easyobjects.h>
+#include <easyfile.h>
 #include <time.h>
 
 static void InitializeExecutor(int w, int h) {
@@ -25,7 +25,7 @@ static void CleanExecutor() {
 }
 
 static void ImportExecuteScene(const char* scenefile) {
-    FileType ft = GetSimpleFileType(scenefile);
+    ez_FileType ft = ez_get_filetype(scenefile);
     switch (ft) {
         case DOTOBJ:
             LoadOBJ(scenefile);
