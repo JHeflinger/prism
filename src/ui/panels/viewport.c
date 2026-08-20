@@ -6,7 +6,6 @@
 #include "ui/panels/edit.h"
 #include "data/input.h"
 #include "core/binds.h"
-#include "core/extender.h"
 #include <easylogger.h>
 #include <rlgl.h>
 #include <math.h>
@@ -144,6 +143,8 @@ static void PanSelectedObject() {
 }
 
 static void DrawViewportPanel(float width, float height) {
+    SetViewportSlice(width, height);
+    SetViewportRec((Rectangle){ UIGetPosition().x, UIGetPosition().y, width, height });
     DrawTexturePro(
         g_viewport_target.texture,
         (Rectangle){ 0, 0, g_viewport_target.texture.width, -g_viewport_target.texture.height },

@@ -1,26 +1,19 @@
 #include "editor.h"
-#include <core/config.h>
-#include "data/defaults.h"
-#include "data/input.h"
-#include "data/colors.h"
-#include "data/fonts.h"
-#include "ui/ui.h"
+#include "core/dev.h"
+#include "renderer/renderer.h"
 #include "ui/panels/diagnostics.h"
-#include "ui/panels/console.h"
 #include "ui/panels/simulate.h"
 #include "ui/panels/viewport.h"
 #include "ui/panels/overview.h"
+#include "ui/panels/actions.h"
 #include "ui/panels/edit.h"
 #include "ui/panels/mesh.h"
-#include "ui/panels/actions.h"
-#include "ui/panels/graph.h"
-#include "renderer/renderer.h"
-#include "core/dev.h"
-#include "core/binds.h"
-#include "core/extender.h"
-#include <raylib.h>
-#include <easymemory.h>
-#include <easylogger.h>
+#include <ui/panels/console.h>
+#include <ui/panels/graph.h>
+#include <core/binds.h>
+#include <core/config.h>
+#include <data/colors.h>
+#include <data/fonts.h>
 
 static UI* g_ui = NULL;
 static Vector2 g_windowsize = { -1.0f, -1.0f };
@@ -46,18 +39,21 @@ static void InitEditor() {
     ARRLIST_Panel_add(&g_shared_panels, GenerateEditPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateMeshPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateGraphPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateConsolePanel());
     ARRLIST_UIConfig default_config = { 0 };
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, 1250.0f, FALSE, TRUE, TRUE, FALSE}); // root
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, 350.0f, FALSE, TRUE, TRUE, FALSE}); // [ scenes + assets + scripts | graph ] | viewport container
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, GetScreenHeight() - 420.0f, TRUE, TRUE, TRUE, FALSE}); // scenes + assets + ascripts | graph container
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Edit Selected", 0.0f, FALSE, FALSE, FALSE, TRUE}); // scenes +
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Mesh", 0.0f, FALSE, FALSE, FALSE, TRUE}); // + assets +
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE}); // + scripts
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Profiling", 0.0f, FALSE, FALSE, FALSE, FALSE}); // graph
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Viewport", 0.0f, FALSE, FALSE, FALSE, FALSE}); // viewport
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, GetScreenHeight() - 360.0f, TRUE, TRUE, TRUE, FALSE}); // edit | console container
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, FALSE}); // edit
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, FALSE}); // console
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, 1250.0f, FALSE, TRUE, TRUE, FALSE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, 350.0f, FALSE, TRUE, TRUE, FALSE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, GetScreenHeight() - 420.0f, TRUE, TRUE, TRUE, FALSE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Edit Selected", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Mesh", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Profiling", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Console", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Viewport", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, GetScreenHeight() - 360.0f, TRUE, TRUE, TRUE, FALSE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Actions", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE});
     SetUIConfig(&default_config);
     ARRLIST_UIConfig_clear(&default_config);
     LoadUIConfig(&g_ui, g_shared_panels);

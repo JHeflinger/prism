@@ -4,9 +4,9 @@
 
 #include "renderer/renderer.h"
 #include "renderer/loader.h"
-#include "data/input.h"
-#include "core/binds.h"
 #include "ui/panels/edit.h"
+#include <data/input.h>
+#include <core/binds.h>
 
 static void LoadArmadillo() {
     LoadOBJ("assets/models/OBJ/dressed/gems.obj");

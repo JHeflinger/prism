@@ -3,10 +3,8 @@
 #include "renderer/renderer.h"
 #include "renderer/loader.h"
 #include <easylogger.h>
-#include <raylib.h>
-#include <easyobjects.h>
+#include <core/binds.h>
 #include <easyfile.h>
-#include <time.h>
 
 static void InitializeExecutor(int w, int h) {
 	OverrideResolution(w, h);
@@ -21,6 +19,7 @@ static void InitializeExecutor(int w, int h) {
 }
 
 static void CleanExecutor() {
+    CleanBinds();
     DestroyRenderer();
 }
 

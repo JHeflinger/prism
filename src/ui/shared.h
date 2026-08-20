@@ -1,7 +1,6 @@
 #ifndef SHARED_H
 #define SHARED_H
 
-#include <stddef.h>
 #include <ui/ui.h>
 
 size_t DropdownSelectSimVisual(void* data, size_t index, BOOL cancel);
