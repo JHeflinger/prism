@@ -7,6 +7,7 @@
 #include <assimp/scene.h>
 #include <util/logger.h>
 #include <easyfile.h>
+#include <ctype.h>
 
 #define MAX_MTLLIB_PATH_SIZE 1024
 #define MAX_OBJ_PATH_SIZE 1024
