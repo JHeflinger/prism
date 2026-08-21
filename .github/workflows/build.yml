@@ -12,10 +12,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Vulkan
+      - name: Install Deps
         run: |
           sudo apt update
-          sudo apt install libvulkan1 mesa-vulkan-drivers vulkan-tools glslc libvulkan-dev
+          sudo apt install libvulkan1 mesa-vulkan-drivers vulkan-tools glslc libvulkan-dev libglfw3-dev
 
       - name: Build
         run: |
