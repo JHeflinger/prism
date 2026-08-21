@@ -48,7 +48,7 @@ jobs:
         with:
           msystem: MINGW64
           update: true
-          install: mingw-w64-x86_64-gcc git mingw-w64-x86_64-toolchain
+          install: mingw-w64-x86_64-gcc git mingw-w64-x86_64-toolchain mingw-w64-x86_64-zlib
 
       - name: Build
         run: |
