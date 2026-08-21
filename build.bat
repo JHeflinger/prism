@@ -130,7 +130,7 @@ if "%3"=="-p" (
 )
 
 :: run builder
-"./build/tiny_windows.exe" -a -f %PROD%
+"./build/tiny_windows.exe" -a -f -d %PROD%
 if !ERRORLEVEL! NEQ 0 (
     exit /b !ERRORLEVEL!
 )
