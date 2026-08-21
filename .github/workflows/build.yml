@@ -12,10 +12,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install GLSLC
+      - name: Install Vulkan
         run: |
           sudo apt update
-          sudo apt install glslc
+          sudo apt install libvulkan1 mesa-vulkan-drivers vulkan-tools glslc
 
       - name: Build
         run: |
