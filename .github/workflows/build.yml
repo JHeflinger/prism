@@ -15,7 +15,7 @@ jobs:
       - name: Install Vulkan
         run: |
           sudo apt update
-          sudo apt install libvulkan1 mesa-vulkan-drivers vulkan-tools glslc
+          sudo apt install libvulkan1 mesa-vulkan-drivers vulkan-tools glslc libvulkan-dev
 
       - name: Build
         run: |
