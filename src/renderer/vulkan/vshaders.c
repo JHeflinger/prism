@@ -2,6 +2,7 @@
 #include <easymemory.h>
 #include <easyobjects.h>
 #include <easybasics.h>
+#include <util/logger.h>
 
 static char* last_relevant_word(char* str, int len) {
 	for (int i = len - 1; i >= 0; i--) {
@@ -442,7 +443,7 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
                     }
                 };
     }
-	EZ_WARN("Unable to automatically identify source references of shader variable \"%s\"", name);
+	logwarn("Unable to automatically identify source references of shader variable \"%s\"", name);
 	return (VulkanBoundVariable){ 0 };
 }
 
@@ -460,7 +461,7 @@ VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char
 			linecount++;
 			int linelen = strlen(line);
 			if (linelen >= 512) 
-				EZ_WARN("Abnormally long line length detected on line %d in shader %s, this may have adverse effects on shader parsing", linecount, readfile);
+				logwarn("Abnormally long line length detected on line %d in shader %s, this may have adverse effects on shader parsing", linecount, readfile);
 			char* bindstr = strstr(line, "layout(binding");
 			if (!bindstr) bindstr = strstr(line, "layout (binding");
 			if (bindstr) {
@@ -489,7 +490,7 @@ VulkanShader* GenerateShader(Renderer* context, const char* readfile, const char
 					}
 					num_vars++;
 				} else {
-					EZ_WARN("Unable to detect a binding on line %d: %s", linecount, bindstr);
+					logwarn("Unable to detect a binding on line %d: %s", linecount, bindstr);
 				}
 			}
 		}

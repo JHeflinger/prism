@@ -1,5 +1,5 @@
 #include "vutils.h"
-#include <easylogger.h>
+#include <util/logger.h>
 
 static Renderer* g_vutil_renderer_ref = NULL;
 
@@ -14,7 +14,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VUTIL_VulkanDebugCallback(
     void* pUserData) {
     EZ_ASSERT(pUserData == NULL, "User data has not been set up to be handled");
     if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        EZ_WARN("%s[VULKAN] [%s]%s %s",
+        logwarn("%s[VULKAN] [%s]%s %s",
             EZ_YELLOW,
             (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ? "GENERAL" :
                 (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ? "VALIDATION" : "PERFORMANCE")),

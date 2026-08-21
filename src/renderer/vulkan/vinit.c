@@ -1,9 +1,9 @@
 #include "vinit.h"
-#include <easylogger.h>
 #include "renderer/vulkan/vutils.h"
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vshaders.h"
 #include <GLFW/glfw3.h>
+#include <util/logger.h>
 
 static Renderer* g_vinit_renderer_ref = NULL;
 
@@ -726,7 +726,7 @@ BOOL VINIT_Targets(VulkanImage* targets_arr) {
 BOOL VINIT_General(VulkanGeneral* general) {
 	// error check for validation layer support
     if (ENABLE_VK_VALIDATION_LAYERS && !VUTIL_CheckValidationLayerSupport()) {
-		EZ_WARN("Requested validation layers are not available");
+		logwarn("Requested validation layers are not available");
         SUPER_DISABLE_VALIDATION_LAYERS();
 	}
 
