@@ -1,13 +1,14 @@
 #ifndef RSTRUCTS_H
 #define RSTRUCTS_H
 
+#define CGLM_FORCE_DEPTH_ZERO_TO_ONE
+
 #include "data/strings.h"
 #include "renderer/vulkan/vconfig.h"
-#define CGLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <cglm/cglm.h>
 #include <vulkan/vulkan.h>
-#include <raylib.h>
 #include <easyprofile.h>
+#include <cglm/cglm.h>
+#include <raylib.h>
 
 #ifndef NO_MESH_MANIPULATION_SUPPORT
 #include <cholmod.h>

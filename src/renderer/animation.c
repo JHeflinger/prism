@@ -1,6 +1,4 @@
 #include "animation.h"
-#include <stdio.h>
-#include <stddef.h>
 
 static BoneChannel* FindChannel(Animation* clip, const char* name) {
     for (size_t i = 0; i < clip->channels.size; i++) {

@@ -1,8 +1,9 @@
 #include "processor.h"
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
-#include <easyhash.h>
+#include <util/logger.h>
 #include <easybasics.h>
+#include <easyhash.h>
 
 typedef struct {
     uint32_t v1;
@@ -170,13 +171,13 @@ BOOL IsManifoldValid(const ManifoldMesh* manifold) {
         // validate border edges
         const uint32_t twin = manifold->halfedges.data[i].twin;
         if (twin == (uint32_t)-1) {
-            EZ_ERROR("Border twin detected on halfedge %lu - this mesh cannot be manifold", (long unsigned int)i);
+            logerror("Border twin detected on halfedge %lu - this mesh cannot be manifold", (long unsigned int)i);
             return FALSE;
         }
 
         // validate twins
         if (twin != (uint32_t)-1 && manifold->halfedges.data[twin].twin != i) {
-            EZ_ERROR("Corrupted twin detected - expected [%lu -> %lu -> %lu] but found [%lu -> %lu -> %lu]",
+            logerror("Corrupted twin detected - expected [%lu -> %lu -> %lu] but found [%lu -> %lu -> %lu]",
                 (long unsigned int)i, (long unsigned int)twin, (long unsigned int)i,
                 (long unsigned int)i, (long unsigned int)twin, (long unsigned int)manifold->halfedges.data[twin].twin);
             return FALSE;
@@ -184,31 +185,31 @@ BOOL IsManifoldValid(const ManifoldMesh* manifold) {
 
         // validate nexts existing
         if (manifold->halfedges.data[i].next >= manifold->halfedges.size) {
-            EZ_ERROR("Halfedge %lu is pointing to an invalid next %lu", (long unsigned int)i, (long unsigned int)manifold->halfedges.data[i].next);
+            logerror("Halfedge %lu is pointing to an invalid next %lu", (long unsigned int)i, (long unsigned int)manifold->halfedges.data[i].next);
             return FALSE;
         }
 
         // validate vertices existing
         if (manifold->halfedges.data[i].vertex >= manifold->vertices.size) {
-            EZ_ERROR("Halfedge %lu has a non-existent vertex %lu", (long unsigned int)i, (long unsigned int)manifold->halfedges.data[i].vertex);
+            logerror("Halfedge %lu has a non-existent vertex %lu", (long unsigned int)i, (long unsigned int)manifold->halfedges.data[i].vertex);
             return FALSE;
         }
 
         // validate faces existing
         if (manifold->halfedges.data[i].face >= manifold->faces.size) {
-            EZ_ERROR("Halfedge %lu has a non-existent face %lu", (long unsigned int)i, (long unsigned int)manifold->halfedges.data[i].face);
+            logerror("Halfedge %lu has a non-existent face %lu", (long unsigned int)i, (long unsigned int)manifold->halfedges.data[i].face);
             return FALSE;
         }
 
         // validate twins existing
         if (twin != (uint32_t)-1 && twin >= manifold->halfedges.size) {
-            EZ_ERROR("Out-of-bounds twin detected on halfedge %lu", (long unsigned int)i);
+            logerror("Out-of-bounds twin detected on halfedge %lu", (long unsigned int)i);
             return FALSE;
         }
 
         // validate nexts
         if (manifold->halfedges.data[i].next == i) {
-            EZ_ERROR("The next of halfedge %lu is pointing to itself", (long unsigned int)i);
+            logerror("The next of halfedge %lu is pointing to itself", (long unsigned int)i);
             return FALSE;
         }
 
@@ -220,7 +221,7 @@ BOOL IsManifoldValid(const ManifoldMesh* manifold) {
             ncount++;
         }
         if (ncount != 2) {
-            EZ_ERROR("An unclosed halfedge face closure was detected on halfedge %lu", (long unsigned int)i);
+            logerror("An unclosed halfedge face closure was detected on halfedge %lu", (long unsigned int)i);
             return FALSE;
         }
 
@@ -231,20 +232,20 @@ BOOL IsManifoldValid(const ManifoldMesh* manifold) {
             if (curr == i) break;
             curr = manifold->halfedges.data[curr].next;
             if (curr == fhe) {
-                EZ_ERROR("Halfedge %lu points to a face that does not include it", (long unsigned int)i);
+                logerror("Halfedge %lu points to a face that does not include it", (long unsigned int)i);
                 return FALSE;
             }
         }
 
         // validate twin-face consistency
         if (twin != (uint32_t)-1 && manifold->halfedges.data[i].face == manifold->halfedges.data[twin].face) {
-            EZ_ERROR("Halfedge %lu points to the same face as its twin %lu", (long unsigned int)i, (long unsigned int)twin);
+            logerror("Halfedge %lu points to the same face as its twin %lu", (long unsigned int)i, (long unsigned int)twin);
             return FALSE;
         }
 
         // validate twin-vertex consistency
         if (twin != (uint32_t)-1 && manifold->halfedges.data[i].vertex == manifold->halfedges.data[twin].vertex) {
-            EZ_ERROR("Halfedge %lu points to the same vertex as its twin %lu", (long unsigned int)i , (long unsigned int)twin);
+            logerror("Halfedge %lu points to the same vertex as its twin %lu", (long unsigned int)i , (long unsigned int)twin);
             return FALSE;
         }
 
@@ -264,20 +265,20 @@ BOOL IsManifoldValid(const ManifoldMesh* manifold) {
             visited++;
             if (curr == start) {
                 if (visited < 2) {
-                    EZ_ERROR("Vertex connectivity is less than 2 on vertex %lu", (long unsigned int)i);
+                    logerror("Vertex connectivity is less than 2 on vertex %lu", (long unsigned int)i);
                     return FALSE;
                 }
                 break;
             }
             if (visited >= manifold->edges.size) {
-                EZ_ERROR("Vertex connectivity is larger than possible on vertex %lu", (long unsigned int)i);
+                logerror("Vertex connectivity is larger than possible on vertex %lu", (long unsigned int)i);
                 return FALSE;
             }
         }
 
         // validate vertex mirroring
         if (manifold->halfedges.data[manifold->vertices.data[i].halfedge].vertex != i) {
-            EZ_ERROR("Vertex %lu's halfedge does not point back to the vertex", (long unsigned int)i);
+            logerror("Vertex %lu's halfedge does not point back to the vertex", (long unsigned int)i);
             return FALSE;
         }
     }
@@ -286,7 +287,7 @@ BOOL IsManifoldValid(const ManifoldMesh* manifold) {
     for (size_t i = 0; i < manifold->edges.size; i++) {
         // validate edge mirroring
         if (manifold->halfedges.data[manifold->edges.data[i].halfedge].edge != i) {
-            EZ_ERROR("Edge %lu's halfedge does not point back to the edge", (long unsigned int)i);
+            logerror("Edge %lu's halfedge does not point back to the edge", (long unsigned int)i);
             return FALSE;
         }
     }
@@ -294,7 +295,7 @@ BOOL IsManifoldValid(const ManifoldMesh* manifold) {
     // Euler characteristic check
     size_t total = manifold->vertices.size - manifold->edges.size + manifold->faces.size;
     if (total != 2) {
-        EZ_ERROR("Euler characteristic check failed - mesh is not closed and manifold");
+        logerror("Euler characteristic check failed - mesh is not closed and manifold");
         return FALSE;
     }
 
@@ -468,7 +469,7 @@ void DirectedEdgeCollapse(ManifoldMesh* manifold, uint32_t edge, vec3 position) 
 void SaveManifoldOBJ(const char* path, ManifoldMesh* manifold) {
     FILE* file = fopen(path, "w");
     if (file == NULL) {
-        EZ_ERROR("Unable to open file");
+        logerror("Unable to open file");
         return;
     }
     uint32_t* vertex_remapping = EZ_ALLOC(manifold->vertices.size, sizeof(uint32_t));
@@ -695,7 +696,7 @@ void SerialSimplify(ManifoldMesh* manifold, size_t reduction) {
 
     // collapse targets 
     for (size_t i = 0; i < reduction; i++) {
-        if (pq.size == 0) EZ_ERROR("Unable to simplify a mesh into a negative number of edges");
+        if (pq.size == 0) logerror("Unable to simplify a mesh into a negative number of edges");
         CollapseTarget target = PQUEUE_CollapseTarget_pop(&pq);
         uint32_t edge = target.edge;
         if (!IsValidCollapse(manifold, edge)) {

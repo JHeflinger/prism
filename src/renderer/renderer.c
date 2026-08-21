@@ -1,18 +1,16 @@
 #include "renderer.h"
-#include "renderer/vulkan/vutils.h"
-#include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vupdate.h"
+#include "renderer/vulkan/vutils.h"
 #include "renderer/vulkan/vclean.h"
+#include "renderer/vulkan/vinit.h"
 #include "renderer/animation.h"
 #include "renderer/processor.h"
 #include "renderer/simulator.h"
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
 #include "ui/panels/edit.h"
-#include <easylogger.h>
+#include <util/logger.h>
 #include <GLFW/glfw3.h>
-#include <easymemory.h>
-#include <string.h>
 #include <time.h>
 
 static Renderer g_renderer = { 0 };
@@ -827,8 +825,8 @@ void Render() {
 static void DrawHelper(float x, float y, float w, float h, float maxw, float maxh) {
     ClearBackground(BLACK);
     BeginBlendMode(BLEND_ADDITIVE);
-    float diffw = g_renderer.dimensions.x / w;//w - g_renderer.dimensions.x;
-    float diffh = g_renderer.dimensions.y / h;//h - g_renderer.dimensions.y;
+    float diffw = g_renderer.dimensions.x / w;
+    float diffh = g_renderer.dimensions.y / h;
     float psuedo_w = diffw < diffh ? g_renderer.dimensions.x : g_renderer.dimensions.y * (w / h);
     float psuedo_h = diffh < diffw ? g_renderer.dimensions.y : g_renderer.dimensions.x * (h / w);
     if (g_renderer.config.flags & PATHTRACE_SHADER_FLAG) {
@@ -951,7 +949,7 @@ BOOL Subdivide() {
         g_renderer.geometry.normals,
         g_renderer.geometry.triangles);
     if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
-        EZ_ERROR("Mesh was not detected to be a valid manifold");
+        logerror("Mesh was not detected to be a valid manifold");
         CleanManifoldMesh(&(g_renderer.geometry.manifold));
         return FALSE;
     } else {
@@ -969,7 +967,7 @@ BOOL Simplify(size_t faces) {
         g_renderer.geometry.normals,
         g_renderer.geometry.triangles);
     if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
-        EZ_ERROR("Mesh was not detected to be a valid manifold");
+        logerror("Mesh was not detected to be a valid manifold");
         CleanManifoldMesh(&(g_renderer.geometry.manifold));
         return FALSE;
     } else {
@@ -1012,7 +1010,7 @@ BOOL Smoothen(float smoothening) {
         g_renderer.geometry.normals,
         g_renderer.geometry.triangles);
     if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
-        EZ_ERROR("Mesh was not detected to be a valid manifold");
+        logerror("Mesh was not detected to be a valid manifold");
         CleanManifoldMesh(&(g_renderer.geometry.manifold));
         return FALSE;
     } else {
@@ -1030,7 +1028,7 @@ BOOL Remesh(float nudge) {
         g_renderer.geometry.normals,
         g_renderer.geometry.triangles);
     if (!IsManifoldValid(&(g_renderer.geometry.manifold))) {
-        EZ_ERROR("Mesh was not detected to be a valid manifold");
+        logerror("Mesh was not detected to be a valid manifold");
         CleanManifoldMesh(&(g_renderer.geometry.manifold));
         return FALSE;
     } else {

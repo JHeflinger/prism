@@ -1,6 +1,5 @@
 #include "overlay.h"
-#include "core/binds.h"
-#include <easylogger.h>
+#include <core/binds.h>
 
 static Renderer* g_overlay_renderer_ref = NULL;
 static Rectangle g_viewport_dims = { 0 };

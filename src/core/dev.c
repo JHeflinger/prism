@@ -8,7 +8,7 @@
 #include <data/input.h>
 #include <core/binds.h>
 
-static void LoadArmadillo() {
+static void LoadStones() {
     LoadOBJ("assets/models/OBJ/dressed/gems.obj");
     SubmitNamedLight((SceneLight){{0},{1,1,1},{0,-1,0},0,0}, "Gems Overhead Light");
     FitCamera();
@@ -34,7 +34,7 @@ static void ClearSoftScene() {
 }
 
 void DevInitialize() {
-    AddBind("load armadillo", LoadArmadillo,
+    AddBind("load stones", LoadStones,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_A_OVERRIDE, BIND_KEY_PRESSED });

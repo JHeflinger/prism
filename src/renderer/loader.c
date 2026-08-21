@@ -5,12 +5,8 @@
 #include <assimp/material.h>
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
+#include <util/logger.h>
 #include <easyfile.h>
-#include <raylib.h>
-#include <errno.h>
-#include <ctype.h>
-#include <math.h>
-#include <stdio.h>
 
 #define MAX_MTLLIB_PATH_SIZE 1024
 #define MAX_OBJ_PATH_SIZE 1024
@@ -206,20 +202,20 @@ static BOOL ParseTriplet(const char* str, int64_t* a, int64_t* b, int64_t* c, si
 
 static BOOL ParseMTL_illum(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
-        EZ_ERROR("Cannot parse illumination model (illum) without exactly 1 argument - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse illumination model (illum) without exactly 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     uint32_t a;
     if (!(ParseUInt(lineargs[1], &a))) {
-        EZ_ERROR("Invalid illumination model (illum) - expected 1 unsigned integer and got \"%s\" instead", lineargs[1]);
+        logerror("Invalid illumination model (illum) - expected 1 unsigned integer and got \"%s\" instead", lineargs[1]);
         return FALSE;
     }
     if (a > 10) {
-        EZ_ERROR("Invalid illumination model (illum) - expected a value from 0 to 10, and got \"%s\" instead", lineargs[1]);
+        logerror("Invalid illumination model (illum) - expected a value from 0 to 10, and got \"%s\" instead", lineargs[1]);
         return FALSE;
     }
     if (a != 2 && a != 5 && a != 7) {
-        EZ_WARN("Unhandled illumination model \"%d\" (illum) detected - defaulting to lambertian model instead (2)", a);
+        logwarn("Unhandled illumination model \"%d\" (illum) detected - defaulting to lambertian model instead (2)", a);
         a = 2;
     }
     SET_MTL_UINT_FIELD(model, a);
@@ -228,12 +224,12 @@ static BOOL ParseMTL_illum(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], si
 
 static BOOL ParseMTL_Ni(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
-        EZ_ERROR("Cannot parse index of refraction field (Ni) without exactly 1 argument - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse index of refraction field (Ni) without exactly 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     float a;
     if (!(ParseFloat(lineargs[1], &a))) {
-        EZ_ERROR("Invalid index of refraction field (Ni) - expected 1 float and got \"%s\" instead", lineargs[1]);
+        logerror("Invalid index of refraction field (Ni) - expected 1 float and got \"%s\" instead", lineargs[1]);
         return FALSE;
     }
     SET_MTL_FLOAT_FIELD(ior, a);
@@ -242,12 +238,12 @@ static BOOL ParseMTL_Ni(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
 
 static BOOL ParseMTL_Ns(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
-        EZ_ERROR("Cannot parse specular shininess field (Ns) without exactly 1 argument - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse specular shininess field (Ns) without exactly 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     float a;
     if (!(ParseFloat(lineargs[1], &a))) {
-        EZ_ERROR("Invalid specular shininess field (Ns) - expected 1 float and got \"%s\" instead", lineargs[1]);
+        logerror("Invalid specular shininess field (Ns) - expected 1 float and got \"%s\" instead", lineargs[1]);
         return FALSE;
     }
     SET_MTL_FLOAT_FIELD(shiny, a);
@@ -256,12 +252,12 @@ static BOOL ParseMTL_Ns(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
 
 static BOOL ParseMTL_Ke(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
-        EZ_ERROR("Cannot parse an emission field (Ke) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse an emission field (Ke) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     float x, y, z;
     if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
-        EZ_ERROR("Invalid emission (Ke) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+        logerror("Invalid emission (Ke) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
     SET_MTL_VEC3_FIELD(emission, x, y, z);
@@ -270,12 +266,12 @@ static BOOL ParseMTL_Ke(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
 
 static BOOL ParseMTL_Ka(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
-        EZ_ERROR("Cannot parse an ambience field (Ka) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse an ambience field (Ka) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     float x, y, z;
     if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
-        EZ_ERROR("Invalid ambience (Ka) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+        logerror("Invalid ambience (Ka) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
     SET_MTL_VEC3_FIELD(ambient, x, y, z);
@@ -284,12 +280,12 @@ static BOOL ParseMTL_Ka(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
 
 static BOOL ParseMTL_Kd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
-        EZ_ERROR("Cannot parse a diffuse field (Kd) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse a diffuse field (Kd) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     float x, y, z;
     if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
-        EZ_ERROR("Invalid diffuse (Kd) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+        logerror("Invalid diffuse (Kd) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
     SET_MTL_VEC3_FIELD(diffuse, x, y, z);
@@ -298,12 +294,12 @@ static BOOL ParseMTL_Kd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
 
 static BOOL ParseMTL_Ks(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
-        EZ_ERROR("Cannot parse a specular field (Ks) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse a specular field (Ks) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     float x, y, z;
     if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
-        EZ_ERROR("Invalid specular (Ks) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+        logerror("Invalid specular (Ks) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
     SET_MTL_VEC3_FIELD(specular, x, y, z);
@@ -312,12 +308,12 @@ static BOOL ParseMTL_Ks(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
 
 static BOOL ParseMTL_Tf(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
-        EZ_ERROR("Cannot parse an absorbtion field (Tf) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse an absorbtion field (Tf) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     float x, y, z;
     if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
-        EZ_ERROR("Invalid absorbtion (Tf) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+        logerror("Invalid absorbtion (Tf) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
     SET_MTL_VEC3_FIELD(absorbtion, x, y, z);
@@ -326,12 +322,12 @@ static BOOL ParseMTL_Tf(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
 
 static BOOL ParseMTL_Rd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
-        EZ_ERROR("Cannot parse a dispersion field (Rd) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse a dispersion field (Rd) without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     float x, y, z;
     if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
-        EZ_ERROR("Invalid dispersion (Rd) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+        logerror("Invalid dispersion (Rd) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
     SET_MTL_VEC3_FIELD(dispersion, x, y, z);
@@ -345,7 +341,7 @@ static BOOL ParseMTL_d(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t
 
 static BOOL ParseMTL_newmtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
-        EZ_ERROR("Invalid format for newmtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
+        logerror("Invalid format for newmtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     char* name = EZ_ALLOC(strlen(lineargs[1]), sizeof(char));
@@ -374,7 +370,7 @@ static ParseFuncMTL GetParserFromArgMTL(const char* header) {
 
 static BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
-        EZ_ERROR("Invalid format for mtllib arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
+        logerror("Invalid format for mtllib arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     char mtlloc[MAX_MTLLIB_PATH_SIZE] = { 0 };
@@ -386,11 +382,11 @@ static BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], s
     sprintf(mtlpath, "%s%s", mtlloc, lineargs[1]);
     ez_File* file = ez_load_file(mtlpath);
     if (!file) {
-        EZ_ERROR("Unable to load invalid filepath to mtllib \"%s\"", mtlpath);
+        logerror("Unable to load invalid filepath to mtllib \"%s\"", mtlpath);
         return FALSE;
     }
     if (file->type != DOTMTL) {
-        EZ_ERROR("\"%s\" is not a .mtl file. Unable to open it with the MTL loader", mtlpath);
+        logerror("\"%s\" is not a .mtl file. Unable to open it with the MTL loader", mtlpath);
         ez_free_file(file);
         return FALSE;
     }
@@ -402,8 +398,8 @@ static BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], s
         size_t numargs = ParseLineArgsOBJ(line, lineargs);
         if (numargs > 0 && lineargs[0][0] != '#') {
             ParseFuncMTL p = GetParserFromArgMTL(lineargs[0]);
-            if (p) { if ((failure = !p(lineargs, numargs, state))) { EZ_ERROR("%s:%d - Unable to parse this MTL field due to an error", mtlpath, (int)parser.line); break; }
-            } else EZ_WARN("%s:%d - Unknown MTL property detected: \"%s\", skipping parsing this field...", mtlpath, (int)parser.line, lineargs[0]);
+            if (p) { if ((failure = !p(lineargs, numargs, state))) { logerror("%s:%d - Unable to parse this MTL field due to an error", mtlpath, (int)parser.line); break; }
+            } else logwarn("%s:%d - Unknown MTL property detected: \"%s\", skipping parsing this field...", mtlpath, (int)parser.line, lineargs[0]);
         }
     }
     ez_free_file(file);
@@ -412,7 +408,7 @@ static BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], s
 
 static BOOL ParseOBJ_usemtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 2) {
-        EZ_ERROR("Invalid format for usemtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
+        logerror("Invalid format for usemtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     size_t ind = 0;
@@ -422,7 +418,7 @@ static BOOL ParseOBJ_usemtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], s
             goto found;
         }
     }
-    EZ_ERROR("No material of name \"%s\" found", lineargs[1]);
+    logerror("No material of name \"%s\" found", lineargs[1]);
     return FALSE;
     found:
     ARRLIST_UseMaterialMarker_add(&(state->markers), (UseMaterialMarker){ state->faces.size, ind });
@@ -431,12 +427,12 @@ static BOOL ParseOBJ_usemtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], s
 
 static BOOL ParseOBJ_v(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
-        EZ_ERROR("Cannot parse a vertex field without exactly 3 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse a vertex field without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     vec3 v;
     if (!(ParseFloat(lineargs[1], &(v[0])) && ParseFloat(lineargs[2], &(v[1])) && ParseFloat(lineargs[3], &(v[2])))) {
-        EZ_ERROR("Invalid vertex fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+        logerror("Invalid vertex fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
     ARRLIST_vec3_add(&(state->vertices), v);
@@ -445,12 +441,12 @@ static BOOL ParseOBJ_v(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t
 
 static BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4) {
-        EZ_ERROR("Cannot parse a vertex normal field without exactly 3 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse a vertex normal field without exactly 3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     vec3 v;
     if (!(ParseFloat(lineargs[1], &(v[0])) && ParseFloat(lineargs[2], &(v[1])) && ParseFloat(lineargs[3], &(v[2])))) {
-        EZ_ERROR("Invalid vertex normal fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
+        logerror("Invalid vertex normal fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
     ARRLIST_vec3_add(&(state->normals), v);
@@ -459,12 +455,12 @@ static BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
 
 static BOOL ParseOBJ_vt(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 3 && numargs != 4) {
-        EZ_ERROR("Cannot parse a vertex texture field without 2-3 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse a vertex texture field without 2-3 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     float u, v; // ignoring w
     if (!(ParseFloat(lineargs[1], &u) && ParseFloat(lineargs[2], &v))) {
-        EZ_ERROR("Invalid vertex texture fields - expected 2 floats and got \"%s %s\" instead", lineargs[1], lineargs[2]);
+        logerror("Invalid vertex texture fields - expected 2 floats and got \"%s %s\" instead", lineargs[1], lineargs[2]);
         return FALSE;
     }
     ARRLIST_UV_add(&(state->uvs), (UV){u, v});
@@ -473,7 +469,7 @@ static BOOL ParseOBJ_vt(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
 
 static BOOL ParseOBJ_f(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t numargs, StateOBJ* state) {
     if (numargs != 4 && numargs != 5) {
-        EZ_ERROR("Cannot parse a face field without exactly 3 or 4 arguments - detected %d instead", (int)numargs - 1);
+        logerror("Cannot parse a face field without exactly 3 or 4 arguments - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
     int64_t values[4][3] = { 0 };
@@ -481,13 +477,13 @@ static BOOL ParseOBJ_f(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t
     for (int i = 0; i < (numargs == 4 ? 3 : 4); i++) {
         size_t c;
         if (!ParseTriplet(lineargs[i + 1], &values[i][0], &values[i][1], &values[i][2], &c)) {
-            EZ_ERROR("Unable to parse face field \"%s\" into valid indices", lineargs[i + 1]);
+            logerror("Unable to parse face field \"%s\" into valid indices", lineargs[i + 1]);
             return FALSE;
         }
         if (count < 0) {
             count = (int)c;
         } else if (count != (int)c) {
-            EZ_ERROR("Detected a mismatched count in face field indices - expected %d but got %d instead", count, (int)c);
+            logerror("Detected a mismatched count in face field indices - expected %d but got %d instead", count, (int)c);
             return FALSE;
         }
     }
@@ -497,13 +493,13 @@ static BOOL ParseOBJ_f(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t
             if (values[j][i] == 0) zeros++;
         }
         if (zeros != 0 && zeros != (numargs == 4 ? 3 : 4)) {
-            EZ_ERROR("Detected a mismatched format count in face field indices - vertex normals/textures should either be all defined or not at all");
+            logerror("Detected a mismatched format count in face field indices - vertex normals/textures should either be all defined or not at all");
             return FALSE;
         }
     }
     for (int i = 0; i < (numargs == 4 ? 3 : 4); i++) {
         if (values[i][0] == 0) {
-            EZ_ERROR("Invalid face field detected - there is no vertex 0");
+            logerror("Invalid face field detected - there is no vertex 0");
             return FALSE;
         }
         if (values[i][0] < 0) {
@@ -575,27 +571,27 @@ static BOOL ConstructOBJ(const StateOBJ state) {
     BOOL failure = FALSE;
     for (size_t i = 0; i < state.faces.size; i++) {
         if (state.faces.data[i].a >= state.vertices.size) {
-            EZ_ERROR("Face %d references an invalid vertex %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].a, (int)state.vertices.size);
+            logerror("Face %d references an invalid vertex %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].a, (int)state.vertices.size);
             failure = TRUE;
         }
         if (state.faces.data[i].b >= state.vertices.size) {
-            EZ_ERROR("Face %d references an invalid vertex %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].b, (int)state.vertices.size);
+            logerror("Face %d references an invalid vertex %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].b, (int)state.vertices.size);
             failure = TRUE;
         }
         if (state.faces.data[i].c >= state.vertices.size) {
-            EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].c, (int)state.vertices.size);
+            logerror("Face %d references an invalid vertex normal %d - there are only %d vertices available", (int)i, (int)state.faces.data[i].c, (int)state.vertices.size);
             failure = TRUE;
         }
         if (state.faces.data[i].normals && state.faces.data[i].an >= state.normals.size) {
-            EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].an, (int)state.normals.size);
+            logerror("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].an, (int)state.normals.size);
             failure = TRUE;
         }
         if (state.faces.data[i].normals && state.faces.data[i].bn >= state.normals.size) {
-            EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].bn, (int)state.normals.size);
+            logerror("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].bn, (int)state.normals.size);
             failure = TRUE;
         }
         if (state.faces.data[i].normals && state.faces.data[i].cn >= state.normals.size) {
-            EZ_ERROR("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].cn, (int)state.normals.size);
+            logerror("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].cn, (int)state.normals.size);
             failure = TRUE;
         }
     }
@@ -636,11 +632,11 @@ BOOL LoadOBJ(const char* filepath) {
     VertexID startv = NumVertices();
     TriangleID startt = NumTriangles();
     if (!file) {
-        EZ_ERROR("Unable to load invalid filepath \"%s\"", filepath);
+        logerror("Unable to load invalid filepath \"%s\"", filepath);
         return FALSE;
     }
     if (file->type != DOTOBJ) {
-        EZ_ERROR("\"%s\" is not a .obj file. Unable to open it with the OBJ loader", filepath);
+        logerror("\"%s\" is not a .obj file. Unable to open it with the OBJ loader", filepath);
         ez_free_file(file);
         return FALSE;
     }
@@ -653,12 +649,12 @@ BOOL LoadOBJ(const char* filepath) {
         size_t numargs = ParseLineArgsOBJ(line, lineargs);
         if (numargs > 0 && lineargs[0][0] != '#') {
             ParseFuncOBJ p = GetParserFromArgOBJ(lineargs[0]);
-            if (p) { if (!p(lineargs, numargs, &state)) { EZ_ERROR("%s:%d - Unable to parse this OBJ field due to an error", filepath, (int)parser.line); CleanStateOBJ(&state); ez_free_file(file); return FALSE; }
-            } else EZ_WARN("%s:%d - Unknown OBJ property detected: \"%s\", skipping parsing this field...", filepath, (int)parser.line, lineargs[0]);
+            if (p) { if (!p(lineargs, numargs, &state)) { logerror("%s:%d - Unable to parse this OBJ field due to an error", filepath, (int)parser.line); CleanStateOBJ(&state); ez_free_file(file); return FALSE; }
+            } else logwarn("%s:%d - Unknown OBJ property detected: \"%s\", skipping parsing this field...", filepath, (int)parser.line, lineargs[0]);
         }
     }
     if (!ConstructOBJ(state)) {
-        EZ_ERROR("Unable to construct .obj \"%s\" due to an error", filepath);
+        logerror("Unable to construct .obj \"%s\" due to an error", filepath);
         ez_free_file(file);
         return FALSE;
     } else {
@@ -717,7 +713,7 @@ static uint32_t LookupOrRegisterBone(Skeleton* sk, const char* name, const struc
             return (uint32_t)i;
     }
     if (sk->bonecount >= MAX_BONES) {
-        EZ_WARN("Skeleton exceeds MAX_BONES (%d) — bone \"%s\" skipped", MAX_BONES, name);
+        logwarn("Skeleton exceeds MAX_BONES (%d) — bone \"%s\" skipped", MAX_BONES, name);
         return 0;
     }
     Bone* b = &sk->bones[sk->bonecount];
@@ -731,7 +727,7 @@ static uint32_t LookupOrRegisterBone(Skeleton* sk, const char* name, const struc
 
 static BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialID mat_id, size_t vertices_start, size_t normals_start) {
     if (!(mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)) {
-        EZ_WARN("Non-triangle FBX mesh detected - skipping \"%s\"", mesh->mName.data);
+        logwarn("Non-triangle FBX mesh detected - skipping \"%s\"", mesh->mName.data);
         return TRUE;
     }
     BOOL has_normals = mesh->mNormals != NULL;
@@ -768,7 +764,7 @@ static BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialI
     for (size_t i = 0; i < mesh->mNumFaces; i++) {
         const struct aiFace* face = &mesh->mFaces[i];
         if (face->mNumIndices != 3) {
-            EZ_WARN("FBX face is a non-triangle - skipping");
+            logwarn("FBX face is a non-triangle - skipping");
             continue;
         }
         unsigned int ia = face->mIndices[0];
@@ -917,7 +913,7 @@ BOOL LoadFBX(const char* filepath) {
                        | aiProcess_PopulateArmatureData; // reconstruct skeleton hierarchy, converting world-space animation channels to local-space
     const struct aiScene* scene = aiImportFile(filepath, flags);
     if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !scene->mRootNode) {
-        EZ_ERROR("Failed to load FBX file \"%s\": %s", filepath, aiGetErrorString());
+        logerror("Failed to load FBX file \"%s\": %s", filepath, aiGetErrorString());
         return FALSE;
     }
     uint32_t starts = NumSkins();
@@ -930,7 +926,7 @@ BOOL LoadFBX(const char* filepath) {
     BOOL aabb_init = FALSE;
     Skeleton skeleton = { 0 };
     if (!TraverseFBXNode(&skeleton, scene->mRootNode, scene, mat_ids, &aabb_min, &aabb_max, &aabb_init)) {
-        EZ_ERROR("Failed to traverse scene graph for \"%s\"", filepath);
+        logerror("Failed to traverse scene graph for \"%s\"", filepath);
         EZ_FREE(mat_ids);
         aiReleaseImport(scene);
         return FALSE;
