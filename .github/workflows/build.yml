@@ -1,0 +1,62 @@
+name: Build Prism
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          ./build.sh
+          mkdir prism_linux_x64
+          mv build/bin.exe prism_linux_x64/prism
+          cp -r build/shaders prism_linux_x64/shaders
+          cp -r build/expanded prism_linux_x64/expanded
+          cp -r assets prism_linux_x64/assets
+          zip -r prism_linux_x64.zip prism_linux_x64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prism_linux_x64.zip
+          path: prism_linux_x64.zip
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2 (MinGW64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-gcc
+
+      - name: Build
+        run: |
+          ./build.bat
+          mkdir prism_windows_x64
+          mv build\bin.exe prism_windows_x64\prism.exe
+          robocopy "build\shaders" "prism_windows_x64\shaders" /E
+          robocopy "build\expanded" "prism_windows_x64\expanded" /E
+          robocopy "assets" "prism_windows_x64\assets" /E
+          tar -a -c -f "prism_windows_x64.zip" "prism_windows_x64"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prism_windows_x64.zip
+          path: prism_windows_x64.zip
