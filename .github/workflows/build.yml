@@ -54,7 +54,7 @@ jobs:
         run: |
           ./build.bat
           mkdir prism_windows_x64
-          mv build\bin.exe prism_windows_x64\prism.exe
+          mv "build\bin.exe" "prism_windows_x64\prism.exe"
           robocopy "build\shaders" "prism_windows_x64\shaders" /E
           robocopy "build\expanded" "prism_windows_x64\expanded" /E
           robocopy "assets" "prism_windows_x64\assets" /E
