@@ -55,9 +55,9 @@ jobs:
           ./build.bat
           mkdir prism_windows_x64
           mv "build\bin.exe" "prism_windows_x64\prism.exe"
-          robocopy "build\shaders" "prism_windows_x64\shaders" //MIR
-          robocopy "build\expanded" "prism_windows_x64\expanded" //MIR
-          robocopy "assets" "prism_windows_x64\assets" //MIR
+          cp -r "build/shaders" "prism_linux_x64/shaders"
+          cp -r "build/expanded" "prism_linux_x64/expanded"
+          cp -r "assets" "prism_linux_x64/assets"
           tar -a -c -f "prism_windows_x64.zip" "prism_windows_x64"
 
       - name: Upload artifact
