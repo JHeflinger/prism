@@ -1,14 +1,9 @@
 #include "viewport.h"
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
-#include "renderer/loader.h"
 #include "renderer/rmath.h"
 #include "ui/panels/edit.h"
-#include "data/input.h"
-#include "core/binds.h"
-#include <easylogger.h>
-#include <rlgl.h>
-#include <math.h>
+#include <core/binds.h>
 
 static RenderTexture2D g_viewport_target;
 static BOOL g_show_hints = FALSE;
@@ -219,9 +214,6 @@ static void UpdateViewportPanel(float width, float height) {
     BeginTextureMode(g_viewport_target);
     Draw(0, 0, width, height);
     EndTextureMode();
-    #ifdef EXTEND_PRISM_VIEWPORT
-    ExtendViewportUpdate(g_viewport_target, width, height);
-    #endif
 }
 
 Panel GenerateViewportPanel() {

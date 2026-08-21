@@ -1,6 +1,5 @@
 #include "overview.h"
 #include "renderer/renderer.h"
-#include "data/strings.h"
 #include "ui/panels/edit.h"
 #include "ui/shared.h"
 
@@ -28,5 +27,6 @@ Panel GenerateOverviewPanel() {
 	Panel p = { 0 };
     SetupPanel(&p, "Overview");
     p.draw = DrawOverviewPanel;
+    p.scrollable = TRUE;
 	return p;
 }

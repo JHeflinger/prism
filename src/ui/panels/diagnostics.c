@@ -1,10 +1,8 @@
 #include "diagnostics.h"
 #include "renderer/renderer.h"
-#include "data/fonts.h"
-#include "data/input.h"
 #include "ui/shared.h"
-#include "renderer/loader.h"
-#include <easymemory.h>
+
+// WARN: this is mostly a scrap panel for temp controls and settings
 
 static BOOL g_vsync_enabled = TRUE;
 
@@ -108,5 +106,6 @@ Panel GenerateDiagnosticsPanel() {
 	Panel p = { 0 };
 	SetupPanel(&p, "Diagnostics");
 	p.draw = DrawDevPanel;
+    p.scrollable = TRUE;
 	return p;
 }

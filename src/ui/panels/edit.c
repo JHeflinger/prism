@@ -1,10 +1,8 @@
 #include "edit.h"
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
-#include "renderer/rmath.h"
 #include "ui/shared.h"
-#include <easylogger.h>
-#include <raymath.h>
+#include <util/logger.h>
 
 typedef enum {
     EDIT_MATERIAL,
@@ -20,68 +18,6 @@ static size_t g_edit_item_index = 0;
 static BOOL g_item_selected = FALSE;
 static EditType g_edit_type = EDIT_MATERIAL;
 static const char* g_light_types[] = { "Directional", "Spot", "Point" };
-
-void SetEditMaterial(size_t index) {
-    g_item_selected = TRUE;
-    g_edit_item_index = index;
-    g_edit_type = EDIT_MATERIAL;
-    SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((VertexID)-1);
-}
-
-void SetEditLight(size_t index) {
-    g_item_selected = TRUE;
-    g_edit_item_index = index;
-    g_edit_type = EDIT_LIGHT;
-    SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((VertexID)-1);
-}
-
-void SetEditTriangle(size_t index) {
-    g_item_selected = TRUE;
-    g_edit_item_index = index;
-    g_edit_type = EDIT_SINGLE_TRIANGLE;
-    SetSelectedVertex((VertexID)-1);
-    SetSelectedTriangle(index);
-}
-
-void SetEditVertex(size_t index) {
-    g_item_selected = TRUE;
-    g_edit_item_index = index;
-    g_edit_type = EDIT_SINGLE_VERTEX;
-    SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex(index);
-}
-
-void SetEditForce(size_t index) {
-    g_item_selected = TRUE;
-    g_edit_item_index = index;
-    g_edit_type = EDIT_SINGLE_FORCE;
-    SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((VertexID)-1);
-}
-
-void SetEditSource(size_t index) {
-    g_item_selected = TRUE;
-    g_edit_item_index = index;
-    g_edit_type = EDIT_SINGLE_SOURCE;
-    SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((VertexID)-1);
-}
-
-void SetEditMesh(size_t index) {
-    g_item_selected = TRUE;
-    g_edit_item_index = index;
-    g_edit_type = EDIT_MESH;
-    SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((VertexID)-1);
-}
-
-void DeselectEditTarget() {
-    g_item_selected = FALSE;
-    SetSelectedTriangle((TriangleID)-1);
-    SetSelectedVertex((VertexID)-1);
-}
 
 static void DrawEditPanel(float width, float height) {
     if (g_item_selected) {
@@ -197,13 +133,6 @@ static void DrawEditPanel(float width, float height) {
             UIMoveCursor(140, -20);
             UIDropdownMenu(sboxwidth, 3, LightModelLabels(), DropdownSelectLightModel, matref);
             if (edited) UpdateMaterials();
-            if (g_edit_item_index != 0) {
-                if (UIGetCursor().y + 60 < height) {
-                    UISetCursor(UIGetCursor().x, height - 60);
-                }
-                UIMoveCursor((width - 20 - 200) / 2.0f, 0);
-                if (UIButton("Delete", 200)) EZ_WARN("This functionality is not implemented yet");
-            }
         } else if (g_edit_type == EDIT_LIGHT) {
             BOOL edited = FALSE;
             SceneLight* lref = LightReference(g_edit_item_index);
@@ -273,11 +202,6 @@ static void DrawEditPanel(float width, float height) {
             UIMoveCursor(140, -20);
             edited |= UIDragFloat(&(lref->angle), 0, FLT_MAX, 0.1f, sboxwidth);
             if (edited) UpdateLights();
-            if (UIGetCursor().y + 60 < height) {
-                UISetCursor(UIGetCursor().x, height - 60);
-            }
-            UIMoveCursor((width - 20 - 200) / 2.0f, 0);
-            if (UIButton("Delete", 200)) EZ_WARN("This functionality is not implemented yet");
         } else if (g_edit_type == EDIT_SINGLE_TRIANGLE) {
             BOOL edited = FALSE;
             Triangle* tref = TriangleReference(g_edit_item_index);
@@ -350,11 +274,6 @@ static void DrawEditPanel(float width, float height) {
             glm_vec3_add(VertexReference(tref->b), adiff, VertexReference(tref->b));
             glm_vec3_add(VertexReference(tref->c), adiff, VertexReference(tref->c));
             if (edited) UpdateVertices();
-            if (UIGetCursor().y + 60 < height) {
-                UISetCursor(UIGetCursor().x, height - 60);
-            }
-            UIMoveCursor((width - 20 - 200) / 2.0f, 0);
-            if (UIButton("Delete", 200)) EZ_WARN("This functionality is not implemented yet");
         } else if (g_edit_type == EDIT_SINGLE_VERTEX) {
             BOOL edited = FALSE;
             float* vref = VertexReference(g_edit_item_index);
@@ -387,11 +306,6 @@ static void DrawEditPanel(float width, float height) {
                 else UnlockVertex(g_edit_item_index);
                 UpdateVertices();
             }
-            if (UIGetCursor().y + 60 < height) {
-                UISetCursor(UIGetCursor().x, height - 60);
-            }
-            UIMoveCursor((width - 20 - 200) / 2.0f, 0);
-            if (UIButton("Delete", 200)) EZ_WARN("This functionality is not implemented yet");
         } else if (g_edit_type == EDIT_SINGLE_SOURCE) {
             BOOL edited = FALSE;
             FluidSimulation* fsim = &(RendererGeometry()->fluid);
@@ -602,9 +516,72 @@ static void DrawEditPanel(float width, float height) {
     }
 }
 
+void SetEditMaterial(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_MATERIAL;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
+}
+
+void SetEditLight(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_LIGHT;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
+}
+
+void SetEditTriangle(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_SINGLE_TRIANGLE;
+    SetSelectedVertex((VertexID)-1);
+    SetSelectedTriangle(index);
+}
+
+void SetEditVertex(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_SINGLE_VERTEX;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex(index);
+}
+
+void SetEditForce(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_SINGLE_FORCE;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
+}
+
+void SetEditSource(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_SINGLE_SOURCE;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
+}
+
+void SetEditMesh(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_MESH;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
+}
+
+void DeselectEditTarget() {
+    g_item_selected = FALSE;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
+}
+
 Panel GenerateEditPanel() {
 	Panel p = { 0 };
 	SetupPanel(&p, "Edit Selected");
+    p.scrollable = TRUE;
 	p.draw = DrawEditPanel;
 	return p;
 }

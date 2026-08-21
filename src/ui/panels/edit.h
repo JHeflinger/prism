@@ -1,8 +1,7 @@
 #ifndef EDIT_H
 #define EDIT_H
 
-#include "ui/ui.h"
-#include "renderer/rstructs.h"
+#include <ui/ui.h>
 
 void SetEditMaterial(size_t index);
 

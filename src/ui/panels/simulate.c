@@ -108,5 +108,6 @@ Panel GenerateSimulatePanel() {
 	Panel p = { 0 };
 	SetupPanel(&p, "Simulate");
 	p.draw = DrawSimulatePanel;
+    p.scrollable = TRUE;
 	return p;
 }

@@ -2,11 +2,9 @@
 #include "renderer/renderer.h"
 #include "renderer/loader.h"
 #include "renderer/rmath.h"
-#include "data/colors.h"
-#include "data/input.h"
+#include <data/colors.h>
+#include <util/logger.h>
 #include <ui/popup.h>
-#include <easymemory.h>
-#include <easylogger.h>
 #include <nfd.h>
 
 static char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric" };
@@ -25,86 +23,6 @@ static char g_force_name[MAX_FORCE_NAME_SIZE] = "Untitled Force";
 static char g_source_name[MAX_SOURCE_NAME_SIZE] = "Untitled Source";
 static char g_object_name[MAX_MESH_NAME_SIZE] = "Untitled Object";
 static Triangle g_dummy_triangle = { 0 };
-
-size_t DropdownSelectSimVisual(void* data, size_t index, BOOL cancel) {
-    if (index == (size_t)-1) {
-        return RendererGeometry()->fluid.style;
-    } else {
-        RendererGeometry()->fluid.style = index;
-    }
-    return index;
-}
-
-size_t DropdownSelectMaterial(void* data, size_t index, BOOL cancel) {
-    Triangle* triref = (Triangle*)data;
-    if (index == (size_t)-1) return triref->material;
-    triref->material = index;
-    if (NumTriangles() != 0) UpdateTriangles();
-    return index;
-}
-
-size_t DropdownSelectLightModel(void* data, size_t index, BOOL cancel) {
-    SurfaceMaterial* matref = (SurfaceMaterial*)data;
-    if (index == (size_t)-1) {
-        switch (matref->model) {
-            case 2: return 0;
-            case 5: return 1;
-            case 7: return 2;
-            default: return 0;
-        }
-    } else {
-        switch (index) {
-            case 0:
-                matref->model = 2;
-                break;
-            case 1:
-                matref->model = 5;
-                break;
-            case 2:
-                matref->model = 7;
-                break;
-            default: break;
-        }
-        UpdateMaterials();
-    }
-    return index;
-}
-
-size_t DropdownSelectARAPModel(void* data, size_t index, BOOL cancel) {
-    if (index == (size_t)-1) {
-        return RenderConfig()->arap.style;
-    } else {
-        RenderConfig()->arap.style = index;
-    }
-    return index;
-}
-
-size_t DropdownSelectAnimation(void* data, size_t index, BOOL cancel) {
-    MeshAnimation* animation = (MeshAnimation*)data;
-    if (index != (size_t)-1) SwitchAnimation(animation, index);
-    return animation->current;
-}
-
-size_t DropdownSelectDebugMode(void* data, size_t index, BOOL cancel) {
-    if (index != (size_t)-1) RenderConfig()->debug = (DebugConfig)index;
-    return RenderConfig()->debug;
-}
-
-char** SimVisualLabels() {
-    return g_sim_visual_labels;
-}
-
-char** LightModelLabels() {
-    return g_lightmodel_labels;
-}
-
-char** ARAPModelLabels() {
-    return g_arapmodel_labels;
-}
-
-char** DebugModeLabels() {
-    return g_debugmode_labels;
-}
 
 static int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 250;
@@ -134,11 +52,11 @@ static int add_obj_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     nfdchar_t* outpath = NULL;
     nfdresult_t result = NFD_OpenDialog("obj", NULL, &outpath);
     if (result == NFD_OKAY) {
-        if (!LoadOBJ(outpath)) EZ_ERROR("Unable to load obj file \"%s\"", outpath);
+        if (!LoadOBJ(outpath)) logerror("Unable to load obj file \"%s\"", outpath);
     } else if (result == NFD_CANCEL) {
 
     } else {
-        EZ_ERROR("Unable to open file due to NFD error: %s", NFD_GetError());
+        logerror("Unable to open file due to NFD error: %s", NFD_GetError());
     }
     return 0;
 }
@@ -355,7 +273,7 @@ static int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(xpos + 165, -20);
     UIDragFloat(&(g_scene_light.angle), 0, 360.0f, 0.1f, 200);
     UIMoveCursor(xpos, 5);
-    
+
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
         SubmitNamedLight(g_scene_light, g_light_name);
@@ -577,15 +495,15 @@ static int add_fluid_force_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(xpos, 0);
     UIDrawText("x");
     UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_fluid_force.force[0]), 0, FLT_MAX, 0.001f, 100);
+    UIDragFloat(&(g_fluid_force.force[0]), -FLT_MAX, FLT_MAX, 0.001f, 100);
     UIMoveCursor(xpos + 125, -20);
     UIDrawText("y");
     UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_fluid_force.force[1]), 0, FLT_MAX, 0.001f, 100);
+    UIDragFloat(&(g_fluid_force.force[1]), -FLT_MAX, FLT_MAX, 0.001f, 100);
     UIMoveCursor(xpos + 250, -20);
     UIDrawText("z");
     UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_fluid_force.force[2]), 0, FLT_MAX, 0.001f, 100);
+    UIDragFloat(&(g_fluid_force.force[2]), -FLT_MAX, FLT_MAX, 0.001f, 100);
 
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
@@ -674,6 +592,85 @@ static int add_fluid_source_stage_0(size_t x, size_t y, size_t w, size_t h) {
     return -1;
 }
 
+size_t DropdownSelectSimVisual(void* data, size_t index, BOOL cancel) {
+    if (index == (size_t)-1) {
+        return RendererGeometry()->fluid.style;
+    } else {
+        RendererGeometry()->fluid.style = index;
+    }
+    return index;
+}
+
+size_t DropdownSelectMaterial(void* data, size_t index, BOOL cancel) {
+    Triangle* triref = (Triangle*)data;
+    if (index == (size_t)-1) return triref->material;
+    triref->material = index;
+    if (NumTriangles() != 0) UpdateTriangles();
+    return index;
+}
+
+size_t DropdownSelectLightModel(void* data, size_t index, BOOL cancel) {
+    SurfaceMaterial* matref = (SurfaceMaterial*)data;
+    if (index == (size_t)-1) {
+        switch (matref->model) {
+            case 2: return 0;
+            case 5: return 1;
+            case 7: return 2;
+            default: return 0;
+        }
+    } else {
+        switch (index) {
+            case 0:
+                matref->model = 2;
+                break;
+            case 1:
+                matref->model = 5;
+                break;
+            case 2:
+                matref->model = 7;
+                break;
+            default: break;
+        }
+        UpdateMaterials();
+    }
+    return index;
+}
+
+size_t DropdownSelectARAPModel(void* data, size_t index, BOOL cancel) {
+    if (index == (size_t)-1) {
+        return RenderConfig()->arap.style;
+    } else {
+        RenderConfig()->arap.style = index;
+    }
+    return index;
+}
+
+size_t DropdownSelectAnimation(void* data, size_t index, BOOL cancel) {
+    MeshAnimation* animation = (MeshAnimation*)data;
+    if (index != (size_t)-1) SwitchAnimation(animation, index);
+    return animation->current;
+}
+
+size_t DropdownSelectDebugMode(void* data, size_t index, BOOL cancel) {
+    if (index != (size_t)-1) RenderConfig()->debug = (DebugConfig)index;
+    return RenderConfig()->debug;
+}
+
+char** SimVisualLabels() {
+    return g_sim_visual_labels;
+}
+
+char** LightModelLabels() {
+    return g_lightmodel_labels;
+}
+
+char** ARAPModelLabels() {
+    return g_arapmodel_labels;
+}
+
+char** DebugModeLabels() {
+    return g_debugmode_labels;
+}
 Popup* GenerateAddObjectPopup() {
     Popup* popup = GenerateEmptyPopup();
     popup->options = 4;

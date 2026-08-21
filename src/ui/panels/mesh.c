@@ -74,5 +74,6 @@ Panel GenerateMeshPanel() {
 	Panel p = { 0 };
 	SetupPanel(&p, "Mesh");
 	p.draw = DrawMeshPanel;
+    p.scrollable = TRUE;
 	return p;
 }

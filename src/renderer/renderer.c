@@ -338,7 +338,7 @@ void InitializeRenderer() {
     }
 
     // configure stat profiler
-    ConfigureProfile(&(g_renderer.stats.profile), "Renderer", 10);
+    ez_configure_profile(&(g_renderer.stats.profile), "Renderer", 10);
 
     // configure GPU stat cache
     g_renderer.stats.cache.update_interval = 1.0;
@@ -688,7 +688,7 @@ void Render() {
     // detect changes in described data
     if (async_update) {
         // profile for stats
-        BeginProfile(&(g_renderer.stats.profile));
+        ez_begin_profile(&(g_renderer.stats.profile));
 
         // recompute min/max
         if (g_renderer.geometry.changes.update_meshes || g_renderer.geometry.changes.update_vertices) {
@@ -816,7 +816,7 @@ void Render() {
         glBindTexture(GL_TEXTURE_2D, 0);
 
         // end profiling
-        EndProfile(&(g_renderer.stats.profile));
+        ez_end_profile(&(g_renderer.stats.profile));
     } else {
         async_update = FALSE;
     }
@@ -827,10 +827,10 @@ void Render() {
 static void DrawHelper(float x, float y, float w, float h, float maxw, float maxh) {
     ClearBackground(BLACK);
     BeginBlendMode(BLEND_ADDITIVE);
-    float diffw = w - g_renderer.dimensions.x;
-    float diffh = h - g_renderer.dimensions.y;
-    float psuedo_w = diffw > diffh ? g_renderer.dimensions.x : g_renderer.dimensions.y * (w / h);
-    float psuedo_h = diffh > diffw ? g_renderer.dimensions.y : g_renderer.dimensions.x * (h / w);
+    float diffw = g_renderer.dimensions.x / w;//w - g_renderer.dimensions.x;
+    float diffh = g_renderer.dimensions.y / h;//h - g_renderer.dimensions.y;
+    float psuedo_w = diffw < diffh ? g_renderer.dimensions.x : g_renderer.dimensions.y * (w / h);
+    float psuedo_h = diffh < diffw ? g_renderer.dimensions.y : g_renderer.dimensions.x * (h / w);
     if (g_renderer.config.flags & PATHTRACE_SHADER_FLAG) {
         for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
             DrawTexturePro(
@@ -866,7 +866,7 @@ void Draw(float x, float y, float w, float h) {
 }
 
 float RenderTime() {
-    return ProfileResult(&(g_renderer.stats.profile));
+    return ez_profile_result(&(g_renderer.stats.profile));
 }
 
 size_t NumNormals() {
