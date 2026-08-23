@@ -7,7 +7,6 @@ ICEBOX:
 3. Wiki + Info buttons
 5. Reimplement SDFs properly, represent in scene as boxes if marching isn't enabled, otherwise march instead of trace
 6. Volumetrics
-9. Spectral
 12. Delete buttons on edit panel
 12. Rotate triangles
 13. Extrude triangles

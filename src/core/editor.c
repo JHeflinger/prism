@@ -10,14 +10,16 @@
 #include "ui/panels/mesh.h"
 #include <ui/panels/console.h>
 #include <ui/panels/graph.h>
-#include <core/binds.h>
+#include <core/entrypoint.h>
 #include <core/config.h>
+#include <core/binds.h>
 #include <data/colors.h>
 #include <data/fonts.h>
 
 static UI* g_ui = NULL;
 static Vector2 g_windowsize = { -1.0f, -1.0f };
 static ARRLIST_Panel g_shared_panels = { 0 };
+static ARRLIST_UIConfig g_default_ui_config = { 0 };
 
 static void InitEditor() {
 	SetTraceLogLevel(LOG_NONE);
@@ -40,22 +42,21 @@ static void InitEditor() {
     ARRLIST_Panel_add(&g_shared_panels, GenerateMeshPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateGraphPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateConsolePanel());
-    ARRLIST_UIConfig default_config = { 0 };
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, 1250.0f, FALSE, TRUE, TRUE, FALSE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, 350.0f, FALSE, TRUE, TRUE, FALSE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, GetScreenHeight() - 420.0f, TRUE, TRUE, TRUE, FALSE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Edit Selected", 0.0f, FALSE, FALSE, FALSE, TRUE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Mesh", 0.0f, FALSE, FALSE, FALSE, FALSE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Profiling", 0.0f, FALSE, FALSE, FALSE, TRUE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Console", 0.0f, FALSE, FALSE, FALSE, FALSE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Viewport", 0.0f, FALSE, FALSE, FALSE, FALSE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){{ 0 }, GetScreenHeight() - 360.0f, TRUE, TRUE, TRUE, FALSE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, TRUE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Actions", 0.0f, FALSE, FALSE, FALSE, FALSE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, TRUE});
-    ARRLIST_UIConfig_add(&default_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE});
-    SetUIConfig(&default_config);
-    ARRLIST_UIConfig_clear(&default_config);
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, 1250.0f, FALSE, TRUE, TRUE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, 350.0f, FALSE, TRUE, TRUE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, GetScreenHeight() - 420.0f, TRUE, TRUE, TRUE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Edit Selected", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Mesh", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Profiling", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Console", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Viewport", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, GetScreenHeight() - 360.0f, TRUE, TRUE, TRUE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Actions", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    PreloadExtensions();
+    SetUIConfig(&g_default_ui_config);
     LoadUIConfig(&g_ui, g_shared_panels);
     DevInitialize();
 }
@@ -91,9 +92,18 @@ static void CleanEditor() {
     CleanConfig();
 	for (size_t i = 0; i < g_shared_panels.size; i++) DestroyPanel(&(g_shared_panels.data[i]));
     ARRLIST_Panel_clear(&g_shared_panels);
+    ARRLIST_UIConfig_clear(&g_default_ui_config);
     CleanConsoleLogs();
     CleanNotifications();
     CloseWindow();
+}
+
+ARRLIST_Panel* EditorSharedPanels() {
+    return &g_shared_panels;
+}
+
+ARRLIST_UIConfig* EditorDefaultUIConfig() {
+    return &g_default_ui_config;
 }
 
 void RunEditor() {

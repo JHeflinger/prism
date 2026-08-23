@@ -20,3 +20,6 @@ PORT build/expanded
 PORT assets
 
 DEFINE PRISM
+
+# EXTRA MODULES AND EXTENSIONS
+MODULE crys https://github.com/JHeflinger/crys.git .
