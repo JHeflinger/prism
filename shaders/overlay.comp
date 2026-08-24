@@ -132,7 +132,7 @@ void outline_triangle() {
 
 void main() {
     calculate_highlight_color();
-    if (o_ubo.divisor == 1.0)
+    if (o_ubo.divisor == 1.0 && o_ubo.wireframe != 0)
         outline_triangle();
     if (o_ubo.mode == TRIANGLE_SELECT)
         highlight_triangle(hovered_tid);

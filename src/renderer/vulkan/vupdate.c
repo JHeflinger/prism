@@ -469,6 +469,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.single_selected_vid = GetSelectedVertex();
         ubo.divisor = g_vupdt_renderer_ref->config.flags & PATHTRACE_SHADER_FLAG ? CPUSWAP_LENGTH : 1;
         ubo.mode = GetOverlayMode();
+        ubo.wireframe = (uint32_t)g_vupdt_renderer_ref->config.wireframe;
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
 

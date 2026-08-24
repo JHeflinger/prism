@@ -435,6 +435,7 @@ typedef struct {
     BOOL scenelightshadows;
     BOOL spectral;
     BOOL screenspace;
+    BOOL wireframe;
     BOOL reset;
     DebugConfig debug;
     PipelineFlags flags;

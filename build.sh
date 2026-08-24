@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # create all build directories if it does not exist
 if [ ! -d "build" ]; then
     mkdir "build"

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 if [ -d "build/cache" ]; then
     rm -rf build/cache
 fi

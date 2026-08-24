@@ -286,6 +286,7 @@ void InitializeRenderer() {
     g_renderer.config.scenelightshadows = FALSE;
     g_renderer.config.spectral = FALSE;
     g_renderer.config.screenspace = TRUE;
+    g_renderer.config.wireframe = TRUE;
     g_renderer.config.normals = TRUE;
     g_renderer.config.reset = FALSE;
     g_renderer.config.debug = DEBUG_NONE;

@@ -83,6 +83,7 @@ export OverlayUniformBufferObjectDef {
         uint single_selected_vid;
         uint divisor;
         uint mode;
+        uint wireframe;
     }
 }
 

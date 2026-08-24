@@ -63,6 +63,7 @@ static void DrawDevPanel(float width, float height) {
 
     UIMoveCursor(0, 20.0f);
     UICheckboxLabeled("Grid:", &(RenderConfig()->grid));
+    UICheckboxLabeled("Wireframe:", &(RenderConfig()->wireframe));
     UICheckboxLabeled("Smooth Normals:", &(RenderConfig()->normals));
     BOOL preview = !(RenderConfig()->flags & PATHTRACE_SHADER_FLAG);
     UICheckboxLabeled("Preview:", &preview);
