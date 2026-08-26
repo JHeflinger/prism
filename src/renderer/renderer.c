@@ -251,8 +251,12 @@ void SetPipelineFlags(PipelineFlags flags) {
 }
 
 void SetViewportSlice(size_t w, size_t h) {
-	float psuedo_w = w * (g_renderer.dimensions.x / (float)GetScreenWidth());
-	float psuedo_h = h * (g_renderer.dimensions.y / (float)GetScreenHeight());
+    const float fw = (float)w;
+    const float fh = (float)h;
+    const float diffw = g_renderer.dimensions.x / fw;
+    const float diffh = g_renderer.dimensions.y / fh;
+    const float psuedo_w = diffw < diffh ? g_renderer.dimensions.x : g_renderer.dimensions.y * (fw / fh);
+    const float psuedo_h = diffh < diffw ? g_renderer.dimensions.y : g_renderer.dimensions.x * (fh / fw);
     g_renderer.viewport = (Vector2) { ceil(psuedo_w), ceil(psuedo_h) };
 }
 
