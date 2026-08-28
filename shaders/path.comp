@@ -21,6 +21,7 @@ layout(binding = 8) readonly #import NormalSSBODef;
 layout(binding = 9) readonly #import LightSSBODef;
 
 #import CutViewport
+#import EpsilonOffset
 #import TriangleIntersectSuite
 
 const float max_contribution = 10;
@@ -237,7 +238,7 @@ vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     vec3 to_light = pos - h.position;
     float dist = length(to_light);
     to_light = normalize(to_light);
-    Ray sray = { h.position + to_light * EPS, to_light };
+    Ray sray = { epsilon_offset(h.position, h.normal), to_light };
     uint tid = 0;
     Hit shit = trace(sray, tid);
     if (eid != tid || shit.distance <= 0.0) return vec3(0.0);
@@ -278,7 +279,7 @@ vec3 sample_scene_lights(vec3 outgoing, Hit h, Material material) {
         float ndotl = max(dot(incoming, h.normal), 0.0);
         if (ndotl <= 0) continue;
         if (ubo.scenelightshadows != 0) {
-            Ray sray = { h.position + (incoming * (EPS * 100)), incoming };
+            Ray sray = { epsilon_offset(h.position, h.normal), incoming };
             uint tid;
             Hit shit = trace(sray, tid);
             if (shit.distance > 0 && shit.distance < distance_to_light) continue;
@@ -456,7 +457,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         float p = russian_roulette(throughput);
         if (random() > p) break;
         throughput /= p;
-        ray.position = h.position + (incoming * EPS);
+        ray.position = epsilon_offset(h.position, dot(incoming, h.normal) > 0.0 ? h.normal : -h.normal);
         ray.direction = incoming;
         if (material.model != LAMBERTIAN_MODEL) count_emission = true;
         else count_emission = ubo.direct == 0;
