@@ -662,6 +662,7 @@ void Render() {
                     g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize; \
                     if (!resized_buffers) { \
                         resized_buffers = TRUE; \
+                    	if (is_transferring) VUTIL_EndTransferCommands(); \
                         is_transferring = TRUE; \
                         VUTIL_BeginTransferCommands(); \
                         vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, \
