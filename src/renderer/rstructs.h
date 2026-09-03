@@ -442,4 +442,10 @@ typedef struct {
     ARAPConfig arap;
 } RendererConfig;
 
+typedef struct {
+    SimpleCamera core;
+    RendererConfig config;
+} SceneCamera;
+DECLARE_ARRLIST(SceneCamera);
+
 #endif

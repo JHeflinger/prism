@@ -296,9 +296,9 @@ typedef struct {
     CPUSwap swapchain;
     Vector2 dimensions;
     Geometry geometry;
-    SimpleCamera camera;
     Vector2 viewport;
-    RendererConfig config;
+    ARRLIST_SceneCamera cameras;
+    size_t primary;
 } Renderer;
 
 #endif

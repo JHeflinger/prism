@@ -91,15 +91,15 @@ static void DrawDevPanel(float width, float height) {
     UIDrawText("Triangles: %d", (int)NumTriangles());
     UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
 
-    SimpleCamera c = GetCamera();
-    SimpleCamera oldc = GetCamera();
+    SimpleCamera c = RendererCamera()->core;
+    SimpleCamera oldc = RendererCamera()->core;
     BOOL used = FALSE;
     UIMoveCursor(0, 20.0f);
     UIDragFloatLabeled("Aperature:", &(c.aperature), 0.0f, 999999999.0f, 0.01f, width - 20);
     used |= UIWasJustUsed();
     UIDragFloatLabeled("Focus:", &(c.focus), 0.0f, 999999999.0f, 0.01f, width - 20);
     used |= UIWasJustUsed();
-	if (memcmp(&c, &oldc, sizeof(SimpleCamera))) MoveCamera(c);
+	if (memcmp(&c, &oldc, sizeof(SimpleCamera))) RendererCamera()->core = c;
     RenderConfig()->showdof = used;
 }
 

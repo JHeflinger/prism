@@ -15,14 +15,14 @@ static Vector2 g_viewport_position = { 0 };
 static Vector2 g_viewport_dimensions = { 0 };
 
 static void ResetViewportCamera() {
-    SimpleCamera camera = GetCamera();
+    SimpleCamera camera = RendererCamera()->core;
     SETVEC3(camera.position, 0.0f, 2.133f, 2.11f);
     SETVEC3(camera.look, 0.0f, 0.0f, 0.0f);
     SETVEC3(camera.up, 0.0f, 1.0f, 0.0f);
     camera.fov = 90.0f;
     camera.aperature = 0.0f;
     camera.focus = 0.0f;
-    MoveCamera(camera);
+    RendererCamera()->core = camera;
 }
 
 static void ToggleHints() {
@@ -31,7 +31,7 @@ static void ToggleHints() {
 
 static void RotateCameraControls() {
     if (g_rfocused) {
-        SimpleCamera camera = GetCamera();
+        SimpleCamera camera = RendererCamera()->core;
         vec3 offset;
         glm_vec3_sub(camera.position, camera.look, offset);
         float radius = glm_vec3_norm(offset);
@@ -43,7 +43,7 @@ static void RotateCameraControls() {
         camera.position[0] = camera.look[0] + (radius * sin(phi) * cos(theta));
         camera.position[1] = camera.look[1] + (radius * cos(phi));
         camera.position[2] = camera.look[2] + (radius * sin(phi) * sin(theta));
-        MoveCamera(camera);
+        RendererCamera()->core = camera;
     }
 }
 
@@ -59,7 +59,7 @@ static void ZoomCameraControls() {
         float to_previous = glm_vec2_norm(o2p);
         float to_current = glm_vec2_norm(o2c);
         float mousedelta_offset = glm_vec2_norm(mousedelta);
-        SimpleCamera camera = GetCamera();
+        SimpleCamera camera = RendererCamera()->core;
         vec3 offset;
         glm_vec3_sub(camera.position, camera.look, offset);
         float radius = glm_vec3_norm(offset);
@@ -69,13 +69,13 @@ static void ZoomCameraControls() {
         glm_vec3_normalize(offset);
         glm_vec3_scale(offset, radius, offset);
         glm_vec3_add(camera.look, offset, camera.position);
-        if (rbefore != radius) MoveCamera(camera);
+        if (rbefore != radius) RendererCamera()->core = camera;
     }
 }
 
 static void PanCameraControls() {
     if (g_lfocused) {
-        SimpleCamera camera = GetCamera();
+        SimpleCamera camera = RendererCamera()->core;
         vec3 offset;
         glm_vec3_sub(camera.position, camera.look, offset);
         float radius = glm_vec3_norm(offset);
@@ -100,7 +100,7 @@ static void PanCameraControls() {
         camera.position[0] = camera.look[0] + (radius * sin(phi) * cos(theta));
         camera.position[1] = camera.look[1] + (radius * cos(phi));
         camera.position[2] = camera.look[2] + (radius * sin(phi) * sin(theta));
-        MoveCamera(camera);
+        RendererCamera()->core = camera;
     }
 }
 
@@ -111,7 +111,7 @@ static void PanSelectedObject() {
             float* vref = VertexReference(GetSelectedVertex());
             glm_vec3_copy(vref, selected);
         } else return;
-        SimpleCamera camera = GetCamera();
+        SimpleCamera camera = RendererCamera()->core;
         CameraUVW(camera, u, v, w);
         glm_vec3_scale(w, -1.0f, _w);
         glm_vec3_sub(selected, camera.position, offset);
@@ -169,7 +169,7 @@ static void UpdateViewportPanel(float width, float height) {
 
     // camera scroll zoom
     {
-        SimpleCamera camera = GetCamera();
+        SimpleCamera camera = RendererCamera()->core;
         vec3 offset;
         glm_vec3_sub(camera.position, camera.look, offset);
         float radius = glm_vec3_norm(offset);
@@ -179,7 +179,7 @@ static void UpdateViewportPanel(float width, float height) {
         glm_vec3_normalize(offset);
         glm_vec3_scale(offset, radius, offset);
         glm_vec3_add(camera.look, offset, camera.position);
-        if (rbefore != radius) MoveCamera(camera);
+        if (rbefore != radius) RendererCamera()->core = camera;
     }
 
     // selection controls

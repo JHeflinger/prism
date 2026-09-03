@@ -183,9 +183,9 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     // bvh configuration
     if (g_vupdt_renderer_ref->geometry.changes.update_bvh) {
         g_vupdt_renderer_ref->geometry.changes.update_bvh--;
-        g_vupdt_renderer_ref->config.flags |= BVH_PIPELINE_FLAGS;
+        RendererCamera()->config.flags |= BVH_PIPELINE_FLAGS;
     } else {
-        g_vupdt_renderer_ref->config.flags &= ~(BVH_PIPELINE_FLAGS);
+        RendererCamera()->config.flags &= ~(BVH_PIPELINE_FLAGS);
     }
 
     // execute shader stages
@@ -197,8 +197,8 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i], \
             VK_SHADER_STAGE_COMPUTE_BIT, \
             0, sizeof(VulkanPushConstants), &pc);}
-    PipelineFlags pflags = g_vupdt_renderer_ref->config.flags;
-    if (g_vupdt_renderer_ref->config.debug == DEBUG_BOUNCES) {
+    PipelineFlags pflags = RendererCamera()->config.flags;
+    if (RendererCamera()->config.debug == DEBUG_BOUNCES) {
         pflags |= (PATHTRACE_SHADER_FLAG | TONEMAP_SHADER_FLAG);
         pflags &= ~OVERLAY_SHADER_FLAG;
     }
@@ -399,14 +399,14 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     static SimpleCamera old_camera = { 0 };
     static PipelineFlags old_flags = 0;
     static int reset_count = 0;
-    if (old_camera.fov == 0.0f) old_camera = g_vupdt_renderer_ref->camera;
-    if (old_flags == 0) old_flags = g_vupdt_renderer_ref->config.flags;
-    if (g_vupdt_renderer_ref->config.reset || old_flags != g_vupdt_renderer_ref->config.flags ||
-        memcmp(&old_camera, &(g_vupdt_renderer_ref->camera), sizeof(SimpleCamera)) != 0)
+    if (old_camera.fov == 0.0f) old_camera = RendererCamera()->core;
+    if (old_flags == 0) old_flags = RendererCamera()->config.flags;
+    if (RendererCamera()->config.reset || old_flags != RendererCamera()->config.flags ||
+        memcmp(&old_camera, &(RendererCamera()->core), sizeof(SimpleCamera)) != 0)
         reset_count = CPUSWAP_LENGTH;
-    g_vupdt_renderer_ref->config.reset = FALSE;
-    old_camera = g_vupdt_renderer_ref->camera;
-    old_flags = g_vupdt_renderer_ref->config.flags;
+    RendererCamera()->config.reset = FALSE;
+    old_camera = RendererCamera()->core;
+    old_flags = RendererCamera()->config.flags;
     BOOL cam_reset = reset_count != 0;
     if (reset_count > 0) reset_count--;
 
@@ -418,14 +418,15 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     // core uniform buffer
     {
         UniformBufferObject ubo = { 0 };
-        glm_vec3_copy(g_vupdt_renderer_ref->camera.position, ubo.position);
-        glm_vec3_copy(g_vupdt_renderer_ref->camera.look, ubo.look);
+        SimpleCamera camera = RendererCamera()->core;
+        glm_vec3_copy(camera.position, ubo.position);
+        glm_vec3_copy(camera.look, ubo.look);
         glm_vec3_sub(ubo.look, ubo.position, ubo.look);
-        glm_vec3_copy(g_vupdt_renderer_ref->camera.up, ubo.up);
+        glm_vec3_copy(camera.up, ubo.up);
         glm_vec3_normalize(ubo.up);
         glm_vec3_normalize(ubo.look);
-        CameraUVW(g_vupdt_renderer_ref->camera, ubo.u, ubo.v, ubo.w);
-        ubo.fov = glm_rad(g_vupdt_renderer_ref->camera.fov);
+        CameraUVW(camera, ubo.u, ubo.v, ubo.w);
+        ubo.fov = glm_rad(camera.fov);
         ubo.width = g_vupdt_renderer_ref->dimensions.x;
         ubo.height = g_vupdt_renderer_ref->dimensions.y;
         ubo.triangles = g_vupdt_renderer_ref->geometry.triangles.size;
@@ -435,26 +436,26 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.frametime = RenderFrameTime();
         ubo.seed = rand();
         ubo.lights = g_vupdt_renderer_ref->geometry.lights.size;
-        ubo.grid = (uint32_t)g_vupdt_renderer_ref->config.grid;
+        ubo.grid = (uint32_t)RendererCamera()->config.grid;
         ubo.reset = cam_reset;
         ubo.samples = samples;
-        ubo.direct = g_vupdt_renderer_ref->config.direct;
+        ubo.direct = RendererCamera()->config.direct;
         ubo.lightarea = g_vupdt_renderer_ref->geometry.lightarea;
-        ubo.whitepoint = g_vupdt_renderer_ref->config.whitepoint*g_vupdt_renderer_ref->config.whitepoint;
-        ubo.gamma = g_vupdt_renderer_ref->config.gamma;
+        ubo.whitepoint = RendererCamera()->config.whitepoint*RendererCamera()->config.whitepoint;
+        ubo.gamma = RendererCamera()->config.gamma;
         ubo.swap = CPUSWAP_LENGTH;
-        ubo.showdof = g_vupdt_renderer_ref->config.showdof;
-        ubo.aperature = g_vupdt_renderer_ref->camera.aperature;
-        ubo.focus = g_vupdt_renderer_ref->camera.focus;
-        ubo.normals = g_vupdt_renderer_ref->config.normals;
-        ubo.directonly = g_vupdt_renderer_ref->config.directonly;
-        ubo.scenelighting = g_vupdt_renderer_ref->config.scenelighting;
-        ubo.scenelightingonly = g_vupdt_renderer_ref->config.scenelightingonly;
-        ubo.scenelightshadows = g_vupdt_renderer_ref->config.scenelightshadows;
-        ubo.debugmode = (uint32_t)g_vupdt_renderer_ref->config.debug;
-        ubo.maxbounces = (uint32_t)g_vupdt_renderer_ref->config.maxbounces;
-        ubo.spectral = (uint32_t)g_vupdt_renderer_ref->config.spectral;
-        ubo.screenspace = (uint32_t)g_vupdt_renderer_ref->config.screenspace;
+        ubo.showdof = RendererCamera()->config.showdof;
+        ubo.aperature = camera.aperature;
+        ubo.focus = camera.focus;
+        ubo.normals = RendererCamera()->config.normals;
+        ubo.directonly = RendererCamera()->config.directonly;
+        ubo.scenelighting = RendererCamera()->config.scenelighting;
+        ubo.scenelightingonly = RendererCamera()->config.scenelightingonly;
+        ubo.scenelightshadows = RendererCamera()->config.scenelightshadows;
+        ubo.debugmode = (uint32_t)RendererCamera()->config.debug;
+        ubo.maxbounces = (uint32_t)RendererCamera()->config.maxbounces;
+        ubo.spectral = (uint32_t)RendererCamera()->config.spectral;
+        ubo.screenspace = (uint32_t)RendererCamera()->config.screenspace;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 
@@ -467,9 +468,9 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 		ubo.image_height = g_vupdt_renderer_ref->dimensions.y;
         ubo.single_selected_tid = GetSelectedTriangle();
         ubo.single_selected_vid = GetSelectedVertex();
-        ubo.divisor = g_vupdt_renderer_ref->config.flags & PATHTRACE_SHADER_FLAG ? CPUSWAP_LENGTH : 1;
+        ubo.divisor = RendererCamera()->config.flags & PATHTRACE_SHADER_FLAG ? CPUSWAP_LENGTH : 1;
         ubo.mode = GetOverlayMode();
-        ubo.wireframe = (uint32_t)g_vupdt_renderer_ref->config.wireframe;
+        ubo.wireframe = (uint32_t)RendererCamera()->config.wireframe;
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
 

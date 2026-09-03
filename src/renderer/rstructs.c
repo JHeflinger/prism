@@ -29,3 +29,4 @@ IMPL_ARRLIST(QuatKey);
 IMPL_ARRLIST(Vec3Key);
 IMPL_ARRLIST(MeshAnimation);
 IMPL_ARRLIST(VertexSkin);
+IMPL_ARRLIST(SceneCamera);

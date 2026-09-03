@@ -243,11 +243,11 @@ static void ReconstructARAP() {
 }
 
 PipelineFlags GetPipelineFlags() {
-    return g_renderer.config.flags;
+    return RendererCamera()->config.flags;
 }
 
 void SetPipelineFlags(PipelineFlags flags) {
-    g_renderer.config.flags = flags;
+    RendererCamera()->config.flags = flags;
 }
 
 void SetViewportSlice(size_t w, size_t h) {
@@ -275,31 +275,34 @@ void InitializeRenderer() {
     cholmod_start(&g_cholmod);
     #endif
 
+    // default camera
+    ARRLIST_SceneCamera_add(&(g_renderer.cameras), (SceneCamera){ 0 });
+
     // initialize config
-    g_renderer.config.whitepoint = 20.0f;
-    g_renderer.config.gamma = 2.2f;
-    g_renderer.config.maxbounces = 10;
-    g_renderer.config.multiplier = 1;
-    g_renderer.config.direct = TRUE;
-    g_renderer.config.grid = TRUE;
-    g_renderer.config.async = TRUE;
-    g_renderer.config.showdof = TRUE;
-    g_renderer.config.directonly = FALSE;
-    g_renderer.config.scenelighting = TRUE;
-    g_renderer.config.scenelightingonly = TRUE;
-    g_renderer.config.scenelightshadows = FALSE;
-    g_renderer.config.spectral = FALSE;
-    g_renderer.config.screenspace = TRUE;
-    g_renderer.config.wireframe = TRUE;
-    g_renderer.config.normals = TRUE;
-    g_renderer.config.reset = FALSE;
-    g_renderer.config.debug = DEBUG_NONE;
-    g_renderer.config.flags = PREVIEW_PIPELINE_FLAGS;
-    g_renderer.config.arap.iterations = 10;
-    g_renderer.config.arap.style = 0;
-    g_renderer.config.arap.cube_lambda = 0.5f;
-    g_renderer.config.arap.cube_rho = 1e-4f;
-    g_renderer.config.arap.addm = 5;
+    RendererCamera()->config.whitepoint = 20.0f;
+    RendererCamera()->config.gamma = 2.2f;
+    RendererCamera()->config.maxbounces = 10;
+    RendererCamera()->config.multiplier = 1;
+    RendererCamera()->config.direct = TRUE;
+    RendererCamera()->config.grid = TRUE;
+    RendererCamera()->config.async = TRUE;
+    RendererCamera()->config.showdof = TRUE;
+    RendererCamera()->config.directonly = FALSE;
+    RendererCamera()->config.scenelighting = TRUE;
+    RendererCamera()->config.scenelightingonly = TRUE;
+    RendererCamera()->config.scenelightshadows = FALSE;
+    RendererCamera()->config.spectral = FALSE;
+    RendererCamera()->config.screenspace = TRUE;
+    RendererCamera()->config.wireframe = TRUE;
+    RendererCamera()->config.normals = TRUE;
+    RendererCamera()->config.reset = FALSE;
+    RendererCamera()->config.debug = DEBUG_NONE;
+    RendererCamera()->config.flags = PREVIEW_PIPELINE_FLAGS;
+    RendererCamera()->config.arap.iterations = 10;
+    RendererCamera()->config.arap.style = 0;
+    RendererCamera()->config.arap.cube_lambda = 0.5f;
+    RendererCamera()->config.arap.cube_rho = 1e-4f;
+    RendererCamera()->config.arap.addm = 5;
 
     // initialize sim
     g_renderer.geometry.fluid.timestep = 0.016f;
@@ -314,7 +317,7 @@ void InitializeRenderer() {
     SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
 
     // initialize camera
-    g_renderer.camera = (SimpleCamera){
+    RendererCamera()->core = (SimpleCamera){
         { 0.0f, 2.133f, 2.11f },
         { 0.0f, 0.0f, 0.0f },
         { 0.0f, 1.0f, 0.0f },
@@ -386,19 +389,18 @@ void DestroyRenderer() {
         if (g_renderer.ebuffers.data[i].size != 0)
             EZ_FREE(g_renderer.ebuffers.data[i].data);
     ARRLIST_ShaderBuffer_clear(&(g_renderer.ebuffers));
+
+    // clean cameras
+    ARRLIST_SceneCamera_clear(&(g_renderer.cameras));
 }
 
-SimpleCamera GetCamera() {
-    return g_renderer.camera;
-}
-
-void MoveCamera(SimpleCamera camera) {
-    g_renderer.camera = camera;
+SceneCamera* RendererCamera() {
+    return &(g_renderer.cameras.data[g_renderer.primary]);
 }
 
 void FitCamera() {
     vec3 min, max;
-    if (g_renderer.config.flags & FLUID_SHADER_FLAG) {
+    if (RendererCamera()->config.flags & FLUID_SHADER_FLAG) {
         min[0] = -(float)(g_renderer.geometry.fluid.width) * 0.5f;
         min[1] = -(float)(g_renderer.geometry.fluid.height) * 0.5f;
         min[2] = -(float)(g_renderer.geometry.fluid.length) * 0.5f;
@@ -411,25 +413,28 @@ void FitCamera() {
     }
     if (min[0] >= max[0]) return;
     vec3 l2p;
-    glm_vec3_sub(g_renderer.camera.position, g_renderer.camera.look, l2p);
+    SimpleCamera camera = RendererCamera()->core;
+    glm_vec3_sub(camera.position, camera.look, l2p);
     glm_vec3_normalize(l2p);
     vec3 extend, min2o, newo;
     glm_vec3_sub(max, min, extend);
     glm_vec3_scale(extend, 0.5f, min2o);
     glm_vec3_add(min2o, min, newo);
     float width = glm_vec3_norm(extend);
-    glm_vec3_copy(newo, g_renderer.camera.look);
+    glm_vec3_copy(newo, camera.look);
     glm_vec3_scale(l2p, width, l2p);
-    glm_vec3_add(l2p, newo, g_renderer.camera.position);
+    glm_vec3_add(l2p, newo, camera.position);
+    RendererCamera()->core = camera;
 }
 
 void ReorientCamera() {
     for (int i = 0; i < 3; i++) {
-        float sign = g_renderer.camera.up[i] > 0 ? 1.0f : (g_renderer.camera.up[i] < 0 ? -1.0f : 0.0f);
-        g_renderer.camera.look[i] += sign*1e-6f;
+        float sign = RendererCamera()->core.up[i] > 0 ? 1.0f : (RendererCamera()->core.up[i] < 0 ? -1.0f : 0.0f);
+        RendererCamera()->core.look[i] += sign*1e-6f;
     }
-    vec3 desired = { 0, 1, 0 };
-    glm_vec3_copy(desired, g_renderer.camera.up);
+    RendererCamera()->core.up[0] = 0;
+    RendererCamera()->core.up[1] = 1;
+    RendererCamera()->core.up[2] = 0;
 }
 
 void GetVertex(size_t index, vec3 out) {
@@ -684,7 +689,7 @@ void Render() {
     }
 
     // update render frame time;
-    g_rft += GetFrameTime() / ((float)(g_renderer.config.multiplier));
+    g_rft += GetFrameTime() / ((float)(RendererCamera()->config.multiplier));
 
     // ARAP pose saving
     if (g_renderer.geometry.changes.update_triangles) SavePose();
@@ -735,7 +740,7 @@ void Render() {
             g_renderer.geometry.changes.update_meshes ||
             g_renderer.geometry.changes.update_poses)
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH;
-        if (g_renderer.config.screenspace)
+        if (RendererCamera()->config.screenspace)
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH * 2; // double, so if we turn off itll update bvh back to original
 
         // transfer updates
@@ -803,7 +808,7 @@ void Render() {
     }
 
     // wait for and reset rendering fence
-    if (!g_renderer.config.async || g_renderer.config.multiplier > 1)
+    if (!RendererCamera()->config.async || RendererCamera()->config.multiplier > 1)
         vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]), VK_TRUE, UINT64_MAX);
     if (vkGetFenceStatus(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]) == VK_SUCCESS) {
         // copy overlay results to host
@@ -835,7 +840,7 @@ static void DrawHelper(float x, float y, float w, float h, float maxw, float max
     float diffh = g_renderer.dimensions.y / h;
     float psuedo_w = diffw < diffh ? g_renderer.dimensions.x : g_renderer.dimensions.y * (w / h);
     float psuedo_h = diffh < diffw ? g_renderer.dimensions.y : g_renderer.dimensions.x * (h / w);
-    if (g_renderer.config.flags & PATHTRACE_SHADER_FLAG) {
+    if (RendererCamera()->config.flags & PATHTRACE_SHADER_FLAG) {
         for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
             DrawTexturePro(
                 g_renderer.swapchain.target[i].texture,
@@ -928,7 +933,7 @@ Vector2 RenderResolution() {
 }
 
 RendererConfig* RenderConfig() {
-    return &(g_renderer.config);
+    return &(RendererCamera()->config);
 }
 
 Geometry* RendererGeometry() {
@@ -1057,12 +1062,12 @@ void RigidDeform() {
     }
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++) {
         if (isunlocked(i)) glm_vec3_copy(g_renderer.geometry.arap.originals[i], g_renderer.geometry.vertices.data[i]);
-        if (g_renderer.config.arap.style == 1) {
+        if (RendererCamera()->config.arap.style == 1) {
             glm_vec3_copy(g_renderer.geometry.arap.normals[i], g_renderer.geometry.arap.z[i]);
             glm_vec3_zero(g_renderer.geometry.arap.u[i]);
         }
     }
-    for (size_t i = 0; i < g_renderer.config.arap.iterations; i++) {
+    for (size_t i = 0; i < RendererCamera()->config.arap.iterations; i++) {
         // compute rotations
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
             glm_mat3_zero(g_renderer.geometry.arap.covariance[j]);
@@ -1082,14 +1087,14 @@ void RigidDeform() {
         }
         for (size_t j = 0; j < g_renderer.geometry.vertices.size; j++) {
             if (!isunlocked(j)) continue;
-            if (g_renderer.config.arap.style == 1) {
+            if (RendererCamera()->config.arap.style == 1) {
                 vec3* z = &g_renderer.geometry.arap.z[j];
                 vec3* u = &g_renderer.geometry.arap.u[j];
                 vec3* n = &g_renderer.geometry.arap.normals[j];
                 float a = g_renderer.geometry.arap.areas[j];
-                float lambda = g_renderer.config.arap.cube_lambda;
-                float rho = g_renderer.config.arap.cube_rho;
-                for (size_t admm = 0; admm < g_renderer.config.arap.addm; admm++) {
+                float lambda = RendererCamera()->config.arap.cube_lambda;
+                float rho = RendererCamera()->config.arap.cube_rho;
+                for (size_t admm = 0; admm < RendererCamera()->config.arap.addm; admm++) {
                     vec3 z_minus_u;
                     glm_vec3_sub(*z, *u, z_minus_u);
                     mat3 S, aug, R;

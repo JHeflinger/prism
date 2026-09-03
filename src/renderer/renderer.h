@@ -15,9 +15,7 @@ void InitializeRenderer();
 
 void DestroyRenderer();
 
-SimpleCamera GetCamera();
-
-void MoveCamera(SimpleCamera camera);
+SceneCamera* RendererCamera();
 
 void FitCamera();
 
