@@ -276,7 +276,7 @@ void InitializeRenderer() {
     #endif
 
     // default camera
-    ARRLIST_SceneCamera_add(&(g_renderer.cameras), (SceneCamera){ 0 });
+    SubmitNamedCamera((SceneCamera){ 0 }, "Default");
 
     // initialize config
     RendererCamera()->config.whitepoint = 20.0f;
@@ -389,13 +389,10 @@ void DestroyRenderer() {
         if (g_renderer.ebuffers.data[i].size != 0)
             EZ_FREE(g_renderer.ebuffers.data[i].data);
     ARRLIST_ShaderBuffer_clear(&(g_renderer.ebuffers));
-
-    // clean cameras
-    ARRLIST_SceneCamera_clear(&(g_renderer.cameras));
 }
 
 SceneCamera* RendererCamera() {
-    return &(g_renderer.cameras.data[g_renderer.primary]);
+    return &(g_renderer.geometry.cameras.data[g_renderer.geometry.primarycamera]);
 }
 
 void FitCamera() {
@@ -613,6 +610,36 @@ void ClearMaterials() {
         EZ_FREE(g_renderer.geometry.materialnames.data[i]);
     ARRLIST_DynamicString_clear(&(g_renderer.geometry.materialnames));
     g_renderer.geometry.changes.update_materials = TRUE;
+}
+
+size_t SubmitCamera(SceneCamera camera) {
+    char buf[MAX_CAMERA_NAME_SIZE] = { 0 };
+    sprintf(buf, "Camera #%d", (int)g_renderer.geometry.cameras.size);
+    return SubmitNamedCamera(camera, buf);
+}
+
+size_t SubmitNamedCamera(SceneCamera camera, const char* name) {
+    ARRLIST_SceneCamera_add(&(g_renderer.geometry.cameras), camera);
+    char* b = EZ_ALLOC(MAX_CAMERA_NAME_SIZE + 1, sizeof(char));
+    strncpy(b, name, MAX_CAMERA_NAME_SIZE);
+    ARRLIST_DynamicString_add(&(g_renderer.geometry.cameranames), b);
+    return g_renderer.geometry.cameras.size - 1;
+}
+
+char* CameraName(size_t cid) {
+    EZ_ASSERT(cid < g_renderer.geometry.cameras.size, "Invalid camera ID detected");
+    return g_renderer.geometry.cameranames.data[cid];
+}
+
+char** CameraNameReference(size_t cid) {
+    return &(g_renderer.geometry.cameranames.data[cid]);
+}
+
+void ClearCameras() {
+    ARRLIST_SceneCamera_clear(&(g_renderer.geometry.cameras));
+    for (size_t i = 0; i < g_renderer.geometry.cameranames.size; i++)
+        EZ_FREE(g_renderer.geometry.cameranames.data[i]);
+    ARRLIST_DynamicString_clear(&(g_renderer.geometry.cameranames));
 }
 
 void Render() {
@@ -892,6 +919,10 @@ size_t NumTriangles() {
 
 size_t NumMaterials() {
     return g_renderer.geometry.materials.size;
+}
+
+size_t NumCameras() {
+    return g_renderer.geometry.cameras.size;
 }
 
 size_t NumEmissives() {
@@ -1540,4 +1571,5 @@ void ClearScene(BOOL hard) {
     ClearAnimations();
     ClearSimulation();
     DeselectEditTarget();
+    if (hard) ClearCameras();
 }

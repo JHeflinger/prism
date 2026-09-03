@@ -379,32 +379,6 @@ typedef struct {
 DECLARE_ARRLIST(MeshAnimation);
 
 typedef struct {
-    ManifoldMesh manifold;
-    ARRLIST_vec4 vertices;
-    ARRLIST_vec4 normals;
-    ARRLIST_SceneLight lights;
-    ARRLIST_DynamicString lightnames;
-    ARRLIST_Triangle triangles;
-    ARRLIST_TriangleID emissives;
-    ARRLIST_SurfaceMaterial materials;
-    ARRLIST_DynamicString materialnames;
-    ARRLIST_Skeleton skeletons;
-    ARRLIST_MeshAnimation animations;
-    ARRLIST_VertexSkin skins;
-    ARRLIST_mat4 poses;
-    HASHMAP_Locks locks;
-    HASHMAP_EdgeGlue glue;
-    ARRLIST_Edge edges;
-    ARAPData arap;
-    FluidSimulation fluid;
-    float lightarea;
-    ChangeSet changes;
-    AxisAlignedBoundingBox bounds;
-    ARRLIST_MeshDescriptor meshes;
-    ARRLIST_DynamicString meshnames;
-} Geometry;
-
-typedef struct {
     size_t style;
     uint32_t iterations;
     float cube_lambda;
@@ -447,5 +421,35 @@ typedef struct {
     RendererConfig config;
 } SceneCamera;
 DECLARE_ARRLIST(SceneCamera);
+
+
+typedef struct {
+    ManifoldMesh manifold;
+    ARRLIST_vec4 vertices;
+    ARRLIST_vec4 normals;
+    ARRLIST_SceneLight lights;
+    ARRLIST_DynamicString lightnames;
+    ARRLIST_Triangle triangles;
+    ARRLIST_TriangleID emissives;
+    ARRLIST_SurfaceMaterial materials;
+    ARRLIST_DynamicString materialnames;
+    ARRLIST_Skeleton skeletons;
+    ARRLIST_MeshAnimation animations;
+    ARRLIST_VertexSkin skins;
+    ARRLIST_mat4 poses;
+    HASHMAP_Locks locks;
+    HASHMAP_EdgeGlue glue;
+    ARRLIST_Edge edges;
+    ARAPData arap;
+    FluidSimulation fluid;
+    float lightarea;
+    ChangeSet changes;
+    AxisAlignedBoundingBox bounds;
+    ARRLIST_MeshDescriptor meshes;
+    ARRLIST_DynamicString meshnames;
+    ARRLIST_SceneCamera cameras;
+    ARRLIST_DynamicString cameranames;
+    size_t primarycamera;
+} Geometry;
 
 #endif

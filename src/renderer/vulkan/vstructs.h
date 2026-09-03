@@ -297,8 +297,6 @@ typedef struct {
     Vector2 dimensions;
     Geometry geometry;
     Vector2 viewport;
-    ARRLIST_SceneCamera cameras;
-    size_t primary;
 } Renderer;
 
 #endif

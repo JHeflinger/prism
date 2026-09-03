@@ -63,6 +63,16 @@ char** MaterialNameReference(MaterialID mid);
 
 void ClearMaterials();
 
+size_t SubmitCamera(SceneCamera camera);
+
+size_t SubmitNamedCamera(SceneCamera camera, const char* name);
+
+char* CameraName(size_t cid);
+
+char** CameraNameReference(size_t cid);
+
+void ClearCameras();
+
 void Render();
 
 void Draw(float x, float y, float w, float h);
@@ -76,6 +86,8 @@ size_t NumVertices();
 size_t NumTriangles();
 
 size_t NumMaterials();
+
+size_t NumCameras();
 
 size_t NumEmissives();
 
