@@ -3,6 +3,8 @@
 
 #include <ui/ui.h>
 
+void SetEditCamera(size_t index);
+
 void SetEditMaterial(size_t index);
 
 void SetEditLight(size_t index);

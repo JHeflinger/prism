@@ -62,45 +62,10 @@ static void DrawDevPanel(float width, float height) {
     }
 
     UIMoveCursor(0, 20.0f);
-    UICheckboxLabeled("Grid:", &(RenderConfig()->grid));
-    UICheckboxLabeled("Wireframe:", &(RenderConfig()->wireframe));
-    UICheckboxLabeled("Smooth Normals:", &(RenderConfig()->normals));
-    BOOL preview = !(RenderConfig()->flags & PATHTRACE_SHADER_FLAG);
-    UICheckboxLabeled("Preview:", &preview);
-    SetPipelineFlags(preview ? PREVIEW_PIPELINE_FLAGS : PATHTRACE_PIPELINE_FLAGS);
-    UICheckboxLabeled("Screenspace BVH:", &(RenderConfig()->screenspace));
-    UICheckboxLabeled("Direct Light Sampling:", &(RenderConfig()->direct));
-    UICheckboxLabeled("Direct Light Only:", &(RenderConfig()->directonly));
-    UICheckboxLabeled("Scene Light Sampling:", &(RenderConfig()->scenelighting));
-    UICheckboxLabeled("Scene Light Only:", &(RenderConfig()->scenelightingonly));
-    UICheckboxLabeled("Scene Light Shadows:", &(RenderConfig()->scenelightshadows));
-    UICheckboxLabeled("Spectral Coloring:", &(RenderConfig()->spectral));
-    UIDrawText("Debug mode:");
-    UIMoveCursor(UITextWidth("Debug mode:") + 10, -20.0f);
-    UIDropdownMenu(width - UITextWidth("Debug mode:") - 30, 4, DebugModeLabels(), DropdownSelectDebugMode, NULL);
-    UIDragSizeLabeled("Max Bounces:", &(RenderConfig()->maxbounces), 0, 999999999, 1, width - 20);
-    UIDragSizeLabeled("Frame Multiplier:", &(RenderConfig()->multiplier), 1, 999999999, 1, width - 20);
-
-    UIMoveCursor(0, 20.0f);
-    UIDragFloatLabeled("Whitepoint:", &(RenderConfig()->whitepoint), 0.01f, 999999999.0f, 0.1f, width - 20);
-    UIDragFloatLabeled("Gamma:", &(RenderConfig()->gamma), 0.01f, 999999999.0f, 0.01f, width - 20);
-
-    UIMoveCursor(0, 20.0f);
     UIDrawText("Renderer FPS: %d", (int)(1.0f / ((float)RenderTime() * RenderConfig()->multiplier / 1000.0f)));
     UIDrawText("Render time: %.6f ms", (float)RenderTime() * RenderConfig()->multiplier);
     UIDrawText("Triangles: %d", (int)NumTriangles());
     UIDrawText("Render Resolution: %dx%d", (int)RenderResolution().x, (int)RenderResolution().y);
-
-    SimpleCamera c = RendererCamera()->core;
-    SimpleCamera oldc = RendererCamera()->core;
-    BOOL used = FALSE;
-    UIMoveCursor(0, 20.0f);
-    UIDragFloatLabeled("Aperature:", &(c.aperature), 0.0f, 999999999.0f, 0.01f, width - 20);
-    used |= UIWasJustUsed();
-    UIDragFloatLabeled("Focus:", &(c.focus), 0.0f, 999999999.0f, 0.01f, width - 20);
-    used |= UIWasJustUsed();
-	if (memcmp(&c, &oldc, sizeof(SimpleCamera))) RendererCamera()->core = c;
-    RenderConfig()->showdof = used;
 }
 
 Panel GenerateDiagnosticsPanel() {

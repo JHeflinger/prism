@@ -286,7 +286,7 @@ void InitializeRenderer() {
     RendererCamera()->config.direct = TRUE;
     RendererCamera()->config.grid = TRUE;
     RendererCamera()->config.async = TRUE;
-    RendererCamera()->config.showdof = TRUE;
+    RendererCamera()->config.showdof = FALSE;
     RendererCamera()->config.directonly = FALSE;
     RendererCamera()->config.scenelighting = TRUE;
     RendererCamera()->config.scenelightingonly = TRUE;

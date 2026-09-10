@@ -3,11 +3,6 @@
 #include "ui/panels/edit.h"
 #include "ui/shared.h"
 
-#include <util/logger.h>
-static void DeleteThisASAP(size_t index) {
-    logerror("This has not been implemented yet!");
-}
-
 static void DrawOverviewPanel(float width, float height) {
     UIDrawText("Add To Scene...");
     UIMoveCursor(width - 45, -20);
@@ -20,7 +15,7 @@ static void DrawOverviewPanel(float width, float height) {
         UIMoveCursor(0, 5);
         UIDropList("Sources", width - 20, NumSources(), SourceNameReference(0), SetEditSource);
     } else {
-        UIDropList("Cameras", width - 20, NumCameras(), CameraNameReference(0), DeleteThisASAP);
+        UIDropList("Cameras", width - 20, NumCameras(), CameraNameReference(0), SetEditCamera);
         UIMoveCursor(0, 5);
         UIDropList("Materials", width - 20, NumMaterials(), MaterialNameReference(0), SetEditMaterial);
         UIMoveCursor(0, 5);
