@@ -276,33 +276,7 @@ void InitializeRenderer() {
     #endif
 
     // default camera
-    SubmitNamedCamera((SceneCamera){ 0 }, "Default");
-
-    // initialize config
-    RendererCamera()->config.whitepoint = 20.0f;
-    RendererCamera()->config.gamma = 2.2f;
-    RendererCamera()->config.maxbounces = 10;
-    RendererCamera()->config.multiplier = 1;
-    RendererCamera()->config.direct = TRUE;
-    RendererCamera()->config.grid = TRUE;
-    RendererCamera()->config.async = TRUE;
-    RendererCamera()->config.showdof = FALSE;
-    RendererCamera()->config.directonly = FALSE;
-    RendererCamera()->config.scenelighting = TRUE;
-    RendererCamera()->config.scenelightingonly = TRUE;
-    RendererCamera()->config.scenelightshadows = FALSE;
-    RendererCamera()->config.spectral = FALSE;
-    RendererCamera()->config.screenspace = TRUE;
-    RendererCamera()->config.wireframe = TRUE;
-    RendererCamera()->config.normals = TRUE;
-    RendererCamera()->config.reset = FALSE;
-    RendererCamera()->config.debug = DEBUG_NONE;
-    RendererCamera()->config.flags = PREVIEW_PIPELINE_FLAGS;
-    RendererCamera()->config.arap.iterations = 10;
-    RendererCamera()->config.arap.style = 0;
-    RendererCamera()->config.arap.cube_lambda = 0.5f;
-    RendererCamera()->config.arap.cube_rho = 1e-4f;
-    RendererCamera()->config.arap.addm = 5;
+    SubmitNamedCamera(DefaultCamera(), "Default");
 
     // initialize sim
     g_renderer.geometry.fluid.timestep = 0.016f;
@@ -315,14 +289,6 @@ void InitializeRenderer() {
     // initialize min/max BB
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
     SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
-
-    // initialize camera
-    RendererCamera()->core = (SimpleCamera){
-        { 0.0f, 2.133f, 2.11f },
-        { 0.0f, 0.0f, 0.0f },
-        { 0.0f, 1.0f, 0.0f },
-        90.0f, 0.0f, 0.0f
-    };
 
     // set up dimensions
     g_renderer.dimensions = (Vector2){ 
@@ -393,6 +359,46 @@ void DestroyRenderer() {
 
 SceneCamera* RendererCamera() {
     return &(g_renderer.geometry.cameras.data[g_renderer.geometry.primarycamera]);
+}
+
+SceneCamera* GetCamera(size_t cid) {
+    EZ_ASSERT(cid < g_renderer.geometry.cameras.size, "Invalid camera ID detected");
+    return &(g_renderer.geometry.cameras.data[cid]);
+}
+
+SceneCamera DefaultCamera() {
+    SceneCamera sc = { 0 };
+    sc.config.whitepoint = 20.0f;
+    sc.config.gamma = 2.2f;
+    sc.config.maxbounces = 10;
+    sc.config.multiplier = 1;
+    sc.config.direct = TRUE;
+    sc.config.grid = TRUE;
+    sc.config.async = TRUE;
+    sc.config.showdof = FALSE;
+    sc.config.directonly = FALSE;
+    sc.config.scenelighting = TRUE;
+    sc.config.scenelightingonly = TRUE;
+    sc.config.scenelightshadows = FALSE;
+    sc.config.spectral = FALSE;
+    sc.config.screenspace = TRUE;
+    sc.config.wireframe = TRUE;
+    sc.config.normals = TRUE;
+    sc.config.reset = FALSE;
+    sc.config.debug = DEBUG_NONE;
+    sc.config.flags = PREVIEW_PIPELINE_FLAGS;
+    sc.config.arap.iterations = 10;
+    sc.config.arap.style = 0;
+    sc.config.arap.cube_lambda = 0.5f;
+    sc.config.arap.cube_rho = 1e-4f;
+    sc.config.arap.addm = 5;
+    sc.core = (SimpleCamera){
+        { 0.0f, 2.133f, 2.11f },
+        { 0.0f, 0.0f, 0.0f },
+        { 0.0f, 1.0f, 0.0f },
+        90.0f, 0.0f, 0.0f
+    };
+    return sc;
 }
 
 void FitCamera() {
@@ -624,6 +630,15 @@ size_t SubmitNamedCamera(SceneCamera camera, const char* name) {
     strncpy(b, name, MAX_CAMERA_NAME_SIZE);
     ARRLIST_DynamicString_add(&(g_renderer.geometry.cameranames), b);
     return g_renderer.geometry.cameras.size - 1;
+}
+
+void SetCamera(size_t cid) {
+    EZ_ASSERT(cid < g_renderer.geometry.cameras.size, "Invalid camera ID detected");
+    g_renderer.geometry.primarycamera = cid;
+}
+
+size_t PrimaryCameraID() {
+    return g_renderer.geometry.primarycamera;
 }
 
 char* CameraName(size_t cid) {

@@ -17,6 +17,10 @@ void DestroyRenderer();
 
 SceneCamera* RendererCamera();
 
+SceneCamera* GetCamera(size_t cid);
+
+SceneCamera DefaultCamera();
+
 void FitCamera();
 
 void ReorientCamera();
@@ -66,6 +70,10 @@ void ClearMaterials();
 size_t SubmitCamera(SceneCamera camera);
 
 size_t SubmitNamedCamera(SceneCamera camera, const char* name);
+
+void SetCamera(size_t cid);
+
+size_t PrimaryCameraID();
 
 char* CameraName(size_t cid);
 

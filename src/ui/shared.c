@@ -43,8 +43,10 @@ static int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     if (UIButton("Cube", button_width)) return 2;
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
     if (UIButton(".OBJ", button_width)) return 3;
+    UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
+    if (UIButton("Camera", button_width)) return 4;
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
-    if (UIButton("Cancel", button_width)) return 4;
+    if (UIButton("Cancel", button_width)) return 5;
     return -1;
 }
 
@@ -58,6 +60,11 @@ static int add_obj_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     } else {
         logerror("Unable to open file due to NFD error: %s", NFD_GetError());
     }
+    return 0;
+}
+
+static int add_camera_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+    SubmitCamera(DefaultCamera());
     return 0;
 }
 
@@ -673,10 +680,10 @@ char** DebugModeLabels() {
 }
 Popup* GenerateAddObjectPopup() {
     Popup* popup = GenerateEmptyPopup();
-    popup->options = 4;
+    popup->options = 5;
     popup->behavior = add_object_popup_stage_0;
     popup->results = EZ_ALLOC(popup->options, sizeof(Popup*));
-    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0, add_obj_popup_stage_0};
+    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0, add_obj_popup_stage_0, add_camera_popup_stage_0 };
     for (size_t i = 0; i < popup->options; i++) {
         Popup* next = GenerateEmptyPopup();
         next->options = 0;

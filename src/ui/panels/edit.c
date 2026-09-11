@@ -509,67 +509,123 @@ static void DrawEditPanel(float width, float height) {
             edited |= UIDragFloat(&(md->scale[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
             if (edited) UpdateObjectTransform(g_edit_item_index);
         } else if (g_edit_type == EDIT_CAMERA) {
+            float component_width = (width - 20 - (3 * 15) - (2 * 10)) / 3.0f;
             UIMoveCursor((width - 20 - UITextWidth("Edit Camera")) / 2.0f, 0);
             UIDrawText("Edit Camera");
             UIMoveCursor(0, 15);
             UITextInput("Name", *(CameraNameReference(g_edit_item_index)), MAX_CAMERA_NAME_SIZE, width - 20, FALSE);
-            UIMoveCursor(0, 15);
+            UIMoveCursor(0, 3);
+            if (g_edit_item_index == PrimaryCameraID()) DisableUI();
+            if (UIButton("Set Primary", width - 20)) {
+                SetCamera(g_edit_item_index);
+            }
+            EnableUI();
+            UIMoveCursor(0, 20);
+            UIMoveCursor((width / 2) - (UITextWidth("Position") / 2) - 10, 0);
+            UIDrawText("Position");
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->core.position[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->core.position[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->core.position[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(0, 5);
+            UIMoveCursor((width / 2) - (UITextWidth("Look") / 2) - 10, 0);
+            UIDrawText("Look");
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->core.look[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->core.look[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->core.look[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(0, 5);
+            UIMoveCursor((width / 2) - (UITextWidth("Up") / 2) - 10, 0);
+            UIDrawText("Up");
+            UIMoveCursor(0, 5);
+            UIDrawText("x");
+            UIMoveCursor(15, -20);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->core.up[0]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(component_width + 25, -20);
+            UIDrawText("y");
+            UIMoveCursor(component_width + 40, -20);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->core.up[1]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor((2*component_width) + 50, -20);
+            UIDrawText("z");
+            UIMoveCursor((2*component_width) + 65, -20);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->core.up[2]), -FLT_MAX, FLT_MAX, 0.1f, component_width);
+            UIMoveCursor(0, 25);
             UIDrawText("Preview Only");
             UIMoveCursor(160, -20);
-            BOOL preview = !(RenderConfig()->flags & PATHTRACE_SHADER_FLAG);
-            UICheckbox(&preview);
-            SetPipelineFlags(preview ? PREVIEW_PIPELINE_FLAGS : PATHTRACE_PIPELINE_FLAGS);
+            BOOL preview = !(GetCamera(g_edit_item_index)->config.flags & PATHTRACE_SHADER_FLAG);
+            if (UICheckbox(&preview)) {
+                GetCamera(g_edit_item_index)->config.flags = preview ? PREVIEW_PIPELINE_FLAGS : PATHTRACE_PIPELINE_FLAGS;
+            }
             UIDrawText("Grid");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->grid));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.grid));
             UIDrawText("Wireframe");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->wireframe));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.wireframe));
             UIDrawText("Smooth Normals");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->normals));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.normals));
             UIDrawText("BVH Culling");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->screenspace));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.screenspace));
             UIDrawText("Direct Lighting");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->direct));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.direct));
             UIDrawText("Direct Lighting Only");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->directonly));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.directonly));
             UIDrawText("Scene Lights");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->scenelighting));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.scenelighting));
             UIDrawText("Scene Lights Only");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->scenelightingonly));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.scenelightingonly));
             UIDrawText("Scene Light Shadows");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->scenelightshadows));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.scenelightshadows));
             UIDrawText("Spectral Coloring");
             UIMoveCursor(160, -20);
-            UICheckbox(&(RenderConfig()->spectral));
+            UICheckbox(&(GetCamera(g_edit_item_index)->config.spectral));
 
             UIMoveCursor(0, 15);
             float sboxwidth = width - 20 - 160;
             UIDrawText("Debug Mode");
             UIMoveCursor(160, -20);
+            size_t pp = PrimaryCameraID();
+            SetCamera(g_edit_item_index);
             UIDropdownMenu(sboxwidth, 4, DebugModeLabels(), DropdownSelectDebugMode, NULL);
+            SetCamera(pp);
             UIDrawText("Max Bounces");
             UIMoveCursor(160, -20);
-            UIDragSize(&(RenderConfig()->maxbounces), 0, 999999999, 1, sboxwidth);
+            UIDragSize(&(GetCamera(g_edit_item_index)->config.maxbounces), 0, 999999999, 1, sboxwidth);
             UIDrawText("Frame Multiplier");
             UIMoveCursor(160, -20);
-            UIDragSize(&(RenderConfig()->multiplier), 0, 999999999, 1, sboxwidth);
+            UIDragSize(&(GetCamera(g_edit_item_index)->config.multiplier), 0, 999999999, 1, sboxwidth);
             UIDrawText("Whitepoint");
             UIMoveCursor(160, -20);
-            UIDragFloat(&(RenderConfig()->whitepoint), 0.01f, 999999999.0f, 0.1f, sboxwidth);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->config.whitepoint), 0.01f, 999999999.0f, 0.1f, sboxwidth);
             UIDrawText("Gamma");
             UIMoveCursor(160, -20);
-            UIDragFloat(&(RenderConfig()->gamma), 0.01f, 999999999.0f, 0.1f, sboxwidth);
+            UIDragFloat(&(GetCamera(g_edit_item_index)->config.gamma), 0.01f, 999999999.0f, 0.1f, sboxwidth);
 
-            SimpleCamera c = RendererCamera()->core;
-            SimpleCamera oldc = RendererCamera()->core;
+            SimpleCamera c = GetCamera(g_edit_item_index)->core;
+            SimpleCamera oldc = GetCamera(g_edit_item_index)->core;
             BOOL used = FALSE;
             UIMoveCursor(0, 20.0f);
             UIDrawText("Aperature");
@@ -580,19 +636,11 @@ static void DrawEditPanel(float width, float height) {
             UIMoveCursor(160, -20);
             UIDragFloat(&(c.focus), 0.0f, 999999999.0f, 0.01f, sboxwidth);
             used |= UIWasJustUsed();
-	        if (memcmp(&c, &oldc, sizeof(SimpleCamera))) RendererCamera()->core = c;
-            RenderConfig()->showdof = used;
-
-            UIMoveCursor(0, 30.0f);
-            if (UIButton("Set Primary", width - 20)) {
-                logerror("not implemented yet!");
-            }
-
-            // TODO:
-            // 1. set primary camera button
-            // 2. add additional camera option
-            // 3. draw star next to primary camera
-            // 4. camera translation, rot, up, fov etc options
+            UIDrawText("FOV");
+            UIMoveCursor(160, -20);
+            UIDragFloat(&(c.fov), 0.0f, 180.0f, 0.1f, sboxwidth);
+	        if (memcmp(&c, &oldc, sizeof(SimpleCamera))) GetCamera(g_edit_item_index)->core = c;
+            GetCamera(g_edit_item_index)->config.showdof = used;
         } else {
             EZ_FATAL("Unhandled edit type detected");
         }
