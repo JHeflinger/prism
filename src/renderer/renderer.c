@@ -686,9 +686,7 @@ void Render() {
                     if (is_transferring) VUTIL_EndTransferCommands(); \
                     is_transferring = TRUE; \
                     VUTIL_BeginTransferCommands(); \
-                    vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, \
-                            &g_renderer.vulkan.core.scheduler.syncro.fences[new_ind], \
-                            VK_TRUE, UINT64_MAX); \
+                    vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); \
                 } \
                 VCLEAN_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
                 VINIT_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
@@ -712,9 +710,7 @@ void Render() {
                     	if (is_transferring) VUTIL_EndTransferCommands(); \
                         is_transferring = TRUE; \
                         VUTIL_BeginTransferCommands(); \
-                        vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, \
-                                &g_renderer.vulkan.core.scheduler.syncro.fences[new_ind], \
-                                VK_TRUE, UINT64_MAX); \
+                        vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); \
                     } \
                     VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
                     VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
