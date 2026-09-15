@@ -22,6 +22,8 @@
 #define MAX_XML_LINE_SIZE 2048
 #define MAX_XML_ARG_SIZE 32
 #define MAX_XML_NUM_ARGS 64
+#define SSSG_MAGIC 0x47535353u /* 'SSSG' */
+#define SSSG_VERSION 1u
 
 #define SET_MTL_FLOAT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
 #define SET_MTL_UINT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
@@ -54,6 +56,14 @@ typedef struct {
     BOOL textures;
     BOOL normals;
 } Face;
+
+typedef struct {
+    uint32_t magic;
+    uint32_t version;
+    uint32_t count;
+    uint32_t stride;
+    uint32_t reserved[4];
+} SSSGHeader;
 
 DECLARE_ARRLIST(Face);
 DECLARE_ARRLIST(UV);
@@ -958,5 +968,56 @@ BOOL LoadFBX(const char* filepath) {
         if (num_anims > 0) MeshReference(NumMeshes() - 1)->pose = (NumAnimations() - 1) * MAX_BONES;
     }
     aiReleaseImport(scene);
+    return TRUE;
+}
+
+BOOL LoadSSSG(const char* filepath) {
+    ez_File* file = ez_load_file(filepath);
+    if (!file) {
+        logerror("Unable to load invalid filepath \"%s\"", filepath);
+        return FALSE;
+    }
+    if (file->size < sizeof(SSSGHeader)) {
+        logerror("\"%s\" is too small to be a .sssg file", filepath);
+        ez_free_file(file);
+        return FALSE;
+    }
+
+    SSSGHeader header;
+    memcpy(&header, file->data, sizeof(SSSGHeader));
+
+    if (header.magic != SSSG_MAGIC) {
+        logerror("\"%s\" is not a .sssg file (bad magic)", filepath);
+        ez_free_file(file);
+        return FALSE;
+    }
+    if (header.version != SSSG_VERSION) {
+        logerror("\"%s\" is .sssg version %u, this build reads version %u", filepath, header.version, SSSG_VERSION);
+        ez_free_file(file);
+        return FALSE;
+    }
+    if (header.stride != sizeof(Splat)) {
+        logerror("\"%s\" was exported with Splat stride %u bytes, this build expects %zu -- rebuild the .sssg with a matching convert_sssg.py", filepath, header.stride, sizeof(Splat));
+        ez_free_file(file);
+        return FALSE;
+    }
+
+    size_t need = sizeof(SSSGHeader) + (size_t)header.count * sizeof(Splat);
+    if (need > file->size) {
+        logerror("\"%s\" is truncated: expected %zu bytes for %u splats, file is %zu bytes", filepath, need, header.count, file->size);
+        ez_free_file(file);
+        return FALSE;
+    }
+
+    Geometry* geometry = RendererGeometry();
+    const Splat* splats = (const Splat*)(file->data + sizeof(SSSGHeader));
+
+    for (uint32_t i = 0; i < header.count; i++) {
+        ARRLIST_Splat_add(&geometry->splats, splats[i]);
+    }
+
+    UpdateSplats();
+    loginfo("Loaded %u gaussian splats from \"%s\" (%zu total)", header.count, filepath, geometry->splats.size);
+    ez_free_file(file);
     return TRUE;
 }

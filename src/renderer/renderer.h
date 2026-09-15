@@ -219,4 +219,6 @@ void UpdateShaderBuffer(ShaderBuffer* buffer);
 
 void ClearScene(BOOL hard);
 
+void UpdateSplats();
+
 #endif

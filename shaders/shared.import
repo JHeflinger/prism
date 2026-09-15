@@ -21,6 +21,21 @@ export Definitions {
     #define MAX_BONE_INFLUENCES 4
 }
 
+export SplatDef {
+    struct Splat {
+        vec3 position;
+        vec3 scale;
+        vec4 rotation;
+        vec3 basecolor;
+        vec3 color;
+        vec3 normal;
+        float opacity;
+        float roughness;
+        float metallic;
+        float subsurfaceness;
+    }
+}
+
 export RayGeneratorDef {
     struct RayGenerator {
         uint tid;

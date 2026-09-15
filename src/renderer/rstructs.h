@@ -114,6 +114,20 @@ typedef struct {
 } RayGenerator;
 
 typedef struct {
+    alignas(16) vec3 position;
+    alignas(16) vec3 scale;
+    alignas(16) versor rotation;
+    alignas(16) vec3 basecolor;
+    alignas(16) vec3 color;
+    alignas(16) vec3 normal;
+    alignas(4) float opacity;
+    alignas(4) float roughness;
+    alignas(4) float metallic;
+    alignas(4) float subsurfaceness;
+} Splat;
+DECLARE_ARRLIST(Splat);
+
+typedef struct {
     uint32_t value;
     BOOL exists;
 } Schrodingnum;
@@ -135,6 +149,7 @@ typedef struct {
     size_t max_meshes;
     size_t max_skins;
     size_t max_poses;
+    size_t max_splats;
     size_t num_normals;
     size_t num_vertices;
     size_t num_triangles;
@@ -145,6 +160,7 @@ typedef struct {
     size_t num_meshes;
     size_t num_skins;
     size_t num_poses;
+    size_t num_splats;
     BOOL update_normals;
     BOOL update_vertices;
     BOOL update_triangles;
@@ -154,6 +170,7 @@ typedef struct {
     BOOL update_meshes;
     BOOL update_skins;
     BOOL update_poses;
+    BOOL update_splats;
     size_t update_bvh;
 } ChangeSet;
 
@@ -422,7 +439,6 @@ typedef struct {
 } SceneCamera;
 DECLARE_ARRLIST(SceneCamera);
 
-
 typedef struct {
     ManifoldMesh manifold;
     ARRLIST_vec4 vertices;
@@ -449,6 +465,7 @@ typedef struct {
     ARRLIST_DynamicString meshnames;
     ARRLIST_SceneCamera cameras;
     ARRLIST_DynamicString cameranames;
+    ARRLIST_Splat splats;
     size_t primarycamera;
 } Geometry;
 

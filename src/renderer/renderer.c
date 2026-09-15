@@ -1584,3 +1584,7 @@ void ClearScene(BOOL hard) {
     DeselectEditTarget();
     if (hard) ClearCameras();
 }
+
+void UpdateSplats() {
+    g_renderer.geometry.changes.update_splats = TRUE;
+}
