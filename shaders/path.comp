@@ -335,6 +335,121 @@ vec3 cheap_spectral_color(in vec3 rgb) {
     return cheap_wavelength_to_rgb(lambdaR) * rgb.r + cheap_wavelength_to_rgb(lambdaG) * rgb.g + cheap_wavelength_to_rgb(lambdaB) * rgb.b;
 }
 
+// =============== TODO: REMOTE TEMP WORK ====================
+
+float scalar_sigma_t(Material material) {
+    vec3 sigma_t = material.scattering + material.absorbtion;
+    return max(dot(sigma_t, vec3(0.2126, 0.7152, 0.0722)), EPS);
+}
+
+float sample_free_flight(Material material) {
+    float sigma_t = scalar_sigma_t(material);
+    float xi = max(random(), 1e-6);
+    return -log(1.0 - xi) / sigma_t;
+}
+
+float phase_henyey_greenstein(float cos_theta, float g) {
+    float denom = 1.0 + g * g - 2.0 * g * cos_theta;
+    return (1.0 - g * g) / (4.0 * PI * pow(denom, 1.5));
+}
+
+vec3 sample_henyey_greenstein(vec3 outgoing, float g) {
+    float xi1 = random();
+    float xi2 = random();
+    float cos_theta = 0.0;
+    if (abs(g) < 0.001) {
+        cos_theta = 1.0 - 2.0 * xi1;
+    } else {
+        float sqr = (1.0 - g * g) / (1.0 - g + 2.0 * g * xi1);
+        cos_theta = (1.0 + g * g - sqr * sqr) / (2.0 * g);
+        cos_theta = clamp(cos_theta, -1.0, 1.0);
+    }
+    float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+    float phi = 2.0 * PI * xi2;
+    vec3 local = vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
+    return onb(outgoing, local);
+}
+
+bool sample_subsurface_event(Ray ray, Hit surface, Material material, out vec3 position, out vec3 direction, out vec3 weight) {
+    float distance = sample_free_flight(material);
+    Ray inside;
+    inside.position = epsilon_offset(surface.position, -surface.normal);
+    inside.direction = ray.direction;
+    Hit exit_hit;
+    uint exit_id = 0;
+    exit_hit = trace(inside, exit_id);
+    if (exit_hit.distance <= 0.0) return false;
+    if (distance >= exit_hit.distance) return false;
+    position = inside.position + inside.direction * distance;
+    direction = sample_henyey_greenstein(-inside.direction, material.anisotropy);
+    vec3 sigma_s = material.scattering;
+    vec3 sigma_t = material.scattering + material.absorbtion;
+    weight = exp(-sigma_t * distance) * sigma_s;
+    return true;
+}
+
+vec3 evaluate_sss_direct_light(vec3 position, vec3 incoming_direction, Material material) {
+    vec3 result = vec3(0.0);
+    for (uint i = 0; i < ubo.lights; ++i) {
+        SceneLight light = lightIn[i];
+        vec3 to_light = light.position - position;
+        float distance_to_light = length(to_light);
+        vec3 light_dir = normalize(to_light);
+        float falloff = 1.0;
+        if (light.angle == 0.0 && light.direction == vec3(0.0)) {
+            // point light
+        } else if (light.angle != 0.0) {
+            // spot light
+            if (light.direction == vec3(0.0)) light.direction = vec3(0, -1, 0);
+            float angle = acos(clamp(dot(-light_dir, normalize(light.direction)), -1.0, 1.0));
+            float lightangle = radians(light.angle * 0.5);
+            if (angle > lightangle) continue;
+            if (angle > lightangle * (1.0 - light.penumbra)) {
+                falloff -= (angle - lightangle * (1.0 - light.penumbra)) / (light.penumbra * lightangle);
+            }
+        } else {
+            // directional light
+            light_dir = -normalize(light.direction);
+            distance_to_light = FLTMAX;
+        }
+
+        // Trace through the interior.
+        /* TODO: need to identity if the hit belongs to the same object
+        Ray shadow_ray;
+        shadow_ray.position = position + light_dir * EPS;
+        shadow_ray.direction = light_dir;
+        uint tid = 0;
+        Hit shadow_hit = trace(shadow_ray, tid);
+        if (shadow_hit.distance > 0.0 && shadow_hit.distance < distance_to_light) continue;*/ 
+
+        float phase = phase_henyey_greenstein(dot(-incoming_direction, light_dir), material.anisotropy);
+        result += light.color * phase * falloff;
+    }
+
+    return result;
+}
+
+vec3 render_sss(Ray ray, inout uint hit_id, inout float hit_distance) {
+    Hit surface;
+    surface.distance = -1.0;
+    surface = trace(ray, hit_id);
+    if (surface.distance <= 0.0) {
+        hit_distance = -1.0;
+        return vec3(0.0);
+    }
+    hit_distance = surface.distance;
+    Material material = materialIn[surface.material];
+    vec3 scatter_position;
+    vec3 scatter_direction;
+    vec3 scatter_weight;
+    bool scattered = sample_subsurface_event(ray, surface, material, scatter_position, scatter_direction, scatter_weight);
+    if (!scattered) return vec3(0.0);
+    vec3 direct = evaluate_sss_direct_light(scatter_position, scatter_direction, material);// TODO: this needs to evaluate global lighting
+    return scatter_weight * direct;
+}
+
+// ===========================================================
+
 void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout float wavelength) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
@@ -483,6 +598,9 @@ void main() {
 	// calculate ray color
     uint hit_id = -1;
     float hit_distance = -1.0f;
+    // === collapse here ===
+    //vec3 color = render_sss(create_ray(vec2(rx, ry)), hit_id, hit_distance);
+    // =====================
     vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id, hit_distance);
     if (ubo.spectral != 0) color = cheap_spectral_color(color);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;

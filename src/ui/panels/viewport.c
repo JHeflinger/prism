@@ -137,6 +137,11 @@ static void PanSelectedObject() {
     }
 }
 
+static void TogglePreview() {
+    BOOL preview = !(RenderConfig()->flags & PATHTRACE_SHADER_FLAG);
+    RenderConfig()->flags = !preview ? PREVIEW_PIPELINE_FLAGS : PATHTRACE_PIPELINE_FLAGS;
+}
+
 static void DrawViewportPanel(float width, float height) {
     SetViewportSlice(width, height);
     SetViewportRec((Rectangle){ UIGetPosition().x, UIGetPosition().y, width, height });
@@ -230,5 +235,6 @@ Panel GenerateViewportPanel() {
 	AddBind("reset viewport camera", ResetViewportCamera, (BindCommand){ IK_RESET_CAMERA, BIND_KEY_PRESSED });
 	AddBind("fit viewport camera to model", FitCamera, (BindCommand){ IK_FIT_CAMERA, BIND_KEY_PRESSED });
     AddBind("toggle input hints", ToggleHints, (BindCommand){ IK_TOGGLE_HINTS, BIND_KEY_PRESSED });
+    AddBind("toggle primary camera preview", TogglePreview, (BindCommand){ IK_TOGGLE_PREVIEW, BIND_KEY_PRESSED });
     return p;
 }

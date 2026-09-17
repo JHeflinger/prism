@@ -17,6 +17,7 @@ export Definitions {
     #define LAMBERTIAN_MODEL 2
     #define MIRROR_MODEL 5
     #define DIELECTRIC_MODEL 7
+    #define SUBSURFACE_MODEL 11
     #define PI 3.14159265358979323846
     #define MAX_BONE_INFLUENCES 4
 }
@@ -246,6 +247,9 @@ export MaterialDef {
         vec3 specular;
         vec3 absorbtion;
         vec3 dispersion;
+        vec3 scattering;
+        float anisotropy;
+        float scale;
         float ior;
         float shiny;
         uint model;

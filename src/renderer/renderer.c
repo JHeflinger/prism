@@ -317,6 +317,7 @@ void InitializeRenderer() {
     PollGPUCache(TRUE);
 
     // default material
+    /*
     SubmitNamedMaterial((SurfaceMaterial){
         {0.0f, 0.0f, 0.0f},
         {1.0f, 1.0f, 1.0f},
@@ -324,8 +325,24 @@ void InitializeRenderer() {
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
-        0, 10.0f, 2
-    }, "Default");
+        {0.0f, 0.0f, 0.0f},
+        0.0f, 1.0f, 0, 10.0f, 2
+    }, "Default");*/
+    SurfaceMaterial wax = {
+        .emission = {0.0f, 0.0f, 0.0f},
+        .ambient = {1.0f, 1.0f, 1.0f},
+        .diffuse = {0.8f, 0.25f, 0.15f},
+        .specular = {0.04f, 0.04f, 0.04f},
+        .dispersion = {0.0f, 0.0f, 0.0f},
+        .ior = 1.45f,
+        .shiny = 20.0f,
+        .model = 2,
+        .scattering = {1.5f, 1.2f, 1.0f},
+        .absorbtion = {0.15f, 0.35f, 0.5f},
+        .anisotropy = 0.0f,
+        .scale = 1.0f
+    };
+    SubmitNamedMaterial(wax, "Default");
 
     // set overlay context
     SetOverlayContext(&g_renderer);

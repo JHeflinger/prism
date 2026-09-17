@@ -7,7 +7,7 @@
 #include <ui/popup.h>
 #include <nfd.h>
 
-static char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric" };
+static char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric", "subsurface" };
 static char* g_arapmodel_labels[] = { "rigid", "cubic" };
 static char* g_sim_visual_labels[] = { "smoke", "fire", "water", "plasma" };
 static char* g_debugmode_labels[] = { "none", "normals", "bvh", "bounces" };
@@ -193,7 +193,7 @@ static int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(0, 35);
     UIDrawText("Lighting Model");
     UIMoveCursor(xpos + 165, -20);
-    UIDropdownMenu(200, 3, LightModelLabels(), DropdownSelectLightModel, &g_material);
+    UIDropdownMenu(200, 4, LightModelLabels(), DropdownSelectLightModel, &g_material);
 
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
     if (UIButton("Submit", button_width)) {
@@ -623,6 +623,7 @@ size_t DropdownSelectLightModel(void* data, size_t index, BOOL cancel) {
             case 2: return 0;
             case 5: return 1;
             case 7: return 2;
+            case 11: return 3;
             default: return 0;
         }
     } else {
@@ -635,6 +636,9 @@ size_t DropdownSelectLightModel(void* data, size_t index, BOOL cancel) {
                 break;
             case 2:
                 matref->model = 7;
+                break;
+            case 3:
+                matref->model = 11;
                 break;
             default: break;
         }
