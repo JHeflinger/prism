@@ -1,65 +1,7 @@
-OFFLINE:
-1. bounce-per-frame should be ultimately faster bc we're not stacking lagging path times
-
-ICEBOX:
-1. Select multiple faces via holding shift
-2. Select all seen faces via dragging box
-3. Wiki + Info buttons
-5. Reimplement SDFs properly, represent in scene as boxes if marching isn't enabled, otherwise march instead of trace
-6. Volumetrics
-12. Delete buttons on edit panel
-12. Rotate triangles
-13. Extrude triangles
-16. Offline rendering pipeline
-18. Textures/mipmapping/bilinear/trilinear filtering
-19. Dynamically adjustable resolution (window is max resolution, scale down viewport and usage from there)
-20. Resizeable window
-21. Compositing pipeline
-22. SDF construction pipeline using union, intersection, modifiers, etc
-24. New test suite
-31. no need to trace initial hit every single time when accumulating paths? restir?
-32. optimization - caclulation struct! pre calculate everything possible and just pass the struct around as to reduce redundant calculations
-33. for sampling a direct light uniformly, weight each emissive material by area. Then make a mapping array that maps the random index you get to the weighted index of the emissive array
-34. Changing emission in material editor needs to re compute emissive materials (maybe we just do this on preview change)
-36. Executor should be bounce-per-frame as well
-37. command-based geometry editing
-38. update emissives on vertex change too, probably just redo all emissive stuff on bvh change
-39. make a much more efficient way to update gpu memory based on host memory (which is definitely possible btw!)
-40. all remove vertex and update ids support
-41. bug: mesh flickers during moving/reconstructing bvh - is this bc of the bvh, or is it the waiting to idle? check by turning on bvh construction all the time, if it still flickers its the bvh construction, seems to probably be due to pipeline refreshing
-42. Ensure windows compat
-43. bug - stressful geometry operations do eventually break if you play around enough
-44. bug - something is wrong with lighting - best seen by scene lighting only
-45. do cholmod yourself
-46. basic analysis on image sections to determine if need to trace more on it or not so we can prioritize parts of the image that needs more samples
-47. integrate simulator into geometry editor
-48. real spectral rendering maybe use hero rays and fix spectral aliasing
-49. simulation on GPU
-50. optimize memory bits and types
-51. detach from assimp
-52. unique views - when you switch a view the entire ui layout changes
-53. implement in house file dialogue system
-54. animation panel
-
-Next:
-    DENOISING AND MULTIFRAME IN ONE AND APPLY PENUMBRA TO DIRECTIONAL LIGHTS
-    - fix multiframe timing 
-    - fix multiframe camera reset
-
--4. ohhhh the funky shadows is because the normal sometimes points into the surface due to the way we calculate it, meaning that adding it as the epsilon definitely causes those shadow fucks - we should be using the incoming direction as an epsilon
--3. smooth normals isn't working anymore somehow? maybe just for shadow hits it isn't? idk
-8. proper rendering/camera panel
-9. CPUswap greater than 2 breaks??
-11. change overlay edge highlighting to just use barycentric coordinates
-14. uhh fwidth() is a think that may be useful for improving overlay
-15. fix the flashing and flickering that happens on just pathtrace no direct lighting components
-16. outline objects and select object mode
-17. add a toggle orientation thing to see the coordinate system orientation
-18. smooth mesh normals
-21. implement marcuses features with like resizing renderer size and whatnot
-22. simulate aperature shape
-23. denoising!
-24. refactor how input and colors are declared to the same way mundus/carbon does it
-
-ideas:
+Deletion:
 never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything
+
+Path Denoising:
+See if you can derive a way to denoise a individual unique path by getting a confidence metric - this metric is discerned by something like path similarity or bvh intersection or basically just trying to get a read on the likeliness of this path contributing a lot, and then each contribution sample can then be weighted based on that confidence.
+
+^ maybe this is extensible to GS, where the training tries and derives a smaller set of possible paths reflected/directed by the gaussians that can approximate the SSS well enough?

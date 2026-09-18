@@ -6,8 +6,8 @@ static void DrawMeshPanel(float width, float height) {
     UIMoveCursor((width - 20 - UITextWidth("Edit Mesh")) / 2.0f, 0);
     UIDrawText("Edit Mesh");
     UIMoveCursor(0, 15);
-    UIDrawText("Geometry Operations");
-    UIDivider(width - 20);
+    UIDividerLabeled(width, "Geometry Operations");
+    UIMoveCursor(0, 5);
     if (UIButton("Subdivide", width - 20)) {
         Subdivide();
     }
@@ -38,8 +38,8 @@ static void DrawMeshPanel(float width, float height) {
     UIMoveCursor((width - 20.0f)/2.0f, -20);
     UIDragFloat(&nudgening, 0, 1.0f, 0.001f, (width - 20.0f)/2.0f);
     UIMoveCursor(0, 15);
-    UIDrawText("Mesh Deformation");
-    UIDivider(width - 20);
+    UIDividerLabeled(width, "Mesh Deformation");
+    UIMoveCursor(0, 5);
     if (UIButton("Set Pose", width - 20)) {
         SavePose();
     }

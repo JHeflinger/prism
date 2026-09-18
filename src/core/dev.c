@@ -21,7 +21,8 @@ static void LoadBox() {
 
 static void LoadRabbit() {
     LoadOBJ("assets/models/OBJ/naked/bunny.obj");
-    SubmitNamedLight((SceneLight){{0, 0, -1.5f},{1,1,1},{0,0,0},0,0}, "Rabbit Point Light");
+    //LoadFBX("assets/models/FBX/dragon.fbx");
+    SubmitNamedLight((SceneLight){{0, 0, -1.5f},{10,10,10},{0,0,0},0,0}, "Rabbit Point Light");
     FitCamera();
 }
 
@@ -43,8 +44,6 @@ void DevInitialize() {
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_B_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("load rabbit", LoadRabbit,
-        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
-        (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_R_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("clear scene", ClearSoftScene,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
