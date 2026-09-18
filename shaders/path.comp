@@ -448,24 +448,71 @@ vec3 render_sss(Ray ray, inout uint hit_id, inout float hit_distance) {
     return scatter_weight * direct;
 }
 
+vec3 sample_sss_transmittance(Material material, float distance) {
+    vec3 sigma_t = material.scattering + material.absorbtion;
+    return exp(-sigma_t * distance);
+}
+
+bool subsurface_walk(inout Ray ray, inout vec3 throughput, Hit entry_hit, Material material, inout uint medium) {
+    vec3 sigma_s = material.scattering;
+    vec3 sigma_a = material.absorbtion;
+    vec3 sigma_t = sigma_s + sigma_a;
+    medium = entry_hit.material;
+    for (int bounce = 0; bounce < MAX_SSS_BOUNCES; ++bounce) { // TODO: put MAX_SSS_BOUNCES as camera param
+        Ray boundary_ray;
+        boundary_ray.position = epsilon_offset(ray.position, -ray.direction);
+        boundary_ray.direction = ray.direction;
+        uint boundary_id = uint(-1);
+        Hit boundary = trace(boundary_ray, boundary_id);
+        if (boundary.distance <= 0.0) {
+            medium = AIR_MEDIUM;
+            return false;
+        }
+        float sigma = max(luminance(sigma_t), EPS);
+        float xi = max(random(), 1e-6);
+        float free_distance = -log(1.0 - xi) / sigma;
+        if (free_distance >= boundary.distance) {
+            vec3 transmittance = exp(-sigma_t * boundary.distance);
+            throughput *= transmittance;
+            ray.position = epsilon_offset(boundary.position, boundary.normal);
+            medium = AIR_MEDIUM; // TODO: this should not exactly be air medium, but the previous participating medium
+            return true;
+        }
+        vec3 scatter_position = ray.position + ray.direction * free_distance;
+        throughput *= exp(-sigma_t * free_distance);
+        throughput *= sigma_s / max(sigma, EPS);
+        vec3 new_direction = sample_henyey_greenstein(-ray.direction, material.anisotropy);
+        ray.position = scatter_position;
+        ray.direction = new_direction;
+        float p = russian_roulette(throughput);
+        if (random() > p) return false;
+        throughput /= p;
+    }
+    return false;
+}
+
 // ===========================================================
+
+void sample_lambertian(vec3 outgoing, Hit h, Material material, out vec3 incoming, out float pdf, out vec3 throughput) {
+    float ks = luminance(material.specular);
+    float kd = luminance(material.diffuse);
+    float kskd = ks + kd;
+    float pd = kd/kskd;
+    float ps = ks/kskd;
+    vec3 R = reflect(-outgoing, h.normal);
+    incoming = random() < pd ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
+    throughput = 
+        ((material.diffuse / PI) +
+        (material.specular * (material.shiny + 2.0) /
+        (2.0 * PI) * pow(max(dot(R, incoming), 0.0), material.shiny))) *
+        max(0.0, dot(incoming, h.normal));
+    pdf = (pd * diffuse_pdf(h.normal, incoming) + ps * specular_pdf(incoming, R, material.shiny));
+}
 
 void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout float wavelength) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
-            float ks = luminance(material.specular);
-            float kd = luminance(material.diffuse);
-            float kskd = ks + kd;
-            float pd = kd/kskd;
-            float ps = ks/kskd;
-            vec3 R = reflect(-outgoing, h.normal);
-            incoming = random() < pd ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
-            throughput = 
-                ((material.diffuse / PI) +
-                (material.specular * (material.shiny + 2.0) /
-                (2.0 * PI) * pow(max(dot(R, incoming), 0.0), material.shiny))) *
-                max(0.0, dot(incoming, h.normal));
-            pdf = (pd * diffuse_pdf(h.normal, incoming) + ps * specular_pdf(incoming, R, material.shiny));
+            sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
             break;
         case MIRROR_MODEL:
             incoming = reflect(-outgoing, h.normal);
@@ -510,6 +557,30 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
                 medium = mat_t;
             }
             break;
+        case SUBSURFACE_MODEL:
+            float p_sss = 0.5;
+            float p_surface = 1.0 - p_sss;
+            if (random() < p_sss) {
+                vec3 entry_direction;
+                float F = fresnel_dielectric(dot(outgoing, h.normal), ior, material.ior);
+                if (!refract_ray(-outgoing, h.normal, ior / material.ior, incoming)) {
+                    // TIR shouldn't normally happen
+                    // when entering from air.
+                    //break;
+                }
+                throughput *= (1.0 - F);
+                Ray ray;
+                ray.position = epsilon_offset(h.position, -h.normal);
+                ray.direction = incoming;
+                if (!subsurface_walk(ray, throughput, h, material, medium)) {
+                    //break;
+                }
+                throughput /= p_sss;
+            } else {
+                sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
+                throughput /= p_surface;
+            }
+            break;
         default: break;
     }
 }
@@ -520,7 +591,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     bool firsthit = true;
     uint hid = -1;
     float ior = 1.0;
-    uint medium = -1;
+    uint medium = AIR_MEDIUM;
     bool count_emission = true;
     float wavelength = -1.0;
     uint i = 0;
@@ -533,18 +604,20 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         }
         if (h.distance <= 0) break;
         Material material = materialIn[h.material];
+        bool dispersive = material.model == LAMBERTIAN_MODEL || material.model == SUBSURFACE_MODEL;
+        bool reflective = material.model == DIELECTRIC_MODEL || material.model == MIRROR_MODEL;
         if (material.emission != vec3(0.0) && count_emission) {
             radiance += throughput * material.emission;
             break;
         }
         bool same_medium = medium == h.material;
         uint b4medium = medium;
-        if (ubo.scenelighting != 0 && ubo.lights > 0 && material.model == LAMBERTIAN_MODEL) {
+        if (ubo.scenelighting != 0 && ubo.lights > 0 && dispersive) {
             vec3 light = sample_scene_lights(-ray.direction, h, material);
             radiance += min(throughput * light, max_contribution);
             if (ubo.scenelightingonly != 0) break;
         }
-        if (ubo.direct != 0 && material.model == LAMBERTIAN_MODEL && ubo.emissives > 0) {
+        if (ubo.direct != 0 && dispersive && ubo.emissives > 0) {
             vec3 direct = sample_direct_light(-ray.direction, h, material);
             radiance += min(throughput * direct, max_contribution);
             if (ubo.directonly != 0) break;
@@ -574,7 +647,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         throughput /= p;
         ray.position = epsilon_offset(h.position, dot(incoming, h.normal) > 0.0 ? h.normal : -h.normal);
         ray.direction = incoming;
-        if (material.model != LAMBERTIAN_MODEL) count_emission = true;
+        if (reflective) count_emission = true;
         else count_emission = ubo.direct == 0;
     }
     if (ubo.debugmode == DEBUG_BOUNCES) return vec3(pow(float(i) / float(ubo.maxbounces), 2.0), 0, 0);
@@ -598,9 +671,6 @@ void main() {
 	// calculate ray color
     uint hit_id = -1;
     float hit_distance = -1.0f;
-    // === collapse here ===
-    //vec3 color = render_sss(create_ray(vec2(rx, ry)), hit_id, hit_distance);
-    // =====================
     vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id, hit_distance);
     if (ubo.spectral != 0) color = cheap_spectral_color(color);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;

@@ -20,6 +20,8 @@ export Definitions {
     #define SUBSURFACE_MODEL 11
     #define PI 3.14159265358979323846
     #define MAX_BONE_INFLUENCES 4
+    #define MAX_SSS_BOUNCES 16
+    const uint AIR_MEDIUM = uint(-1);
 }
 
 export RayGeneratorDef {
