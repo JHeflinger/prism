@@ -429,6 +429,7 @@ vec3 evaluate_sss_direct_light(vec3 position, vec3 incoming_direction, Material 
     return result;
 }
 
+// TODO: remove all dregs of previous impl of sss
 vec3 render_sss(Ray ray, inout uint hit_id, inout float hit_distance) {
     Hit surface;
     surface.distance = -1.0;
@@ -453,6 +454,10 @@ vec3 sample_sss_transmittance(Material material, float distance) {
     return exp(-sigma_t * distance);
 }
 
+void random_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium) {
+
+}
+
 bool subsurface_walk(inout Ray ray, inout vec3 throughput, Hit entry_hit, Material material, inout uint medium) {
     vec3 sigma_s = material.scattering;
     vec3 sigma_a = material.absorbtion;
@@ -468,7 +473,7 @@ bool subsurface_walk(inout Ray ray, inout vec3 throughput, Hit entry_hit, Materi
             medium = AIR_MEDIUM;
             return false;
         }
-        float sigma = max(luminance(sigma_t), EPS);
+        float sigma = max(luminance(sigma_t) * material.scale, EPS);
         float xi = max(random(), 1e-6);
         float free_distance = -log(1.0 - xi) / sigma;
         if (free_distance >= boundary.distance) {
@@ -485,7 +490,7 @@ bool subsurface_walk(inout Ray ray, inout vec3 throughput, Hit entry_hit, Materi
         ray.position = scatter_position;
         ray.direction = new_direction;
         float p = russian_roulette(throughput);
-        if (random() > p) return false;
+        if (random() > p) return false; // how to propogate this termination?
         throughput /= p;
     }
     return false;
@@ -509,7 +514,7 @@ void sample_lambertian(vec3 outgoing, Hit h, Material material, out vec3 incomin
     pdf = (pd * diffuse_pdf(h.normal, incoming) + ps * specular_pdf(incoming, R, material.shiny));
 }
 
-void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout float wavelength) {
+void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout float wavelength) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
@@ -561,19 +566,24 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
             float p_sss = 0.5;
             float p_surface = 1.0 - p_sss;
             if (random() < p_sss) {
+                // set up ray
+                //random_walk(inout Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium);
                 vec3 entry_direction;
                 float F = fresnel_dielectric(dot(outgoing, h.normal), ior, material.ior);
                 if (!refract_ray(-outgoing, h.normal, ior / material.ior, incoming)) {
-                    // TIR shouldn't normally happen
-                    // when entering from air.
-                    //break;
+                    // TIR shouldn't normally happen when entering from air?
+                    sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
+                    throughput /= p_surface;
+                    break;
                 }
                 throughput *= (1.0 - F);
                 Ray ray;
                 ray.position = epsilon_offset(h.position, -h.normal);
                 ray.direction = incoming;
                 if (!subsurface_walk(ray, throughput, h, material, medium)) {
-                    //break;
+                    // This should also never happen?
+                    throughput /= p_sss;
+                    break;
                 }
                 throughput /= p_sss;
             } else {

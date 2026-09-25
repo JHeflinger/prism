@@ -43,7 +43,7 @@ void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, float he
     UIColumnHeader("Specular", LEFT_COLUMN_WIDTH);
     edited |= UITriplet("rgb", UI_FLOATS, &(matref->specular[0]), &(matref->specular[1]), &(matref->specular[2]), (UIMultiValue){ ._float = 0 }, (UIMultiValue){ ._float = 1.0f }, (UIMultiValue){ ._float = 0.05f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
     UIColumnHeader("Scattering", LEFT_COLUMN_WIDTH);
-    edited |= UITriplet("rgb", UI_FLOATS, &(matref->scattering[0]), &(matref->scattering[1]), &(matref->scattering[2]), (UIMultiValue){ ._float = 0 }, (UIMultiValue){ ._float = 1.0f }, (UIMultiValue){ ._float = 0.05f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
+    edited |= UITriplet("rgb", UI_FLOATS, &(matref->scattering[0]), &(matref->scattering[1]), &(matref->scattering[2]), (UIMultiValue){ ._float = 0 }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.05f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
     UIMoveCursor(0, 35);
     float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
     UIColumnHeader("Index of Refraction", LEFT_COLUMN_WIDTH);
