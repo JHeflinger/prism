@@ -54,6 +54,8 @@ void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, float he
     edited |= UIDragFloat(&(matref->anisotropy), 0, FLT_MAX, 0.01f, sboxwidth);
     UIColumnHeader("Transport Scale", LEFT_COLUMN_WIDTH);
     edited |= UIDragFloat(&(matref->scale), 0, FLT_MAX, 0.01f, sboxwidth);
+    UIColumnHeader("Subsurface Ratio", LEFT_COLUMN_WIDTH);
+    edited |= UIDragFloat(&(matref->subsurface), 0, 1.0f, 0.01f, sboxwidth);
     UIMoveCursor(0, 35);
     UIColumnHeader("Lighting Model", LEFT_COLUMN_WIDTH);
     UIDropdownMenu(sboxwidth, 4, LightModelLabels(), DropdownSelectLightModel, matref);
@@ -182,6 +184,8 @@ void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
     SetCamera(pp);
     UIColumnHeader("Max Bounces", LEFT_COLUMN_WIDTH);
     UIDragSize(&(cref->config.maxbounces), 0, 999999999, 1, sboxwidth);
+    UIColumnHeader("Max SSS Bounces", LEFT_COLUMN_WIDTH);
+    UIDragSize(&(cref->config.maxsssbounces), 0, 999999999, 1, sboxwidth);
     UIColumnHeader("Frame Multiplier", LEFT_COLUMN_WIDTH);
     UIDragSize(&(cref->config.multiplier), 0, 999999999, 1, sboxwidth);
     UIColumnHeader("Whitepoint", LEFT_COLUMN_WIDTH);

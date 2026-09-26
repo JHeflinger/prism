@@ -340,7 +340,8 @@ void InitializeRenderer() {
         .scattering = {1.5f, 1.2f, 1.0f},
         .absorbtion = {0.15f, 0.35f, 0.5f},
         .anisotropy = 0.0f,
-        .scale = 1.0f
+        .scale = 1.0f,
+        .subsurface = 0.5f
     };
     SubmitNamedMaterial(wax, "Default");
 
@@ -388,6 +389,7 @@ SceneCamera DefaultCamera() {
     sc.config.whitepoint = 20.0f;
     sc.config.gamma = 2.2f;
     sc.config.maxbounces = 10;
+    sc.config.maxsssbounces = 32;
     sc.config.multiplier = 1;
     sc.config.direct = FALSE;
     sc.config.grid = TRUE;

@@ -105,6 +105,7 @@ typedef struct {
     alignas(16) vec3 scattering;
     alignas(4) float anisotropy;
     alignas(4) float scale;
+    alignas(4) float subsurface;
     alignas(4) float ior;
     alignas(4) float shiny;
     alignas(4) uint32_t model;
@@ -400,6 +401,7 @@ typedef struct {
     float whitepoint;
     float gamma;
     size_t maxbounces;
+    size_t maxsssbounces;
     size_t multiplier;
     BOOL normals;
     BOOL direct;

@@ -115,6 +115,7 @@ export UniformBufferObjectDef {
         uint scenelightshadows;
         uint debugmode;
         uint maxbounces;
+        uint maxsssbounces;
         uint spectral;
         uint screenspace;
         float fov;
@@ -252,6 +253,7 @@ export MaterialDef {
         vec3 scattering;
         float anisotropy;
         float scale;
+        float subsurface;
         float ior;
         float shiny;
         uint model;

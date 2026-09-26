@@ -335,24 +335,6 @@ vec3 cheap_spectral_color(in vec3 rgb) {
     return cheap_wavelength_to_rgb(lambdaR) * rgb.r + cheap_wavelength_to_rgb(lambdaG) * rgb.g + cheap_wavelength_to_rgb(lambdaB) * rgb.b;
 }
 
-// =============== TODO: REMOTE TEMP WORK ====================
-
-float scalar_sigma_t(Material material) {
-    vec3 sigma_t = material.scattering + material.absorbtion;
-    return max(dot(sigma_t, vec3(0.2126, 0.7152, 0.0722)), EPS);
-}
-
-float sample_free_flight(Material material) {
-    float sigma_t = scalar_sigma_t(material);
-    float xi = max(random(), 1e-6);
-    return -log(1.0 - xi) / sigma_t;
-}
-
-float phase_henyey_greenstein(float cos_theta, float g) {
-    float denom = 1.0 + g * g - 2.0 * g * cos_theta;
-    return (1.0 - g * g) / (4.0 * PI * pow(denom, 1.5));
-}
-
 vec3 sample_henyey_greenstein(vec3 outgoing, float g) {
     float xi1 = random();
     float xi2 = random();
@@ -370,133 +352,42 @@ vec3 sample_henyey_greenstein(vec3 outgoing, float g) {
     return onb(outgoing, local);
 }
 
-bool sample_subsurface_event(Ray ray, Hit surface, Material material, out vec3 position, out vec3 direction, out vec3 weight) {
-    float distance = sample_free_flight(material);
-    Ray inside;
-    inside.position = epsilon_offset(surface.position, -surface.normal);
-    inside.direction = ray.direction;
-    Hit exit_hit;
-    uint exit_id = 0;
-    exit_hit = trace(inside, exit_id);
-    if (exit_hit.distance <= 0.0) return false;
-    if (distance >= exit_hit.distance) return false;
-    position = inside.position + inside.direction * distance;
-    direction = sample_henyey_greenstein(-inside.direction, material.anisotropy);
-    vec3 sigma_s = material.scattering;
-    vec3 sigma_t = material.scattering + material.absorbtion;
-    weight = exp(-sigma_t * distance) * sigma_s;
-    return true;
-}
-
-vec3 evaluate_sss_direct_light(vec3 position, vec3 incoming_direction, Material material) {
-    vec3 result = vec3(0.0);
-    for (uint i = 0; i < ubo.lights; ++i) {
-        SceneLight light = lightIn[i];
-        vec3 to_light = light.position - position;
-        float distance_to_light = length(to_light);
-        vec3 light_dir = normalize(to_light);
-        float falloff = 1.0;
-        if (light.angle == 0.0 && light.direction == vec3(0.0)) {
-            // point light
-        } else if (light.angle != 0.0) {
-            // spot light
-            if (light.direction == vec3(0.0)) light.direction = vec3(0, -1, 0);
-            float angle = acos(clamp(dot(-light_dir, normalize(light.direction)), -1.0, 1.0));
-            float lightangle = radians(light.angle * 0.5);
-            if (angle > lightangle) continue;
-            if (angle > lightangle * (1.0 - light.penumbra)) {
-                falloff -= (angle - lightangle * (1.0 - light.penumbra)) / (light.penumbra * lightangle);
-            }
-        } else {
-            // directional light
-            light_dir = -normalize(light.direction);
-            distance_to_light = FLTMAX;
-        }
-
-        // Trace through the interior.
-        /* TODO: need to identity if the hit belongs to the same object
-        Ray shadow_ray;
-        shadow_ray.position = position + light_dir * EPS;
-        shadow_ray.direction = light_dir;
-        uint tid = 0;
-        Hit shadow_hit = trace(shadow_ray, tid);
-        if (shadow_hit.distance > 0.0 && shadow_hit.distance < distance_to_light) continue;*/ 
-
-        float phase = phase_henyey_greenstein(dot(-incoming_direction, light_dir), material.anisotropy);
-        result += light.color * phase * falloff;
-    }
-
-    return result;
-}
-
-// TODO: remove all dregs of previous impl of sss
-vec3 render_sss(Ray ray, inout uint hit_id, inout float hit_distance) {
-    Hit surface;
-    surface.distance = -1.0;
-    surface = trace(ray, hit_id);
-    if (surface.distance <= 0.0) {
-        hit_distance = -1.0;
-        return vec3(0.0);
-    }
-    hit_distance = surface.distance;
-    Material material = materialIn[surface.material];
-    vec3 scatter_position;
-    vec3 scatter_direction;
-    vec3 scatter_weight;
-    bool scattered = sample_subsurface_event(ray, surface, material, scatter_position, scatter_direction, scatter_weight);
-    if (!scattered) return vec3(0.0);
-    vec3 direct = evaluate_sss_direct_light(scatter_position, scatter_direction, material);// TODO: this needs to evaluate global lighting
-    return scatter_weight * direct;
-}
-
-vec3 sample_sss_transmittance(Material material, float distance) {
-    vec3 sigma_t = material.scattering + material.absorbtion;
-    return exp(-sigma_t * distance);
-}
-
-void random_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium) {
-
-}
-
-bool subsurface_walk(inout Ray ray, inout vec3 throughput, Hit entry_hit, Material material, inout uint medium) {
+void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium) {
+    throughput = vec3(1.0);
     vec3 sigma_s = material.scattering;
     vec3 sigma_a = material.absorbtion;
     vec3 sigma_t = sigma_s + sigma_a;
-    medium = entry_hit.material;
-    for (int bounce = 0; bounce < MAX_SSS_BOUNCES; ++bounce) { // TODO: put MAX_SSS_BOUNCES as camera param
-        Ray boundary_ray;
-        boundary_ray.position = epsilon_offset(ray.position, -ray.direction);
-        boundary_ray.direction = ray.direction;
-        uint boundary_id = uint(-1);
-        Hit boundary = trace(boundary_ray, boundary_id);
-        if (boundary.distance <= 0.0) {
-            medium = AIR_MEDIUM;
-            return false;
-        }
-        float sigma = max(luminance(sigma_t) * material.scale, EPS);
+    float sigma = max(luminance(sigma_t) * material.scale, EPS);
+    vec3 sigma_mul = sigma_s / max(sigma, EPS);
+    uint boundary_id = uint(-1);
+    medium = hit.material;
+    for (int bounce = 0; bounce < ubo.maxsssbounces; ++bounce) {
+        Hit boundary = trace(ray, boundary_id);
         float xi = max(random(), 1e-6);
         float free_distance = -log(1.0 - xi) / sigma;
-        if (free_distance >= boundary.distance) {
+        if (free_distance >= boundary.distance) { // exiting
+            ray.position = epsilon_offset(ray.position, ray.direction) + ray.direction * boundary.distance;
             vec3 transmittance = exp(-sigma_t * boundary.distance);
             throughput *= transmittance;
-            ray.position = epsilon_offset(boundary.position, boundary.normal);
-            medium = AIR_MEDIUM; // TODO: this should not exactly be air medium, but the previous participating medium
-            return true;
+            throughput *= sigma_mul;
+            //medium = AIR_MEDIUM; // TODO: this should not exactly be air medium, but the previous participating medium
+                                 // might need to edit material here to prev material?
+            break;
+        } else {
+            vec3 scatter_position = ray.position + ray.direction * free_distance;
+            throughput *= exp(-sigma_t * free_distance);
+            throughput *= sigma_mul;
+            vec3 new_direction = sample_henyey_greenstein(-ray.direction, material.anisotropy);
+            ray.position = scatter_position;
+            ray.direction = new_direction;
         }
-        vec3 scatter_position = ray.position + ray.direction * free_distance;
-        throughput *= exp(-sigma_t * free_distance);
-        throughput *= sigma_s / max(sigma, EPS);
-        vec3 new_direction = sample_henyey_greenstein(-ray.direction, material.anisotropy);
-        ray.position = scatter_position;
-        ray.direction = new_direction;
         float p = russian_roulette(throughput);
-        if (random() > p) return false; // how to propogate this termination?
+        if (random() > p) break; // TODO: how to propogate this termination?
         throughput /= p;
     }
-    return false;
+    hit.normal = ray.direction;
+    hit.position = ray.position;
 }
-
-// ===========================================================
 
 void sample_lambertian(vec3 outgoing, Hit h, Material material, out vec3 incoming, out float pdf, out vec3 throughput) {
     float ks = luminance(material.specular);
@@ -563,29 +454,16 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in Material material,
             }
             break;
         case SUBSURFACE_MODEL:
-            float p_sss = 0.5;
+            float p_sss = material.subsurface;
             float p_surface = 1.0 - p_sss;
-            if (random() < p_sss) {
-                // set up ray
-                //random_walk(inout Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium);
-                vec3 entry_direction;
-                float F = fresnel_dielectric(dot(outgoing, h.normal), ior, material.ior);
-                if (!refract_ray(-outgoing, h.normal, ior / material.ior, incoming)) {
-                    // TIR shouldn't normally happen when entering from air?
-                    sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
-                    throughput /= p_surface;
-                    break;
-                }
-                throughput *= (1.0 - F);
+            if (random() <= p_sss) {
                 Ray ray;
-                ray.position = epsilon_offset(h.position, -h.normal);
-                ray.direction = incoming;
-                if (!subsurface_walk(ray, throughput, h, material, medium)) {
-                    // This should also never happen?
-                    throughput /= p_sss;
-                    break;
-                }
+                ray.direction = sample_henyey_greenstein(outgoing, material.anisotropy);
+                ray.position = epsilon_offset(h.position, ray.direction);
+                subsurface_walk(ray, throughput, h, material, medium);
                 throughput /= p_sss;
+                incoming = h.normal;
+                pdf = 1.0;
             } else {
                 sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
                 throughput /= p_surface;

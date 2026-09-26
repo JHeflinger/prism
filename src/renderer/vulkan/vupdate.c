@@ -454,6 +454,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.scenelightshadows = RendererCamera()->config.scenelightshadows;
         ubo.debugmode = (uint32_t)RendererCamera()->config.debug;
         ubo.maxbounces = (uint32_t)RendererCamera()->config.maxbounces;
+        ubo.maxsssbounces = (uint32_t)RendererCamera()->config.maxsssbounces;
         ubo.spectral = (uint32_t)RendererCamera()->config.spectral;
         ubo.screenspace = (uint32_t)RendererCamera()->config.screenspace;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
