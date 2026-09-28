@@ -219,4 +219,12 @@ void UpdateShaderBuffer(ShaderBuffer* buffer);
 
 void ClearScene(BOOL hard);
 
+void ClearSplats();
+
+size_t NumSplats();
+
+void SubmitSplat(GaussianSplat splat);
+
+void UpdateSplats();
+
 #endif

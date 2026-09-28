@@ -8,6 +8,7 @@ static uint64_t hash_edge(Edge edge) {
 IMPL_ARRLIST(Edge);
 IMPL_ARRLIST(TriangleID);
 IMPL_ARRLIST(Triangle);
+IMPL_ARRLIST(GaussianSplat);
 IMPL_ARRLIST(SurfaceMaterial);
 IMPL_ARRLIST(SceneLight);
 IMPL_ARRLIST(ManifoldVertex);

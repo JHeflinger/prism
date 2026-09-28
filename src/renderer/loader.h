@@ -11,4 +11,6 @@ BOOL LoadOBJ(const char* filepath);
 
 BOOL LoadFBX(const char* filepath);
 
+BOOL LoadPLY(const char* filepath);
+
 #endif

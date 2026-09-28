@@ -495,12 +495,12 @@ BOOL VertexLocked(VertexID vertex) {
 }
 
 void SubmitVertex(vec3 vertex) {
-    g_renderer.geometry.changes.update_vertices = TRUE;
     vec4 v = { 0 };
     glm_vec3_copy(vertex, v);
     ARRLIST_vec4_add(&(g_renderer.geometry.vertices), v);
     glm_vec3_minv(g_renderer.geometry.bounds.min, vertex, g_renderer.geometry.bounds.min);
     glm_vec3_maxv(g_renderer.geometry.bounds.max, vertex, g_renderer.geometry.bounds.max);
+    UpdateVertices();
 }
 
 void ClearVertices() {
@@ -508,22 +508,22 @@ void ClearVertices() {
     ARRLIST_vec4_clear(&(g_renderer.geometry.vertices));
     HASHMAP_Locks_clear(&(g_renderer.geometry.locks));
     ARRLIST_Edge_clear(&(g_renderer.geometry.edges));
-    g_renderer.geometry.changes.update_vertices = TRUE;
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
     SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
+    UpdateVertices();
 }
 
 void SubmitNormal(vec3 normal) {
-    g_renderer.geometry.changes.update_normals = TRUE;
     vec4 n = { 0 };
     glm_vec3_copy(normal, n);
     ARRLIST_vec4_add(&(g_renderer.geometry.normals), n);
+    UpdateNormals();
 }
 
 void ClearNormals() {
     if (g_renderer.geometry.normals.maxsize == 0) return;
     ARRLIST_vec4_clear(&(g_renderer.geometry.normals));
-    g_renderer.geometry.changes.update_normals = TRUE;
+    UpdateNormals();
 }
 
 TriangleID SubmitTriangle(Triangle triangle) {
@@ -583,7 +583,7 @@ LightID SubmitNamedLight(SceneLight light, const char* name) {
     char* b = EZ_ALLOC(MAX_LIGHT_NAME_SIZE + 1, sizeof(char));
     strncpy(b, name, MAX_LIGHT_NAME_SIZE);
     ARRLIST_DynamicString_add(&(g_renderer.geometry.lightnames), b);
-    g_renderer.geometry.changes.update_lights = TRUE;
+    UpdateLights();
     return g_renderer.geometry.lights.size - 1;
 }
 
@@ -601,7 +601,7 @@ void ClearLights() {
     for (size_t i = 0; i < g_renderer.geometry.lightnames.size; i++)
         EZ_FREE(g_renderer.geometry.lightnames.data[i]);
     ARRLIST_DynamicString_clear(&(g_renderer.geometry.lightnames));
-    g_renderer.geometry.changes.update_lights = TRUE;
+    UpdateLights();
 }
 
 MaterialID SubmitMaterial(SurfaceMaterial material) {
@@ -615,7 +615,7 @@ MaterialID SubmitNamedMaterial(SurfaceMaterial material, const char* name) {
     char* b = EZ_ALLOC(MAX_MATERIAL_NAME_SIZE + 1, sizeof(char));
     strncpy(b, name, MAX_MATERIAL_NAME_SIZE);
     ARRLIST_DynamicString_add(&(g_renderer.geometry.materialnames), b);
-    g_renderer.geometry.changes.update_materials = TRUE;
+    UpdateMaterials();
     return g_renderer.geometry.materials.size - 1;
 }
 
@@ -634,7 +634,7 @@ void ClearMaterials() {
     for (size_t i = 0; i < g_renderer.geometry.materialnames.size; i++)
         EZ_FREE(g_renderer.geometry.materialnames.data[i]);
     ARRLIST_DynamicString_clear(&(g_renderer.geometry.materialnames));
-    g_renderer.geometry.changes.update_materials = TRUE;
+    UpdateMaterials();
 }
 
 size_t SubmitCamera(SceneCamera camera) {
@@ -1600,6 +1600,26 @@ void ClearScene(BOOL hard) {
     ClearMeshDescriptors();
     ClearAnimations();
     ClearSimulation();
+    ClearSplats();
     DeselectEditTarget();
     if (hard) ClearCameras();
+}
+
+void ClearSplats() {
+    if (g_renderer.geometry.splats.maxsize == 0) return;
+    ARRLIST_GaussianSplat_clear(&(g_renderer.geometry.splats));
+    UpdateSplats();
+}
+
+size_t NumSplats() {
+    return g_renderer.geometry.splats.size;
+}
+
+void SubmitSplat(GaussianSplat splat) {
+    ARRLIST_GaussianSplat_add(&(g_renderer.geometry.splats), splat);
+    UpdateSplats();
+}
+
+void UpdateSplats() {
+    g_renderer.geometry.changes.update_splats = TRUE;
 }

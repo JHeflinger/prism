@@ -82,6 +82,15 @@ typedef struct {
 DECLARE_ARRLIST(Triangle);
 
 typedef struct {
+    alignas(16) vec3 position;
+    alignas(16) vec3 logscale;
+    alignas(16) vec4 rotation;
+    alignas(4) float opacity;
+    alignas(16) vec3 shdc;
+} GaussianSplat;
+DECLARE_ARRLIST(GaussianSplat);
+
+typedef struct {
     alignas(16) vec3 min;
     alignas(16) vec3 max;
 } AxisAlignedBoundingBox;
@@ -132,6 +141,7 @@ typedef struct {
     size_t max_normals;
     size_t max_vertices;
     size_t max_triangles;
+    size_t max_splats;
     size_t max_emissives;
     size_t max_materials;
     size_t max_lights;
@@ -142,6 +152,7 @@ typedef struct {
     size_t num_normals;
     size_t num_vertices;
     size_t num_triangles;
+    size_t num_splats;
     size_t num_emissives;
     size_t num_materials;
     size_t num_lights;
@@ -152,6 +163,7 @@ typedef struct {
     BOOL update_normals;
     BOOL update_vertices;
     BOOL update_triangles;
+    BOOL update_splats;
     BOOL update_materials;
     BOOL update_lights;
     BOOL update_simulation;
@@ -435,6 +447,7 @@ typedef struct {
     ARRLIST_SceneLight lights;
     ARRLIST_DynamicString lightnames;
     ARRLIST_Triangle triangles;
+    ARRLIST_GaussianSplat splats;
     ARRLIST_TriangleID emissives;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;

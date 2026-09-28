@@ -6,6 +6,7 @@
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <util/logger.h>
+#include <easyparse.h>
 #include <easyfile.h>
 #include <ctype.h>
 #include <errno.h>
@@ -23,6 +24,9 @@
 #define MAX_XML_LINE_SIZE 2048
 #define MAX_XML_ARG_SIZE 32
 #define MAX_XML_NUM_ARGS 64
+#define MAX_PLY_HEADER_LINE 512
+#define MAX_PLY_PROPERTIES 128
+#define MAX_PLY_PROPERTY_NAME 64
 
 #define SET_MTL_FLOAT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
 #define SET_MTL_UINT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
@@ -55,6 +59,31 @@ typedef struct {
     BOOL textures;
     BOOL normals;
 } Face;
+
+typedef enum {
+    PLY_TYPE_INVALID = 0,
+    PLY_TYPE_CHAR,
+    PLY_TYPE_UCHAR,
+    PLY_TYPE_SHORT,
+    PLY_TYPE_USHORT,
+    PLY_TYPE_INT,
+    PLY_TYPE_UINT,
+    PLY_TYPE_FLOAT,
+    PLY_TYPE_DOUBLE
+} PLYType;
+
+typedef struct {
+    char name[MAX_PLY_PROPERTY_NAME];
+    PLYType type;
+} PLYProperty;
+
+typedef struct {
+    PLYProperty properties[MAX_PLY_PROPERTIES];
+    size_t property_count;
+    size_t vertex_count;
+    int64_t data_offset;
+    BOOL binary_little_endian;
+} PLYHeader;
 
 DECLARE_ARRLIST(Face);
 DECLARE_ARRLIST(UV);
@@ -106,6 +135,168 @@ static BOOL IsWhitespace(char c) {
     return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
+static PLYType ParsePLYType(const char* type) {
+    if (strcmp(type, "char") == 0 || strcmp(type, "int8") == 0) return PLY_TYPE_CHAR;
+    if (strcmp(type, "uchar") == 0 || strcmp(type, "uint8") == 0) return PLY_TYPE_UCHAR;
+    if (strcmp(type, "short") == 0 || strcmp(type, "int16") == 0) return PLY_TYPE_SHORT;
+    if (strcmp(type, "ushort") == 0 || strcmp(type, "uint16") == 0) return PLY_TYPE_USHORT;
+    if (strcmp(type, "int") == 0 || strcmp(type, "int32") == 0) return PLY_TYPE_INT;
+    if (strcmp(type, "uint") == 0 || strcmp(type, "uint32") == 0) return PLY_TYPE_UINT;
+    if (strcmp(type, "float") == 0 || strcmp(type, "float32") == 0) return PLY_TYPE_FLOAT;
+    if (strcmp(type, "double") == 0 || strcmp(type, "float64") == 0) return PLY_TYPE_DOUBLE;
+    return PLY_TYPE_INVALID;
+}
+
+static size_t PLYTypeSize(PLYType type) {
+    switch (type) {
+        case PLY_TYPE_CHAR: return 1;
+        case PLY_TYPE_UCHAR: return 1;
+        case PLY_TYPE_SHORT: return 2;
+        case PLY_TYPE_USHORT: return 2;
+        case PLY_TYPE_INT: return 4;
+        case PLY_TYPE_UINT: return 4;
+        case PLY_TYPE_FLOAT: return 4;
+        case PLY_TYPE_DOUBLE: return 8;
+        default: return 0;
+    }
+}
+
+static float ReadPLYFloat(FILE* file, PLYType type) {
+    if (type == PLY_TYPE_FLOAT) {
+        float value;
+        if (fread(&value, sizeof(float), 1, file) != 1) return NAN;
+        return value;
+    }
+    if (type == PLY_TYPE_DOUBLE) {
+        double value;
+        if (fread(&value, sizeof(double), 1, file) != 1) return NAN;
+        return (float)value;
+    }
+    if (type == PLY_TYPE_CHAR) {
+        int8_t value;
+        if (fread(&value, sizeof(value), 1, file) != 1) return NAN;
+        return (float)value;
+    }
+    if (type == PLY_TYPE_UCHAR) {
+        uint8_t value;
+        if (fread(&value, sizeof(value), 1, file) != 1) return NAN;
+        return (float)value;
+    }
+    if (type == PLY_TYPE_SHORT) {
+        int16_t value;
+        if (fread(&value, sizeof(value), 1, file) != 1) return NAN;
+        return (float)value;
+    }
+    if (type == PLY_TYPE_USHORT) {
+        uint16_t value;
+        if (fread(&value, sizeof(value), 1, file) != 1) return NAN;
+        return (float)value;
+    }
+    if (type == PLY_TYPE_INT) {
+        int32_t value;
+        if (fread(&value, sizeof(value), 1, file) != 1) return NAN;
+        return (float)value;
+    }
+    if (type == PLY_TYPE_UINT) {
+        uint32_t value;
+        if (fread(&value, sizeof(value), 1, file) != 1) return NAN;
+        return (float)value;
+    }
+    return NAN;
+}
+
+static BOOL ParsePLYHeader(FILE* file, PLYHeader* header) {
+    char line[MAX_PLY_HEADER_LINE];
+    memset(header, 0, sizeof(*header));
+    if (!fgets(line, sizeof(line), file)) return FALSE;
+    if (strncmp(line, "ply", 3) != 0) {
+        logerror("PLY file does not begin with \"ply\"");
+        return FALSE;
+    }
+    BOOL found_format = FALSE;
+    BOOL found_vertex = FALSE;
+    BOOL in_vertex = FALSE;
+    while (fgets(line, sizeof(line), file)) {
+        char keyword[MAX_PLY_PROPERTY_NAME] = { 0 };
+        if (sscanf(line, "%63s", keyword) != 1) continue;
+        if (strcmp(keyword, "format") == 0) {
+            char format[MAX_PLY_PROPERTY_NAME] = { 0 };
+            float version = 0.0f;
+            if (sscanf(line, "%*s %63s %f", format, &version) != 2) return FALSE;
+            if (strcmp(format, "binary_little_endian") != 0) {
+                logerror(
+                    "Unsupported PLY format \"%s\". "
+                    "Currently only binary_little_endian is supported.",
+                    format
+                );
+                return FALSE;
+            }
+            header->binary_little_endian = TRUE;
+            found_format = TRUE;
+        }
+        else if (strcmp(keyword, "element") == 0) {
+            char element[64] = { 0 };
+            size_t count = 0;
+            if (sscanf(line, "%*s %63s %zu", element, &count) != 2) return FALSE;
+            in_vertex = strcmp(element, "vertex") == 0;
+            if (in_vertex) {
+                header->vertex_count = count;
+                found_vertex = TRUE;
+            }
+        }
+        else if (strcmp(keyword, "property") == 0 && in_vertex) {
+            char type[64] = { 0 };
+            char name[64] = { 0 };
+            if (sscanf(line, "%*s %63s %63s", type, name) != 2) {
+                logerror("Malformed PLY vertex property");
+                return FALSE;
+            }
+            if (header->property_count >= MAX_PLY_PROPERTIES) {
+                logerror("PLY contains too many vertex properties");
+                return FALSE;
+            }
+            PLYType ptype = ParsePLYType(type);
+            if (ptype == PLY_TYPE_INVALID) {
+                logerror(
+                    "Unsupported PLY property type \"%s\" for \"%s\"",
+                    type,
+                    name
+                );
+                return FALSE;
+            }
+            PLYProperty* property = &header->properties[header->property_count++];
+            strncpy(property->name, name, sizeof(property->name) - 1);
+            property->name[sizeof(property->name) - 1] = '\0';
+            property->type = ptype;
+        }
+        else if (strcmp(keyword, "end_header") == 0) {
+            header->data_offset = ftell(file);
+            break;
+        }
+    }
+    if (!found_format) {
+        logerror("PLY file has no format declaration");
+        return FALSE;
+    }
+    if (!found_vertex) {
+        logerror("PLY file has no vertex element");
+        return FALSE;
+    }
+    if (header->property_count == 0) {
+        logerror("PLY vertex element contains no properties");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static int FindPLYProperty(const PLYHeader* header, const char* name) {
+    for (size_t i = 0; i < header->property_count; i++) {
+        if (strcmp(header->properties[i].name, name) == 0)
+            return (int)i;
+    }
+    return -1;
+}
+
 static size_t ParseLineArgsOBJ(const char line[MAX_OBJ_LINE_SIZE], char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE]) {
     int numargs = 0;
     int cursor = 0;
@@ -124,45 +315,6 @@ static size_t ParseLineArgsOBJ(const char line[MAX_OBJ_LINE_SIZE], char lineargs
         numargs++;
     }
     return numargs;
-}
-
-static BOOL ParseFloat(const char* str, float* value) {
-    char *end;
-    float result;
-    errno = 0;
-    if (!str || !value) return FALSE;
-    result = strtof(str, &end);
-    if (end == str || errno == ERANGE) return FALSE;
-    while (isspace((unsigned char)*end)) end++;
-    if (*end != '\0') return FALSE;
-    *value = result;
-    return TRUE;
-}
-
-static BOOL ParseUInt(const char* str, uint32_t* value) {
-    char *end;
-    unsigned long result;
-    errno = 0;
-    if (!str || !value) return FALSE;
-    result = strtoul(str, &end, 10);
-    if (end == str || errno == ERANGE) return FALSE;
-    while (isspace((unsigned char)*end)) end++;
-    if (*end != '\0') return FALSE;
-    *value = (uint32_t)result;
-    return TRUE;
-}
-
-static BOOL ParseLInt(const char* str, int64_t* value) {
-    char *end;
-    long long result;
-    errno = 0;
-    if (!str || !value) return FALSE;
-    result = strtoll(str, &end, 10);
-    if (end == str || errno == ERANGE) return FALSE;
-    while (isspace((unsigned char)*end)) end++;
-    if (*end != '\0') return FALSE;
-    *value = (int64_t)result;
-    return TRUE;
 }
 
 static BOOL ParseTriplet(const char* str, int64_t* a, int64_t* b, int64_t* c, size_t* count) {
@@ -188,15 +340,15 @@ static BOOL ParseTriplet(const char* str, int64_t* a, int64_t* b, int64_t* c, si
     }
     memcpy(*count == 0 ? abuff : (*count == 1 ? bbuff : cbuff), str + ptr, strlen(str) - ptr);
     *count += 1;
-    BOOL success = ParseLInt(abuff, a);
+    BOOL success = ez_parse_lint(abuff, a);
     success &= (*a != 0);
     if (success && strlen(bbuff) > 0) {
-        success &= ParseLInt(bbuff, b) & (*b != 0);
+        success &= ez_parse_lint(bbuff, b) & (*b != 0);
     } else {
         b = 0;
     }
     if (success && strlen(cbuff) > 0) {
-        success &= ParseLInt(cbuff, c) & (*c != 0);
+        success &= ez_parse_lint(cbuff, c) & (*c != 0);
     } else {
         c = 0;
     }
@@ -209,7 +361,7 @@ static BOOL ParseMTL_illum(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], si
         return FALSE;
     }
     uint32_t a;
-    if (!(ParseUInt(lineargs[1], &a))) {
+    if (!(ez_parse_uint(lineargs[1], &a))) {
         logerror("Invalid illumination model (illum) - expected 1 unsigned integer and got \"%s\" instead", lineargs[1]);
         return FALSE;
     }
@@ -231,7 +383,7 @@ static BOOL ParseMTL_Ni(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     float a;
-    if (!(ParseFloat(lineargs[1], &a))) {
+    if (!(ez_parse_float(lineargs[1], &a))) {
         logerror("Invalid index of refraction field (Ni) - expected 1 float and got \"%s\" instead", lineargs[1]);
         return FALSE;
     }
@@ -245,7 +397,7 @@ static BOOL ParseMTL_Ns(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     float a;
-    if (!(ParseFloat(lineargs[1], &a))) {
+    if (!(ez_parse_float(lineargs[1], &a))) {
         logerror("Invalid specular shininess field (Ns) - expected 1 float and got \"%s\" instead", lineargs[1]);
         return FALSE;
     }
@@ -259,7 +411,7 @@ static BOOL ParseMTL_Ke(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     float x, y, z;
-    if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
+    if (!(ez_parse_float(lineargs[1], &x) && ez_parse_float(lineargs[2], &y) && ez_parse_float(lineargs[3], &z))) {
         logerror("Invalid emission (Ke) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
@@ -273,7 +425,7 @@ static BOOL ParseMTL_Ka(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     float x, y, z;
-    if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
+    if (!(ez_parse_float(lineargs[1], &x) && ez_parse_float(lineargs[2], &y) && ez_parse_float(lineargs[3], &z))) {
         logerror("Invalid ambience (Ka) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
@@ -287,7 +439,7 @@ static BOOL ParseMTL_Kd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     float x, y, z;
-    if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
+    if (!(ez_parse_float(lineargs[1], &x) && ez_parse_float(lineargs[2], &y) && ez_parse_float(lineargs[3], &z))) {
         logerror("Invalid diffuse (Kd) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
@@ -301,7 +453,7 @@ static BOOL ParseMTL_Ks(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     float x, y, z;
-    if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
+    if (!(ez_parse_float(lineargs[1], &x) && ez_parse_float(lineargs[2], &y) && ez_parse_float(lineargs[3], &z))) {
         logerror("Invalid specular (Ks) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
@@ -315,7 +467,7 @@ static BOOL ParseMTL_Tf(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     float x, y, z;
-    if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
+    if (!(ez_parse_float(lineargs[1], &x) && ez_parse_float(lineargs[2], &y) && ez_parse_float(lineargs[3], &z))) {
         logerror("Invalid absorbtion (Tf) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
@@ -329,7 +481,7 @@ static BOOL ParseMTL_Rd(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     float x, y, z;
-    if (!(ParseFloat(lineargs[1], &x) && ParseFloat(lineargs[2], &y) && ParseFloat(lineargs[3], &z))) {
+    if (!(ez_parse_float(lineargs[1], &x) && ez_parse_float(lineargs[2], &y) && ez_parse_float(lineargs[3], &z))) {
         logerror("Invalid dispersion (Rd) fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
@@ -434,7 +586,7 @@ static BOOL ParseOBJ_v(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t
         return FALSE;
     }
     vec3 v;
-    if (!(ParseFloat(lineargs[1], &(v[0])) && ParseFloat(lineargs[2], &(v[1])) && ParseFloat(lineargs[3], &(v[2])))) {
+    if (!(ez_parse_float(lineargs[1], &(v[0])) && ez_parse_float(lineargs[2], &(v[1])) && ez_parse_float(lineargs[3], &(v[2])))) {
         logerror("Invalid vertex fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
@@ -448,7 +600,7 @@ static BOOL ParseOBJ_vn(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     vec3 v;
-    if (!(ParseFloat(lineargs[1], &(v[0])) && ParseFloat(lineargs[2], &(v[1])) && ParseFloat(lineargs[3], &(v[2])))) {
+    if (!(ez_parse_float(lineargs[1], &(v[0])) && ez_parse_float(lineargs[2], &(v[1])) && ez_parse_float(lineargs[3], &(v[2])))) {
         logerror("Invalid vertex normal fields - expected 3 floats and got \"%s %s %s\" instead", lineargs[1], lineargs[2], lineargs[3]);
         return FALSE;
     }
@@ -462,7 +614,7 @@ static BOOL ParseOBJ_vt(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_
         return FALSE;
     }
     float u, v; // ignoring w
-    if (!(ParseFloat(lineargs[1], &u) && ParseFloat(lineargs[2], &v))) {
+    if (!(ez_parse_float(lineargs[1], &u) && ez_parse_float(lineargs[2], &v))) {
         logerror("Invalid vertex texture fields - expected 2 floats and got \"%s %s\" instead", lineargs[1], lineargs[2]);
         return FALSE;
     }
@@ -981,5 +1133,92 @@ BOOL LoadFBX(const char* filepath) {
         if (num_anims > 0) MeshReference(NumMeshes() - 1)->pose = (NumAnimations() - 1) * MAX_BONES;
     }
     aiReleaseImport(scene);
+    return TRUE;
+}
+
+BOOL LoadPLY(const char* filepath) {
+    if (!filepath) {
+        logerror("Cannot load Gaussian PLY from a NULL filepath");
+        return FALSE;
+    }
+    FILE* file = fopen(filepath, "rb");
+    if (!file) {
+        logerror("Unable to open Gaussian PLY \"%s\": %s", filepath, strerror(errno));
+        return FALSE;
+    }
+    PLYHeader header = { 0 };
+    if (!ParsePLYHeader(file, &header)) {
+        fclose(file);
+        return FALSE;
+    }
+    const int px = FindPLYProperty(&header, "x");
+    const int py = FindPLYProperty(&header, "y");
+    const int pz = FindPLYProperty(&header, "z");
+    const int sx = FindPLYProperty(&header, "scale_0");
+    const int sy = FindPLYProperty(&header, "scale_1");
+    const int sz = FindPLYProperty(&header, "scale_2");
+    const int r0 = FindPLYProperty(&header, "rot_0");
+    const int r1 = FindPLYProperty(&header, "rot_1");
+    const int r2 = FindPLYProperty(&header, "rot_2");
+    const int r3 = FindPLYProperty(&header, "rot_3");
+    const int opacity = FindPLYProperty(&header, "opacity");
+    const int dc0 = FindPLYProperty(&header, "f_dc_0");
+    const int dc1 = FindPLYProperty(&header, "f_dc_1");
+    const int dc2 = FindPLYProperty(&header, "f_dc_2");
+    if (px < 0 || py < 0 || pz < 0) {
+        logerror("Gaussian PLY \"%s\" is missing position properties", filepath);
+        fclose(file);
+        return FALSE;
+    }
+    if (sx < 0 || sy < 0 || sz < 0) {
+        logerror("Gaussian PLY \"%s\" is missing scale properties", filepath);
+        fclose(file);
+        return FALSE;
+    }
+    if (r0 < 0 || r1 < 0 || r2 < 0 || r3 < 0) {
+        logerror("Gaussian PLY \"%s\" is missing rotation properties", filepath);
+        fclose(file);
+        return FALSE;
+    }
+    if (opacity < 0) {
+        logerror("Gaussian PLY \"%s\" is missing opacity", filepath);
+        fclose(file);
+        return FALSE;
+    }
+    if (dc0 < 0 || dc1 < 0 || dc2 < 0) {
+        logerror("Gaussian PLY \"%s\" is missing spherical harmonic DC coefficients", filepath);
+        fclose(file);
+        return FALSE;
+    }
+    for (size_t i = 0; i < header.vertex_count; i++) {
+        GaussianSplat gaussian = { 0 };
+        for (size_t property = 0; property < header.property_count; property++) {
+            float value = ReadPLYFloat(file, header.properties[property].type);
+            if (isnan(value)) {
+                logerror("Unexpected end of data while reading Gaussian %zu in \"%s\"", i, filepath);
+                ClearSplats(); // TODO: use a intermediate arrlist buffer so this doesn't clear all splats on failure
+                fclose(file);
+                return FALSE;
+            }
+            const char* name = header.properties[property].name;
+            if (strcmp(name, "x") == 0) gaussian.position[0] = value;
+            else if (strcmp(name, "y") == 0) gaussian.position[1] = value;
+            else if (strcmp(name, "z") == 0) gaussian.position[2] = value;
+            else if (strcmp(name, "scale_0") == 0) gaussian.logscale[0] = value;
+            else if (strcmp(name, "scale_1") == 0) gaussian.logscale[1] = value;
+            else if (strcmp(name, "scale_2") == 0) gaussian.logscale[2] = value;
+            else if (strcmp(name, "rot_0") == 0) gaussian.rotation[0] = value;
+            else if (strcmp(name, "rot_1") == 0) gaussian.rotation[1] = value;
+            else if (strcmp(name, "rot_2") == 0) gaussian.rotation[2] = value;
+            else if (strcmp(name, "rot_3") == 0) gaussian.rotation[3] = value;
+            else if (strcmp(name, "opacity") == 0) gaussian.opacity = value;
+            else if (strcmp(name, "f_dc_0") == 0) gaussian.shdc[0] = value;
+            else if (strcmp(name, "f_dc_1") == 0) gaussian.shdc[1] = value;
+            else if (strcmp(name, "f_dc_2") == 0) gaussian.shdc[2] = value;
+        }
+        SubmitSplat(gaussian);
+    }
+    fclose(file);
+    loginfo("Loaded %zu Gaussian splats from \"%s\"", header.vertex_count, filepath);
     return TRUE;
 }
