@@ -147,20 +147,6 @@ static PLYType ParsePLYType(const char* type) {
     return PLY_TYPE_INVALID;
 }
 
-static size_t PLYTypeSize(PLYType type) {
-    switch (type) {
-        case PLY_TYPE_CHAR: return 1;
-        case PLY_TYPE_UCHAR: return 1;
-        case PLY_TYPE_SHORT: return 2;
-        case PLY_TYPE_USHORT: return 2;
-        case PLY_TYPE_INT: return 4;
-        case PLY_TYPE_UINT: return 4;
-        case PLY_TYPE_FLOAT: return 4;
-        case PLY_TYPE_DOUBLE: return 8;
-        default: return 0;
-    }
-}
-
 static float ReadPLYFloat(FILE* file, PLYType type) {
     if (type == PLY_TYPE_FLOAT) {
         float value;
