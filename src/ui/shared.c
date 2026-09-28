@@ -5,7 +5,6 @@
 #include <data/colors.h>
 #include <util/logger.h>
 #include <ui/popup.h>
-#include <nfd.h>
 
 static char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric", "subsurface" };
 static char* g_arapmodel_labels[] = { "rigid", "cubic" };
@@ -44,21 +43,26 @@ static int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
     if (UIButton(".OBJ", button_width)) return 3;
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
-    if (UIButton("Camera", button_width)) return 4;
+    if (UIButton(".FBX", button_width)) return 4;
+    UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
+    if (UIButton("Camera", button_width)) return 5;
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
-    if (UIButton("Cancel", button_width)) return 5;
+    if (UIButton("Cancel", button_width)) return 6;
     return -1;
 }
 
 static int add_obj_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
-    nfdchar_t* outpath = NULL;
-    nfdresult_t result = NFD_OpenDialog("obj", NULL, &outpath);
-    if (result == NFD_OKAY) {
-        if (!LoadOBJ(outpath)) logerror("Unable to load obj file \"%s\"", outpath);
-    } else if (result == NFD_CANCEL) {
+    const char* filepath = GetOpenFile("obj");
+    if (filepath && !LoadOBJ(filepath)) {
+        logerror("Unable to load obj file \"%s\"", filepath);
+    }
+    return 0;
+}
 
-    } else {
-        logerror("Unable to open file due to NFD error: %s", NFD_GetError());
+static int add_fbx_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+    const char* filepath = GetOpenFile("fbx");
+    if (filepath && !LoadFBX(filepath)) {
+        logerror("Unable to load obj file \"%s\"", filepath);
     }
     return 0;
 }
@@ -687,7 +691,7 @@ Popup* GenerateAddObjectPopup() {
     popup->options = 5;
     popup->behavior = add_object_popup_stage_0;
     popup->results = EZ_ALLOC(popup->options, sizeof(Popup*));
-    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0, add_obj_popup_stage_0, add_camera_popup_stage_0 };
+    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0, add_obj_popup_stage_0, add_fbx_popup_stage_0, add_camera_popup_stage_0 };
     for (size_t i = 0; i < popup->options; i++) {
         Popup* next = GenerateEmptyPopup();
         next->options = 0;

@@ -9,6 +9,7 @@
 #include <easyfile.h>
 #include <ctype.h>
 #include <errno.h>
+#include <nfd.h>
 
 #define MAX_MTLLIB_PATH_SIZE 1024
 #define MAX_OBJ_PATH_SIZE 1024
@@ -627,6 +628,28 @@ static BOOL ConstructOBJ(const StateOBJ state) {
     }
     ARRLIST_MaterialID_clear(&ids);
     return TRUE;
+}
+
+const char* GetOpenFile(const char* type) {
+    nfdchar_t* outpath = NULL;
+    nfdresult_t result = NFD_OpenDialog(type, NULL, &outpath);
+    if (result == NFD_CANCEL) {
+        logtrace("Open file cancelled by user");
+    } else if (result != NFD_OKAY) {
+        logerror("Unable to open file due to NFD error: %s", NFD_GetError());
+    }
+    return (char*)outpath;
+}
+
+const char* GetSaveFile(const char* type) {
+    nfdchar_t* outpath = NULL;
+    nfdresult_t result = NFD_SaveDialog(type, NULL, &outpath);
+    if (result == NFD_CANCEL) {
+        logtrace("Save file cancelled by user");
+    } else if (result != NFD_OKAY) {
+        logerror("Unable to save file due to NFD error: %s", NFD_GetError());
+    }
+    return (char*)outpath;
 }
 
 BOOL LoadOBJ(const char* filepath) {
