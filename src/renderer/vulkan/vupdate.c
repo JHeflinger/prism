@@ -10,12 +10,13 @@
 #define TRANSFER_ACQUIRE_VERTICES   (1 << 0)
 #define TRANSFER_ACQUIRE_NORMALS    (1 << 1)
 #define TRANSFER_ACQUIRE_TRIANGLES  (1 << 2)
-#define TRANSFER_ACQUIRE_EMISSIVES  (1 << 3)
-#define TRANSFER_ACQUIRE_MATERIALS  (1 << 4)
-#define TRANSFER_ACQUIRE_LIGHTS     (1 << 5)
-#define TRANSFER_ACQUIRE_TRANSFORMS (1 << 6)
-#define TRANSFER_ACQUIRE_POSES      (1 << 7)
-#define TRANSFER_ACQUIRE_SKINS      (1 << 8)
+#define TRANSFER_ACQUIRE_SPLATS     (1 << 3)
+#define TRANSFER_ACQUIRE_EMISSIVES  (1 << 4)
+#define TRANSFER_ACQUIRE_MATERIALS  (1 << 5)
+#define TRANSFER_ACQUIRE_LIGHTS     (1 << 6)
+#define TRANSFER_ACQUIRE_TRANSFORMS (1 << 7)
+#define TRANSFER_ACQUIRE_POSES      (1 << 8)
+#define TRANSFER_ACQUIRE_SKINS      (1 << 9)
 #define PENDING(x) g_vupdt_renderer_ref->vulkan.core.transfer.pending |= x
 
 static Renderer* g_vupdt_renderer_ref = NULL;
@@ -121,6 +122,16 @@ void VUPDT_Triangles(VulkanDataBuffer* triangles) {
     PENDING(TRANSFER_ACQUIRE_TRIANGLES);
 }
 
+void VUPDT_Splats(VulkanDataBuffer* splats) {
+    if (sizeof(GaussianSplat) * g_vupdt_renderer_ref->geometry.splats.maxsize == 0) return;
+    VUTIL_AsyncCopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.splats.data,
+        sizeof(GaussianSplat) * g_vupdt_renderer_ref->geometry.splats.size,
+        sizeof(GaussianSplat) * g_vupdt_renderer_ref->geometry.splats.maxsize,
+        splats->buffer);
+    PENDING(TRANSFER_ACQUIRE_SPLATS);
+}
+
 void VUPDT_Emissives(VulkanDataBuffer* emissives) {
     if (sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.maxsize == 0) return;
     VUTIL_AsyncCopyHostToBuffer(
@@ -170,6 +181,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_LIGHTS, g_vupdt_renderer_ref->vulkan.core.geometry.lights.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_EMISSIVES, g_vupdt_renderer_ref->vulkan.core.geometry.emissives.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRIANGLES, g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_SPLATS, g_vupdt_renderer_ref->vulkan.core.geometry.splats.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_NORMALS, g_vupdt_renderer_ref->vulkan.core.geometry.normals.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRANSFORMS, g_vupdt_renderer_ref->vulkan.core.geometry.transforms.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_POSES, g_vupdt_renderer_ref->vulkan.core.geometry.poses.buffer)
@@ -430,6 +442,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.width = g_vupdt_renderer_ref->dimensions.x;
         ubo.height = g_vupdt_renderer_ref->dimensions.y;
         ubo.triangles = g_vupdt_renderer_ref->geometry.triangles.size;
+        ubo.splats = g_vupdt_renderer_ref->geometry.splats.size;
         ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
         ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
         ubo.emissives = g_vupdt_renderer_ref->geometry.emissives.size;

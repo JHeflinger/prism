@@ -140,6 +140,21 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 				sizeof(Triangle)
 			}
 		};
+	} else if (strcmp(name, "SplatSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.splats.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.splats.size)
+				}, 0.0f,
+				sizeof(GaussianSplat)
+			}
+		};
 	} else if (strcmp(name, "EmissiveSSBOIn") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,

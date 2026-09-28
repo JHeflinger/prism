@@ -1176,13 +1176,14 @@ BOOL LoadPLY(const char* filepath) {
         fclose(file);
         return FALSE;
     }
+    ARRLIST_GaussianSplat splats = { 0 };
     for (size_t i = 0; i < header.vertex_count; i++) {
         GaussianSplat gaussian = { 0 };
         for (size_t property = 0; property < header.property_count; property++) {
             float value = ReadPLYFloat(file, header.properties[property].type);
             if (isnan(value)) {
                 logerror("Unexpected end of data while reading Gaussian %zu in \"%s\"", i, filepath);
-                ClearSplats(); // TODO: use a intermediate arrlist buffer so this doesn't clear all splats on failure
+                ARRLIST_GaussianSplat_clear(&splats);
                 fclose(file);
                 return FALSE;
             }
@@ -1202,9 +1203,11 @@ BOOL LoadPLY(const char* filepath) {
             else if (strcmp(name, "f_dc_1") == 0) gaussian.shdc[1] = value;
             else if (strcmp(name, "f_dc_2") == 0) gaussian.shdc[2] = value;
         }
-        SubmitSplat(gaussian);
+        ARRLIST_GaussianSplat_add(&splats, gaussian);
     }
     fclose(file);
+    for (size_t i = 0; i < splats.size; i++) SubmitSplat(splats.data[i]);
+    ARRLIST_GaussianSplat_clear(&splats);
     loginfo("Loaded %zu Gaussian splats from \"%s\"", header.vertex_count, filepath);
     return TRUE;
 }

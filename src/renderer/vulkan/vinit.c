@@ -653,6 +653,18 @@ BOOL VINIT_Triangles(VulkanDataBuffer* triangles) {
     return TRUE;
 }
 
+BOOL VINIT_Splats(VulkanDataBuffer* splats) {
+    size_t arrsize = sizeof(GaussianSplat) * g_vinit_renderer_ref->geometry.splats.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        splats);
+    VUPDT_Splats(splats);
+    return TRUE;
+}
+
 BOOL VINIT_Emissives(VulkanDataBuffer* emissives) {
     size_t arrsize = sizeof(TriangleID) * g_vinit_renderer_ref->geometry.emissives.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
@@ -870,6 +882,7 @@ BOOL VINIT_Geometry(VulkanGeometry* geometry) {
     if (!VINIT_Normals(&(geometry->normals))) return FALSE;
     if (!VINIT_Vertices(&(geometry->vertices))) return FALSE;
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;
+	if (!VINIT_Splats(&(geometry->splats))) return FALSE;
 	if (!VINIT_Emissives(&(geometry->emissives))) return FALSE;
 	if (!VINIT_Materials(&(geometry->materials))) return FALSE;
 	if (!VINIT_Lights(&(geometry->lights))) return FALSE;

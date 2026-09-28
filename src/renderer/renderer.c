@@ -804,6 +804,7 @@ void Render() {
         TRANSFER_UPDATE(normals, normals, g_renderer.geometry.normals.maxsize, g_renderer.geometry.normals.size, normals, Normals, FALSE);
         TRANSFER_UPDATE(vertices, vertices, g_renderer.geometry.vertices.maxsize, g_renderer.geometry.vertices.size, vertices, Vertices, FALSE);
         TRANSFER_UPDATE(triangles, triangles, g_renderer.geometry.triangles.maxsize, g_renderer.geometry.triangles.size, triangles, Triangles, TRUE);
+        TRANSFER_UPDATE(splats, splats, g_renderer.geometry.splats.maxsize, g_renderer.geometry.splats.size, splats, Splats, FALSE);
         TRANSFER_UPDATE(materials, materials, g_renderer.geometry.materials.maxsize, g_renderer.geometry.materials.size, materials, Materials, FALSE);
         TRANSFER_UPDATE(lights, lights, g_renderer.geometry.lights.maxsize, g_renderer.geometry.lights.size, lights, Lights, FALSE);
         TRANSFER_UPDATE(simulation, sim_size, SimSize(g_renderer.geometry.fluid), SimSize(g_renderer.geometry.fluid), fluid, Simulation, FALSE);

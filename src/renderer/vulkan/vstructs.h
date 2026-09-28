@@ -46,6 +46,7 @@ typedef struct {
     alignas(16) vec3 w;
     alignas(8) vec2 viewport;
     alignas(4) uint32_t triangles;
+    alignas(4) uint32_t splats;
     alignas(4) uint32_t emissives;
     alignas(4) uint32_t lights;
     alignas(4) uint32_t samples;
@@ -200,6 +201,7 @@ typedef struct {
     VulkanDataBuffer normals;
     VulkanVertices vertices;
     VulkanDataBuffer triangles;
+    VulkanDataBuffer splats;
     VulkanDataBuffer emissives;
     VulkanDataBuffer materials;
     VulkanDataBuffer lights;

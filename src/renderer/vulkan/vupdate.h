@@ -21,6 +21,8 @@ void VUPDT_Vertices(VulkanVertices* vertices);
 
 void VUPDT_Triangles(VulkanDataBuffer* triangles);
 
+void VUPDT_Splats(VulkanDataBuffer* splats);
+
 void VUPDT_Emissives(VulkanDataBuffer* emissives);
 
 void VUPDT_Materials(VulkanDataBuffer* materials);
