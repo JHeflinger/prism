@@ -52,7 +52,7 @@ vec3 splat_color(uint id) {
 
 bool splat_intersect(Ray ray, uint gaussian_ind, inout Hit hit) {
     GaussianSplat gaussian = splatIn[gaussian_ind];
-    const float MIN_OPACITY = 0.9;
+    const float MIN_OPACITY = 0.3;
     float alpha = 1.0 / (1.0 + exp(-gaussian.opacity));
     if (alpha < MIN_OPACITY) return false;
     vec3 scale = exp(gaussian.logscale);
