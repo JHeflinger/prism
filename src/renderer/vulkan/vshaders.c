@@ -270,7 +270,7 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			(SchrodingSize) {
 				(SchrodingRef) {
 					TRUE,
-					&(renderer->geometry.triangles.size)
+                    &(renderer->geometry.mostprimitives)
 				}, INVOCATION_GROUP_SIZE,
 				sizeof(uint32_t) * 16
 			}
@@ -285,7 +285,7 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			(SchrodingSize) {
 				(SchrodingRef) {
 					TRUE,
-					&(renderer->geometry.triangles.size)
+                    &(renderer->geometry.mostprimitives)
 				}, INVOCATION_GROUP_SIZE,
 				sizeof(uint32_t) * 16
 			}
@@ -300,7 +300,7 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			(SchrodingSize) {
 				(SchrodingRef) {
 					TRUE,
-					&(renderer->geometry.triangles.size)
+                    &(renderer->geometry.mostprimitives)
 				}, 0.0f,
 				sizeof(uint32_t)
 			}
@@ -315,7 +315,7 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			(SchrodingSize) {
 				(SchrodingRef) {
 					TRUE,
-					&(renderer->geometry.triangles.size)
+                    &(renderer->geometry.mostprimitives)
 				}, 0.0f,
 				sizeof(uint32_t)
 			}
@@ -330,7 +330,7 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			(SchrodingSize) {
 				(SchrodingRef) {
 					TRUE,
-					&(renderer->geometry.triangles.size)
+                    &(renderer->geometry.mostprimitives)
 				}, 0.0f,
 				sizeof(uint32_t)
 			}
@@ -345,7 +345,7 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			(SchrodingSize) {
 				(SchrodingRef) {
 					TRUE,
-					&(renderer->geometry.triangles.size)
+                    &(renderer->geometry.mostprimitives)
 				}, 0.0f,
 				sizeof(uint32_t)
 			}
@@ -360,7 +360,7 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			(SchrodingSize) {
 				(SchrodingRef) {
 					TRUE,
-					&(renderer->geometry.triangles.size)
+                    &(renderer->geometry.mostprimitives)
 				}, 0.0f,
 				sizeof(AxisAlignedBoundingBox)
 			}
@@ -375,7 +375,7 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			(SchrodingSize) {
 				(SchrodingRef) {
 					TRUE,
-					&(renderer->geometry.triangles.size)
+                    &(renderer->geometry.maxprimitives)
 				}, 0.0f,
 				sizeof(BVHNode) * 2
 			}

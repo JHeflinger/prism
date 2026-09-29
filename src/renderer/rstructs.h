@@ -171,6 +171,7 @@ typedef struct {
     BOOL update_skins;
     BOOL update_poses;
     size_t update_bvh;
+    size_t update_splat_bvh;
 } ChangeSet;
 
 typedef struct {
@@ -463,11 +464,14 @@ typedef struct {
     float lightarea;
     ChangeSet changes;
     AxisAlignedBoundingBox bounds;
+    AxisAlignedBoundingBox splatbounds;
     ARRLIST_MeshDescriptor meshes;
     ARRLIST_DynamicString meshnames;
     ARRLIST_SceneCamera cameras;
     ARRLIST_DynamicString cameranames;
     size_t primarycamera;
+    size_t maxprimitives;
+    size_t mostprimitives;
 } Geometry;
 
 #endif

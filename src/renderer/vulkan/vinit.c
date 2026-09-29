@@ -511,8 +511,12 @@ BOOL VINIT_RenderContext(VulkanRenderContext* context) {
 }
 
 BOOL VINIT_BVH(VulkanBVH* bvh) {
+    // combined triangles + splats size
+    size_t fullcount = g_vinit_renderer_ref->geometry.triangles.maxsize + g_vinit_renderer_ref->geometry.splats.maxsize;
+    size_t maxcount = g_vinit_renderer_ref->geometry.triangles.maxsize > g_vinit_renderer_ref->geometry.splats.maxsize ? g_vinit_renderer_ref->geometry.triangles.maxsize : g_vinit_renderer_ref->geometry.splats.maxsize;
+
     // workgroup history
-    size_t arrsize = 16 * sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / (float)INVOCATION_GROUP_SIZE);
+    size_t arrsize = 16 * sizeof(uint32_t) * ceil(maxcount / (float)INVOCATION_GROUP_SIZE);
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -521,7 +525,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         &(bvh->workhistory));
 
     // workgroup offsets
-    arrsize = 16 * sizeof(uint32_t) * ceil(g_vinit_renderer_ref->geometry.triangles.maxsize / (float)INVOCATION_GROUP_SIZE);
+    arrsize = 16 * sizeof(uint32_t) * ceil(maxcount / (float)INVOCATION_GROUP_SIZE);
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -530,7 +534,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         &(bvh->workoffsets));
 
     // mortons
-    arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = sizeof(uint32_t) * maxcount;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -539,7 +543,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         &(bvh->mortons));
 
     // indices
-    arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = sizeof(uint32_t) * maxcount;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -548,7 +552,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         &(bvh->indices));
 
     // morton swap
-    arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = sizeof(uint32_t) * maxcount;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -557,7 +561,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         &(bvh->mortonswap));
 
     // index swap
-    arrsize = sizeof(uint32_t) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = sizeof(uint32_t) * maxcount;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -566,7 +570,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         &(bvh->indexswap));
 
     // bounding boxes
-    arrsize = sizeof(AxisAlignedBoundingBox) * g_vinit_renderer_ref->geometry.triangles.maxsize;
+    arrsize = sizeof(AxisAlignedBoundingBox) * maxcount;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
@@ -575,7 +579,7 @@ BOOL VINIT_BVH(VulkanBVH* bvh) {
         &(bvh->boundingboxes));
 
     // nodes
-    arrsize = sizeof(BVHNode) * g_vinit_renderer_ref->geometry.triangles.maxsize * 2;
+    arrsize = sizeof(BVHNode) * fullcount * 2;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,

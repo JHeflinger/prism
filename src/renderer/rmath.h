@@ -19,4 +19,6 @@ void CameraUVW(SimpleCamera camera, vec3 u, vec3 v, vec3 w);
 
 void PolarDecompose(mat3 C, mat3 R_out);
 
+AxisAlignedBoundingBox SplatBounds(GaussianSplat* splat);
+
 #endif

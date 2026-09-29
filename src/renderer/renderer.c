@@ -289,6 +289,8 @@ void InitializeRenderer() {
     // initialize min/max BB
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
     SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
+    SETVEC3(g_renderer.geometry.splatbounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
+    SETVEC3(g_renderer.geometry.splatbounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
 
     // set up dimensions
     g_renderer.dimensions = (Vector2){ 
@@ -683,6 +685,10 @@ void Render() {
     BOOL resized_buffers = FALSE;
     BOOL is_transferring = FALSE;
 
+    // update calculated sizes
+    g_renderer.geometry.maxprimitives = g_renderer.geometry.triangles.size + g_renderer.geometry.splats.size;
+    g_renderer.geometry.mostprimitives = g_renderer.geometry.triangles.size > g_renderer.geometry.splats.size ? g_renderer.geometry.triangles.size : g_renderer.geometry.splats.size;
+
     // update external buffers
     for (size_t i = 0; i < g_renderer.ebuffers.size; i++) {
         if (g_renderer.ebuffers.data[i].update) {
@@ -789,6 +795,8 @@ void Render() {
                 glm_vec3_minv(worldmin, g_renderer.geometry.bounds.min, g_renderer.geometry.bounds.min);
                 glm_vec3_maxv(worldmax, g_renderer.geometry.bounds.max, g_renderer.geometry.bounds.max);
             }
+            glm_vec3_minv(g_renderer.geometry.splatbounds.min, g_renderer.geometry.bounds.min, g_renderer.geometry.bounds.min);
+            glm_vec3_maxv(g_renderer.geometry.splatbounds.max, g_renderer.geometry.bounds.max, g_renderer.geometry.bounds.max);
         }
 
         // set bvh reconstruction
@@ -797,14 +805,18 @@ void Render() {
             g_renderer.geometry.changes.update_meshes ||
             g_renderer.geometry.changes.update_poses)
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH;
-        if (RendererCamera()->config.screenspace)
+        if (RendererCamera()->config.screenspace) {
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH * 2; // double, so if we turn off itll update bvh back to original
+            g_renderer.geometry.changes.update_splat_bvh = CPUSWAP_LENGTH * 2;
+        }
+        if (g_renderer.geometry.changes.update_splats)
+            g_renderer.geometry.changes.update_splat_bvh = CPUSWAP_LENGTH;
 
         // transfer updates
         TRANSFER_UPDATE(normals, normals, g_renderer.geometry.normals.maxsize, g_renderer.geometry.normals.size, normals, Normals, FALSE);
         TRANSFER_UPDATE(vertices, vertices, g_renderer.geometry.vertices.maxsize, g_renderer.geometry.vertices.size, vertices, Vertices, FALSE);
         TRANSFER_UPDATE(triangles, triangles, g_renderer.geometry.triangles.maxsize, g_renderer.geometry.triangles.size, triangles, Triangles, TRUE);
-        TRANSFER_UPDATE(splats, splats, g_renderer.geometry.splats.maxsize, g_renderer.geometry.splats.size, splats, Splats, FALSE);
+        TRANSFER_UPDATE(splats, splats, g_renderer.geometry.splats.maxsize, g_renderer.geometry.splats.size, splats, Splats, TRUE);
         TRANSFER_UPDATE(materials, materials, g_renderer.geometry.materials.maxsize, g_renderer.geometry.materials.size, materials, Materials, FALSE);
         TRANSFER_UPDATE(lights, lights, g_renderer.geometry.lights.maxsize, g_renderer.geometry.lights.size, lights, Lights, FALSE);
         TRANSFER_UPDATE(simulation, sim_size, SimSize(g_renderer.geometry.fluid), SimSize(g_renderer.geometry.fluid), fluid, Simulation, FALSE);
@@ -1618,6 +1630,9 @@ size_t NumSplats() {
 
 void SubmitSplat(GaussianSplat splat) {
     ARRLIST_GaussianSplat_add(&(g_renderer.geometry.splats), splat);
+    AxisAlignedBoundingBox box = SplatBounds(&splat);
+    glm_vec3_minv(box.min, g_renderer.geometry.splatbounds.min, g_renderer.geometry.splatbounds.min);
+    glm_vec3_maxv(box.max, g_renderer.geometry.splatbounds.max, g_renderer.geometry.splatbounds.max);
     UpdateSplats();
 }
 

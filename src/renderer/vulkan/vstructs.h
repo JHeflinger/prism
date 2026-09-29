@@ -109,6 +109,7 @@ typedef struct {
 typedef struct {
     alignas(4) uint32_t elements;
     alignas(4) uint32_t bitstart;
+    alignas(4) uint32_t update;
 } VulkanPushConstants;
 
 typedef struct {

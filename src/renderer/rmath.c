@@ -107,3 +107,39 @@ void PolarDecompose(mat3 C, mat3 R_out) {
             }
     }
 }
+
+AxisAlignedBoundingBox SplatBounds(GaussianSplat* splat) {
+    float s[3] = {
+        expf(splat->logscale[0]),
+        expf(splat->logscale[1]),
+        expf(splat->logscale[2])
+    };
+    float x = splat->rotation[0];
+    float y = splat->rotation[1];
+    float z = splat->rotation[2];
+    float w = splat->rotation[3];
+    float len = sqrtf(x*x + y*y + z*z + w*w);
+    if (len > 0.0f) {
+        float inv = 1.0f / len;
+        x *= inv; y *= inv; z *= inv; w *= inv;
+    } else {
+        x = y = z = 0.0f;
+        w = 1.0f;
+    }
+    float R[3][3] = {
+        { 1.0f - 2.0f*(y*y + z*z), 2.0f*(x*y - z*w), 2.0f*(x*z + y*w) },
+        { 2.0f*(x*y + z*w), 1.0f - 2.0f*(x*x + z*z), 2.0f*(y*z - x*w) },
+        { 2.0f*(x*z - y*w), 2.0f*(y*z + x*w), 1.0f - 2.0f*(x*x + y*y) }
+    };
+    AxisAlignedBoundingBox box;
+    float k = 3.0f;
+    for (int i = 0; i < 3; i++) {
+        float a = R[i][0] * s[0];
+        float b = R[i][1] * s[1];
+        float c = R[i][2] * s[2];
+        float extent = k * sqrtf(a*a + b*b + c*c);
+        box.min[i] = splat->position[i] - extent;
+        box.max[i] = splat->position[i] + extent;
+    }
+    return box;
+}

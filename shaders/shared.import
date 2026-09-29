@@ -50,6 +50,16 @@ export TriangleDef {
     }
 }
 
+export SplatDef {
+    struct GaussianSplat {
+        vec3 position;
+        vec3 logscale;
+        vec4 rotation;
+        float opacity;
+        vec3 shdc;
+    }
+}
+
 export RayGeneratorSSBODef {
     buffer RayGeneratorSSBOIn {
         RayGenerator raygenIn[ ];
@@ -67,6 +77,12 @@ export OverlaySSBODef {
 export TriangleSSBODef {
     buffer TriangleSSBOIn {
         Triangle triangleIn[ ];
+    }
+}
+
+export SplatSSBODef {
+    buffer SplatSSBOIn {
+        GaussianSplat splatIn[ ];
     }
 }
 
@@ -159,6 +175,7 @@ export PushConstantDef {
     uniform PushConstants {
         uint elements;
         uint bitstart;
+        uint update;
     }
 }
 
