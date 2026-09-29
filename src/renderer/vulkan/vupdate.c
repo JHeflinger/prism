@@ -194,18 +194,10 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
     // bvh configuration
     BOOL queue_update_splats_bvh = FALSE;
-    BOOL update_splats_bvh = FALSE;
     if (g_vupdt_renderer_ref->geometry.changes.update_bvh) {
         g_vupdt_renderer_ref->geometry.changes.update_bvh--;
         RendererCamera()->config.flags |= BVH_PIPELINE_FLAGS;
-        if (g_vupdt_renderer_ref->geometry.changes.update_splat_bvh) {
-            g_vupdt_renderer_ref->geometry.changes.update_splat_bvh--;
-            queue_update_splats_bvh = TRUE;
-        }
-    } else if (g_vupdt_renderer_ref->geometry.changes.update_splat_bvh) {
-        g_vupdt_renderer_ref->geometry.changes.update_splat_bvh--;
-        RendererCamera()->config.flags |= BVH_PIPELINE_FLAGS;
-        update_splats_bvh = TRUE;
+        queue_update_splats_bvh = TRUE;
     } else {
         RendererCamera()->config.flags &= ~(BVH_PIPELINE_FLAGS);
     }
@@ -213,7 +205,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     // execute shader stages
     uint32_t radix_bits = 0;
     #define _record_push_constants(elements) { \
-        VulkanPushConstants pc = { elements, radix_bits, update_splats_bvh }; \
+        VulkanPushConstants pc = { elements, radix_bits, !queue_update_splats_bvh }; \
         vkCmdPushConstants( \
             command, \
             g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i], \
@@ -228,7 +220,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (i < nativeshaders && !(pflags & (1u << i))) continue;
         uint32_t invocations = (uint32_t)g_vupdt_renderer_ref->dimensions.x * (uint32_t)g_vupdt_renderer_ref->dimensions.y;
-        uint32_t bvh_elements_size = update_splats_bvh ? g_vupdt_renderer_ref->geometry.splats.size : g_vupdt_renderer_ref->geometry.triangles.size;
+        uint32_t bvh_elements_size = !queue_update_splats_bvh ? g_vupdt_renderer_ref->geometry.splats.size : g_vupdt_renderer_ref->geometry.triangles.size;
         if (i >= nativeshaders) invocations = g_vupdt_renderer_ref->externals.data[i - nativeshaders].invocations;
 
         if ((1u << i) & VERTEX_SHADER_FLAG) {
@@ -275,7 +267,6 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
 
         if (queue_update_splats_bvh && (1u << i) & REBIND_SHADER_FLAG) {
             queue_update_splats_bvh = FALSE;
-            update_splats_bvh = TRUE;
             radix_bits = 0;
             i -= 7;
         }

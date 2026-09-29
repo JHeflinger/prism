@@ -21,7 +21,8 @@ static void LoadBox() {
 }
 
 static void LoadRabbit() {
-    LoadOBJ("assets/models/OBJ/naked/bunny.obj");
+    //LoadOBJ("assets/models/OBJ/naked/bunny.obj");
+    LoadPLY("assets/models/PLY/fly.ply");
     if (FALSE) {
         SubmitNamedLight((SceneLight){{0, 0, -1.5f},{10,10,10},{0,0,0},0,0}, "Rabbit Point Light");
     } else {

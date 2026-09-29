@@ -2,28 +2,30 @@
 
 #import BVHNodeDef;
 
-layout(binding = 0) #import BVHNodeSSBODef;
+layout(binding = 0) coherent #import BVHNodeSSBODef;
+layout(binding = 1) readonly #import UniformBufferObjectDef uubo;
 layout(push_constant) #import PushConstantDef pc;
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
     if (id >= pc.elements) return;
     uint nodeIndex = pc.elements - 1 + id;
-    while (nodeIndex != 0) {
+    uint root = 0;
+    uint jump = 0;
+    if (pc.update != 0) jump = uubo.triangles * 2;
+    nodeIndex += jump;
+    root += jump;
+    while (nodeIndex != root) {
         uint parent = nodeIn[nodeIndex].parent;
+        memoryBarrierBuffer();
         uint old = atomicAdd(nodeIn[parent].counter, 1);
         if (old == 0) return;
+        memoryBarrierBuffer();
         uint left = nodeIn[parent].left;
         uint right = nodeIn[parent].right;
-        if (nodeIndex != left) while (nodeIn[right].counter != 3) {}
-        else while (nodeIn[left].counter != 3) {}
-        vec3 minA = nodeIn[left].minBB;
-        vec3 minB = nodeIn[right].minBB;
-        vec3 maxA = nodeIn[left].maxBB;
-        vec3 maxB = nodeIn[right].maxBB;
-        nodeIn[parent].minBB = min(minA, minB);
-        nodeIn[parent].maxBB = max(maxA, maxB);
-        atomicExchange(nodeIn[parent].counter, 3);
+        nodeIn[parent].minBB = min(nodeIn[left].minBB, nodeIn[right].minBB);
+        nodeIn[parent].maxBB = max(nodeIn[left].maxBB, nodeIn[right].maxBB);
+        nodeIn[parent].counter = 3;
         nodeIndex = parent;
     }
 }

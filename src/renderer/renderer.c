@@ -803,14 +803,11 @@ void Render() {
         if (g_renderer.geometry.changes.update_vertices ||
             g_renderer.geometry.changes.update_triangles ||
             g_renderer.geometry.changes.update_meshes ||
-            g_renderer.geometry.changes.update_poses)
+            g_renderer.geometry.changes.update_poses ||
+            g_renderer.geometry.changes.update_splats)
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH;
-        if (RendererCamera()->config.screenspace) {
+        if (RendererCamera()->config.screenspace)
             g_renderer.geometry.changes.update_bvh = CPUSWAP_LENGTH * 2; // double, so if we turn off itll update bvh back to original
-            g_renderer.geometry.changes.update_splat_bvh = CPUSWAP_LENGTH * 2;
-        }
-        if (g_renderer.geometry.changes.update_splats)
-            g_renderer.geometry.changes.update_splat_bvh = CPUSWAP_LENGTH;
 
         // transfer updates
         TRANSFER_UPDATE(normals, normals, g_renderer.geometry.normals.maxsize, g_renderer.geometry.normals.size, normals, Normals, FALSE);

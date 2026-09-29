@@ -171,7 +171,6 @@ typedef struct {
     BOOL update_skins;
     BOOL update_poses;
     size_t update_bvh;
-    size_t update_splat_bvh;
 } ChangeSet;
 
 typedef struct {

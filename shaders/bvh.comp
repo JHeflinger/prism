@@ -4,6 +4,7 @@
 
 layout(binding = 0) #import BVHNodeSSBODef;
 layout(binding = 1) readonly #import MortonSSBODef;
+layout(binding = 2) readonly #import UniformBufferObjectDef uubo;
 layout(push_constant) #import PushConstantDef pc;
 
 int clz(uint x) {
@@ -52,6 +53,13 @@ void main() {
     } while (step > 1);
     uint leftChild = (split == first) ? pc.elements - 1 + uint(split) : uint(split);
     uint rightChild = (split + 1 == last) ? pc.elements - 1 + uint(split + 1) : uint(split + 1);
+
+    // adjust indices if constructing splat BVH
+    uint jump = 0;
+    if (pc.update != 0) jump = uubo.triangles * 2;
+    i += jump;
+    leftChild += jump;
+    rightChild += jump;
 
     nodeIn[i].left = leftChild;
     nodeIn[i].right = rightChild;

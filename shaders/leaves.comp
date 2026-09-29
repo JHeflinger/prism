@@ -6,17 +6,23 @@
 layout(binding = 0) readonly #import IndexSSBODef;
 layout(binding = 1) readonly #import BoundingBoxSSBODef;
 layout(binding = 2) #import BVHNodeSSBODef;
+layout(binding = 3) readonly #import UniformBufferObjectDef uubo;
 layout(push_constant) #import PushConstantDef pc;
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
     if (id >= pc.elements) return;
     uint leaf_index = pc.elements - 1 + id;
+    uint root = 0;
+    uint jump = 0;
+    if (pc.update != 0) jump = uubo.triangles * 2;
+    leaf_index += jump;
+    root += jump;
     uint primID = indexIn[id];
     nodeIn[leaf_index].minBB = bbIn[primID].minBB;
     nodeIn[leaf_index].maxBB = bbIn[primID].maxBB;
     nodeIn[leaf_index].left = primID;
     nodeIn[leaf_index].right = 0xFFFFFFFF; // mark as leaf
-    nodeIn[leaf_index].parent = 0;
+    nodeIn[leaf_index].parent = root;
     nodeIn[leaf_index].counter = 3;
 }

@@ -114,10 +114,10 @@ AxisAlignedBoundingBox SplatBounds(GaussianSplat* splat) {
         expf(splat->logscale[1]),
         expf(splat->logscale[2])
     };
-    float x = splat->rotation[0];
-    float y = splat->rotation[1];
-    float z = splat->rotation[2];
-    float w = splat->rotation[3];
+    float w = splat->rotation[0];
+    float x = splat->rotation[1];
+    float y = splat->rotation[2];
+    float z = splat->rotation[3];
     float len = sqrtf(x*x + y*y + z*z + w*w);
     if (len > 0.0f) {
         float inv = 1.0f / len;
