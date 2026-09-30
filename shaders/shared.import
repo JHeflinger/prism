@@ -8,6 +8,7 @@ export Definitions {
     #define NO_SELECT 0
     #define TRIANGLE_SELECT 1
     #define VERTEX_SELECT 2
+    #define SPLAT_SELECT 3
     #define EPS 0.000001
     #define DEBUG_NONE 0
     #define DEBUG_NORMALS 1
@@ -57,6 +58,16 @@ export SplatDef {
         vec4 rotation;
         float opacity;
         vec3 shdc;
+    }
+}
+
+export SplatChordDef {
+    struct GaussChord {
+        float tc;
+        float sd;
+        float za;
+        float zb;
+        float c;
     }
 }
 
@@ -135,6 +146,7 @@ export UniformBufferObjectDef {
         uint maxsssbounces;
         uint spectral;
         uint screenspace;
+        uint splatshadows;
         float fov;
         float width;
         float height;
@@ -482,4 +494,32 @@ export TriangleIntersectSuite {
         }
         return hit;
     }
+}
+
+export QuatToMat {
+    mat3 quat_to_mat3(vec4 q) {
+        float w = q.x;
+        float x = q.y;
+        float y = q.z;
+        float z = q.w;
+        return transpose(mat3(
+            1.0 - 2.0 * (y * y + z * z),
+            2.0 * (x * y - z * w),
+            2.0 * (x * z + y * w),
+            2.0 * (x * y + z * w),
+            1.0 - 2.0 * (x * x + z * z),
+            2.0 * (y * z - x * w),
+            2.0 * (x * z - y * w),
+            2.0 * (y * z + x * w),
+            1.0 - 2.0 * (x * x + y * y)
+        ));
+    }
+}
+
+export SplatConstants {
+    const float SPLAT_SIGMA = 3.0; // support radius in std-devs
+    const float SPLAT_DENSITY = 1.0; // global extinction multiplier
+    const float SPLAT_G = 0.0; // Henyey-Greenstein anisotropy of the phase function (-1..1)
+    const float VOLUME_TFAR = 1e30;
+    const float SQRT_2PI = 2.50662827463;
 }

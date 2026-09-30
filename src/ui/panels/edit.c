@@ -162,6 +162,8 @@ void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
     UICheckbox(&(cref->config.normals));
     UIColumnHeader("BVH Culling", LEFT_COLUMN_WIDTH);
     UICheckbox(&(cref->config.screenspace));
+    UIColumnHeader("Splat Shading", LEFT_COLUMN_WIDTH);
+    UICheckbox(&(cref->config.splatshadows));
     UIColumnHeader("Direct Lighting", LEFT_COLUMN_WIDTH);
     UICheckbox(&(cref->config.direct));
     UIColumnHeader("Direct Lighting Only", LEFT_COLUMN_WIDTH);

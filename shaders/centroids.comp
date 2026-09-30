@@ -15,6 +15,8 @@ layout(binding = 6) readonly #import UniformBufferObjectDef uubo;
 layout(binding = 7) #import SplatSSBODef;
 layout(push_constant) #import PushConstantDef pc;
 
+#import QuatToMat
+
 uint expandBits(uint v) {
     v = (v * 0x00010001u) & 0xFF0000FFu;
     v = (v * 0x00000101u) & 0x0F00F00Fu;
@@ -91,39 +93,15 @@ bool splat_in_frustum(in GaussianSplat splat, vec3 extents) {
     float farZ = 1e30;
     float tanHalfFov = tan(uubo.fov * 0.5);
     float aspect = uubo.width / uubo.height;
-    if (center.z + e.z < nearZ)
-        return false;
-    if (center.z - e.z > farZ)
-        return false;
+    if (center.z + e.z < nearZ) return false;
+    if (center.z - e.z > farZ) return false;
     float xScale = tanHalfFov * aspect;
-    if (center.x + center.z * xScale + e.x + e.z * xScale < 0.0)
-        return false;
-    if (-center.x + center.z * xScale + e.x + e.z * xScale < 0.0)
-        return false;
+    if (center.x + center.z * xScale + e.x + e.z * xScale < 0.0) return false;
+    if (-center.x + center.z * xScale + e.x + e.z * xScale < 0.0) return false;
     float yScale = tanHalfFov;
-    if (center.y + center.z * yScale + e.y + e.z * yScale < 0.0)
-        return false;
-    if (-center.y + center.z * yScale + e.y + e.z * yScale < 0.0)
-        return false;
+    if (center.y + center.z * yScale + e.y + e.z * yScale < 0.0) return false;
+    if (-center.y + center.z * yScale + e.y + e.z * yScale < 0.0) return false;
     return true;
-}
-
-mat3 quat_to_mat3(vec4 q) {
-    float w = q.x;
-    float x = q.y;
-    float y = q.z;
-    float z = q.w;
-    return transpose(mat3(
-        1.0 - 2.0 * (y * y + z * z),
-        2.0 * (x * y - z * w),
-        2.0 * (x * z + y * w),
-        2.0 * (x * y + z * w),
-        1.0 - 2.0 * (x * x + z * z),
-        2.0 * (y * z - x * w),
-        2.0 * (x * z - y * w),
-        2.0 * (y * z + x * w),
-        1.0 - 2.0 * (x * x + y * y)
-    ));
 }
 
 vec3 splatextents(in GaussianSplat splat) {

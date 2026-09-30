@@ -65,6 +65,7 @@ typedef struct {
     alignas(4) uint32_t maxsssbounces;
     alignas(4) uint32_t spectral;
     alignas(4) uint32_t screenspace;
+    alignas(4) uint32_t splatshadows;
     alignas(4) float fov;
     alignas(4) float width;
     alignas(4) float height;

@@ -403,6 +403,7 @@ SceneCamera DefaultCamera() {
     sc.config.scenelightshadows = TRUE;
     sc.config.spectral = FALSE;
     sc.config.screenspace = FALSE;
+    sc.config.splatshadows = TRUE;
     sc.config.wireframe = TRUE;
     sc.config.normals = TRUE;
     sc.config.reset = FALSE;
@@ -763,7 +764,7 @@ void Render() {
         ez_begin_profile(&(g_renderer.stats.profile));
 
         // recompute min/max
-        if (g_renderer.geometry.changes.update_meshes || g_renderer.geometry.changes.update_vertices) {
+        if (g_renderer.geometry.changes.update_meshes || g_renderer.geometry.changes.update_vertices || g_renderer.geometry.changes.update_splats) {
             SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
             SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
             for (size_t i = 0; i < g_renderer.geometry.meshes.size; i++) {
@@ -1618,6 +1619,8 @@ void ClearScene(BOOL hard) {
 void ClearSplats() {
     if (g_renderer.geometry.splats.maxsize == 0) return;
     ARRLIST_GaussianSplat_clear(&(g_renderer.geometry.splats));
+    SETVEC3(g_renderer.geometry.splatbounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
+    SETVEC3(g_renderer.geometry.splatbounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
     UpdateSplats();
 }
 

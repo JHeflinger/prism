@@ -1,5 +1,6 @@
 #import Boilerplate
 #import Definitions
+#import SplatConstants
 
 #import BVHNodeDef;
 #import RayGeneratorDef;
@@ -8,6 +9,8 @@
 #import TriangleDef;
 #import MaterialDef;
 #import SceneLightDef;
+#import SplatDef;
+#import SplatChordDef;
 
 layout(binding = 0) readonly #import UniformBufferObjectDef ubo;
 layout(binding = 1) #import RayGeneratorSSBODef;
@@ -19,10 +22,12 @@ layout(binding = 6) readonly #import EmissiveSSBODef;
 layout(binding = 7) readonly #import TransformedVertexSSBODef;
 layout(binding = 8) readonly #import NormalSSBODef;
 layout(binding = 9) readonly #import LightSSBODef;
+layout(binding = 10) readonly #import SplatSSBODef;
 
 #import CutViewport
 #import EpsilonOffset
 #import TriangleIntersectSuite
+#import QuatToMat
 
 const float max_contribution = 10;
 uvec4 seed = uvec4(0);
@@ -473,6 +478,239 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in Material material,
     }
 }
 
+float erf_approx(float x) { // Abramowitz & Stegun 7.1.26, abs error < 1.5e-7
+    float s = sign(x);
+    x = abs(x);
+    float t = 1.0 / (1.0 + 0.3275911 * x);
+    float y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-x * x);
+    return s * y;
+}
+
+float normal_cdf(float x) {
+    return 0.5 * (1.0 + erf_approx(x * 0.70710678));
+}
+
+float erfinv_approx(float x) { // M. Giles, single precision
+    float w = -log((1.0 - x) * (1.0 + x));
+    float p;
+    if (w < 5.0) {
+        w = w - 2.5;
+        p = 2.81022636e-08;
+        p = 3.43273939e-07 + p * w;
+        p = -3.5233877e-06 + p * w;
+        p = -4.39150654e-06 + p * w;
+        p = 0.00021858087 + p * w;
+        p = -0.00125372503 + p * w;
+        p = -0.00417768164 + p * w;
+        p = 0.246640727 + p * w;
+        p = 1.50140941 + p * w;
+    } else {
+        w = sqrt(w) - 3.0;
+        p = -0.000200214257;
+        p = 0.000100950558 + p * w;
+        p = 0.00134934322 + p * w;
+        p = -0.00367342844 + p * w;
+        p = 0.00573950773 + p * w;
+        p = -0.0076224613 + p * w;
+        p = 0.00943887047 + p * w;
+        p = 1.00167406 + p * w;
+        p = 2.83297682 + p * w;
+    }
+    return p * x;
+}
+
+float normal_quantile(float p) {
+    p = clamp(p, 1e-7, 1.0 - 1e-7);
+    return 1.41421356 * erfinv_approx(2.0 * p - 1.0);
+}
+
+vec3 splat_albedo(uint id) {
+    return clamp(0.5 + 0.28209479177387814 * splatIn[id].shdc, vec3(0.0), vec3(1.0));
+}
+
+vec3 safe_inverse(vec3 d) {
+    return 1.0 / mix(d, vec3(1e-20), lessThan(abs(d), vec3(1e-20)));
+}
+
+bool aabb_range(Ray ray, vec3 inv, uint node_ind, float tfar, out float tnear) {
+    vec3 t0 = (nodeIn[node_ind].minBB - ray.position) * inv;
+    vec3 t1 = (nodeIn[node_ind].maxBB - ray.position) * inv;
+    vec3 tlo = min(t0, t1);
+    vec3 thi = max(t0, t1);
+    tnear = max(max(tlo.x, tlo.y), max(tlo.z, 0.0));
+    float tf = min(min(thi.x, thi.y), min(thi.z, tfar));
+    return tnear <= tf;
+}
+
+bool gaussian_chord(Ray ray, uint id, float tmax, out GaussChord ch) {
+    GaussianSplat g = splatIn[id];
+    float alpha = min(1.0 / (1.0 + exp(-g.opacity)), 0.999);
+    vec3 s = max(exp(g.logscale), vec3(1e-4));
+    mat3 Rt = transpose(quat_to_mat3(normalize(g.rotation)));
+    vec3 o = (Rt * (ray.position - g.position)) / s;
+    vec3 d = (Rt * ray.direction) / s;
+    float A = dot(d, d);
+    float tc = -dot(o, d) / A;
+    vec3 oxd = cross(o, d);
+    float h2 = dot(oxd, oxd) / A;
+    float S2 = SPLAT_SIGMA * SPLAT_SIGMA;
+    if (!(h2 < S2)) return false;
+    float sd = inversesqrt(A);
+    float zmax = sqrt(S2 - h2);
+    float za = max(-zmax, (EPS - tc) / sd);
+    float zb = min(zmax, (tmax - tc) / sd);
+    if (!(za < zb)) return false;
+    float smin = min(s.x, min(s.y, s.z));
+    float kappa = SPLAT_DENSITY * -log(1.0 - alpha) / (SQRT_2PI * smin);
+    ch.tc = tc;
+    ch.sd = sd;
+    ch.za = za;
+    ch.zb = zb;
+    ch.c = kappa * exp(-0.5 * h2) * sd * SQRT_2PI;
+    return true;
+}
+
+bool sample_gaussian_event(Ray ray, uint id, float tmax, out float t_event) {
+    GaussChord ch;
+    if (!gaussian_chord(ray, id, tmax, ch)) return false;
+    float Pa = normal_cdf(ch.za);
+    float Pb = normal_cdf(ch.zb);
+    float E = -log(max(1.0 - random(), 1e-12));
+    if (E >= ch.c * (Pb - Pa)) return false;
+    float z = normal_quantile(Pa + E / ch.c);
+    t_event = clamp(ch.tc + z * ch.sd, EPS, tmax);
+    return true;
+}
+
+bool sample_volume_event(Ray ray, float tmax, out float t_event, out uint id_event) {
+    t_event = tmax;
+    id_event = uint(-1);
+    if (ubo.splats == 0) return false;
+    bool found = false;
+    vec3 inv = safe_inverse(ray.direction);
+    uint stack[MAX_RECURSIVE_DEPTH];
+    int stack_ptr = 0;
+    stack[stack_ptr++] = ubo.triangles * 2;
+    while (stack_ptr > 0) {
+        uint node_index = stack[--stack_ptr];
+        BVHNode node = nodeIn[node_index];
+        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
+        float tnear;
+        if (!aabb_range(ray, inv, node_index, t_event, tnear)) continue;
+        if (node.right == 0xFFFFFFFF) {
+            float t;
+            if (sample_gaussian_event(ray, node.left, t_event, t)) {
+                t_event = t;
+                id_event = node.left;
+                found = true;
+            }
+        } else {
+            stack[stack_ptr++] = node.left;
+            stack[stack_ptr++] = node.right;
+        }
+    }
+    return found;
+}
+
+float volume_transmittance(Ray ray, float tmax) {
+    if (ubo.splats == 0) return 1.0;
+    tmax = min(tmax, VOLUME_TFAR);
+    float tau = 0.0;
+    vec3 inv = safe_inverse(ray.direction);
+    uint stack[MAX_RECURSIVE_DEPTH];
+    int stack_ptr = 0;
+    stack[stack_ptr++] = ubo.triangles * 2;
+    while (stack_ptr > 0 && tau < 20.0) {
+        uint node_index = stack[--stack_ptr];
+        BVHNode node = nodeIn[node_index];
+        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
+        float tnear;
+        if (!aabb_range(ray, inv, node_index, tmax, tnear)) continue;
+        if (node.right == 0xFFFFFFFF) {
+            GaussChord ch;
+            if (gaussian_chord(ray, node.left, tmax, ch))
+                tau += ch.c * (normal_cdf(ch.zb) - normal_cdf(ch.za));
+        } else {
+            stack[stack_ptr++] = node.left;
+            stack[stack_ptr++] = node.right;
+        }
+    }
+    return exp(-tau);
+}
+
+float hg_phase(float cos_theta, float g) {
+    float denom = 1.0 + g * g - 2.0 * g * cos_theta;
+    return (1.0 - g * g) / (4.0 * PI * denom * sqrt(denom));
+}
+
+vec3 sample_phase(vec3 forward, float g) {
+    float xi1 = random();
+    float xi2 = random();
+    float cos_theta;
+    if (abs(g) < 0.001) {
+        cos_theta = 1.0 - 2.0 * xi1;
+    } else {
+        float sqr = (1.0 - g * g) / (1.0 - g + 2.0 * g * xi1);
+        cos_theta = clamp((1.0 + g * g - sqr * sqr) / (2.0 * g), -1.0, 1.0);
+    }
+    float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+    float phi = 2.0 * PI * xi2;
+    return onb(forward, vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta));
+}
+
+vec3 sample_scene_lights_volume(vec3 pos, vec3 travel_dir, vec3 albedo) {
+    vec3 intensity = vec3(0);
+    for (uint i = 0; i < ubo.lights; i++) {
+        SceneLight light = lightIn[i];
+        vec3 incoming;
+        vec3 to_light = light.position - pos;
+        float distance_to_light = length(to_light);
+        float falloff = 1.0;
+        if (light.angle == 0 && light.direction == vec3(0)) { // point light
+            incoming = normalize(to_light);
+        } else if (light.angle != 0) { // spot light
+            if (light.direction == vec3(0)) light.direction = vec3(0, -1, 0);
+            incoming = normalize(to_light);
+            float angle = acos(clamp(dot(-incoming, normalize(light.direction)), -1.0, 1.0));
+            float lightangle = radians(light.angle / 2.0);
+            if (angle > lightangle) continue;
+            if (angle > lightangle * (1.0 - light.penumbra)) falloff -= (angle - lightangle * (1.0 - light.penumbra)) / (light.penumbra * lightangle);
+        } else { // directional light
+            incoming = -normalize(light.direction);
+            distance_to_light = FLTMAX;
+        }
+        Ray sray = Ray(pos, incoming);
+        if (ubo.scenelightshadows != 0) {
+            uint tid;
+            Hit shit = trace(sray, tid);
+            if (shit.distance > 0 && shit.distance < distance_to_light) continue;
+        }
+        float vis = volume_transmittance(sray, distance_to_light);
+        intensity += albedo * hg_phase(dot(incoming, travel_dir), SPLAT_G) * light.color * falloff * vis;
+    }
+    return intensity;
+}
+
+vec3 sample_direct_light_volume(vec3 pos, vec3 travel_dir, vec3 albedo) {
+    uint eid;
+    float area;
+    vec3 light_pos = sample_direct_light_point(eid, area);
+    vec3 to_light = light_pos - pos;
+    float dist = length(to_light);
+    to_light = normalize(to_light);
+    Ray sray = Ray(pos, to_light);
+    uint tid = 0;
+    Hit shit = trace(sray, tid);
+    if (eid != tid || shit.distance <= 0.0) return vec3(0.0);
+    float cos_light = max(dot(shit.normal, -to_light), 0.0);
+    if (cos_light <= 0.0) return vec3(0.0);
+    vec3 emission = materialIn[shit.material].emission;
+    float p_area = (1.0 / float(ubo.emissives)) / area;
+    float p_omega = p_area * dist * dist / cos_light;
+    float vis = volume_transmittance(sray, shit.distance);
+    return emission * albedo * hg_phase(dot(to_light, travel_dir), SPLAT_G) * vis / p_omega;
+}
+
 vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     vec3 throughput = vec3(1.0);
     vec3 radiance = vec3(0.0);
@@ -485,10 +723,46 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     uint i = 0;
     for (; i < ubo.maxbounces; i++) {
         Hit h = trace(ray, hid);
+        bool firstsplat = false;
         if (firsthit) {
+            firstsplat = true;
             firsthit = false;
             hit_id = hid;
             hit_distance = h.distance;
+        }
+        if (ubo.splats > 0) {
+            float t_surface = h.distance > 0.0 ? h.distance : VOLUME_TFAR;
+            float t_vol;
+            uint vol_id;
+            if (sample_volume_event(ray, t_surface, t_vol, vol_id)) {
+                vec3 albedo = splat_albedo(vol_id);
+                if (firstsplat && luminance(albedo) > 0.01) {
+                    hit_id = vol_id + ubo.triangles;
+                }
+                if (ubo.splatshadows == 0) {
+                    radiance += throughput * albedo;
+                    break;
+                }
+                vec3 vpos = ray.position + ray.direction * t_vol;
+                if (ubo.scenelighting != 0 && ubo.lights > 0) {
+                    vec3 light = sample_scene_lights_volume(vpos, ray.direction, albedo);
+                    radiance += min(throughput * light, max_contribution);
+                    if (ubo.scenelightingonly != 0) break;
+                }
+                if (ubo.direct != 0 && ubo.emissives > 0) {
+                    vec3 direct = sample_direct_light_volume(vpos, ray.direction, albedo);
+                    radiance += min(throughput * direct, max_contribution);
+                    if (ubo.directonly != 0) break;
+                }
+                throughput *= albedo; // phase / pdf == 1 because we sample the phase function directly
+                float pv = russian_roulette(throughput);
+                if (random() > pv) break;
+                throughput /= pv;
+                ray.position = vpos;
+                ray.direction = sample_phase(ray.direction, SPLAT_G);
+                count_emission = ubo.direct == 0;
+                continue;
+            }
         }
         if (h.distance <= 0) break;
         Material material = materialIn[h.material];

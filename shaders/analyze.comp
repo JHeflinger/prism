@@ -37,6 +37,7 @@ void main() {
     if (rx == o_ubo.mouse_x && ry == o_ubo.mouse_y) {
         if (o_ubo.mode == TRIANGLE_SELECT) {
 		    hovered_tid = raygenIn[gl_GlobalInvocationID.x].tid;
+            if (hovered_tid >= ubo.triangles) hovered_tid = -1;
         } else if (o_ubo.mode == VERTEX_SELECT) {
             hovered_tid = -1;
             Ray ray = create_ray(vec2(rx, ry));
