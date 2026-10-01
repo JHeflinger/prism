@@ -12,7 +12,7 @@ WIP - Prism is not production ready and may have bugs or issues. Download and us
 
 ## REQUIREMENTS
 
-While Prism uses Vulkan and other supplemental libraries such as raylib or cglm, all external libraries are included in the repository or via subrepositories. You can install the Vulkan SDK if you wish to enable the Vulkan debug handler, but other than that all you will need is gcc to compile. If you are on Linux, you will also have to install GLSLC to compile the shaders, or you can bug me to include the pre-built binary in the repo and add it to the build scripts.
+While Prism uses Vulkan and other supplemental libraries such as raylib or cglm, all external libraries are included in the repository or via submodules. You can install the Vulkan SDK if you wish to enable the Vulkan debug handler, but other than that all you will need is gcc to compile. If you are on Linux, you will also have to install GLSLC to compile the shaders, or you can bug me to include the pre-built binary in the repo and add it to the build scripts.
 
 ## BUILDING
 
@@ -25,14 +25,13 @@ If you have already cloned it, you can also download the subrepos by running the
 ```
 git submodule update --recursive --init
 ```
-If you're on Linux, you can compile and run the program using `run.sh`
+If you're on Linux, you can compile the program using `scripts/build.sh`
 ```
-./run.sh
+./scripts/build.sh
 ```
-If you're on Windows, you can compile and run the program using `run.bat`
+If you're on Windows, you can compile and run the program using `scripts/build.bat`
 ```
-./run.bat
+./scripts/build.bat
 ```
-You can also use the `shell.sh` or `shell.bat` scripts to enter a mini shell program with additional commands intended for development use. Note that these scripts utilize Python, so make sure you have that installed.
 
-> **_NOTE:_**  Prism is only cross-platform for Linux and Windows systems - Mac is not supported.
+> **_NOTE:_** Don't forget to give permissions to scripts so you can run them! 

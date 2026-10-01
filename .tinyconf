@@ -19,6 +19,9 @@ PORT build/shaders
 PORT build/expanded
 PORT assets
 
+LINUX EXECUTE scripts/shaders.sh
+WINDOWS EXECUTE scripts/shaders.bat
+
 DEFINE PRISM
 
 # EXTRA MODULES AND EXTENSIONS
