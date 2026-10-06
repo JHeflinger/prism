@@ -1,0 +1,29 @@
+#import Boilerplate
+#import TrainerSuite
+
+// LSD radix sort, pass 2: exclusive scan of the digit-major histogram (16 * SORT_GROUPS entries)
+BUF(B_SORT_HIST, hist, uint, );
+
+shared uint sh[256];
+
+void main() {
+    uint tid = gl_LocalInvocationID.x;
+    const uint PER = (SORT_RADIX * SORT_GROUPS) / 256u;
+    uint lo = tid * PER;
+    uint sum = 0u;
+    for (uint k = 0u; k < PER; k++) sum += hist[lo + k];
+    sh[tid] = sum;
+    barrier();
+    for (uint off = 1u; off < 256u; off <<= 1u) {
+        uint add = tid >= off ? sh[tid - off] : 0u;
+        barrier();
+        sh[tid] += add;
+        barrier();
+    }
+    uint run = sh[tid] - sum;
+    for (uint k = 0u; k < PER; k++) {
+        uint x = hist[lo + k];
+        hist[lo + k] = run;
+        run += x;
+    }
+}

@@ -1,0 +1,73 @@
+#import Boilerplate
+#import TrainerSuite
+
+// Tile based front to back alpha compositing. One workgroup per 16x16 tile, one thread per pixel.
+BUF(B_GEOM, geom, float, readonly);
+BUF(B_VALS_A, vals, uint, readonly);
+BUF(B_RANGES, ranges, uint, readonly);
+BUF(B_RENDER, render_out, float, );
+BUF(B_NCONTRIB, nconts, uint, );
+
+shared vec2 s_xy[BLOCK];
+shared vec4 s_con[BLOCK];
+shared vec4 s_col[BLOCK];
+shared uint s_done;
+
+void main() {
+    uint lid = gl_LocalInvocationIndex;
+    uvec2 tile = gl_WorkGroupID.xy;
+    uvec2 pix = tile * TILE + uvec2(lid % TILE, lid / TILE);
+    bool inside = pix.x < pc.dims.x && pix.y < pc.dims.y;
+    uint pidx = pix.y * pc.dims.x + pix.x;
+    vec2 pf = vec2(pix) + 0.5;
+    uint tid_ = tile.y * pc.dims.z + tile.x;
+    uint start = ranges[tid_ * 2u];
+    uint end = ranges[tid_ * 2u + 1u];
+    uint rounds = (end - start + BLOCK - 1u) / BLOCK;
+
+    float T = 1.0;
+    vec3 C = vec3(0.0);
+    uint last = 0u;
+    bool done = !inside;
+
+    for (uint r = 0u; r < rounds; r++) {
+        if (lid == 0u) s_done = 0u;
+        barrier();
+        if (done) atomicAdd(s_done, 1u);
+        barrier();
+        if (s_done == BLOCK) break;
+        uint idx = start + r * BLOCK + lid;
+        if (idx < end) {
+            uint id = vals[idx];
+            uint g = id * GSTRIDE;
+            s_xy[lid] = vec2(geom[g + G_MEAN], geom[g + G_MEAN + 1]);
+            s_con[lid] = vec4(geom[g + G_CONIC], geom[g + G_CONIC + 1], geom[g + G_CONIC + 2], geom[g + G_OPAC]);
+            s_col[lid] = vec4(geom[g + G_COLOR], geom[g + G_COLOR + 1], geom[g + G_COLOR + 2], 0.0);
+        }
+        barrier();
+        uint n = min(BLOCK, end - start - r * BLOCK);
+        for (uint j = 0u; j < n && !done; j++) {
+            vec2 d = s_xy[j] - pf;
+            vec4 con = s_con[j];
+            float power = -0.5 * (con.x * d.x * d.x + con.z * d.y * d.y) - con.y * d.x * d.y;
+            if (power > 0.0) continue;
+            float alpha = min(MAX_ALPHA, con.w * exp(power));
+            if (alpha < MIN_ALPHA) continue;
+            float Tn = T * (1.0 - alpha);
+            if (Tn < T_EPSILON) { done = true; continue; }
+            C += s_col[j].rgb * alpha * T;
+            T = Tn;
+            last = r * BLOCK + j + 1u;
+        }
+        barrier();
+    }
+    if (inside) {
+        vec3 bg = pc.bgl.rgb;
+        vec3 outc = C + T * bg;
+        render_out[pidx * 4u] = outc.r;
+        render_out[pidx * 4u + 1u] = outc.g;
+        render_out[pidx * 4u + 2u] = outc.b;
+        render_out[pidx * 4u + 3u] = T;
+        nconts[pidx] = last;
+    }
+}

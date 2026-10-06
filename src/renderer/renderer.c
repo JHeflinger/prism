@@ -319,7 +319,6 @@ void InitializeRenderer() {
     PollGPUCache(TRUE);
 
     // default material
-    /*
     SubmitNamedMaterial((SurfaceMaterial){
         {0.0f, 0.0f, 0.0f},
         {1.0f, 1.0f, 1.0f},
@@ -328,9 +327,9 @@ void InitializeRenderer() {
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
-        0.0f, 1.0f, 0, 10.0f, 2
-    }, "Default");*/
-    SurfaceMaterial wax = {
+        0.0f, 1.0f, 0.0f, 0, 10.0f, 2
+    }, "Default");
+    /*SurfaceMaterial wax = {
         .emission = {0.0f, 0.0f, 0.0f},
         .ambient = {1.0f, 1.0f, 1.0f},
         .diffuse = {0.8f, 0.25f, 0.15f},
@@ -345,7 +344,7 @@ void InitializeRenderer() {
         .scale = 1.0f,
         .subsurface = 0.5f
     };
-    SubmitNamedMaterial(wax, "Default");
+    SubmitNamedMaterial(wax, "Default");*/
 
     // set overlay context
     SetOverlayContext(&g_renderer);
@@ -1529,6 +1528,25 @@ void SaveRender(const char* filepath) {
     ExportImage(image, filepath);
     UnloadImage(image);
     UnloadRenderTexture(rt);
+}
+
+BOOL CaptureRender(uint8_t* rgba) {
+    const int w = (int)g_renderer.dimensions.x;
+    const int h = (int)g_renderer.dimensions.y;
+    RenderTexture rt = LoadRenderTexture(w, h);
+    if (!IsRenderTextureValid(rt)) return FALSE;
+    BeginTextureMode(rt);
+    DrawHelper(0, 0, w, -h, w, h);
+    EndTextureMode();
+    Image image = LoadImageFromTexture(rt.texture);
+    BOOL ok = image.data != NULL;
+    if (ok) {
+        ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        memcpy(rgba, image.data, (size_t)w * (size_t)h * 4);
+    }
+    UnloadImage(image);
+    UnloadRenderTexture(rt);
+    return ok;
 }
 
 char* GPUModel() {

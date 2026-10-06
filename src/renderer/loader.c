@@ -1189,15 +1189,15 @@ BOOL LoadPLY(const char* filepath) {
             }
             const char* name = header.properties[property].name;
             if (strcmp(name, "x") == 0) gaussian.position[0] = value;
-            else if (strcmp(name, "y") == 0) gaussian.position[1] = value;
+            else if (strcmp(name, "y") == 0) gaussian.position[1] = -value;
             else if (strcmp(name, "z") == 0) gaussian.position[2] = value;
             else if (strcmp(name, "scale_0") == 0) gaussian.logscale[0] = value;
             else if (strcmp(name, "scale_1") == 0) gaussian.logscale[1] = value;
             else if (strcmp(name, "scale_2") == 0) gaussian.logscale[2] = value;
             else if (strcmp(name, "rot_0") == 0) gaussian.rotation[0] = value;
-            else if (strcmp(name, "rot_1") == 0) gaussian.rotation[1] = value;
+            else if (strcmp(name, "rot_1") == 0) gaussian.rotation[1] = -value;
             else if (strcmp(name, "rot_2") == 0) gaussian.rotation[2] = value;
-            else if (strcmp(name, "rot_3") == 0) gaussian.rotation[3] = value;
+            else if (strcmp(name, "rot_3") == 0) gaussian.rotation[3] = -value;
             else if (strcmp(name, "opacity") == 0) gaussian.opacity = value;
             else if (strcmp(name, "f_dc_0") == 0) gaussian.shdc[0] = value;
             else if (strcmp(name, "f_dc_1") == 0) gaussian.shdc[1] = value;

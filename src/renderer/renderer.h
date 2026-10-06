@@ -199,6 +199,8 @@ void UpdatePoses();
 
 void SaveRender(const char* filepath);
 
+BOOL CaptureRender(uint8_t* rgba);
+
 char* GPUModel();
 
 void PollGPUCache(BOOL init);

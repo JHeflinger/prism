@@ -1,0 +1,120 @@
+#import Boilerplate
+#import TrainerSuite
+
+// Backward pass of the projection. Takes the gradients w.r.t. the 2D gaussian (scratch buffer filled by
+// render_bwd.comp) and produces gradients w.r.t. the trainable parameters. Also accumulates the
+// statistics used for adaptive density control.
+BUF(B_PARAMS, params, float, readonly);
+BUF(B_GRADS, grads, float, );
+BUF(B_GEOM, geom, float, readonly);
+BUF(B_GRAD2D, grad2d, float, readonly);
+BUF(B_DENS, dens, float, );
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.cnt.x) return;
+    uint p = i * PSTRIDE;
+    uint g = i * GSTRIDE;
+    uint o = i * RSTRIDE;
+    for (uint k = 0u; k < PSTRIDE; k++) grads[p + k] = 0.0;
+    float radius = geom[g + G_RADIUS];
+    if (radius <= 0.0) return;
+
+    Cam cam = load_cam();
+    vec3 mean = vec3(params[p + P_POS], params[p + P_POS + 1], params[p + P_POS + 2]);
+    vec3 logscale = vec3(params[p + P_SCALE], params[p + P_SCALE + 1], params[p + P_SCALE + 2]);
+    vec4 q = vec4(params[p + P_QUAT], params[p + P_QUAT + 1], params[p + P_QUAT + 2], params[p + P_QUAT + 3]);
+    Proj pr;
+    if (!project_gaussian(cam, mean, logscale, q, pr)) return;
+
+    float dmx = grad2d[o], dmy = grad2d[o + 1];
+    float dA = grad2d[o + 2], dB = grad2d[o + 3], dC = grad2d[o + 4];
+    float dop = grad2d[o + 5];
+    vec3 dcol = vec3(grad2d[o + 6], grad2d[o + 7], grad2d[o + 8]);
+
+    // conic = (c, -b, a) / det
+    float a = pr.a, b = pr.b, c = pr.c, det = pr.det;
+    float id = 1.0 / det;
+    float id2 = id * id;
+    float dLda = dA * (-c * c * id2) + dB * (b * c * id2) + dC * (id - a * c * id2);
+    float dLdb = dA * (2.0 * b * c * id2) + dB * (-id - 2.0 * b * b * id2) + dC * (2.0 * a * b * id2);
+    float dLdc = dA * (id - a * c * id2) + dB * (a * b * id2) + dC * (-a * a * id2);
+
+    // cov2D = T Sigma T^T
+    mat3 G = dLda * outerProduct(pr.T0, pr.T0) + dLdc * outerProduct(pr.T1, pr.T1) + dLdb * outerProduct(pr.T0, pr.T1);
+    mat3 dM = (G + transpose(G)) * pr.M;
+    vec3 sT0 = pr.Sigma * pr.T0;
+    vec3 sT1 = pr.Sigma * pr.T1;
+    vec3 dT0 = (2.0 * dLda) * sT0 + dLdb * sT1;
+    vec3 dT1 = (2.0 * dLdc) * sT1 + dLdb * sT0;
+
+    // T0 = j00 * right + j02 * fwd, T1 = j11 * down + j12 * fwd
+    float dj00 = dot(dT0, cam.right);
+    float dj02 = dot(dT0, cam.fwd);
+    float dj11 = dot(dT1, cam.down);
+    float dj12 = dot(dT1, cam.fwd);
+    float tz = pr.t.z;
+    float itz = 1.0 / tz;
+    float itz2 = itz * itz;
+    float d = cam.d;
+    vec3 dt = vec3(0.0);
+    dt.z += (dj00 + dj11) * (-d * itz2);
+    // j02 = -d * clx / tz
+    if (pr.clampx) dt.z += dj02 * d * pr.clx * itz2;
+    else { dt.x += dj02 * (-d * itz2); dt.z += dj02 * (2.0 * d * pr.t.x * itz2 * itz); }
+    if (pr.clampy) dt.z += dj12 * d * pr.cly * itz2;
+    else { dt.y += dj12 * (-d * itz2); dt.z += dj12 * (2.0 * d * pr.t.y * itz2 * itz); }
+    // mean2d = d * t.xy / t.z + c
+    dt.x += dmx * d * itz;
+    dt.y += dmy * d * itz;
+    dt.z += (dmx * (-d * pr.t.x) + dmy * (-d * pr.t.y)) * itz2;
+    vec3 dmean = cam.right * dt.x + cam.down * dt.y + cam.fwd * dt.z;
+
+    // M = R diag(s): column l of M is R[l] * s_l
+    vec3 dlogs = vec3(0.0);
+    mat3 dR;
+    for (int l = 0; l < 3; l++) {
+        dlogs[l] = dot(dM[l], pr.R[l]) * pr.s[l];
+        dR[l] = dM[l] * pr.s[l];
+    }
+    // rotation backward, math entry dr_ij = dR[j][i]
+    float qn = sqrt(max(dot(q, q), 1e-24));
+    vec4 r = q / qn;
+    float w = r.x, x = r.y, y = r.z, z = r.w;
+    float dr00 = dR[0][0], dr10 = dR[0][1], dr20 = dR[0][2];
+    float dr01 = dR[1][0], dr11 = dR[1][1], dr21 = dR[1][2];
+    float dr02 = dR[2][0], dr12 = dR[2][1], dr22 = dR[2][2];
+    vec4 drq;
+    drq.x = 2.0 * (-z * dr01 + y * dr02 + z * dr10 - x * dr12 - y * dr20 + x * dr21);
+    drq.y = 2.0 * (y * dr01 + z * dr02 + y * dr10 - 2.0 * x * dr11 - w * dr12 + z * dr20 + w * dr21 - 2.0 * x * dr22);
+    drq.z = 2.0 * (x * dr01 + w * dr02 + x * dr10 + z * dr12 - w * dr20 + z * dr21 - 2.0 * y * dr00 - 2.0 * y * dr22);
+    drq.w = 2.0 * (-w * dr01 + x * dr02 + w * dr10 + y * dr12 + x * dr20 + y * dr21 - 2.0 * z * dr00 - 2.0 * z * dr11);
+    vec4 dq = (drq - r * dot(r, drq)) / qn;
+
+    float op = sigmoidf(params[p + P_OPAC]);
+    float dlogit = dop * op * (1.0 - op);
+    vec3 craw = vec3(0.5) + SH_C0 * vec3(params[p + P_COLOR], params[p + P_COLOR + 1], params[p + P_COLOR + 2]);
+    vec3 ddc = dcol * SH_C0 * vec3(greaterThan(craw, vec3(0.0)));
+
+    grads[p + P_POS] = dmean.x;
+    grads[p + P_POS + 1] = dmean.y;
+    grads[p + P_POS + 2] = dmean.z;
+    grads[p + P_SCALE] = dlogs.x;
+    grads[p + P_SCALE + 1] = dlogs.y;
+    grads[p + P_SCALE + 2] = dlogs.z;
+    grads[p + P_QUAT] = dq.x;
+    grads[p + P_QUAT + 1] = dq.y;
+    grads[p + P_QUAT + 2] = dq.z;
+    grads[p + P_QUAT + 3] = dq.w;
+    grads[p + P_OPAC] = dlogit;
+    grads[p + P_COLOR] = ddc.x;
+    grads[p + P_COLOR + 1] = ddc.y;
+    grads[p + P_COLOR + 2] = ddc.z;
+
+    // density control statistics: screen space gradient magnitude in NDC units
+    uint s = i * 4u;
+    vec2 gndc = vec2(dmx * 0.5 * float(pc.dims.x), dmy * 0.5 * float(pc.dims.y));
+    dens[s] += length(gndc);
+    dens[s + 1u] += 1.0;
+    dens[s + 2u] = max(dens[s + 2u], radius);
+}

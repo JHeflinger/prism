@@ -21,4 +21,6 @@ void PolarDecompose(mat3 C, mat3 R_out);
 
 AxisAlignedBoundingBox SplatBounds(GaussianSplat* splat);
 
+void QuaternionFromBasis(const vec3 c0, const vec3 c1, const vec3 c2, versor q);
+
 #endif

@@ -7,4 +7,6 @@ void RunGeometryExecutor(const char* scenefile, const char* outfile, int method,
 
 void RunRenderExecutor(const char* scenefile, const char* outfile, int width, int height, int samples, BOOL direct_lighting, BOOL direct_only);
 
+void RunTrainExecutor(const char* scenefile, const char* outply, int views, int iterations, int width, int height);
+
 #endif

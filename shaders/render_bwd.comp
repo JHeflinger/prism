@@ -1,0 +1,114 @@
+#import Boilerplate
+#import TrainerSuite
+
+// Backward pass of the tile rasterizer. Walks every tile's list back to front, reconstructing the
+// transmittance from the stored final value, and scatters gradients w.r.t. the projected 2D gaussian
+// (mean, conic, opacity, color) into the raster gradient scratch buffer.
+BUF(B_GEOM, geom, float, readonly);
+BUF(B_VALS_A, vals, uint, readonly);
+BUF(B_RANGES, ranges, uint, readonly);
+BUF(B_RENDER, render_out, float, readonly);
+BUF(B_NCONTRIB, nconts, uint, readonly);
+BUF(B_DLDPIX, dldpix, float, readonly);
+BUF(B_GRAD2D, grad2d, uint, coherent);
+
+shared vec2 s_xy[BLOCK];
+shared vec4 s_con[BLOCK];
+shared vec4 s_col[BLOCK];
+shared uint s_ids[BLOCK];
+shared uint s_max_last;
+
+void add_grad(uint i, float v) {
+    if (v == 0.0) return;
+    uint old = grad2d[i];
+    for (;;) {
+        uint nw = floatBitsToUint(uintBitsToFloat(old) + v);
+        uint prev = atomicCompSwap(grad2d[i], old, nw);
+        if (prev == old) break;
+        old = prev;
+    }
+}
+
+void main() {
+    uint lid = gl_LocalInvocationIndex;
+    uvec2 tile = gl_WorkGroupID.xy;
+    uvec2 pix = tile * TILE + uvec2(lid % TILE, lid / TILE);
+    bool inside = pix.x < pc.dims.x && pix.y < pc.dims.y;
+    uint pidx = pix.y * pc.dims.x + pix.x;
+    vec2 pf = vec2(pix) + 0.5;
+    uint tid_ = tile.y * pc.dims.z + tile.x;
+    uint start = ranges[tid_ * 2u];
+    uint end = ranges[tid_ * 2u + 1u];
+
+    uint last = 0u;
+    float Tfinal = 1.0;
+    vec3 dLdC = vec3(0.0);
+    if (inside) {
+        last = nconts[pidx];
+        Tfinal = render_out[pidx * 4u + 3u];
+        dLdC = vec3(dldpix[pidx * 4u], dldpix[pidx * 4u + 1u], dldpix[pidx * 4u + 2u]);
+    }
+    if (lid == 0u) s_max_last = 0u;
+    barrier();
+    atomicMax(s_max_last, last);
+    barrier();
+    uint todo = s_max_last;
+    uint rounds = (todo + BLOCK - 1u) / BLOCK;
+
+    vec3 bg = pc.bgl.rgb;
+    float bg_dot = dot(bg, dLdC);
+    float T = Tfinal;
+    vec3 accum = vec3(0.0);
+    vec3 last_color = vec3(0.0);
+    float last_alpha = 0.0;
+
+    for (uint r = 0u; r < rounds; r++) {
+        uint progress = r * BLOCK + lid;
+        if (progress < todo) {
+            uint idx = start + todo - 1u - progress;
+            uint id = vals[idx];
+            uint g = id * GSTRIDE;
+            s_ids[lid] = id;
+            s_xy[lid] = vec2(geom[g + G_MEAN], geom[g + G_MEAN + 1]);
+            s_con[lid] = vec4(geom[g + G_CONIC], geom[g + G_CONIC + 1], geom[g + G_CONIC + 2], geom[g + G_OPAC]);
+            s_col[lid] = vec4(geom[g + G_COLOR], geom[g + G_COLOR + 1], geom[g + G_COLOR + 2], 0.0);
+        }
+        barrier();
+        uint n = min(BLOCK, todo - r * BLOCK);
+        for (uint j = 0u; j < n; j++) {
+            if (!inside) break;
+            uint k = todo - 1u - (r * BLOCK + j);     // index inside the tile list
+            if (k >= last) continue;
+            vec2 d = s_xy[j] - pf;
+            vec4 con = s_con[j];
+            float power = -0.5 * (con.x * d.x * d.x + con.z * d.y * d.y) - con.y * d.x * d.y;
+            if (power > 0.0) continue;
+            float G = exp(power);
+            float araw = con.w * G;
+            float alpha = min(MAX_ALPHA, araw);
+            if (alpha < MIN_ALPHA) continue;
+            T = T / (1.0 - alpha);
+            vec3 col = s_col[j].rgb;
+            accum = last_alpha * last_color + (1.0 - last_alpha) * accum;
+            last_color = col;
+            last_alpha = alpha;
+            float dL_dalpha = dot(col - accum, dLdC) * T;
+            dL_dalpha += (-Tfinal / (1.0 - alpha)) * bg_dot;
+            vec3 dL_dcol = alpha * T * dLdC;
+            uint o = s_ids[j] * RSTRIDE;
+            add_grad(o + 6u, dL_dcol.r);
+            add_grad(o + 7u, dL_dcol.g);
+            add_grad(o + 8u, dL_dcol.b);
+            if (araw < MAX_ALPHA) {
+                float dL_dpower = dL_dalpha * con.w * G;
+                add_grad(o + 0u, dL_dpower * -(con.x * d.x + con.y * d.y));
+                add_grad(o + 1u, dL_dpower * -(con.z * d.y + con.y * d.x));
+                add_grad(o + 2u, dL_dpower * (-0.5 * d.x * d.x));
+                add_grad(o + 3u, dL_dpower * (-d.x * d.y));
+                add_grad(o + 4u, dL_dpower * (-0.5 * d.y * d.y));
+                add_grad(o + 5u, dL_dalpha * G);
+            }
+        }
+        barrier();
+    }
+}

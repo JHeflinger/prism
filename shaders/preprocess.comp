@@ -1,0 +1,49 @@
+#import Boilerplate
+#import TrainerSuite
+
+BUF(B_PARAMS, params, float, readonly);
+BUF(B_GEOM, geom, float, );
+BUF(B_COUNTS, counts, uint, );
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.cnt.x) return;
+    uint g = i * GSTRIDE;
+    uint p = i * PSTRIDE;
+    counts[i] = 0u;
+    geom[g + G_RADIUS] = 0.0;
+    Cam cam = load_cam();
+    vec3 mean = vec3(params[p + P_POS], params[p + P_POS + 1], params[p + P_POS + 2]);
+    vec3 logscale = vec3(params[p + P_SCALE], params[p + P_SCALE + 1], params[p + P_SCALE + 2]);
+    vec4 q = vec4(params[p + P_QUAT], params[p + P_QUAT + 1], params[p + P_QUAT + 2], params[p + P_QUAT + 3]);
+    Proj pr;
+    if (!project_gaussian(cam, mean, logscale, q, pr)) return;
+
+    float mid = 0.5 * (pr.a + pr.c);
+    float lambda1 = mid + sqrt(max(0.1, mid * mid - pr.det));
+    float radius = ceil(3.0 * sqrt(lambda1));
+    int tx = int(pc.dims.z), ty = int(pc.dims.w);
+    int minx = min(tx, max(0, int((pr.mean2d.x - radius) / float(TILE))));
+    int maxx = min(tx, max(0, int((pr.mean2d.x + radius + float(TILE) - 1.0) / float(TILE))));
+    int miny = min(ty, max(0, int((pr.mean2d.y - radius) / float(TILE))));
+    int maxy = min(ty, max(0, int((pr.mean2d.y + radius + float(TILE) - 1.0) / float(TILE))));
+    uint area = uint(max(0, maxx - minx) * max(0, maxy - miny));
+    if (area == 0u) return;
+
+    float inv = 1.0 / pr.det;
+    geom[g + G_MEAN] = pr.mean2d.x;
+    geom[g + G_MEAN + 1] = pr.mean2d.y;
+    geom[g + G_CONIC] = pr.c * inv;
+    geom[g + G_CONIC + 1] = -pr.b * inv;
+    geom[g + G_CONIC + 2] = pr.a * inv;
+    geom[g + G_OPAC] = sigmoidf(params[p + P_OPAC]);
+    for (int k = 0; k < 3; k++)
+        geom[g + G_COLOR + k] = max(0.5 + SH_C0 * params[p + P_COLOR + k], 0.0);
+    geom[g + G_DEPTH] = pr.t.z;
+    geom[g + G_RADIUS] = radius;
+    geom[g + G_RECT] = uintBitsToFloat(uint(minx));
+    geom[g + G_RECT + 1] = uintBitsToFloat(uint(miny));
+    geom[g + G_RECT + 2] = uintBitsToFloat(uint(maxx));
+    geom[g + G_RECT + 3] = uintBitsToFloat(uint(maxy));
+    counts[i] = area;
+}

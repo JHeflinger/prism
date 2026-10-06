@@ -1,0 +1,31 @@
+#import Boilerplate
+
+// Adam optimizer step over the interleaved parameter layout (16 floats per gaussian, 14 used).
+layout(std430, set = 0, binding = 0) buffer Buf_params { float params[]; };
+layout(std430, set = 0, binding = 1) readonly buffer Buf_grads { float grads[]; };
+layout(std430, set = 0, binding = 2) buffer Buf_m { float adam_m[]; };
+layout(std430, set = 0, binding = 3) buffer Buf_v { float adam_v[]; };
+
+layout(push_constant) uniform PC {
+    vec4 lr_a; // lr position, scale, rotation, opacity
+    vec4 lr_b; // lr color, beta1, beta2, eps
+    vec4 bias; // 1 - beta1^t, 1 - beta2^t, unused, unused
+    uvec4 cnt; // gaussian count
+} pc;
+
+void main() {
+    uint e = gl_GlobalInvocationID.x;
+    if (e >= pc.cnt.x * 16u) return;
+    uint lane = e & 15u;
+    if (lane >= 14u) return;
+    float lr = lane < 3u ? pc.lr_a.x : (lane < 6u ? pc.lr_a.y : (lane < 10u ? pc.lr_a.z : (lane == 10u ? pc.lr_a.w : pc.lr_b.x)));
+    float g = grads[e];
+    float b1 = pc.lr_b.y, b2 = pc.lr_b.z;
+    float m = b1 * adam_m[e] + (1.0 - b1) * g;
+    float v = b2 * adam_v[e] + (1.0 - b2) * g * g;
+    adam_m[e] = m;
+    adam_v[e] = v;
+    float mh = m / pc.bias.x;
+    float vh = v / pc.bias.y;
+    params[e] -= lr * mh / (sqrt(vh) + pc.lr_b.w);
+}

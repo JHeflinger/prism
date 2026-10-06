@@ -6,7 +6,13 @@
 #include <easylogger.h>
 
 int main(int argc, char** argv) {
-    if (argc == 1) {
+    if (argc >= 4 && argc <= 8 && strcmp(argv[1], "train") == 0) {
+        int views = argc > 4 ? atoi(argv[4]) : 0;
+        int iterations = argc > 5 ? atoi(argv[5]) : 0;
+        int width = argc > 6 ? atoi(argv[6]) : 800;
+        int height = argc > 7 ? atoi(argv[7]) : 600;
+        RunTrainExecutor(argv[2], argv[3], views, iterations, width, height);
+    } else if (argc == 1) {
         RunEditor();
     } else if (argc == 3) {
 		int rx = atoi(argv[1]);
@@ -37,6 +43,7 @@ int main(int argc, char** argv) {
         printf("  ./<executable> <width> <height>                                                            // Runs editor with custom viewport resolution\n");
         printf("  ./<executable> <scene> <output> <method> <arg?>                                            // Processes object geometry\n");
         printf("  ./<executable> <scene> <output> <width> <height> <samples> <direct_lighting> <direct_only> // Renders a single image\n");
+        printf("  ./<executable> train <scene> <output.ply> [views] [iterations] [width] [height]           // Trains gaussian splats of a scene\n");
         return 1;
     }
     EZ_INFO("See you, Space Cowboy");

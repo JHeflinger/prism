@@ -1,0 +1,54 @@
+#import Boilerplate
+#import TrainerSuite
+
+// dL/d(rendered pixel) for L = (1 - lambda) * L1 + lambda * (1 - SSIM), both averaged over all
+// pixels and channels.
+BUF(B_RENDER, render_out, float, readonly);
+BUF(B_GT, gt, uint, readonly);
+BUF(B_SSIM, ssim_maps, float, readonly);
+BUF(B_DLDPIX, dldpix, float, );
+
+const float WIN[11] = float[11](
+    0.0010283801, 0.0075987582, 0.0360007720, 0.1093606800, 0.2130055300, 0.2660117000,
+    0.2130055300, 0.1093606800, 0.0360007720, 0.0075987582, 0.0010283801);
+
+vec3 gt_pixel(uint view, uint x, uint y) {
+    uint v = gt[(view * pc.dims.y + y) * pc.dims.x + x];
+    return vec3(float(v & 255u), float((v >> 8) & 255u), float((v >> 16) & 255u)) / 255.0;
+}
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    uint W = pc.dims.x, H = pc.dims.y;
+    if (i >= W * H) return;
+    int px = int(i % W), py = int(i / W);
+    float lambda = pc.bgl.w;
+    float inv = 1.0 / (3.0 * float(W) * float(H));
+    vec3 xv = vec3(render_out[i * 4u], render_out[i * 4u + 1u], render_out[i * 4u + 2u]);
+    vec3 yv = gt_pixel(pc.cnt.z, uint(px), uint(py));
+    vec3 g1 = sign(xv - yv) * (1.0 - lambda) * inv;
+    vec3 sum_ap = vec3(0), sum_b = vec3(0), sum_c = vec3(0);
+    if (lambda > 0.0) {
+        for (int dy = -5; dy <= 5; dy++) {
+            int qy = py + dy;
+            if (qy < 0 || qy >= int(H)) continue;
+            for (int dx = -5; dx <= 5; dx++) {
+                int qx = px + dx;
+                if (qx < 0 || qx >= int(W)) continue;
+                float w = WIN[dx + 5] * WIN[dy + 5];
+                uint qi = (uint(qy) * W + uint(qx)) * 9u;
+                for (int ch = 0; ch < 3; ch++) {
+                    sum_ap[ch] += w * ssim_maps[qi + uint(ch) * 3u];
+                    sum_b[ch] += w * ssim_maps[qi + uint(ch) * 3u + 1u];
+                    sum_c[ch] += w * ssim_maps[qi + uint(ch) * 3u + 2u];
+                }
+            }
+        }
+    }
+    vec3 dssim = sum_ap + 2.0 * xv * sum_b + yv * sum_c;
+    vec3 g = g1 - lambda * inv * dssim;
+    dldpix[i * 4u] = g.r;
+    dldpix[i * 4u + 1u] = g.g;
+    dldpix[i * 4u + 2u] = g.b;
+    dldpix[i * 4u + 3u] = 0.0;
+}

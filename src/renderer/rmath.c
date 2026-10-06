@@ -143,3 +143,23 @@ AxisAlignedBoundingBox SplatBounds(GaussianSplat* splat) {
     }
     return box;
 }
+
+void QuaternionFromBasis(const vec3 c0, const vec3 c1, const vec3 c2, versor q) {
+    float m00 = c0[0], m10 = c0[1], m20 = c0[2];
+    float m01 = c1[0], m11 = c1[1], m21 = c1[2];
+    float m02 = c2[0], m12 = c2[1], m22 = c2[2];
+    float tr = m00 + m11 + m22;
+    if (tr > 0.0f) {
+        float s = sqrtf(tr + 1.0f) * 2.0f;
+        q[0] = 0.25f * s; q[1] = (m21 - m12) / s; q[2] = (m02 - m20) / s; q[3] = (m10 - m01) / s;
+    } else if (m00 > m11 && m00 > m22) {
+        float s = sqrtf(1.0f + m00 - m11 - m22) * 2.0f;
+        q[0] = (m21 - m12) / s; q[1] = 0.25f * s; q[2] = (m01 + m10) / s; q[3] = (m02 + m20) / s;
+    } else if (m11 > m22) {
+        float s = sqrtf(1.0f + m11 - m00 - m22) * 2.0f;
+        q[0] = (m02 - m20) / s; q[1] = (m01 + m10) / s; q[2] = 0.25f * s; q[3] = (m12 + m21) / s;
+    } else {
+        float s = sqrtf(1.0f + m22 - m00 - m11) * 2.0f;
+        q[0] = (m10 - m01) / s; q[1] = (m02 + m20) / s; q[2] = (m12 + m21) / s; q[3] = 0.25f * s;
+    }
+}

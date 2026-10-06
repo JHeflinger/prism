@@ -1,0 +1,33 @@
+#import Boilerplate
+#import TrainerSuite
+
+// Adaptive density control decision per gaussian.
+//   action 0 = prune, 1 = keep, 2 = clone, 3 = split.  counts = number of gaussians produced.
+BUF(B_PARAMS, params, float, readonly);
+BUF(B_DENS, dens, float, readonly);
+BUF(B_COUNTS, counts, uint, );
+BUF(B_ACTIONS, actions, uint, );
+
+// pc.dr = (grad threshold, min opacity, clone/split scale threshold, max world scale)
+// pc.bgl.x = max screen radius (<= 0 disables), pc.cnt.z = grow enable, pc.cnt.w = prune big enable
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.cnt.x) return;
+    uint p = i * PSTRIDE;
+    float op = sigmoidf(params[p + P_OPAC]);
+    float smax = exp(max(params[p + P_SCALE], max(params[p + P_SCALE + 1], params[p + P_SCALE + 2])));
+    float denom = dens[i * 4u + 1u];
+    float grad = denom > 0.0 ? dens[i * 4u] / denom : 0.0;
+    float maxr = dens[i * 4u + 2u];
+    bool prune = op < pc.dr.y;
+    if (pc.cnt.w != 0u) {
+        if (pc.bgl.x > 0.0 && maxr > pc.bgl.x) prune = true;
+        if (smax > pc.dr.w) prune = true;
+    }
+    uint action = 1u;
+    if (prune) action = 0u;
+    else if (pc.cnt.z != 0u && grad >= pc.dr.x) action = smax <= pc.dr.z ? 2u : 3u;
+    actions[i] = action;
+    counts[i] = action == 0u ? 0u : (action == 1u ? 1u : 2u);
+}

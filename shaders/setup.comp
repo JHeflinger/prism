@@ -1,0 +1,17 @@
+#import Boilerplate
+#import TrainerSuite
+
+BUF(B_COUNTS, counts, uint, readonly);
+BUF(B_OFFSETS, offsets, uint, readonly);
+BUF(B_META, meta, uint, );
+
+void main() {
+    uint n = pc.cnt.x;
+    uint total = n > 0u ? offsets[n - 1u] + counts[n - 1u] : 0u;
+    uint pairs = min(total, pc.cnt.y);
+    meta[META_TOTAL] = total;
+    meta[META_PAIRS] = pairs;
+    meta[META_INDIRECT] = (pairs + 255u) / 256u;
+    meta[META_INDIRECT + 1] = 1u;
+    meta[META_INDIRECT + 2] = 1u;
+}

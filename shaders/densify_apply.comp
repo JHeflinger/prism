@@ -1,0 +1,72 @@
+#import Boilerplate
+#import TrainerSuite
+
+// Rebuilds one PSTRIDE-per-gaussian array (selected by pc.cnt.z) into the temporary buffer (grads).
+//   mode 0: parameters   (clone duplicates, split samples two new gaussians inside the old one)
+//   mode 1: adam state   (kept gaussians keep their moments, new ones start from zero)
+BUF(B_PARAMS, params, float, readonly);
+BUF(B_GRADS, outbuf, float, );
+BUF(B_ADAM_M, state_m, float, readonly);
+BUF(B_ADAM_V, state_v, float, readonly);
+BUF(B_OFFSETS, offsets, uint, readonly);
+BUF(B_ACTIONS, actions, uint, readonly);
+
+// pc.cnt.z: 0 params, 1 adam m, 2 adam v. pc.cnt.w: random seed. pc.dr.x: split scale divisor
+
+uint pcg(uint v) {
+    uint state = v * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float rnd(inout uint s) { s = pcg(s); return float(s >> 8) * (1.0 / 16777216.0); }
+
+vec3 randn3(inout uint s) {
+    float u1 = max(rnd(s), 1e-7), u2 = rnd(s), u3 = max(rnd(s), 1e-7), u4 = rnd(s);
+    float r1 = sqrt(-2.0 * log(u1)), r2 = sqrt(-2.0 * log(u3));
+    return vec3(r1 * cos(6.2831853 * u2), r1 * sin(6.2831853 * u2), r2 * cos(6.2831853 * u4));
+}
+
+float src(uint mode, uint e) {
+    if (mode == 0u) return params[e];
+    if (mode == 1u) return state_m[e];
+    return state_v[e];
+}
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.cnt.x) return;
+    uint action = actions[i];
+    if (action == 0u) return;
+    uint mode = pc.cnt.z;
+    uint oi = offsets[i];
+    uint ib = i * PSTRIDE;
+    uint ob = oi * PSTRIDE;
+    if (action == 1u) {
+        for (uint k = 0u; k < PSTRIDE; k++) outbuf[ob + k] = src(mode, ib + k);
+    } else if (action == 2u) {
+        for (uint k = 0u; k < PSTRIDE; k++) {
+            float v = src(mode, ib + k);
+            outbuf[ob + k] = v;
+            outbuf[ob + PSTRIDE + k] = mode == 0u ? v : 0.0;
+        }
+    } else {
+        if (mode != 0u) {
+            for (uint k = 0u; k < PSTRIDE; k++) { outbuf[ob + k] = 0.0; outbuf[ob + PSTRIDE + k] = 0.0; }
+        } else {
+            vec3 ls = vec3(params[ib + P_SCALE], params[ib + P_SCALE + 1], params[ib + P_SCALE + 2]);
+            vec3 s = exp(ls);
+            mat3 R = quat_to_rot(vec4(params[ib + P_QUAT], params[ib + P_QUAT + 1], params[ib + P_QUAT + 2], params[ib + P_QUAT + 3]));
+            uint seed = pcg(i ^ pc.cnt.w);
+            for (uint c = 0u; c < 2u; c++) {
+                vec3 local = randn3(seed) * s;
+                vec3 off = R * local;
+                for (uint k = 0u; k < PSTRIDE; k++) outbuf[ob + c * PSTRIDE + k] = params[ib + k];
+                for (uint k = 0u; k < 3u; k++) {
+                    outbuf[ob + c * PSTRIDE + P_POS + k] = params[ib + P_POS + k] + off[k];
+                    outbuf[ob + c * PSTRIDE + P_SCALE + k] = ls[k] - log(pc.dr.x);
+                }
+            }
+        }
+    }
+}

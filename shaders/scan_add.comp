@@ -1,0 +1,15 @@
+#import Boilerplate
+#import TrainerSuite
+
+BUF(B_OFFSETS, offsets, uint, );
+BUF(B_BLOCKS, blocks, uint, readonly);
+
+void main() {
+    uint n = pc.cnt.x;
+    uint add = blocks[gl_WorkGroupID.x];
+    uint base = gl_WorkGroupID.x * SCAN_BLOCK + gl_LocalInvocationID.x * 8u;
+    for (uint k = 0u; k < 8u; k++) {
+        uint idx = base + k;
+        if (idx < n) offsets[idx] += add;
+    }
+}

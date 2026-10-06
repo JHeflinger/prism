@@ -523,3 +523,171 @@ export SplatConstants {
     const float VOLUME_TFAR = 1e30;
     const float SQRT_2PI = 2.50662827463;
 }
+
+export TrainerSuite {
+    // Shared definitions for the Gaussian splat trainer compute shaders.
+    // Every kernel uses the same descriptor set layout (see tgpu.h) and a 128 byte push constant block.
+    // A kernel only declares the buffers it touches.
+
+    #define PSTRIDE 16          // floats per gaussian in params / grads / adam buffers
+    #define GSTRIDE 16          // floats per gaussian in the projected geometry buffer
+    #define RSTRIDE 12          // floats per gaussian in the raster gradient scratch buffer
+    #define SH_C0 0.28209479177387814
+    #define TILE 16
+    #define BLOCK 256
+    #define SORT_GROUPS 256
+    #define SORT_RADIX 16
+    #define SCAN_BLOCK 2048
+    #define LOW_PASS 0.3
+    #define MIN_ALPHA (1.0 / 255.0)
+    #define MAX_ALPHA 0.99
+    #define T_EPSILON 0.0001
+
+    // params layout (per gaussian, PSTRIDE floats)
+    #define P_POS 0
+    #define P_SCALE 3
+    #define P_QUAT 6
+    #define P_OPAC 10
+    #define P_COLOR 11
+
+    // projected geometry layout (per gaussian, GSTRIDE floats)
+    #define G_MEAN 0            // xy, pixel space
+    #define G_CONIC 2           // xyz = (A, B, C)
+    #define G_OPAC 5            // sigmoid(opacity)
+    #define G_COLOR 6           // rgb
+    #define G_DEPTH 9
+    #define G_RADIUS 10
+    #define G_RECT 12           // uvec4 tile rect (minx, miny, maxx, maxy) stored as uint bits
+
+    // binding slots
+    #define B_PARAMS 0
+    #define B_GRADS 1
+    #define B_ADAM_M 2
+    #define B_ADAM_V 3
+    #define B_GEOM 4
+    #define B_COUNTS 5
+    #define B_OFFSETS 6
+    #define B_BLOCKS 7
+    #define B_KEYS_A 8
+    #define B_VALS_A 9
+    #define B_KEYS_B 10
+    #define B_VALS_B 11
+    #define B_SORT_HIST 12
+    #define B_RANGES 13
+    #define B_META 14
+    #define B_RENDER 15
+    #define B_NCONTRIB 16
+    #define B_GT 17
+    #define B_DLDPIX 18
+    #define B_SSIM 19
+    #define B_GRAD2D 20
+    #define B_DENS 21
+    #define B_ACTIONS 22
+    #define B_LOSS 23
+
+    #define BUF(slot, name, type, qual) layout(std430, set = 0, binding = slot) qual buffer Buf_##name { type name[]; }
+
+    // meta buffer slots
+    #define META_TOTAL 0        // raw (unclamped) tile/gaussian pair count
+    #define META_PAIRS 1        // clamped pair count actually stored
+    #define META_INDIRECT 8     // 3 uints, dispatch args for pair sized kernels
+
+    // push constants shared by the render pipeline kernels
+    layout(push_constant) uniform PC {
+        vec4 eye_d;         // eye.xyz, focal length in pixels
+        vec4 right_cx;      // camera right axis, principal point x
+        vec4 down_cy;       // camera down axis, principal point y
+        vec4 fwd_near;      // camera forward axis, near plane
+        uvec4 dims;         // width, height, tiles x, tiles y
+        uvec4 cnt;          // gaussian count, pair capacity, view index, sort shift | (direction << 16)
+        vec4 bgl;           // background rgb, lambda ssim
+        vec4 dr;            // depth min, depth scale (65535 / range), unused, unused
+    } pc;
+
+    // quaternion (w, x, y, z), will be normalized
+    mat3 quat_to_rot(vec4 q) {
+        float n = inversesqrt(max(dot(q, q), 1e-24));
+        float w = q.x * n, x = q.y * n, y = q.z * n, z = q.w * n;
+        // GLSL matrices are column major: R[col][row]
+        return mat3(
+            1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y + w * z), 2.0 * (x * z - w * y),
+            2.0 * (x * y - w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z + w * x),
+            2.0 * (x * z + w * y), 2.0 * (y * z - w * x), 1.0 - 2.0 * (x * x + y * y));
+    }
+
+    float sigmoidf(float x) { return 1.0 / (1.0 + exp(-x)); }
+
+    // Camera derived quantities shared by the projection forward / backward kernels.
+    struct Cam {
+        vec3 eye, right, down, fwd;
+        float d, cx, cy, near, limx, limy;
+    };
+
+    Cam load_cam() {
+        Cam c;
+        c.eye = pc.eye_d.xyz;
+        c.d = pc.eye_d.w;
+        c.right = pc.right_cx.xyz;
+        c.cx = pc.right_cx.w;
+        c.down = pc.down_cy.xyz;
+        c.cy = pc.down_cy.w;
+        c.fwd = pc.fwd_near.xyz;
+        c.near = pc.fwd_near.w;
+        float W = float(pc.dims.x), H = float(pc.dims.y);
+        c.limx = 1.3 * max(c.cx, W - c.cx) / c.d;
+        c.limy = 1.3 * max(c.cy, H - c.cy) / c.d;
+        return c;
+    }
+
+    // EWA splatting projection of a 3D gaussian, shared by the forward and backward kernels so that the
+    // two always agree. Requires train_common.glsl.
+
+    struct Proj {
+        vec3 t;             // camera space position (x right, y down, z forward)
+        vec3 s;             // exp(logscale)
+        mat3 R;             // rotation, R[col][row]
+        mat3 M;             // R * diag(s)
+        mat3 Sigma;         // M * M^T
+        vec3 T0, T1;        // rows of J * W expressed in world space
+        float a, b, c;      // 2D covariance (with low pass filter)
+        float det;
+        float clx, cly;     // clamped t.x / t.z, t.y / t.z
+        bool clampx, clampy;
+        vec2 mean2d;
+    };
+
+    // returns false when the gaussian cannot be rasterized from this camera
+    bool project_gaussian(Cam cam, vec3 mean, vec3 logscale, vec4 q, out Proj p) {
+        vec3 rel = mean - cam.eye;
+        p.t = vec3(dot(rel, cam.right), dot(rel, cam.down), dot(rel, cam.fwd));
+        p.s = exp(logscale);
+        p.R = quat_to_rot(q);
+        p.M = mat3(p.R[0] * p.s.x, p.R[1] * p.s.y, p.R[2] * p.s.z);
+        p.Sigma = p.M * transpose(p.M);
+        p.mean2d = vec2(0.0);
+        p.T0 = vec3(0.0); p.T1 = vec3(0.0);
+        p.a = 0.0; p.b = 0.0; p.c = 0.0; p.det = 0.0;
+        p.clx = 0.0; p.cly = 0.0; p.clampx = false; p.clampy = false;
+        if (p.t.z <= cam.near) return false;
+        float tx = p.t.x / p.t.z;
+        float ty = p.t.y / p.t.z;
+        p.clampx = tx < -cam.limx || tx > cam.limx;
+        p.clampy = ty < -cam.limy || ty > cam.limy;
+        p.clx = clamp(tx, -cam.limx, cam.limx);
+        p.cly = clamp(ty, -cam.limy, cam.limy);
+        float j00 = cam.d / p.t.z;
+        float j02 = -cam.d * p.clx / p.t.z;
+        float j11 = cam.d / p.t.z;
+        float j12 = -cam.d * p.cly / p.t.z;
+        p.T0 = j00 * cam.right + j02 * cam.fwd;
+        p.T1 = j11 * cam.down + j12 * cam.fwd;
+        vec3 sT0 = p.Sigma * p.T0;
+        vec3 sT1 = p.Sigma * p.T1;
+        p.a = dot(p.T0, sT0) + LOW_PASS;
+        p.b = dot(p.T0, sT1);
+        p.c = dot(p.T1, sT1) + LOW_PASS;
+        p.det = p.a * p.c - p.b * p.b;
+        p.mean2d = vec2(cam.d * p.t.x / p.t.z + cam.cx, cam.d * p.t.y / p.t.z + cam.cy);
+        return p.det > 0.0;
+    }
+}

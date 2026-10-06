@@ -1,6 +1,7 @@
 #include "editor.h"
 #include "core/dev.h"
 #include "renderer/renderer.h"
+#include "renderer/trainer.h"
 #include "ui/panels/diagnostics.h"
 #include "ui/panels/simulate.h"
 #include "ui/panels/viewport.h"
@@ -63,6 +64,8 @@ static void InitEditor() {
 
 static void UpdateEditor() {
     UpdateUI(g_ui);
+    // Gaussian splat training runs in small time slices so the editor stays interactive
+    if (TrainingScenePhaseNow() == TRAINSCENE_CAPTURING || TrainingScenePhaseNow() == TRAINSCENE_TRAINING) TrainingSceneTick(0.03);
 }
 
 static void PreRenderEditor() {

@@ -1,0 +1,17 @@
+#import Boilerplate
+#import TrainerSuite
+
+// Clamps every opacity to pc.dr.x (probability) and clears the matching adam moments.
+BUF(B_PARAMS, params, float, );
+BUF(B_ADAM_M, adam_m, float, );
+BUF(B_ADAM_V, adam_v, float, );
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.cnt.x) return;
+    uint e = i * PSTRIDE + P_OPAC;
+    float cap = log(pc.dr.x / (1.0 - pc.dr.x));
+    params[e] = min(params[e], cap);
+    adam_m[e] = 0.0;
+    adam_v[e] = 0.0;
+}

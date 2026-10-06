@@ -1,0 +1,77 @@
+#import Boilerplate
+#import TrainerSuite
+
+// Per pixel L1 and SSIM statistics. SSIM uses an 11x11 gaussian window (sigma 1.5, zero padding).
+// Writes, for every pixel and channel, the three SSIM partial derivatives (a', b, c) that
+// loss_grad.comp convolves again to get the gradient w.r.t. the rendered image.
+BUF(B_RENDER, render_out, float, readonly);
+BUF(B_GT, gt, uint, readonly);
+BUF(B_SSIM, ssim_maps, float, );
+BUF(B_LOSS, lossparts, float, );
+
+const float WIN[11] = float[11](
+    0.0010283801, 0.0075987582, 0.0360007720, 0.1093606800, 0.2130055300, 0.2660117000,
+    0.2130055300, 0.1093606800, 0.0360007720, 0.0075987582, 0.0010283801);
+
+shared float s_l1[256];
+shared float s_ss[256];
+
+vec3 gt_pixel(uint view, uint x, uint y) {
+    uint v = gt[(view * pc.dims.y + y) * pc.dims.x + x];
+    return vec3(float(v & 255u), float((v >> 8) & 255u), float((v >> 16) & 255u)) / 255.0;
+}
+
+void main() {
+    uint tid = gl_LocalInvocationID.x;
+    uint i = gl_GlobalInvocationID.x;
+    uint W = pc.dims.x, H = pc.dims.y;
+    float l1 = 0.0, ss = 0.0;
+    if (i < W * H) {
+        int px = int(i % W), py = int(i / W);
+        uint view = pc.cnt.z;
+        vec3 x0 = vec3(render_out[i * 4u], render_out[i * 4u + 1u], render_out[i * 4u + 2u]);
+        vec3 y0 = gt_pixel(view, uint(px), uint(py));
+        l1 = dot(abs(x0 - y0), vec3(1.0));
+        vec3 mx = vec3(0), my = vec3(0), exx = vec3(0), eyy = vec3(0), exy = vec3(0);
+        for (int dy = -5; dy <= 5; dy++) {
+            int qy = py + dy;
+            if (qy < 0 || qy >= int(H)) continue;
+            for (int dx = -5; dx <= 5; dx++) {
+                int qx = px + dx;
+                if (qx < 0 || qx >= int(W)) continue;
+                float w = WIN[dx + 5] * WIN[dy + 5];
+                uint qi = uint(qy) * W + uint(qx);
+                vec3 xv = vec3(render_out[qi * 4u], render_out[qi * 4u + 1u], render_out[qi * 4u + 2u]);
+                vec3 yv = gt_pixel(view, uint(qx), uint(qy));
+                mx += w * xv; my += w * yv;
+                exx += w * xv * xv; eyy += w * yv * yv; exy += w * xv * yv;
+            }
+        }
+        const float C1 = 0.01 * 0.01, C2 = 0.03 * 0.03;
+        vec3 sxx = exx - mx * mx, syy = eyy - my * my, sxy = exy - mx * my;
+        vec3 A1 = 2.0 * mx * my + C1, A2 = 2.0 * sxy + C2;
+        vec3 B1 = mx * mx + my * my + C1, B2 = sxx + syy + C2;
+        vec3 S = (A1 * A2) / (B1 * B2);
+        vec3 a = (2.0 * my * A2) / (B1 * B2) - S * (2.0 * mx) / B1;
+        vec3 b = -S / B2;
+        vec3 c = (2.0 * A1) / (B1 * B2);
+        vec3 ap = a - 2.0 * b * mx - c * my;
+        for (int ch = 0; ch < 3; ch++) {
+            ssim_maps[i * 9u + uint(ch) * 3u] = ap[ch];
+            ssim_maps[i * 9u + uint(ch) * 3u + 1u] = b[ch];
+            ssim_maps[i * 9u + uint(ch) * 3u + 2u] = c[ch];
+        }
+        ss = dot(1.0 - S, vec3(1.0));
+    }
+    s_l1[tid] = l1;
+    s_ss[tid] = ss;
+    barrier();
+    for (uint off = 128u; off > 0u; off >>= 1u) {
+        if (tid < off) { s_l1[tid] += s_l1[tid + off]; s_ss[tid] += s_ss[tid + off]; }
+        barrier();
+    }
+    if (tid == 0u) {
+        lossparts[gl_WorkGroupID.x * 2u] = s_l1[0];
+        lossparts[gl_WorkGroupID.x * 2u + 1u] = s_ss[0];
+    }
+}

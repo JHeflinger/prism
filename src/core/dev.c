@@ -21,11 +21,14 @@ static void LoadBox() {
 }
 
 static void LoadRabbit() {
-    //LoadOBJ("assets/models/OBJ/naked/bunny.obj");
-    LoadPLY("assets/models/PLY/fly.ply");
+    LoadOBJ("assets/models/OBJ/naked/armadillo.obj");
+    //LoadPLY("assets/models/PLY/fly.ply");
     if (TRUE) {
         //SubmitNamedLight((SceneLight){{0, 0, -1.5f},{10,10,10},{0,0,0},0,0}, "Rabbit Point Light");
-        SubmitNamedLight((SceneLight){{0, 1, 0},{10,10,10},{0,0,0},0,0}, "Rabbit Point Light");
+        SubmitNamedLight((SceneLight){{0,0,0},{9,1,1},{1, 1, 1},0,0}, "Rabbit Point Light");
+        SubmitNamedLight((SceneLight){{0,0,0},{1,9,1},{1, -1, 1},0,0}, "Rabbit Point Light");
+        SubmitNamedLight((SceneLight){{0,0,0},{1,1,9},{-1, 0, -1},0,0}, "Rabbit Point Light");
+        SubmitNamedLight((SceneLight){{0,0,0},{9,9,1},{1, 0, -1},0,0}, "Rabbit Point Light");
     } else {
         SurfaceMaterial light = { 0 };
         light.emission[0] = 10.0f;

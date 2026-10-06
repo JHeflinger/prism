@@ -1,0 +1,37 @@
+#import Boilerplate
+#import TrainerSuite
+
+// Exclusive scan of counts -> offsets, one workgroup per SCAN_BLOCK elements, block totals -> blocks
+BUF(B_COUNTS, counts, uint, readonly);
+BUF(B_OFFSETS, offsets, uint, );
+BUF(B_BLOCKS, blocks, uint, );
+
+shared uint sh[256];
+
+void main() {
+    uint n = pc.cnt.x;
+    uint tid = gl_LocalInvocationID.x;
+    uint base = gl_WorkGroupID.x * SCAN_BLOCK + tid * 8u;
+    uint v[8];
+    uint sum = 0u;
+    for (uint k = 0u; k < 8u; k++) {
+        uint idx = base + k;
+        uint x = idx < n ? counts[idx] : 0u;
+        v[k] = sum;
+        sum += x;
+    }
+    sh[tid] = sum;
+    barrier();
+    for (uint off = 1u; off < 256u; off <<= 1u) {
+        uint add = tid >= off ? sh[tid - off] : 0u;
+        barrier();
+        sh[tid] += add;
+        barrier();
+    }
+    uint excl = sh[tid] - sum;
+    for (uint k = 0u; k < 8u; k++) {
+        uint idx = base + k;
+        if (idx < n) offsets[idx] = v[k] + excl;
+    }
+    if (tid == 255u) blocks[gl_WorkGroupID.x] = sh[255];
+}

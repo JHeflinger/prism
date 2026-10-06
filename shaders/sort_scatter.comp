@@ -1,0 +1,92 @@
+#import Boilerplate
+#import TrainerSuite
+
+// LSD radix sort, pass 3: stable scatter. Each workgroup walks its contiguous range in sub chunks of
+// 256 threads x 16 elements. Every thread owns 16 consecutive elements which keeps the local ranking
+// stable without any inter thread atomics.
+BUF(B_KEYS_A, keys_a, uint, );
+BUF(B_VALS_A, vals_a, uint, );
+BUF(B_KEYS_B, keys_b, uint, );
+BUF(B_VALS_B, vals_b, uint, );
+BUF(B_SORT_HIST, hist, uint, readonly);
+BUF(B_META, meta, uint, readonly);
+
+#define EPT 16u
+shared uint cnt[SORT_RADIX * 256];
+shared uint seg[SORT_RADIX * 16];
+shared uint base_digit[SORT_RADIX];
+shared uint chunk_total[SORT_RADIX];
+
+void main() {
+    uint tid = gl_LocalInvocationID.x;
+    uint wg = gl_WorkGroupID.x;
+    uint shift = pc.cnt.w & 0xFFFFu;
+    bool from_b = (pc.cnt.w >> 16) != 0u;
+    uint total = meta[META_PAIRS];
+    uint per = (total + SORT_GROUPS - 1u) / SORT_GROUPS;
+    uint lo = min(wg * per, total);
+    uint hi = min(lo + per, total);
+    if (tid < SORT_RADIX) base_digit[tid] = hist[tid * SORT_GROUPS + wg];
+    barrier();
+    for (uint start = lo; start < hi; start += 256u * EPT) {
+        uint mine = start + tid * EPT;
+        uint c[SORT_RADIX];
+        for (uint d = 0u; d < SORT_RADIX; d++) c[d] = 0u;
+        uint keys[16];
+        uint vals[16];
+        for (uint k = 0u; k < EPT; k++) {
+            uint idx = mine + k;
+            if (idx < hi) {
+                keys[k] = from_b ? keys_b[idx] : keys_a[idx];
+                vals[k] = from_b ? vals_b[idx] : vals_a[idx];
+                c[(keys[k] >> shift) & 15u]++;
+            }
+        }
+        for (uint d = 0u; d < SORT_RADIX; d++) cnt[d * 256u + tid] = c[d];
+        barrier();
+        // thread (d = tid / 16, l = tid % 16) reduces slots [l*16, l*16+16) of digit d
+        {
+            uint d = tid >> 4u;
+            uint l = tid & 15u;
+            uint s = 0u;
+            for (uint k = 0u; k < 16u; k++) s += cnt[d * 256u + l * 16u + k];
+            seg[d * 16u + l] = s;
+        }
+        barrier();
+        if (tid < SORT_RADIX) {
+            uint run = 0u;
+            for (uint l = 0u; l < 16u; l++) {
+                uint x = seg[tid * 16u + l];
+                seg[tid * 16u + l] = run;
+                run += x;
+            }
+            chunk_total[tid] = run;
+        }
+        barrier();
+        {
+            uint d = tid >> 4u;
+            uint l = tid & 15u;
+            uint run = seg[d * 16u + l];
+            for (uint k = 0u; k < 16u; k++) {
+                uint x = cnt[d * 256u + l * 16u + k];
+                cnt[d * 256u + l * 16u + k] = run;
+                run += x;
+            }
+        }
+        barrier();
+        uint rank[SORT_RADIX];
+        for (uint d = 0u; d < SORT_RADIX; d++) rank[d] = base_digit[d] + cnt[d * 256u + tid];
+        for (uint k = 0u; k < EPT; k++) {
+            uint idx = mine + k;
+            if (idx < hi) {
+                uint d = (keys[k] >> shift) & 15u;
+                uint dst = rank[d]++;
+                if (from_b) { keys_a[dst] = keys[k]; vals_a[dst] = vals[k]; }
+                else { keys_b[dst] = keys[k]; vals_b[dst] = vals[k]; }
+            }
+        }
+        barrier();
+        if (tid < SORT_RADIX) base_digit[tid] += chunk_total[tid];
+        barrier();
+    }
+}

@@ -1,8 +1,6 @@
 PROJECT src
 MAIN main.c
 
-LINUX LINK vulkan
-
 MODULE raylib https://github.com/JHeflinger/minis.git raylib
 MODULE nfd https://github.com/JHeflinger/minis.git nfd
 MODULE easyc https://github.com/JHeflinger/EasyC.git include
@@ -11,9 +9,8 @@ MODULE stb_image https://github.com/JHeflinger/minis.git stb_image
 MODULE suitesparse https://github.com/JHeflinger/minis.git suitesparse
 MODULE cglm https://github.com/JHeflinger/minis.git cglm
 MODULE gooey https://github.com/JHeflinger/gooey.git .
-
-WINDOWS MODULE vulkan https://github.com/JHeflinger/minis.git vulkan
-WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
+MODULE vulkan https://github.com/JHeflinger/minis.git vulkan
+MODULE tgpu https://github.com/JHeflinger/minis.git tgpu
 
 PORT build/shaders
 PORT build/expanded
@@ -23,6 +20,7 @@ LINUX EXECUTE scripts/shaders.sh
 WINDOWS EXECUTE scripts/shaders.bat
 
 DEFINE PRISM
+WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
 
 # EXTRA MODULES AND EXTENSIONS
 MODULE crys https://github.com/JHeflinger/crys.git .

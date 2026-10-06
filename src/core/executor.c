@@ -1,6 +1,7 @@
 #include "executor.h"
 #include "renderer/processor.h"
 #include "renderer/renderer.h"
+#include "renderer/trainer.h"
 #include "renderer/loader.h"
 #include <easylogger.h>
 #include <core/binds.h>
@@ -110,5 +111,37 @@ void RunRenderExecutor(const char* scenefile, const char* outfile, int width, in
     SaveRender(outfile);
     EZ_INFO("Cleaning up and exiting prism execution suite...");
     CleanExecutor();	
+    EZ_ASSERT(memcheck == EZ_ALLOCATED(), "Memory cleanup revealed a leak of %d bytes", (int)(EZ_ALLOCATED() - memcheck));
+}
+
+void RunTrainExecutor(const char* scenefile, const char* outply, int views, int iterations, int width, int height) {
+    size_t memcheck = EZ_ALLOCATED();
+    EZ_INFO("Initializing prism execution suite (gaussian splat training version)...");
+    InitializeExecutor(width, height);
+    EZ_INFO("Importing scene...");
+    ImportExecuteScene(scenefile);
+    TrainingSceneConfig config = TrainingSceneDefaultConfig();
+    if (views > 0) config.views = (uint32_t)views;
+    if (iterations > 0) config.iterations = (uint32_t)iterations;
+    config.output_ply = outply;
+    config.replace_splats = FALSE;
+    if (!TrainingSceneStart(&config)) {
+        EZ_ERROR("Unable to start training: %s", TrainingSceneStatus());
+        CleanExecutor();
+        exit(1);
+    }
+    double last_print = -1.0;
+    while (TrainingSceneTick(0.25)) {
+        double now = GetTime();
+        if (now - last_print > 2.0) {
+            printf("%s (%.1f%%)\n", TrainingSceneStatus(), 100.0f * TrainingSceneProgress());
+            last_print = now;
+        }
+    }
+    BOOL ok = TrainingScenePhaseNow() == TRAINSCENE_DONE;
+    printf("%s\n", TrainingSceneStatus());
+    EZ_INFO("Cleaning up and exiting prism execution suite...");
+    CleanExecutor();
+    if (!ok) exit(1);
     EZ_ASSERT(memcheck == EZ_ALLOCATED(), "Memory cleanup revealed a leak of %d bytes", (int)(EZ_ALLOCATED() - memcheck));
 }

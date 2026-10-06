@@ -1,0 +1,36 @@
+#import Boilerplate
+#import TrainerSuite
+
+// In place exclusive scan of the block totals (single workgroup). pc.cnt.x = element count n
+BUF(B_BLOCKS, blocks, uint, );
+
+shared uint sh[256];
+
+void main() {
+    uint nblocks = (pc.cnt.x + SCAN_BLOCK - 1u) / SCAN_BLOCK;
+    uint tid = gl_LocalInvocationID.x;
+    uint per = (nblocks + 255u) / 256u;
+    uint lo = tid * per;
+    uint sum = 0u;
+    for (uint k = 0u; k < per; k++) {
+        uint idx = lo + k;
+        if (idx < nblocks) sum += blocks[idx];
+    }
+    sh[tid] = sum;
+    barrier();
+    for (uint off = 1u; off < 256u; off <<= 1u) {
+        uint add = tid >= off ? sh[tid - off] : 0u;
+        barrier();
+        sh[tid] += add;
+        barrier();
+    }
+    uint run = sh[tid] - sum;
+    for (uint k = 0u; k < per; k++) {
+        uint idx = lo + k;
+        if (idx < nblocks) {
+            uint x = blocks[idx];
+            blocks[idx] = run;
+            run += x;
+        }
+    }
+}

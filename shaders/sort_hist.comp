@@ -1,0 +1,30 @@
+#import Boilerplate
+#import TrainerSuite
+
+// LSD radix sort, pass 1: per workgroup digit histogram. The pair list is cut into SORT_GROUPS
+// contiguous ranges (one per workgroup) so that the scatter pass can stay stable.
+BUF(B_KEYS_A, keys_a, uint, readonly);
+BUF(B_KEYS_B, keys_b, uint, readonly);
+BUF(B_SORT_HIST, hist, uint, );
+BUF(B_META, meta, uint, readonly);
+
+shared uint local_hist[SORT_RADIX];
+
+void main() {
+    uint tid = gl_LocalInvocationID.x;
+    uint wg = gl_WorkGroupID.x;
+    uint shift = pc.cnt.w & 0xFFFFu;
+    bool from_b = (pc.cnt.w >> 16) != 0u;
+    uint total = meta[META_PAIRS];
+    uint per = (total + SORT_GROUPS - 1u) / SORT_GROUPS;
+    uint lo = min(wg * per, total);
+    uint hi = min(lo + per, total);
+    if (tid < SORT_RADIX) local_hist[tid] = 0u;
+    barrier();
+    for (uint i = lo + tid; i < hi; i += 256u) {
+        uint key = from_b ? keys_b[i] : keys_a[i];
+        atomicAdd(local_hist[(key >> shift) & 15u], 1u);
+    }
+    barrier();
+    if (tid < SORT_RADIX) hist[tid * SORT_GROUPS + wg] = local_hist[tid];
+}
