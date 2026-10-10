@@ -15,6 +15,7 @@ typedef struct {
     float lr_opacity;
     float lr_color;
     float lambda_ssim;
+    float lambda_alpha; // weight of the silhouette (alpha) loss, keeps empty space empty
     uint32_t densify_from;
     uint32_t densify_until;
     uint32_t densify_interval;

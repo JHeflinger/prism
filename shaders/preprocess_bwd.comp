@@ -94,7 +94,11 @@ void main() {
     float op = sigmoidf(params[p + P_OPAC]);
     float dlogit = dop * op * (1.0 - op);
     vec3 craw = vec3(0.5) + SH_C0 * vec3(params[p + P_COLOR], params[p + P_COLOR + 1], params[p + P_COLOR + 2]);
-    vec3 ddc = dcol * SH_C0 * vec3(greaterThan(craw, vec3(0.0)));
+    // The rendered color is max(craw, 0). A channel that clamped to 0 used to get zero gradient forever, which
+    // permanently kills saturated channels (colored lights are full of exact zeros). Let the gradient through
+    // whenever it wants to raise the color again (dL/dcolor < 0).
+    vec3 gate = max(vec3(greaterThan(craw, vec3(0.0))), vec3(lessThan(dcol, vec3(0.0))));
+    vec3 ddc = dcol * SH_C0 * gate;
 
     grads[p + P_POS] = dmean.x;
     grads[p + P_POS + 1] = dmean.y;

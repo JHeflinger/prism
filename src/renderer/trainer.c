@@ -1,6 +1,7 @@
 #include "trainer.h"
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
+#include "trainmask.h"
 #include <util/logger.h>
 
 #define PSTRIDE 16
@@ -47,9 +48,19 @@ typedef struct {
     float center[3];
     float radius;
     float background[3];
-    double corner_sum[3];
-    double corner_sq[3];
-    double corner_n;
+    // coverage mask + seed colouring (see trainmask.h)
+    float (*tris)[3][3]; // enabled scene triangles in world space
+    size_t tri_count;
+    float* coverage; // per training pixel
+    float* depth;
+    float* scratch;
+    GaussianSplat* seeds;
+    float* seed_geo; // 6 floats per seed: position, normal
+    float* seed_acc; // 4 floats per seed: weighted rgb, weight
+    uint32_t seed_count;
+    double bg_sum[3];
+    double bg_n;
+    uint32_t orient_votes[4]; // captured image orientation: index = flip_x | flip_y << 1
     char status[160];
     char message[160];
     double started_at;
@@ -90,6 +101,7 @@ TrainerConfig DefaultTrainerConfig() {
     c.lr_opacity = 5.0e-2f;
     c.lr_color = 2.5e-3f;
     c.lambda_ssim = 0.2f;
+    c.lambda_alpha = 1.0f;
     c.densify_from = 500;
     c.densify_until = 4500;
     c.densify_interval = 100;
@@ -248,6 +260,7 @@ static void BuildPushConstants(const Trainer* t, uint32_t view, PC* pc) {
     pc->bgl[3] = t->cfg.lambda_ssim;
     pc->dr[0] = v->depth_min;
     pc->dr[1] = v->depth_scale;
+    pc->dr[2] = t->cfg.lambda_alpha;
 }
 
 static uint32_t GroupsFor(uint32_t n, uint32_t per) {
@@ -355,12 +368,13 @@ static BOOL RunFlags(Trainer* t, int grow, uint32_t* out_total) {
     return TRUE;
 }
 
-static BOOL Densify(Trainer* t) {
+static BOOL DensifyEx(Trainer* t, int grow) {
     uint32_t total = 0;
-    if (!RunFlags(t, 1, &total)) return FALSE;
-    if (total > t->capacity) {
+    if (!RunFlags(t, grow, &total)) return FALSE;
+    if (grow && total > t->capacity) {
         if (!RunFlags(t, 0, &total)) return FALSE; // out of room: prune only
     }
+    if (!grow && total == t->count) return TRUE; // nothing to prune
     if (total == 0) {
         logwarn("Trainer density control would remove every gaussian, skipping");
         return TRUE;
@@ -385,6 +399,22 @@ static BOOL Densify(Trainer* t) {
     if (tgpu_submit(&t->gpu)) return FALSE;
     t->count = total;
     return TRUE;
+}
+
+static BOOL Densify(Trainer* t) {
+    return DensifyEx(t, 1);
+}
+
+// Removes gaussians that ended up (almost) transparent. Density control stops long before training does, so
+// without this pass every gaussian that faded out late is still written to the file.
+static BOOL FinalPrune(Trainer* t, float min_opacity) {
+    float keep_opacity = t->cfg.min_opacity, keep_radius = t->cfg.max_screen_radius;
+    t->cfg.min_opacity = min_opacity;
+    t->cfg.max_screen_radius = 0.0f; // the radius statistics are stale here
+    BOOL ok = DensifyEx(t, 0);
+    t->cfg.min_opacity = keep_opacity;
+    t->cfg.max_screen_radius = keep_radius;
+    return ok;
 }
 
 static BOOL ResetOpacity(Trainer* t) {
@@ -416,7 +446,7 @@ static float RandomOne() {
     return (float)(g_seed >> 8) * (1.0f / 16777216.0f);
 }
 
-static GaussianSplat* SeedGaussians(uint32_t want, uint32_t* out_count, vec3 center, float* radius) {
+static GaussianSplat* SeedGaussians(uint32_t want, uint32_t* out_count, vec3 center, float* radius, float** out_geo) {
     Geometry* geo = RendererGeometry();
     size_t tri_count = geo->triangles.size;
     if (tri_count == 0) return NULL;
@@ -475,6 +505,7 @@ static GaussianSplat* SeedGaussians(uint32_t want, uint32_t* out_count, vec3 cen
     *radius = 0.5f * sqrtf(dx * dx + dy * dy + dz * dz);
     if (*radius < 1e-4f) *radius = 1.0f;
     GaussianSplat* out = EZ_ALLOC(want, sizeof(GaussianSplat));
+    float* seed_geo = EZ_ALLOC((size_t)want * 6, sizeof(float));
     float spacing = (float)sqrt(total_area / (double)want);
     g_seed = 0xC0FFEEu;
     for (uint32_t i = 0; i < want; i++) {
@@ -499,6 +530,8 @@ static GaussianSplat* SeedGaussians(uint32_t want, uint32_t* out_count, vec3 cen
         glm_vec3_cross(n, t1, t2);
         glm_vec3_normalize(t2);
         QuaternionFromBasis(t1, t2, n, g->rotation);
+        memcpy(&seed_geo[(size_t)i * 6], g->position, sizeof(vec3));
+        memcpy(&seed_geo[(size_t)i * 6 + 3], n, sizeof(vec3));
         float s = 0.6f * spacing;
         g->logscale[0] = logf(s);
         g->logscale[1] = logf(s);
@@ -519,6 +552,45 @@ static GaussianSplat* SeedGaussians(uint32_t want, uint32_t* out_count, vec3 cen
     EZ_FREE(tv);
     EZ_FREE(cumulative);
     *out_count = want;
+    *out_geo = seed_geo;
+    return out;
+}
+
+// World space copy of every triangle the path tracer can see (disabled meshes are skipped).
+static float (*CollectVisibleTriangles(size_t* out_count))[3][3] {
+    Geometry* geo = RendererGeometry();
+    size_t tri_count = geo->triangles.size;
+    *out_count = 0;
+    if (tri_count == 0) return NULL;
+    int32_t* mesh_of = EZ_ALLOC(tri_count, sizeof(int32_t));
+    for (size_t i = 0; i < tri_count; i++) mesh_of[i] = -1;
+    for (size_t m = 0; m < geo->meshes.size; m++) {
+        const MeshDescriptor* md = &geo->meshes.data[m];
+        for (size_t t = md->tstart; t <= md->tend && t < tri_count; t++) mesh_of[t] = (int32_t)m;
+    }
+    float (*out)[3][3] = EZ_ALLOC(tri_count, sizeof(*out));
+    size_t n = 0;
+    for (size_t t = 0; t < tri_count; t++) {
+        const MeshDescriptor* md = mesh_of[t] >= 0 ? &geo->meshes.data[mesh_of[t]] : NULL;
+        if (md && md->disabled) continue;
+        const Triangle* tri = &geo->triangles.data[t];
+        VertexID ids[3] = { tri->a, tri->b, tri->c };
+        for (int k = 0; k < 3; k++) {
+            vec3 p = { geo->vertices.data[ids[k]][0], geo->vertices.data[ids[k]][1], geo->vertices.data[ids[k]][2] };
+            vec3 world;
+            if (md) {
+                mat4 m;
+                memcpy(m, md->transform, sizeof(mat4));
+                glm_mat4_mulv3(m, p, 1.0f, world);
+            } else {
+                glm_vec3_copy(p, world);
+            }
+            memcpy(out[n][k], world, sizeof(vec3));
+        }
+        n++;
+    }
+    EZ_FREE(mesh_of);
+    *out_count = n;
     return out;
 }
 
@@ -568,18 +640,17 @@ static void DownscaleRGBA(const uint8_t* src, uint32_t sw, uint32_t sh, uint8_t*
     }
 }
 
-static void TrackCorners(TrainingJob* j, const uint8_t* img) {
-    uint32_t w = j->width, h = j->height;
-    uint32_t xs[2] = { 1, w - 2 }, ys[2] = { 1, h - 2 };
-    for (int a = 0; a < 2; a++) for (int b = 0; b < 2; b++) {
-        const uint8_t* p = img + ((size_t)ys[b] * w + xs[a]) * 4;
-        for (int k = 0; k < 3; k++) {
-            double v = p[k] / 255.0;
-            j->corner_sum[k] += v;
-            j->corner_sq[k] += v * v;
-        }
-        j->corner_n += 1.0;
-    }
+// The exact pinhole the trainer will use for this view (mirrors SetTrainerView).
+static void MakeMaskCamera(const TrainingJob* j, const SimpleCamera* cam, MaskCamera* out) {
+    vec3 u = { 0 }, v = { 0 }, w = { 0 }, forward = { 0 };
+    glm_vec3_sub((float*)(cam->look), (float*)(cam->position), forward);
+    glm_vec3_normalize(forward);
+    CameraUVW(*cam, u, v, w);
+    glm_vec3_copy((float*)(cam->position), out->eye);
+    glm_vec3_copy(u, out->right);
+    glm_vec3_scale(v, -1.0f, out->down);
+    glm_vec3_copy(forward, out->fwd);
+    out->focal = ((float)j->width * 0.5f) / tanf(cam->fov * (float)M_PI / 360.0f);
 }
 
 static void BeginCaptureState(TrainingJob* j) {
@@ -608,6 +679,42 @@ static void EndCaptureState(TrainingJob* j) {
     cam->config.reset = TRUE;
 }
 
+// Overlap (IoU) between the scene geometry's silhouette and the image's non black pixels when the image is read with
+// the given flips. The silhouette comes from the exact camera the trainer uses, so whichever flip lines the two up
+// is the way the captured image really relates to that camera.
+static float FlipScore(const uint8_t* img, const float* coverage, uint32_t w, uint32_t h, int fx, int fy) {
+    size_t inter = 0, uni = 0;
+    for (uint32_t y = 0; y < h; y++) {
+        uint32_t sy = fy ? h - 1 - y : y;
+        for (uint32_t x = 0; x < w; x++) {
+            uint32_t sx = fx ? w - 1 - x : x;
+            const uint8_t* p = &img[((size_t)sy * w + sx) * 4];
+            int fg = (p[0] > 10 || p[1] > 10 || p[2] > 10);
+            int m = coverage[(size_t)y * w + x] > 0.5f;
+            inter += (fg && m);
+            uni += (fg || m);
+        }
+    }
+    return uni ? (float)inter / (float)uni : 0.0f;
+}
+
+static void FlipImage(uint8_t* img, uint32_t w, uint32_t h, int fx, int fy) {
+    if (fy) {
+        for (uint32_t y = 0; y < h / 2; y++) {
+            uint8_t* a = &img[(size_t)y * w * 4];
+            uint8_t* b = &img[(size_t)(h - 1 - y) * w * 4];
+            for (size_t k = 0; k < (size_t)w * 4; k++) { uint8_t t = a[k]; a[k] = b[k]; b[k] = t; }
+        }
+    }
+    if (fx) {
+        for (uint32_t y = 0; y < h; y++) {
+            uint8_t* row = &img[(size_t)y * w * 4];
+            for (uint32_t x = 0; x < w / 2; x++)
+                for (int k = 0; k < 4; k++) { uint8_t t = row[x * 4 + k]; row[x * 4 + k] = row[(w - 1 - x) * 4 + k]; row[(w - 1 - x) * 4 + k] = t; }
+        }
+    }
+}
+
 static BOOL CaptureView(TrainingJob* j, uint32_t index) {
     SceneCamera* cam = RendererCamera();
     cam->core.position[0] = j->cameras[index].position[0];
@@ -624,8 +731,29 @@ static BOOL CaptureView(TrainingJob* j, uint32_t index) {
     uint32_t frames = j->config.capture == TRAINSCENE_CAPTURE_PATHTRACE ? j->config.samples + 4 : 4;
     for (uint32_t f = 0; f < frames; f++) Render();
     if (!CaptureRender(j->source)) return FALSE;
-    TrackCorners(j, j->source);
     DownscaleRGBA(j->source, (uint32_t)res.x, (uint32_t)res.y, j->scaled, j->width, j->height);
+    // Work out which pixels the scene geometry really covers. Everything else is "the path hit nothing": it must be
+    // explained by empty space, not by (black) gaussians. The image becomes premultiplied and its alpha the coverage.
+    MaskCamera mc;
+    MakeMaskCamera(j, &j->cameras[index], &mc);
+    RasterizeCoverage((const float (*)[3][3])j->tris, j->tri_count, &mc, j->width, j->height, j->scratch, j->coverage, j->depth);
+    // Make sure the image really is oriented the way the trainer's camera model assumes (see FlipScore). A vertically
+    // or horizontally mirrored capture would otherwise make the images and the geometry describe different objects.
+    float scores[4];
+    int best = 0;
+    for (int f = 0; f < 4; f++) {
+        scores[f] = FlipScore(j->scaled, j->coverage, j->width, j->height, f & 1, f >> 1);
+        if (scores[f] > scores[best]) best = f;
+    }
+    if (best != 0 && scores[best] < scores[0] + 0.03f) best = 0; // no clear winner, trust the camera model
+    j->orient_votes[best]++;
+    if (best != 0) FlipImage(j->scaled, j->width, j->height, best & 1, best >> 1);
+    float bg[3] = { 0, 0, 0 };
+    ApplyCoverageToImage(j->scaled, j->coverage, j->width, j->height, bg);
+    for (int k = 0; k < 3; k++) j->bg_sum[k] += bg[k];
+    j->bg_n += 1.0;
+    // sample this view's colours for the seed gaussians so that they do not all start out as the material colour
+    AccumulateSeedColors(j->seed_geo, j->seed_count, &mc, j->width, j->height, j->scaled, j->depth, j->radius, j->seed_acc);
     return SetTrainerView(&j->trainer, index, &j->cameras[index], j->scaled);
 }
 
@@ -635,6 +763,14 @@ static void ReleaseJob(TrainingJob* j) {
     EZ_FREE(j->cameras); j->cameras = NULL;
     EZ_FREE(j->source); j->source = NULL;
     EZ_FREE(j->scaled); j->scaled = NULL;
+    EZ_FREE(j->tris); j->tris = NULL; j->tri_count = 0;
+    EZ_FREE(j->coverage); j->coverage = NULL;
+    EZ_FREE(j->depth); j->depth = NULL;
+    EZ_FREE(j->scratch); j->scratch = NULL;
+    EZ_FREE(j->seeds); j->seeds = NULL;
+    EZ_FREE(j->seed_geo); j->seed_geo = NULL;
+    EZ_FREE(j->seed_acc); j->seed_acc = NULL;
+    j->seed_count = 0;
 }
 
 static void FailJob(TrainingJob* j, const char* why) {
@@ -647,25 +783,46 @@ static void FailJob(TrainingJob* j, const char* why) {
 
 static void FinishCapture(TrainingJob* j) {
     EndCaptureState(j);
-    if (j->corner_n > 0) {
-        double var = 0;
-        for (int k = 0; k < 3; k++) {
-            double m = j->corner_sum[k] / j->corner_n;
-            var += j->corner_sq[k] / j->corner_n - m * m;
-            j->background[k] = (float)m;
-        }
-        if (var / 3.0 > 0.0004) memset(j->background, 0, sizeof(j->background));
+    // The captured images are premultiplied (background removed), so the trainer renders over black.
+    for (int k = 0; k < 3; k++) {
+        j->background[k] = j->bg_n > 0 ? (float)(j->bg_sum[k] / j->bg_n) : 0.0f; // only reported
+        j->trainer.cfg.background[k] = 0.0f;
     }
-    j->trainer.cfg.background[0] = j->background[0];
-    j->trainer.cfg.background[1] = j->background[1];
-    j->trainer.cfg.background[2] = j->background[2];
+    // start every seed from the colour the views actually showed instead of the material colour
+    uint32_t colored = 0;
+    for (uint32_t i = 0; i < j->seed_count; i++) {
+        const float* a = &j->seed_acc[(size_t)i * 4];
+        if (a[3] <= 1e-4f) continue;
+        for (int k = 0; k < 3; k++) {
+            float c = a[k] / a[3];
+            c = c < 0.0f ? 0.0f : (c > 1.0f ? 1.0f : c);
+            j->seeds[i].shdc[k] = (c - 0.5f) / MIN_SH_C0;
+        }
+        colored++;
+    }
+    if (!SetTrainerGaussians(&j->trainer, j->seeds, j->seed_count)) logwarn("Could not re-upload the coloured seed gaussians");
     EZ_FREE(j->source); j->source = NULL;
     EZ_FREE(j->scaled); j->scaled = NULL;
+    EZ_FREE(j->tris); j->tris = NULL; j->tri_count = 0;
+    EZ_FREE(j->coverage); j->coverage = NULL;
+    EZ_FREE(j->depth); j->depth = NULL;
+    EZ_FREE(j->scratch); j->scratch = NULL;
+    EZ_FREE(j->seeds); j->seeds = NULL;
+    EZ_FREE(j->seed_geo); j->seed_geo = NULL;
+    EZ_FREE(j->seed_acc); j->seed_acc = NULL;
     j->phase = TRAINSCENE_TRAINING;
-    loginfo("Captured %u views (background %.2f %.2f %.2f), optimising...", j->captured, j->background[0], j->background[1], j->background[2]);
+    loginfo("Capture orientation check (views per orientation): as-is %u, flipped vertically %u, flipped horizontally %u, both %u",
+        j->orient_votes[0], j->orient_votes[2], j->orient_votes[1], j->orient_votes[3]);
+    if (j->orient_votes[0] < j->captured)
+        logwarn("Some captured views did not line up with the trainer camera and were flipped to match");
+    loginfo("Captured %u views (background %.2f %.2f %.2f removed), %u/%u seeds coloured from the views, optimising...",
+        j->captured, j->background[0], j->background[1], j->background[2], colored, j->seed_count);
+    j->seed_count = 0;
 }
 
 static void FinishTraining(TrainingJob* j) {
+    uint32_t before = j->trainer.count;
+    if (FinalPrune(&j->trainer, 0.02f)) loginfo("Removed %u nearly transparent gaussians", before - j->trainer.count);
     double psnr = 0;
     if (EvaluateTrainerPSNR(&j->trainer, &psnr)) loginfo("Training finished: %u gaussians, mean PSNR %.2f dB over the training views", j->trainer.count, psnr);
     if (j->config.output_ply && j->config.output_ply[0]) {
@@ -679,9 +836,6 @@ static void FinishTraining(TrainingJob* j) {
         if (n > 0) {
             for (uint32_t i = 0; i < n; i++) {
                 GaussianSplat s = { 0 };
-                result[i].position[1] *= -1;
-                result[i].rotation[1] *= -1;
-                result[i].rotation[3] *= -1;
                 memcpy(s.position, result[i].position, 12);
                 memcpy(s.logscale, result[i].logscale, 12);
                 memcpy(s.rotation, result[i].rotation, 16);
@@ -957,11 +1111,14 @@ BOOL SaveTrainerPLY(Trainer* t, const char* path) {
                          g[i].rotation[2] * g[i].rotation[2] + g[i].rotation[3] * g[i].rotation[3]);
         if (qn < 1e-12f) qn = 1.0f;
         memcpy(row + 0, g[i].position, 12);
+        row[1] = -row[1]; // the loader (loader.c) negates y on read, so write the inverse
         row[3] = row[4] = row[5] = 0.0f;
         memcpy(row + 6, g[i].shdc, 12);
         row[9] = g[i].opacity;
         memcpy(row + 10, g[i].logscale, 12);
         for (int k = 0; k < 4; k++) row[13 + k] = g[i].rotation[k] / qn;
+        row[14] = -row[14]; // rot_1 and rot_3 are negated on read as well
+        row[16] = -row[16];
         fwrite(row, sizeof(float), 17, f);
     }
     fclose(f);
@@ -1061,7 +1218,7 @@ BOOL TrainingSceneStart(const TrainingSceneConfig* config) {
     j->started_at = GetTime();
 
     uint32_t seeded = 0;
-    GaussianSplat* seeds = SeedGaussians(c->init_points, &seeded, j->center, &j->radius);
+    GaussianSplat* seeds = SeedGaussians(c->init_points, &seeded, j->center, &j->radius, &j->seed_geo);
     if (!seeds) {
         snprintf(j->status, sizeof(j->status), "Failed: scene has no triangles to train on");
         logerror("Cannot train Gaussian splats: the scene has no (enabled) triangles");
@@ -1071,6 +1228,7 @@ BOOL TrainingSceneStart(const TrainingSceneConfig* config) {
 
     if (!InitializeTrainer(&j->trainer, &c->trainer, j->width, j->height, c->views)) {
         EZ_FREE(seeds);
+        EZ_FREE(j->seed_geo); j->seed_geo = NULL;
         snprintf(j->status, sizeof(j->status), "Failed: could not set up the GPU trainer");
         logerror("Cannot train Gaussian splats: GPU trainer initialisation failed (see stderr)");
         j->phase = TRAINSCENE_FAILED;
@@ -1081,12 +1239,17 @@ BOOL TrainingSceneStart(const TrainingSceneConfig* config) {
     PlanCameras(j);
     j->source = EZ_ALLOC(1, (size_t)res.x * (size_t)res.y * 4);
     j->scaled = EZ_ALLOC(1, (size_t)j->width * j->height * 4);
+    j->tris = CollectVisibleTriangles(&j->tri_count);
+    j->coverage = EZ_ALLOC((size_t)j->width * j->height, sizeof(float));
+    j->depth = EZ_ALLOC((size_t)j->width * j->height, sizeof(float));
+    j->scratch = EZ_ALLOC(MaskScratchSize(j->width, j->height), sizeof(float));
+    j->seed_acc = EZ_ALLOC((size_t)seeded * 4, sizeof(float));
+    j->seed_count = seeded;
+    j->seeds = seeds; // kept until the views are captured so their colours can be updated
     if (!SetTrainerGaussians(&j->trainer, seeds, seeded)) {
-        EZ_FREE(seeds);
         FailJob(j, "could not upload the initial gaussians");
         return FALSE;
     }
-    EZ_FREE(seeds);
     BeginCaptureState(j);
     j->phase = TRAINSCENE_CAPTURING;
     snprintf(j->status, sizeof(j->status), "Capturing views 0/%u", c->views);
