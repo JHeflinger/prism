@@ -810,6 +810,14 @@ static void FinishCapture(TrainingJob* j) {
     EZ_FREE(j->seeds); j->seeds = NULL;
     EZ_FREE(j->seed_geo); j->seed_geo = NULL;
     EZ_FREE(j->seed_acc); j->seed_acc = NULL;
+    // Path traced captures went through tonemap.comp (extended Reinhard + gamma), so the colours the trainer learns are
+    // display values. The path tracer adds splat albedo into its linear HDR buffer and tonemaps afterwards, so exported
+    // colours are converted back to linear radiance; otherwise they get gamma encoded twice and come out too bright.
+    if (j->config.capture == TRAINSCENE_CAPTURE_PATHTRACE && j->saved_camera.config.gamma > 0.0f && j->saved_camera.config.whitepoint > 0.0f) {
+        j->trainer.export_whitepoint = j->saved_camera.config.whitepoint;
+        j->trainer.export_gamma = j->saved_camera.config.gamma;
+        loginfo("Exporting splat colours as linear radiance (inverse tonemap: whitepoint %.1f, gamma %.2f)", j->trainer.export_whitepoint, j->trainer.export_gamma);
+    }
     j->phase = TRAINSCENE_TRAINING;
     loginfo("Capture orientation check (views per orientation): as-is %u, flipped vertically %u, flipped horizontally %u, both %u",
         j->orient_votes[0], j->orient_votes[2], j->orient_votes[1], j->orient_votes[3]);
@@ -1069,6 +1077,15 @@ BOOL StepTrainer(Trainer* t) {
     return TRUE;
 }
 
+// Exact inverse of tonemap.comp for one channel: extended Reinhard followed by pow(1 / gamma).
+// display -> linear radiance. d is clamped just below 1 where the curve gets steep.
+static float InverseTonemap(float d, float whitepoint, float gamma) {
+    d = d < 0.0f ? 0.0f : (d > 0.999f ? 0.999f : d);
+    float x = powf(d, gamma);
+    // solve x * (x / wp + 1) / (1 + x) = h  for x
+    return 0.5f * whitepoint * ((x - 1.0f) + sqrtf((1.0f - x) * (1.0f - x) + 4.0f * x / whitepoint));
+}
+
 uint32_t DownloadFromTrainer(Trainer* t, GaussianSplat* out, uint32_t max) {
     uint32_t n = t->count < max ? t->count : max;
     float* host = EZ_ALLOC(1, (size_t)n * PSTRIDE * 4);
@@ -1080,6 +1097,12 @@ uint32_t DownloadFromTrainer(Trainer* t, GaussianSplat* out, uint32_t max) {
         memcpy(out[i].rotation, p + 6, 16);
         out[i].opacity = p[10];
         memcpy(out[i].shdc, p + 11, 12);
+        if (t->export_gamma > 0.0f && t->export_whitepoint > 0.0f) {
+            for (int k = 0; k < 3; k++) {
+                float display = 0.5f + MIN_SH_C0 * out[i].shdc[k];
+                out[i].shdc[k] = (InverseTonemap(display, t->export_whitepoint, t->export_gamma) - 0.5f) / MIN_SH_C0;
+            }
+        }
     }
     EZ_FREE(host);
     return n;

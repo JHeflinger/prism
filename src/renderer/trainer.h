@@ -111,6 +111,10 @@ typedef struct {
     float last_l1;
     float last_ssim;
     uint32_t last_pairs;
+    // When > 0 the training images were tonemapped (extended Reinhard + gamma) and exported gaussian colours are
+    // converted back to linear radiance, which is what the path tracer expects splat albedo to be.
+    float export_whitepoint;
+    float export_gamma;
     int pairs_truncated;
     uint32_t sampled_since_check;
     int sorted_in_a;
