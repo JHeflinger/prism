@@ -1,11 +1,6 @@
 #import Boilerplate
 #import TrainerSuite
 
-// dL/d(rendered pixel) for L = (1 - lambda) * L1 + lambda * (1 - SSIM) + lambda_alpha * L1(alpha),
-// averaged over all pixels (and channels for the color terms).
-// The ground truth is premultiplied (rgb already multiplied by the alpha coverage) and the trainer renders
-// over a black background, so empty pixels demand rgb = 0 AND alpha = 0. The alpha term is what stops
-// black gaussians from hiding in front of a black background.
 BUF(B_RENDER, render_out, float, readonly);
 BUF(B_GT, gt, uint, readonly);
 BUF(B_SSIM, ssim_maps, float, readonly);

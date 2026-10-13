@@ -402,6 +402,16 @@ typedef struct {
     size_t addm;
 } ARAPConfig;
 
+typedef struct {
+    vec3 position;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    float focal;
+    float width;
+    float height;
+} ViewProjection;
+
 typedef enum {
     DEBUG_NONE = 0,
     DEBUG_NORMALS = 1,
@@ -439,7 +449,6 @@ typedef struct {
     RendererConfig config;
 } SceneCamera;
 DECLARE_ARRLIST(SceneCamera);
-
 
 typedef struct {
     ManifoldMesh manifold;

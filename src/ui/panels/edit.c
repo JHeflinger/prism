@@ -7,17 +7,6 @@
 
 #define LEFT_COLUMN_WIDTH 150
 
-typedef enum {
-    EDIT_MATERIAL,
-    EDIT_LIGHT,
-    EDIT_SINGLE_TRIANGLE,
-    EDIT_SINGLE_VERTEX,
-    EDIT_SINGLE_FORCE,
-    EDIT_SINGLE_SOURCE,
-    EDIT_MESH,
-    EDIT_CAMERA,
-} EditType;
-
 static size_t g_edit_item_index = 0;
 static BOOL g_item_selected = FALSE;
 static EditType g_edit_type = EDIT_MATERIAL;
@@ -452,6 +441,13 @@ void SetEditMesh(size_t index) {
     g_edit_type = EDIT_MESH;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((VertexID)-1);
+}
+
+BOOL GetEditTarget(EditType* type, size_t* index) {
+    if (!g_item_selected) return FALSE;
+    *type = g_edit_type;
+    *index = g_edit_item_index;
+    return TRUE;
 }
 
 void DeselectEditTarget() {

@@ -3,16 +3,45 @@
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
 #include "ui/panels/edit.h"
+#include "ui/gizmo.h"
+#include <data/colors.h>
+#include <data/fonts.h>
 #include <core/binds.h>
 
+#define TOOLBAR_HEIGHT 20.0f
+#define TOOLBAR_GAP 2.0f
+#define TOOLBAR_PAD 8.0f
+#define TOOLBAR_MARGIN 10.0f
+#define TOOLBAR_FONT 16.0f
+
+typedef enum {
+    BTN_MOVE = 0,
+    BTN_ROTATE,
+    BTN_SCALE,
+    BTN_SPACE,
+    BTN_PIVOT,
+    BTN_SNAP,
+    BTN_COUNT,
+} ToolbarButton;
+
 static RenderTexture2D g_viewport_target;
-static BOOL g_show_hints = FALSE;
+static BOOL g_show_hints = TRUE;
 static BOOL g_rfocused = FALSE;
 static BOOL g_lfocused = FALSE;
 static BOOL g_zfocused = FALSE;
 static vec2 g_mousepoint = { 0 };
 static Vector2 g_viewport_position = { 0 };
 static Vector2 g_viewport_dimensions = { 0 };
+static Gizmo g_gizmo = { 0 };
+static ViewProjection g_view = { 0 };
+static TransformSpace g_space = TRANSFORM_SPACE_WORLD;
+static BOOL g_pivot_center = TRUE;
+static BOOL g_snap = FALSE;
+static BOOL g_dragging = FALSE;
+static TargetSnapshot g_snapshot;
+static int g_toolbar_hot = -1;
+static TargetCaps g_caps = { 0 };
+static BOOL g_gizmos = TRUE;
 
 static void ResetViewportCamera() {
     SimpleCamera camera = RendererCamera()->core;
@@ -31,6 +60,7 @@ static void ToggleHints() {
 
 static void RotateCameraControls() {
     if (g_rfocused) {
+        NavWidgetCancelSnap();
         SimpleCamera camera = RendererCamera()->core;
         vec3 offset;
         glm_vec3_sub(camera.position, camera.look, offset);
@@ -142,6 +172,88 @@ static void TogglePreview() {
     RenderConfig()->flags = !preview ? PREVIEW_PIPELINE_FLAGS : PATHTRACE_PIPELINE_FLAGS;
 }
 
+static GizmoMode EffectiveMode(const TargetCaps* caps) {
+    if (!caps->valid || caps->can[g_gizmo.mode]) return g_gizmo.mode;
+    for (int m = 0; m < 3; m++) if (caps->can[m]) return (GizmoMode)m;
+    return g_gizmo.mode;
+}
+
+static const char* ButtonLabel(int b) {
+    switch (b) {
+        case BTN_MOVE: return "Move";
+        case BTN_ROTATE: return "Rotate";
+        case BTN_SCALE: return "Scale";
+        case BTN_SPACE: return g_space == TRANSFORM_SPACE_LOCAL ? "Local" : "World";
+        case BTN_PIVOT: return g_pivot_center ? "Pivot: Center" : "Pivot: Origin";
+        default: return "Snap";
+    }
+}
+
+static void ToolbarLayout(float height, Rectangle rects[BTN_COUNT]) {
+    Font font = FontAsset();
+    float x = TOOLBAR_MARGIN;
+    float y = height - TOOLBAR_HEIGHT - TOOLBAR_MARGIN;
+    for (int b = 0; b < BTN_COUNT; b++) {
+        float w = MeasureTextEx(font, ButtonLabel(b), TOOLBAR_FONT, 0).x + TOOLBAR_PAD * 2.0f;
+        if (b == BTN_SPACE) x += TOOLBAR_GAP * 2.0f;
+        rects[b] = (Rectangle){ x, y, w, TOOLBAR_HEIGHT };
+        x += w + TOOLBAR_GAP;
+    }
+}
+
+static BOOL ButtonEnabled(int b, const TargetCaps* caps) {
+    if (b > BTN_SCALE) return TRUE;
+    return caps->valid && caps->can[b];
+}
+
+static BOOL ButtonActive(int b, const TargetCaps* caps) {
+    switch (b) {
+        case BTN_MOVE: return EffectiveMode(caps) == GIZMO_TRANSLATE;
+        case BTN_ROTATE: return EffectiveMode(caps) == GIZMO_ROTATE;
+        case BTN_SCALE: return EffectiveMode(caps) == GIZMO_SCALE;
+        case BTN_SPACE: return g_space == TRANSFORM_SPACE_LOCAL;
+        case BTN_PIVOT: return g_pivot_center;
+        default: return g_snap;
+    }
+}
+
+static void ToolbarClick(int b) {
+    switch (b) {
+        case BTN_MOVE: g_gizmo.mode = GIZMO_TRANSLATE; break;
+        case BTN_ROTATE: g_gizmo.mode = GIZMO_ROTATE; break;
+        case BTN_SCALE: g_gizmo.mode = GIZMO_SCALE; break;
+        case BTN_SPACE: g_space = g_space == TRANSFORM_SPACE_LOCAL ? TRANSFORM_SPACE_WORLD : TRANSFORM_SPACE_LOCAL; break;
+        case BTN_PIVOT: g_pivot_center = !g_pivot_center; break;
+        default: g_snap = !g_snap; break;
+    }
+}
+
+static void DrawViewTools(float width, float height) {
+    Vector2 res = RenderResolution();
+    ViewProjection vp = g_view;
+    if (vp.width != width || vp.height != height) vp = ViewProjectionFrom(RendererCamera()->core, res.x, res.y, width, height);
+    TargetCaps caps = TargetQuery();
+    GizmoFrame frame;
+    GizmoMode saved = g_gizmo.mode;
+    if (!g_dragging) g_gizmo.mode = EffectiveMode(&caps);
+    if (TargetFrame(&caps, g_gizmo.mode, g_space, g_pivot_center, &frame)) GizmoDraw(&g_gizmo, &vp, &frame);
+    g_gizmo.mode = saved;
+    NavWidgetDraw(&vp);
+    Rectangle rects[BTN_COUNT];
+    ToolbarLayout(height, rects);
+    Font font = FontAsset();
+    for (int b = 0; b < BTN_COUNT; b++) {
+        BOOL enabled = ButtonEnabled(b, &caps);
+        BOOL active = ButtonActive(b, &caps) && enabled;
+        Color bg = active ? MappedColor(PANEL_BTN_PRS_COLOR) : (b == g_toolbar_hot && enabled ? MappedColor(PANEL_BTN_HVR_COLOR) : MappedColor(PANEL_BTN_BG_COLOR));
+        bg.a = 225;
+        DrawRectangleRec(rects[b], bg);
+        if (active) DrawRectangleLinesEx(rects[b], 1.5f, (Color){ 255, 255, 255, 180 });
+        Color tc = enabled ? MappedColor(UI_TEXT_COLOR) : MappedColor(UI_TEXT_DISABLED);
+        DrawTextEx(font, ButtonLabel(b), (Vector2){ rects[b].x + TOOLBAR_PAD, rects[b].y + (TOOLBAR_HEIGHT - TOOLBAR_FONT) * 0.5f }, TOOLBAR_FONT, 0, tc);
+    }
+}
+
 static void DrawViewportPanel(float width, float height) {
     SetViewportSlice(width, height);
     SetViewportRec((Rectangle){ UIGetPosition().x, UIGetPosition().y, width, height });
@@ -155,11 +267,130 @@ static void DrawViewportPanel(float width, float height) {
     }
     g_viewport_dimensions = (Vector2){ width, height };
     g_viewport_position = UIGetPosition();
+    if (g_gizmos) DrawViewTools(width, height);
+}
+
+static void SetTranslateMode() {
+    if (g_caps.valid && g_caps.can[GIZMO_TRANSLATE]) g_gizmo.mode = GIZMO_TRANSLATE;
+}
+
+static void SetRotateMode() {
+    if (g_caps.valid && g_caps.can[GIZMO_ROTATE]) g_gizmo.mode = GIZMO_ROTATE;
+}
+
+static void SetScaleMode() {
+    if (g_caps.valid && g_caps.can[GIZMO_SCALE]) g_gizmo.mode = GIZMO_SCALE;
+}
+
+static void ToggleTransformSpace() {
+    if (!g_caps.valid) return;
+    g_space = g_space == TRANSFORM_SPACE_LOCAL ? TRANSFORM_SPACE_WORLD : TRANSFORM_SPACE_LOCAL;
+}
+
+static void ToggleSnapping() {
+    g_snap = !g_snap;
+}
+
+static void SnapZAxis() {
+    NavWidgetSnap(2, FALSE, FALSE);
+}
+
+static void SnapXAxis() {
+    NavWidgetSnap(0, FALSE, FALSE);
+}
+
+static void SnapYAxis() {
+    NavWidgetSnap(1, FALSE, FALSE);
+}
+
+static void SnapNZAxis() {
+    NavWidgetSnap(2, TRUE, FALSE);
+}
+
+static void SnapNXAxis() {
+    NavWidgetSnap(0, TRUE, FALSE);
+}
+
+static void SnapNYAxis() {
+    NavWidgetSnap(1, TRUE, FALSE);
+}
+
+static void ToggleGizmos() {
+    g_gizmos = !g_gizmos;
+}
+
+static BOOL UpdateViewTools(float width, float height, Vector2 panel_position, BOOL hovered) {
+    Vector2 m = GetMousePosition();
+    vec2 mouse = { m.x - panel_position.x, m.y - panel_position.y };
+    Vector2 res = RenderResolution();
+    g_view = ViewProjectionFrom(RendererCamera()->core, res.x, res.y, width, height);
+    BOOL inputs_ok = !InputsBlocked();
+    BOOL camera_keys = InputKeyDown(IK_PAN_CAMERA) || InputKeyDown(IK_PAN_SELECTED) || InputKeyDown(IK_ZOOM);
+    BOOL pressed = InputButtonPressed(IK_MOUSELEFT) && hovered && !camera_keys;
+    BOOL down = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    BOOL interactive = hovered && inputs_ok && !camera_keys;
+    TargetCaps caps = TargetQuery();
+    if (hovered && inputs_ok && !InputKeyDown(IK_DEV)) {
+        g_caps = caps;
+    } else {
+        g_caps = (TargetCaps){ 0 };
+    }
+    Rectangle rects[BTN_COUNT];
+    ToolbarLayout(height, rects);
+    g_toolbar_hot = -1;
+    BOOL toolbar_over = FALSE;
+    if (interactive && !g_dragging) {
+        Vector2 mp = { mouse[0], mouse[1] };
+        for (int b = 0; b < BTN_COUNT; b++) if (CheckCollisionPointRec(mp, rects[b])) g_toolbar_hot = b;
+        Rectangle all = { rects[0].x - 4, rects[0].y - 4, rects[BTN_COUNT - 1].x + rects[BTN_COUNT - 1].width - rects[0].x + 8, TOOLBAR_HEIGHT + 8 };
+        toolbar_over = CheckCollisionPointRec(mp, all);
+        if (pressed && g_toolbar_hot >= 0 && ButtonEnabled(g_toolbar_hot, &caps)) ToolbarClick(g_toolbar_hot);
+    }
+    BOOL nav_enabled = interactive && !toolbar_over && !g_dragging;
+    NavWidgetUpdate(&g_view, mouse, nav_enabled, pressed && nav_enabled, down);
+    GizmoMode mode = EffectiveMode(&caps);
+    g_gizmo.mode = g_dragging ? g_gizmo.mode : mode;
+    GizmoFrame frame;
+    BOOL have_frame = TargetFrame(&caps, g_gizmo.mode, g_space, g_pivot_center, &frame);
+    if (!have_frame) {
+        if (g_dragging) {
+            TargetRestore(&g_snapshot);
+            GizmoReset(&g_gizmo);
+            g_dragging = FALSE;
+        }
+        g_gizmo.hover = GIZMO_NONE;
+    } else {
+        GizmoInput in = { 0 };
+        glm_vec2_copy(mouse, in.mouse);
+        in.hover_enabled = interactive && !toolbar_over && !NavWidgetWantsMouse();
+        in.pressed = pressed && in.hover_enabled;
+        in.down = down;
+        in.cancel = IsKeyPressed(KEY_ESCAPE);
+        in.snap = g_snap != InputKeyDown(IK_LEFT_COMMAND);
+        GizmoResult result;
+        GizmoUpdate(&g_gizmo, &g_view, &frame, &in, &result);
+        if (result.began) {
+            TargetBegin(&g_snapshot, &caps, &frame, g_pivot_center);
+            g_dragging = TRUE;
+        }
+        if (result.cancelled && g_dragging) {
+            TargetRestore(&g_snapshot);
+            g_dragging = FALSE;
+        } else if (g_dragging && (result.active || result.ended)) {
+            TargetApply(&g_snapshot, g_gizmo.mode, &result);
+            if (result.ended) g_dragging = FALSE;
+        }
+    }
+    return toolbar_over || NavWidgetWantsMouse() || GizmoWantsMouse(&g_gizmo);
 }
 
 static void UpdateViewportPanel(float width, float height) {
     const char* hpanel = HoveredPanel();
     BOOL hovered = hpanel && strcmp(hpanel, "Viewport") == 0;
+
+    // the view widget, toolbar and transform gizmo get the first claim on the mouse
+    BOOL overlay_captured = g_gizmos ? UpdateViewTools(width, height, g_viewport_position, hovered) : FALSE;
+
     if (InputButtonReleased(IK_MOUSERIGHT)) g_rfocused = FALSE;
     if (InputButtonReleased(IK_MOUSELEFT)) g_lfocused = FALSE;
     if (InputKeyReleased(IK_ZOOM)) {
@@ -168,7 +399,7 @@ static void UpdateViewportPanel(float width, float height) {
         g_mousepoint[1] = GetMouseDelta().y;
     }
     if (InputButtonPressed(IK_MOUSERIGHT) && hovered) g_rfocused = TRUE;
-    if (InputButtonPressed(IK_MOUSELEFT) && hovered) g_lfocused = TRUE;
+    if (InputButtonPressed(IK_MOUSELEFT) && hovered && !overlay_captured) g_lfocused = TRUE;
     if (InputKeyPressed(IK_ZOOM) && hovered) g_zfocused = TRUE;
     SetViewportSlice(width, height);
 
@@ -188,7 +419,8 @@ static void UpdateViewportPanel(float width, float height) {
     }
 
     // selection controls
-    if (InputButtonPressed(IK_MOUSELEFT) && g_lfocused) {
+    BOOL camera_modifier = InputKeyDown(IK_PAN_CAMERA) || InputKeyDown(IK_PAN_SELECTED) || InputKeyDown(IK_ZOOM);
+    if (InputButtonPressed(IK_MOUSELEFT) && g_lfocused && !camera_modifier) {
         switch (GetOverlayMode()) {
             case TRIANGLE_SELECT_MODE:
                 TriangleID tindex = HoveredTriangle();
@@ -228,6 +460,7 @@ Panel GenerateViewportPanel() {
     p.draw = DrawViewportPanel;
     p.update = UpdateViewportPanel;
     g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
+    InitializeGizmo(&g_gizmo);
     AddBind("rotate viewport camera", RotateCameraControls, (BindCommand){ IK_PAN_CAMERA, BIND_KEY_DOWN }, (BindCommand){ IK_MOUSERIGHT, BIND_BUTTON_END });
     AddBind("pan viewport camera", PanCameraControls, (BindCommand){ IK_PAN_CAMERA, BIND_KEY_DOWN }, (BindCommand){ IK_MOUSELEFT, BIND_BUTTON_END });
     AddBind("yank selected vertex", PanSelectedObject, (BindCommand){ IK_PAN_SELECTED, BIND_KEY_DOWN }, (BindCommand){ IK_MOUSELEFT, BIND_BUTTON_END });
@@ -236,5 +469,17 @@ Panel GenerateViewportPanel() {
 	AddBind("fit viewport camera to model", FitCamera, (BindCommand){ IK_FIT_CAMERA, BIND_KEY_PRESSED });
     AddBind("toggle input hints", ToggleHints, (BindCommand){ IK_TOGGLE_HINTS, BIND_KEY_PRESSED });
     AddBind("toggle primary camera preview", TogglePreview, (BindCommand){ IK_TOGGLE_PREVIEW, BIND_KEY_PRESSED });
+    AddBind("translate selected mode", SetTranslateMode, (BindCommand){ IK_TRANSLATE_GIZMO, BIND_KEY_PRESSED });
+    AddBind("rotate selected mode", SetRotateMode, (BindCommand){ IK_ROTATE_GIZMO, BIND_KEY_PRESSED });
+    AddBind("scale selected mode", SetScaleMode, (BindCommand){ IK_SCALE_GIZMO, BIND_KEY_PRESSED });
+    AddBind("toggle transform space", ToggleTransformSpace, (BindCommand){ IK_TOGGLE_SPACE, BIND_KEY_PRESSED });
+    AddBind("toggle gizmo snapping", ToggleSnapping, (BindCommand){ IK_TOGGLE_SNAP, BIND_KEY_PRESSED });
+    AddBind("toggle gizmos", ToggleGizmos, (BindCommand){ IK_TOGGLE_GIZMOS, BIND_KEY_PRESSED });
+    AddBind("snap to X", SnapXAxis, (BindCommand){ IK_ALIGN_X, BIND_KEY_PRESSED });
+    AddBind("snap to Y", SnapYAxis, (BindCommand){ IK_ALIGN_Y, BIND_KEY_PRESSED });
+    AddBind("snap to Z", SnapZAxis, (BindCommand){ IK_ALIGN_Z, BIND_KEY_PRESSED });
+    AddBind("snap to -X", SnapNXAxis, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_ALIGN_X, BIND_KEY_PRESSED });
+    AddBind("snap to -Y", SnapNYAxis, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_ALIGN_Y, BIND_KEY_PRESSED });
+    AddBind("snap to -Z", SnapNZAxis, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_ALIGN_Z, BIND_KEY_PRESSED });
     return p;
 }

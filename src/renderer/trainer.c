@@ -965,7 +965,7 @@ BOOL InitializeTrainer(Trainer* t, const TrainerConfig* cfg, uint32_t width, uin
     return TRUE;
 }
 
-void SetTrainerScene(Trainer* t, const float center[3], float radius) {
+void SetTrainerScene(Trainer* t, const vec3 center, float radius) {
     memcpy(t->scene_center, center, sizeof(float) * 3);
     t->scene_radius = radius > 1e-6f ? radius : 1.0f;
     for (uint32_t i = 0; i < t->num_views; i++) {

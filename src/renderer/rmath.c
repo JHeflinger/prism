@@ -1,5 +1,7 @@
 #include "rmath.h"
 
+#define VIEW_NEAR_DEPTH 1e-3f
+
 float TriangleArea(vec3 a, vec3 b, vec3 c) {
     vec3 b_a, c_a, tcross;
     glm_vec3_sub(b, a, b_a);
@@ -162,4 +164,106 @@ void QuaternionFromBasis(const vec3 c0, const vec3 c1, const vec3 c2, versor q) 
         float s = sqrtf(1.0f + m22 - m00 - m11) * 2.0f;
         q[0] = (m10 - m01) / s; q[1] = (m02 + m20) / s; q[2] = (m12 + m21) / s; q[3] = 0.25f * s;
     }
+}
+
+ViewProjection ViewProjectionFrom(SimpleCamera camera, float render_w, float render_h, float panel_w, float panel_h) {
+    ViewProjection vp = { 0 };
+    glm_vec3_copy(camera.position, vp.position);
+    CameraUVW(camera, vp.u, vp.v, vp.w);
+    vp.width = panel_w > 1.0f ? panel_w : 1.0f;
+    vp.height = panel_h > 1.0f ? panel_h : 1.0f;
+    float diffw = render_w / vp.width;
+    float diffh = render_h / vp.height;
+    float crop_w = diffw < diffh ? render_w : render_h * (vp.width / vp.height);
+    float scale = crop_w > 0.0f ? vp.width / crop_w : 1.0f;
+    float half_fov = glm_rad(camera.fov * 0.5f);
+    float d = (cosf(half_fov) / sinf(half_fov)) * (render_w * 0.5f);
+    vp.focal = d * scale;
+    return vp;
+}
+
+BOOL ViewProject(const ViewProjection* vp, const vec3 world, vec2 out, float* depth) {
+    vec3 rel;
+    glm_vec3_sub((float*)world, (float*)vp->position, rel);
+    float z = -glm_vec3_dot(rel, (float*)vp->w);
+    if (z < VIEW_NEAR_DEPTH) return FALSE;
+    float x = glm_vec3_dot(rel, (float*)vp->u);
+    float y = glm_vec3_dot(rel, (float*)vp->v);
+    out[0] = vp->width * 0.5f + vp->focal * x / z;
+    out[1] = vp->height * 0.5f - vp->focal * y / z;
+    if (depth) *depth = z;
+    return TRUE;
+}
+
+void ViewRay(const ViewProjection* vp, const vec2 panel, vec3 origin, vec3 direction) {
+    float x = panel[0] - vp->width * 0.5f;
+    float y = -(panel[1] - vp->height * 0.5f);
+    vec3 ux, vy, wd;
+    glm_vec3_scale((float*)vp->u, x, ux);
+    glm_vec3_scale((float*)vp->v, y, vy);
+    glm_vec3_scale((float*)vp->w, -vp->focal, wd);
+    glm_vec3_add(ux, vy, direction);
+    glm_vec3_add(direction, wd, direction);
+    glm_vec3_normalize(direction);
+    glm_vec3_copy((float*)vp->position, origin);
+}
+
+void ViewForward(const ViewProjection* vp, vec3 out) {
+    glm_vec3_negate_to((float*)vp->w, out);
+}
+
+float ViewWorldPerPixel(const ViewProjection* vp, const vec3 world) {
+    vec3 rel;
+    glm_vec3_sub((float*)world, (float*)vp->position, rel);
+    float z = -glm_vec3_dot(rel, (float*)vp->w);
+    if (z < VIEW_NEAR_DEPTH) z = VIEW_NEAR_DEPTH;
+    return z / (vp->focal > 1e-6f ? vp->focal : 1e-6f);
+}
+
+float WrapPi(float a) {
+    while (a > GLM_PIf) a -= 2.0f * GLM_PIf;
+    while (a < -GLM_PIf) a += 2.0f * GLM_PIf;
+    return a;
+}
+
+float SnapTo(float value, float step) {
+    if (step <= 1e-9f) return value;
+    return roundf(value / step) * step;
+}
+
+float Dist2D(const vec2 a, const vec2 b) {
+    return hypotf(a[0] - b[0], a[1] - b[1]);
+}
+
+float DistToSegment2D(const vec2 p, const vec2 a, const vec2 b) {
+    float abx = b[0] - a[0], aby = b[1] - a[1];
+    float len2 = abx * abx + aby * aby;
+    float t = 0.0f;
+    if (len2 > 1e-9f) {
+        t = ((p[0] - a[0]) * abx + (p[1] - a[1]) * aby) / len2;
+        t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+    }
+    float cx = a[0] + abx * t, cy = a[1] + aby * t;
+    float dx = p[0] - cx, dy = p[1] - cy;
+    return sqrtf(dx * dx + dy * dy);
+}
+
+float Cross2D(const vec2 o, const vec2 a, const vec2 b) {
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+}
+
+BOOL PointInQuad(const vec2 p, const vec2 q[4]) {
+    BOOL has_pos = FALSE, has_neg = FALSE;
+    for (int i = 0; i < 4; i++) {
+        float c = Cross2D(q[i], q[(i + 1) % 4], p);
+        if (c > 0.0f) has_pos = TRUE;
+        if (c < 0.0f) has_neg = TRUE;
+    }
+    return !(has_pos && has_neg);
+}
+
+float Wrap180(float a) {
+    while (a > 180.0f) a -= 360.0f;
+    while (a < -180.0f) a += 360.0f;
+    return a;
 }

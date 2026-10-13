@@ -3,7 +3,6 @@
 #include "renderer/trainer.h"
 #include "ui/shared.h"
 
-
 static void DrawSplatTrainingSection(float width) {
     static TrainingSceneConfig s_config;
     static BOOL s_initialized = FALSE;

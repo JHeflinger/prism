@@ -4,6 +4,19 @@
 #include "renderer/rstructs.h"
 #include <ui/ui.h>
 
+typedef enum {
+    EDIT_MATERIAL,
+    EDIT_LIGHT,
+    EDIT_SINGLE_TRIANGLE,
+    EDIT_SINGLE_VERTEX,
+    EDIT_SINGLE_FORCE,
+    EDIT_SINGLE_SOURCE,
+    EDIT_MESH,
+    EDIT_CAMERA,
+} EditType;
+
+BOOL GetEditTarget(EditType* type, size_t* index);
+
 void SetEditCamera(size_t index);
 
 void SetEditMaterial(size_t index);
