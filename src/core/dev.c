@@ -9,12 +9,6 @@
 #include <data/input.h>
 #include <core/binds.h>
 
-static void LoadStones() {
-    LoadOBJ("assets/models/OBJ/dressed/gems.obj");
-    SubmitNamedLight((SceneLight){{0},{1,1,1},{0,-1,0},0,0}, "Gems Overhead Light");
-    FitCamera();
-}
-
 static void LoadBox() {
     LoadOBJ("assets/models/OBJ/dressed/CornellBox-Sphere.obj");
     FitCamera();
@@ -109,16 +103,12 @@ static void ClearSoftScene() {
 }
 
 void DevInitialize() {
-    AddBind("load stones", LoadStones,
-        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
-        (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
-        (BindCommand){ IK_A_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("load cornell box", LoadBox,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_B_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("load rabbit", LoadRabbit,
-        (BindCommand){ IK_R_OVERRIDE, BIND_KEY_PRESSED });
+        (BindCommand){ IK_A_OVERRIDE, BIND_KEY_PRESSED });
     AddBind("clear scene", ClearSoftScene,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_C_OVERRIDE, BIND_KEY_PRESSED });
