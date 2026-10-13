@@ -469,6 +469,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.showdof = RendererCamera()->config.showdof;
         ubo.aperature = camera.aperature;
         ubo.focus = camera.focus;
+        ubo.ortho = camera.ortho ? 1 : 0;
+        ubo.orthosize = camera.orthosize > 1e-4f ? camera.orthosize : 1e-4f;
         ubo.normals = RendererCamera()->config.normals;
         ubo.directonly = RendererCamera()->config.directonly;
         ubo.scenelighting = RendererCamera()->config.scenelighting;

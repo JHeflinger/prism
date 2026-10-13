@@ -2,6 +2,7 @@
 #include "renderer/renderer.h"
 #include "renderer/loader.h"
 #include "renderer/rmath.h"
+#include "ui/panels/edit.h"
 #include <data/colors.h>
 #include <util/logger.h>
 #include <ui/popup.h>
@@ -10,14 +11,10 @@ static char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric", "su
 static char* g_arapmodel_labels[] = { "rigid", "cubic" };
 static char* g_sim_visual_labels[] = { "smoke", "fire", "water", "plasma" };
 static char* g_debugmode_labels[] = { "none", "normals", "bvh", "bounces" };
-static SceneLight g_scene_light = { 0 };
-static SurfaceMaterial g_material = { 0 };
 static FluidForce g_fluid_force = { 0 };
 static FluidSource g_fluid_source = { 0 };
 static vec3 g_cube_position = { 0 };
 static vec3 g_cube_scale = { 1.0, 1.0, 1.0 };
-static char g_material_name[MAX_MATERIAL_NAME_SIZE] = "Untitled Material";
-static char g_light_name[MAX_LIGHT_NAME_SIZE] = "Untitled Light";
 static char g_force_name[MAX_FORCE_NAME_SIZE] = "Untitled Force";
 static char g_source_name[MAX_SOURCE_NAME_SIZE] = "Untitled Source";
 static char g_object_name[MAX_MESH_NAME_SIZE] = "Untitled Object";
@@ -79,356 +76,89 @@ static int add_ply_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 
 static int add_camera_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     SubmitCamera(DefaultCamera());
+    SetEditCamera(NumCameras() - 1);
     return 0;
 }
 
 static int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
-    if (g_material.model == 0) g_material.model = 2;
-    float width = 385;
-    float height = 650;
-    float xpos = x + ((w - width) / 2.0f);
-    float ypos = y + ((h - height) / 2.0f);
-    float button_width = 200;
-    UISetPosition(0, 0);
-    UISetCursor(0, ypos + 10);
-    DrawRectangle(xpos, ypos, width, height, MappedColor(PANEL_BG_COLOR));
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Material") / 2), 0);
-    UIDrawText("Add Material");
-
-    UIMoveCursor(xpos, 15);
-    UITextInput("Material Name", g_material_name, MAX_MATERIAL_NAME_SIZE, width - 20, FALSE);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Emission") / 2) - 10, 0);
-    UIDrawText("Emission");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("r");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_material.emission[0]), 0, FLT_MAX, 0.05f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("g");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_material.emission[1]), 0, FLT_MAX, 0.05f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("b");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_material.emission[2]), 0, FLT_MAX, 0.05f, 100);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Absorbtion") / 2) - 10, 0);
-    UIDrawText("Absorbtion");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("r");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_material.absorbtion[0]), 0, FLT_MAX, 0.001f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("g");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_material.absorbtion[1]), 0, FLT_MAX, 0.001f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("b");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_material.absorbtion[2]), 0, FLT_MAX, 0.001f, 100);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Dispersion") / 2) - 10, 0);
-    UIDrawText("Dispersion");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("r");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_material.dispersion[0]), 0, FLT_MAX, 0.001f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("g");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_material.dispersion[1]), 0, FLT_MAX, 0.001f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("b");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_material.dispersion[2]), 0, FLT_MAX, 0.001f, 100);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Ambient") / 2) - 10, 0);
-    UIDrawText("Ambient");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("r");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_material.ambient[0]), 0, 1.0f, 0.05f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("g");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_material.ambient[1]), 0, 1.0f, 0.05f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("b");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_material.ambient[2]), 0, 1.0f, 0.05f, 100);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Diffuse") / 2) - 10, 0);
-    UIDrawText("Diffuse");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("r");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_material.diffuse[0]), 0, 1.0f, 0.05f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("g");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_material.diffuse[1]), 0, 1.0f, 0.05f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("b");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_material.diffuse[2]), 0, 1.0f, 0.05f, 100);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Specular") / 2) - 10, 0);
-    UIDrawText("Specular");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("r");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_material.specular[0]), 0, 1.0f, 0.05f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("g");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_material.specular[1]), 0, 1.0f, 0.05f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("b");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_material.specular[2]), 0, 1.0f, 0.05f, 100);
-
-    UIMoveCursor(xpos, 35);
-    UIDrawText("Refraction Index");
-    UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_material.ior), 0, FLT_MAX, 0.01f, 200);
-    UIMoveCursor(xpos, 5);
-    UIDrawText("Shininess");
-    UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_material.shiny), 0, FLT_MAX, 0.01f, 200);
-    UIMoveCursor(xpos, 5);
-    
-    UIMoveCursor(0, 35);
-    UIDrawText("Lighting Model");
-    UIMoveCursor(xpos + 165, -20);
-    UIDropdownMenu(200, 4, LightModelLabels(), DropdownSelectLightModel, &g_material);
-
-    UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
-    if (UIButton("Submit", button_width)) {
-        SubmitNamedMaterial(g_material, g_material_name);
-        g_material = (SurfaceMaterial){ 0 };
-        memset(g_material_name, 0, MAX_MATERIAL_NAME_SIZE);
-        strcpy(g_material_name, "Untitled Material");
-        return 0;
-    }
-    UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
-    if (UIButton("Cancel", button_width)) return 0;
-    return -1;
+    SurfaceMaterial mat = { 0 };
+    mat.model = 2;
+    SubmitNamedMaterial(mat, "New Material");
+    SetEditMaterial(NumMaterials() - 1);
+    return 0;
 }
 
 static int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
-    float width = 385;
-    float height = 400;
-    float xpos = x + ((w - width) / 2.0f);
-    float ypos = y + ((h - height) / 2.0f);
-    float button_width = 200;
-    UISetPosition(0, 0);
-    UISetCursor(0, ypos + 10);
-    DrawRectangle(xpos, ypos, width, height, MappedColor(PANEL_BG_COLOR));
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Scene Light") / 2), 0);
-    UIDrawText("Add Scene Light");
-
-    UIMoveCursor(xpos, 15);
-    UITextInput("Light Name", g_light_name, MAX_LIGHT_NAME_SIZE, width - 20, FALSE);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Position") / 2) - 10, 0);
-    UIDrawText("Position");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("x");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_scene_light.position[0]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("y");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_scene_light.position[1]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("z");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_scene_light.position[2]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Intensity") / 2) - 10, 0);
-    UIDrawText("Intensity");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("r");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_scene_light.color[0]), 0, FLT_MAX, 0.05f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("g");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_scene_light.color[1]), 0, FLT_MAX, 0.05f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("b");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_scene_light.color[2]), 0, FLT_MAX, 0.05f, 100);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Direction") / 2) - 10, 0);
-    UIDrawText("Direction");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("x");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_scene_light.direction[0]), -FLT_MAX, FLT_MAX, 0.05f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("y");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_scene_light.direction[1]), -FLT_MAX, FLT_MAX, 0.05f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("z");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_scene_light.direction[2]), -FLT_MAX, FLT_MAX, 0.05f, 100);
-
-    UIMoveCursor(xpos, 35);
-    UIDrawText("Penumbra");
-    UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_scene_light.penumbra), 0, 1.0f, 0.001f, 200);
-    UIMoveCursor(xpos, 5);
-    UIDrawText("Angle");
-    UIMoveCursor(xpos + 165, -20);
-    UIDragFloat(&(g_scene_light.angle), 0, 360.0f, 0.1f, 200);
-    UIMoveCursor(xpos, 5);
-
-    UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
-    if (UIButton("Submit", button_width)) {
-        SubmitNamedLight(g_scene_light, g_light_name);
-        g_scene_light = (SceneLight){ 0 };
-        memset(g_light_name, 0, MAX_LIGHT_NAME_SIZE);
-        strcpy(g_light_name, "Untitled Light");
-        return 0;
-    }
-    UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
-    if (UIButton("Cancel", button_width)) return 0;
-    return -1;
+    SubmitNamedLight((SceneLight){ 0 }, "New Light");
+    SetEditLight(NumLights() - 1);
+    return 0;
 }
 
 static int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
-    float width = 385;
-    float height = 340;
-    float xpos = x + ((w - width) / 2.0f);
-    float ypos = y + ((h - height) / 2.0f);
-    float button_width = 200;
-    UISetPosition(0, 0);
-    UISetCursor(0, ypos + 10);
-    DrawRectangle(xpos, ypos, width, height, MappedColor(PANEL_BG_COLOR));
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Add Cube") / 2), 0);
-    UIDrawText("Add Cube");
-
-    UIMoveCursor(xpos, 15);
-    UITextInput("Object Name", g_object_name, MAX_MESH_NAME_SIZE, width - 20, FALSE);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Position") / 2) - 10, 0);
-    UIDrawText("Position");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("x");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_cube_position[0]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("y");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_cube_position[1]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("z");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_cube_position[2]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-
-    UIMoveCursor(0, 15);
-    UIMoveCursor(xpos + (width / 2) - (UITextWidth("Scale") / 2) - 10, 0);
-    UIDrawText("Scale");
-    UIMoveCursor(xpos, 0);
-    UIDrawText("x");
-    UIMoveCursor(xpos + 15, -20);
-    UIDragFloat(&(g_cube_scale[0]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-    UIMoveCursor(xpos + 125, -20);
-    UIDrawText("y");
-    UIMoveCursor(xpos + 140, -20);
-    UIDragFloat(&(g_cube_scale[1]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-    UIMoveCursor(xpos + 250, -20);
-    UIDrawText("z");
-    UIMoveCursor(xpos + 265, -20);
-    UIDragFloat(&(g_cube_scale[2]), -FLT_MAX, FLT_MAX, 0.1f, 100);
-
-    UIMoveCursor(xpos + 2, 30);
-    UIDrawText("Select Material");
-    UIMoveCursor(xpos + 110, -20);
-    UIDropdownMenu(width - 130, NumMaterials(), MaterialNameReference(0), DropdownSelectMaterial, &g_dummy_triangle);
-
-    UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 70);
-    if (UIButton("Submit", button_width)) {
-        size_t vertex_base = NumVertices();
-        size_t triangle_base = NumTriangles();
-        vec3 v1 = {
-            g_cube_position[0] - g_cube_scale[0]/2.0f,
-            g_cube_position[1] - g_cube_scale[1]/2.0f,
-            g_cube_position[2] - g_cube_scale[2]/2.0f};
-        vec3 v2 = {
-            g_cube_position[0] - g_cube_scale[0]/2.0f,
-            g_cube_position[1] + g_cube_scale[1]/2.0f,
-            g_cube_position[2] - g_cube_scale[2]/2.0f};
-        vec3 v3 = {
-            g_cube_position[0] + g_cube_scale[0]/2.0f,
-            g_cube_position[1] + g_cube_scale[1]/2.0f,
-            g_cube_position[2] - g_cube_scale[2]/2.0f};
-        vec3 v4 = {
-            g_cube_position[0] + g_cube_scale[0]/2.0f,
-            g_cube_position[1] - g_cube_scale[1]/2.0f,
-            g_cube_position[2] - g_cube_scale[2]/2.0f};
-        vec3 v5 = {
-            g_cube_position[0] - g_cube_scale[0]/2.0f,
-            g_cube_position[1] - g_cube_scale[1]/2.0f,
-            g_cube_position[2] + g_cube_scale[2]/2.0f};
-        vec3 v6 = {
-            g_cube_position[0] - g_cube_scale[0]/2.0f,
-            g_cube_position[1] + g_cube_scale[1]/2.0f,
-            g_cube_position[2] + g_cube_scale[2]/2.0f};
-        vec3 v7 = {
-            g_cube_position[0] + g_cube_scale[0]/2.0f,
-            g_cube_position[1] + g_cube_scale[1]/2.0f,
-            g_cube_position[2] + g_cube_scale[2]/2.0f};
-        vec3 v8 = {
-            g_cube_position[0] + g_cube_scale[0]/2.0f,
-            g_cube_position[1] - g_cube_scale[1]/2.0f,
-            g_cube_position[2] + g_cube_scale[2]/2.0f};
-        SubmitVertex(v1);
-        SubmitVertex(v2);
-        SubmitVertex(v3);
-        SubmitVertex(v4);
-        SubmitVertex(v5);
-        SubmitVertex(v6);
-        SubmitVertex(v7);
-        SubmitVertex(v8);
-        SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 1, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 2, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 5, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 6, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 2, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 6, vertex_base + 2, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 0, vertex_base + 4, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 4, vertex_base + 7, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 6, vertex_base + 7, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 4, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 0, vertex_base + 1, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 4, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-        g_dummy_triangle = (Triangle){ 0 };
-        vec3 extent;
-        glm_vec3_scale(g_cube_scale, 0.5f, extent);
-        SubmitMeshDescriptor((MeshDescriptor){
-            FALSE, vertex_base, NumVertices() - 1, triangle_base, NumTriangles() - 1, 0, (uint32_t)-1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
-            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, g_object_name);
-        memset(g_object_name, 0, MAX_MESH_NAME_SIZE);
-        strcpy(g_object_name, "Untitled Object");
-        return 0;
-    }
-    UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
-    if (UIButton("Cancel", button_width)) return 0;
-    return -1;
+    size_t vertex_base = NumVertices();
+    size_t triangle_base = NumTriangles();
+    vec3 v1 = {
+        g_cube_position[0] - g_cube_scale[0]/2.0f,
+        g_cube_position[1] - g_cube_scale[1]/2.0f,
+        g_cube_position[2] - g_cube_scale[2]/2.0f};
+    vec3 v2 = {
+        g_cube_position[0] - g_cube_scale[0]/2.0f,
+        g_cube_position[1] + g_cube_scale[1]/2.0f,
+        g_cube_position[2] - g_cube_scale[2]/2.0f};
+    vec3 v3 = {
+        g_cube_position[0] + g_cube_scale[0]/2.0f,
+        g_cube_position[1] + g_cube_scale[1]/2.0f,
+        g_cube_position[2] - g_cube_scale[2]/2.0f};
+    vec3 v4 = {
+        g_cube_position[0] + g_cube_scale[0]/2.0f,
+        g_cube_position[1] - g_cube_scale[1]/2.0f,
+        g_cube_position[2] - g_cube_scale[2]/2.0f};
+    vec3 v5 = {
+        g_cube_position[0] - g_cube_scale[0]/2.0f,
+        g_cube_position[1] - g_cube_scale[1]/2.0f,
+        g_cube_position[2] + g_cube_scale[2]/2.0f};
+    vec3 v6 = {
+        g_cube_position[0] - g_cube_scale[0]/2.0f,
+        g_cube_position[1] + g_cube_scale[1]/2.0f,
+        g_cube_position[2] + g_cube_scale[2]/2.0f};
+    vec3 v7 = {
+        g_cube_position[0] + g_cube_scale[0]/2.0f,
+        g_cube_position[1] + g_cube_scale[1]/2.0f,
+        g_cube_position[2] + g_cube_scale[2]/2.0f};
+    vec3 v8 = {
+        g_cube_position[0] + g_cube_scale[0]/2.0f,
+        g_cube_position[1] - g_cube_scale[1]/2.0f,
+        g_cube_position[2] + g_cube_scale[2]/2.0f};
+    SubmitVertex(v1);
+    SubmitVertex(v2);
+    SubmitVertex(v3);
+    SubmitVertex(v4);
+    SubmitVertex(v5);
+    SubmitVertex(v6);
+    SubmitVertex(v7);
+    SubmitVertex(v8);
+    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 1, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 2, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 5, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 6, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 2, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 6, vertex_base + 2, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 0, vertex_base + 4, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 4, vertex_base + 7, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 6, vertex_base + 7, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 4, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 0, vertex_base + 1, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 4, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    g_dummy_triangle = (Triangle){ 0 };
+    vec3 extent;
+    glm_vec3_scale(g_cube_scale, 0.5f, extent);
+    SubmitMeshDescriptor((MeshDescriptor){
+        FALSE, vertex_base, NumVertices() - 1, triangle_base, NumTriangles() - 1, 0, (uint32_t)-1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
+        { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, g_object_name);
+    memset(g_object_name, 0, MAX_MESH_NAME_SIZE);
+    strcpy(g_object_name, "New Cube");
+    SetEditMesh(NumMeshes() - 1);
+    return 0;
 }
 
 static int add_sim_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {

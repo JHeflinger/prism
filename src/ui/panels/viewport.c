@@ -49,6 +49,7 @@ static void ResetViewportCamera() {
     SETVEC3(camera.look, 0.0f, 0.0f, 0.0f);
     SETVEC3(camera.up, 0.0f, 1.0f, 0.0f);
     camera.fov = 90.0f;
+    camera.orthosize = 4.0f;
     camera.aperature = 0.0f;
     camera.focus = 0.0f;
     RendererCamera()->core = camera;
@@ -96,6 +97,14 @@ static void ZoomCameraControls() {
         float rbefore = radius;
         radius -= (mousedelta_offset * radius / 512.0f) * (to_previous < to_current ? -1.0f : 1.0f);
         if (radius < 1e-6f) radius = 1e-6f;
+        if (camera.ortho) {
+            if (rbefore != radius) {
+                camera.orthosize *= radius / rbefore;
+                if (camera.orthosize < 1e-4f) camera.orthosize = 1e-4f;
+                RendererCamera()->core = camera;
+            }
+            return;
+        }
         glm_vec3_normalize(offset);
         glm_vec3_scale(offset, radius, offset);
         glm_vec3_add(camera.look, offset, camera.position);
@@ -113,6 +122,7 @@ static void PanCameraControls() {
         float phi = acosf(offset[1] / radius);
         float theta = atan2f(offset[2], offset[0]);
         float distance_correction = radius / 600.0f;
+        if (camera.ortho) distance_correction = g_view.ortho && g_view.orthoscale > 1e-6f ? 1.0f / g_view.orthoscale : camera.orthosize / 600.0f;
         vec2 mouse_delta = { GetMouseDelta().x * distance_correction, GetMouseDelta().y * distance_correction };
         vec3 forward;
         glm_vec3_sub(camera.look, camera.position, forward);
@@ -156,6 +166,11 @@ static void PanSelectedObject() {
         float py = b - ((my / RenderResolution().y) * 2.0f * b);
         float cx = (px / d) * cz;
         float cy = (py / d) * cz;
+        if (camera.ortho) {
+            float world_per_pixel = (camera.orthosize > 1e-4f ? camera.orthosize : 1e-4f) / RenderResolution().y;
+            cx = px * world_per_pixel;
+            cy = py * world_per_pixel;
+        }
         glm_vec3_scale(u, cx, u);
         glm_vec3_scale(v, cy, v);
         glm_vec3_scale(w, cz, w);
@@ -412,10 +427,18 @@ static void UpdateViewportPanel(float width, float height) {
         float rbefore = radius;
         if (hovered) radius -= GetMouseWheelMove() * (0.05f * radius);
         if (radius < 1e-6f) radius = 1e-6f;
+        if (camera.ortho) {
+            if (rbefore != radius) {
+                camera.orthosize *= radius / rbefore;
+                if (camera.orthosize < 1e-4f) camera.orthosize = 1e-4f;
+                RendererCamera()->core = camera;
+            }
+        } else {
         glm_vec3_normalize(offset);
         glm_vec3_scale(offset, radius, offset);
         glm_vec3_add(camera.look, offset, camera.position);
         if (rbefore != radius) RendererCamera()->core = camera;
+        }
     }
 
     // selection controls

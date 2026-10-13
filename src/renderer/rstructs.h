@@ -68,6 +68,8 @@ typedef struct {
 	float fov;
     float aperature;
     float focus;
+    BOOL ortho;
+    float orthosize;
 } SimpleCamera;
 
 typedef struct {
@@ -408,6 +410,8 @@ typedef struct {
     vec3 v;
     vec3 w;
     float focal;
+    BOOL ortho;
+    float orthoscale;
     float width;
     float height;
 } ViewProjection;

@@ -723,6 +723,7 @@ static BOOL CaptureView(TrainingJob* j, uint32_t index) {
     memcpy(cam->core.look, j->cameras[index].look, sizeof(float) * 3);
     memcpy(cam->core.up, j->cameras[index].up, sizeof(float) * 3);
     cam->core.fov = j->cameras[index].fov;
+    cam->core.ortho = FALSE; // the trainer's pinhole model assumes a perspective camera
     cam->core.aperature = 0.0f;
     cam->core.focus = 0.0f;
     cam->config.reset = TRUE;

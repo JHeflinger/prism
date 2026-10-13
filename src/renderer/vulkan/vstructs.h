@@ -76,6 +76,8 @@ typedef struct {
     alignas(4) float lightarea;
     alignas(4) float aperature;
     alignas(4) float focus;
+    alignas(4) uint32_t ortho;
+    alignas(4) float orthosize;
 } UniformBufferObject;
 
 typedef struct {

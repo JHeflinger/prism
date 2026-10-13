@@ -49,6 +49,10 @@ bool triangle_in_frustum(in Triangle tri) {
     float farZ = 1e30;
     float tanHalfFov = tan(uubo.fov * 0.5);
     float aspect = uubo.width / uubo.height;
+    float xScale = uubo.ortho != 0u ? 0.0 : tanHalfFov * aspect;
+    float yScale = uubo.ortho != 0u ? 0.0 : tanHalfFov;
+    float xOff = uubo.ortho != 0u ? 0.5 * uubo.orthosize * aspect : 0.0;
+    float yOff = uubo.ortho != 0u ? 0.5 * uubo.orthosize : 0.0;
     if(v0.z < nearZ &&
        v1.z < nearZ &&
        v2.z < nearZ)
@@ -57,21 +61,21 @@ bool triangle_in_frustum(in Triangle tri) {
        v1.z > farZ &&
        v2.z > farZ)
         return false;
-    if(v0.x < -v0.z * tanHalfFov * aspect &&
-       v1.x < -v1.z * tanHalfFov * aspect &&
-       v2.x < -v2.z * tanHalfFov * aspect)
+    if(v0.x < -(v0.z * xScale + xOff) &&
+       v1.x < -(v1.z * xScale + xOff) &&
+       v2.x < -(v2.z * xScale + xOff))
         return false;
-    if(v0.x > v0.z * tanHalfFov * aspect &&
-       v1.x > v1.z * tanHalfFov * aspect &&
-       v2.x > v2.z * tanHalfFov * aspect)
+    if(v0.x > v0.z * xScale + xOff &&
+       v1.x > v1.z * xScale + xOff &&
+       v2.x > v2.z * xScale + xOff)
         return false;
-    if(v0.y < -v0.z * tanHalfFov &&
-       v1.y < -v1.z * tanHalfFov &&
-       v2.y < -v2.z * tanHalfFov)
+    if(v0.y < -(v0.z * yScale + yOff) &&
+       v1.y < -(v1.z * yScale + yOff) &&
+       v2.y < -(v2.z * yScale + yOff))
         return false;
-    if(v0.y > v0.z * tanHalfFov &&
-       v1.y > v1.z * tanHalfFov &&
-       v2.y > v2.z * tanHalfFov)
+    if(v0.y > v0.z * yScale + yOff &&
+       v1.y > v1.z * yScale + yOff &&
+       v2.y > v2.z * yScale + yOff)
         return false;
     return true;
 }
@@ -95,12 +99,14 @@ bool splat_in_frustum(in GaussianSplat splat, vec3 extents) {
     float aspect = uubo.width / uubo.height;
     if (center.z + e.z < nearZ) return false;
     if (center.z - e.z > farZ) return false;
-    float xScale = tanHalfFov * aspect;
-    if (center.x + center.z * xScale + e.x + e.z * xScale < 0.0) return false;
-    if (-center.x + center.z * xScale + e.x + e.z * xScale < 0.0) return false;
-    float yScale = tanHalfFov;
-    if (center.y + center.z * yScale + e.y + e.z * yScale < 0.0) return false;
-    if (-center.y + center.z * yScale + e.y + e.z * yScale < 0.0) return false;
+    float xScale = uubo.ortho != 0u ? 0.0 : tanHalfFov * aspect;
+    float yScale = uubo.ortho != 0u ? 0.0 : tanHalfFov;
+    float xOff = uubo.ortho != 0u ? 0.5 * uubo.orthosize * aspect : 0.0;
+    float yOff = uubo.ortho != 0u ? 0.5 * uubo.orthosize : 0.0;
+    if (center.x + center.z * xScale + xOff + e.x + e.z * xScale < 0.0) return false;
+    if (-center.x + center.z * xScale + xOff + e.x + e.z * xScale < 0.0) return false;
+    if (center.y + center.z * yScale + yOff + e.y + e.z * yScale < 0.0) return false;
+    if (-center.y + center.z * yScale + yOff + e.y + e.z * yScale < 0.0) return false;
     return true;
 }
 

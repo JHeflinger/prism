@@ -152,7 +152,11 @@ Ray create_ray(vec2 rg) {
     float v = b + ((t - b) * (float(rg.y) + jitter.y)) / ubo.height;
 	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
     Ray ray;
-    if (ubo.focus != 0) {
+    if (ubo.ortho != 0u) {
+        float world_per_pixel = ubo.orthosize / ubo.height;
+        ray.direction = normalize(-ubo.w);
+        ray.position = ubo.position + ((ubo.u * u) + (ubo.v * v)) * world_per_pixel;
+    } else if (ubo.focus != 0) {
         vec3 pinhole_dir = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
         vec3 focal_point = ubo.position + pinhole_dir * ubo.focus;
         float r_lens = sqrt(random());

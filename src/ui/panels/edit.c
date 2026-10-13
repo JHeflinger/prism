@@ -1,6 +1,7 @@
 #include "edit.h"
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
+#include "renderer/rmath.h"
 #include "ui/shared.h"
 #include <ui/extra.h>
 #include <util/logger.h>
@@ -194,8 +195,30 @@ void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
     UIColumnHeader("Focus", LEFT_COLUMN_WIDTH);
     UIDragFloat(&(c.focus), 0.0f, 999999999.0f, 0.01f, sboxwidth);
     used |= UIWasJustUsed();
-    UIColumnHeader("FOV", LEFT_COLUMN_WIDTH);
-    UIDragFloat(&(c.fov), 0.0f, 180.0f, 0.1f, sboxwidth);
+    UIColumnHeader("Orthographic", LEFT_COLUMN_WIDTH);
+    UIMoveCursor(-2, 0);
+    UICheckbox(&(c.ortho));
+    if (c.ortho != oldc.ortho) {
+        vec3 offset;
+        glm_vec3_sub(c.position, c.look, offset);
+        float dist = glm_vec3_norm(offset);
+        float half_tan = tanf(glm_rad(CLAMP(c.fov, 1.0f, 170.0f)) * 0.5f);
+        if (c.ortho) {
+            float framed = 2.0f * dist * half_tan;
+            if (framed > 1e-4f) c.orthosize = framed;
+        } else if (dist > 1e-6f && c.orthosize > 1e-4f) {
+            float newdist = c.orthosize / (2.0f * half_tan);
+            glm_vec3_scale(offset, newdist / dist, offset);
+            glm_vec3_add(c.look, offset, c.position);
+        }
+    }
+    if (c.ortho) {
+        UIColumnHeader("Ortho Size", LEFT_COLUMN_WIDTH);
+        UIDragFloat(&(c.orthosize), 0.001f, 999999999.0f, 0.05f, sboxwidth);
+    } else {
+        UIColumnHeader("FOV", LEFT_COLUMN_WIDTH);
+        UIDragFloat(&(c.fov), 0.0f, 180.0f, 0.1f, sboxwidth);
+    }
 	if (memcmp(&c, &oldc, sizeof(SimpleCamera))) cref->core = c;
     cref->config.showdof = used;
 }

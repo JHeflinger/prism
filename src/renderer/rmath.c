@@ -179,6 +179,9 @@ ViewProjection ViewProjectionFrom(SimpleCamera camera, float render_w, float ren
     float half_fov = glm_rad(camera.fov * 0.5f);
     float d = (cosf(half_fov) / sinf(half_fov)) * (render_w * 0.5f);
     vp.focal = d * scale;
+    vp.ortho = camera.ortho;
+    float orthosize = camera.orthosize > 1e-4f ? camera.orthosize : 1e-4f;
+    vp.orthoscale = (render_h / orthosize) * scale;
     return vp;
 }
 
@@ -189,8 +192,13 @@ BOOL ViewProject(const ViewProjection* vp, const vec3 world, vec2 out, float* de
     if (z < VIEW_NEAR_DEPTH) return FALSE;
     float x = glm_vec3_dot(rel, (float*)vp->u);
     float y = glm_vec3_dot(rel, (float*)vp->v);
-    out[0] = vp->width * 0.5f + vp->focal * x / z;
-    out[1] = vp->height * 0.5f - vp->focal * y / z;
+    if (vp->ortho) {
+        out[0] = vp->width * 0.5f + vp->orthoscale * x;
+        out[1] = vp->height * 0.5f - vp->orthoscale * y;
+    } else {
+        out[0] = vp->width * 0.5f + vp->focal * x / z;
+        out[1] = vp->height * 0.5f - vp->focal * y / z;
+    }
     if (depth) *depth = z;
     return TRUE;
 }
@@ -199,6 +207,15 @@ void ViewRay(const ViewProjection* vp, const vec2 panel, vec3 origin, vec3 direc
     float x = panel[0] - vp->width * 0.5f;
     float y = -(panel[1] - vp->height * 0.5f);
     vec3 ux, vy, wd;
+    if (vp->ortho) {
+        float inv = 1.0f / (vp->orthoscale > 1e-6f ? vp->orthoscale : 1e-6f);
+        glm_vec3_scale((float*)vp->u, x * inv, ux);
+        glm_vec3_scale((float*)vp->v, y * inv, vy);
+        glm_vec3_add(ux, vy, origin);
+        glm_vec3_add(origin, (float*)vp->position, origin);
+        glm_vec3_negate_to((float*)vp->w, direction);
+        return;
+    }
     glm_vec3_scale((float*)vp->u, x, ux);
     glm_vec3_scale((float*)vp->v, y, vy);
     glm_vec3_scale((float*)vp->w, -vp->focal, wd);
@@ -216,6 +233,7 @@ float ViewWorldPerPixel(const ViewProjection* vp, const vec3 world) {
     vec3 rel;
     glm_vec3_sub((float*)world, (float*)vp->position, rel);
     float z = -glm_vec3_dot(rel, (float*)vp->w);
+    if (vp->ortho) return 1.0f / (vp->orthoscale > 1e-6f ? vp->orthoscale : 1e-6f);
     if (z < VIEW_NEAR_DEPTH) z = VIEW_NEAR_DEPTH;
     return z / (vp->focal > 1e-6f ? vp->focal : 1e-6f);
 }

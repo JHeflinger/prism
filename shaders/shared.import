@@ -157,6 +157,8 @@ export UniformBufferObjectDef {
         float lightarea;
         float aperature;
         float focus;
+        uint ortho;
+        float orthosize;
     }
 }
 
@@ -387,8 +389,14 @@ export CreateSimpleRay {
         float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
     	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
         Ray ray;
-        ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
-        ray.position = ubo.position;
+        if (ubo.ortho != 0u) {
+            float world_per_pixel = ubo.orthosize / ubo.height;
+            ray.direction = normalize(-ubo.w);
+            ray.position = ubo.position + ((ubo.u * u) + (ubo.v * v)) * world_per_pixel;
+        } else {
+            ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+            ray.position = ubo.position;
+        }
         return ray;
     }
 }

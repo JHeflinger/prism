@@ -24,6 +24,11 @@ vec2 project_vertex(vec3 vertex) {
     float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
     float px = (cx / cz) * d;
     float py = (cy / cz) * d;
+    if (ubo.ortho != 0u) {
+        float pixels_per_unit = ubo.height / ubo.orthosize;
+        px = cx * pixels_per_unit;
+        py = cy * pixels_per_unit;
+    }
     float sx = ((px + r) / (2.0 * r)) * ubo.width;
     float sy = ((b - py) / (2.0 * b)) * ubo.height;
     return vec2(sx - 0.5, sy - 0.5);
