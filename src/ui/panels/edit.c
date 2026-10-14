@@ -187,6 +187,7 @@ void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
 
     UIMoveCursor(0, 20.0f);
     UIColumnHeader("Denoise", LEFT_COLUMN_WIDTH);
+    UIMoveCursor(-2, 0);
     UICheckbox(&(cref->config.denoise));
     if (!cref->config.denoise) DisableUI();
     UIColumnHeader("Denoise Iterations", LEFT_COLUMN_WIDTH);
