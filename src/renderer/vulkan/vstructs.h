@@ -302,6 +302,7 @@ typedef struct {
     VulkanObject vulkan;
     CPUSwap swapchain;
     Vector2 dimensions;
+    size_t pixels;
     Geometry geometry;
     Vector2 viewport;
 } Renderer;

@@ -101,8 +101,8 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
-					FALSE,
-					(void*)(((size_t)renderer->dimensions.x) * ((size_t)renderer->dimensions.y))
+					TRUE,
+					&(renderer->pixels)
 				}, 0.0f,
 				sizeof(RayGenerator)
 			}

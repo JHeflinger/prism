@@ -11,6 +11,8 @@ void SetViewportSlice(size_t w, size_t h);
 
 void OverrideResolution(size_t x, size_t y);
 
+BOOL ResizeRenderer(size_t width, size_t height);
+
 void InitializeRenderer();
 
 void DestroyRenderer();

@@ -7,6 +7,7 @@
 #include "renderer/processor.h"
 #include "renderer/simulator.h"
 #include "renderer/overlay.h"
+#include "renderer/trainer.h"
 #include "renderer/rmath.h"
 #include "ui/panels/edit.h"
 #include <core/config.h>
@@ -265,6 +266,68 @@ void OverrideResolution(size_t x, size_t y) {
 	g_override_resolution = (Vector2){ x, y };
 }
 
+BOOL ResizeRenderer(size_t width, size_t height) {
+    if (!g_renderer_init) {
+        OverrideResolution(width, height);
+        return TRUE;
+    }
+    if (width == 0 || height == 0) {
+        logwarn("Cannot resize renderer to %zux%zu - dimensions must be non-zero", width, height);
+        return FALSE;
+    }
+    if (width == (size_t)g_renderer.dimensions.x && height == (size_t)g_renderer.dimensions.y) return TRUE;
+    if (TrainingScenePhaseNow() == TRAINSCENE_CAPTURING) {
+        logwarn("Cannot resize renderer while training views are being captured");
+        return FALSE;
+    }
+    VkPhysicalDeviceProperties props = { 0 };
+    vkGetPhysicalDeviceProperties(g_renderer.vulkan.core.general.gpu, &props);
+    if (width > props.limits.maxImageDimension2D || height > props.limits.maxImageDimension2D) {
+        logwarn("Cannot resize renderer to %zux%zu - GPU supports at most %u pixels per side",
+            width, height, props.limits.maxImageDimension2D);
+        return FALSE;
+    }
+    VkDevice device = g_renderer.vulkan.core.general.interface;
+    vkDeviceWaitIdle(device);
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUTIL_DestroyImage(g_renderer.vulkan.core.context.targets[i]);
+        VUTIL_DestroyImage(g_renderer.vulkan.core.context.hdr[i]);
+        VUTIL_DestroyBuffer(g_renderer.vulkan.core.context.renderdata.ssbos[i]);
+        UnloadRenderTexture(g_renderer.swapchain.target[i]);
+    }
+    VCLEAN_Bridge(g_renderer.vulkan.core.bridge);
+    g_renderer.dimensions = (Vector2){ (float)width, (float)height };
+    g_renderer.pixels = width * height;
+    BOOL result =
+        VINIT_TargetsHDR(g_renderer.vulkan.core.context.hdr) &&
+        VINIT_Targets(g_renderer.vulkan.core.context.targets) &&
+        VINIT_ShaderStorageBuffers(g_renderer.vulkan.core.context.renderdata.ssbos) &&
+        VINIT_Bridge(g_renderer.vulkan.core.bridge);
+    EZ_ASSERT(result, "Failed to rebuild renderer resources at %zux%zu", width, height);
+    size_t bytes = width * height * 4;
+    VkMappedMemoryRange flush[CPUSWAP_LENGTH] = { 0 };
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        memset(g_renderer.swapchain.reference[i], 0, bytes);
+        flush[i].sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+        flush[i].memory = g_renderer.vulkan.core.bridge[i].memory;
+        flush[i].offset = 0;
+        flush[i].size = VK_WHOLE_SIZE;
+    }
+    vkFlushMappedMemoryRanges(device, CPUSWAP_LENGTH, flush);
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        g_renderer.swapchain.target[i] = LoadRenderTexture(width, height);
+        EZ_ASSERT(IsRenderTextureValid(g_renderer.swapchain.target[i]), "Unable to load target texture");
+        glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.target[i].texture.id);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference[i]);
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+    VUPDT_DescriptorSetsAll(g_renderer.vulkan.core.context.renderdata.descriptors);
+    SetViewportSlice(width, height);
+    RendererCamera()->config.reset = TRUE;
+    loginfo("Renderer resolution set to %zux%zu", width, height);
+    return TRUE;
+}
+
 void InitializeRenderer() {
     g_renderer_init = TRUE;
 
@@ -297,6 +360,7 @@ void InitializeRenderer() {
     g_renderer.dimensions = (Vector2){
 		g_override_resolution.x == 0 ? CONFGET(Float, "default_render_width", GetScreenWidth()) : g_override_resolution.x,
 		g_override_resolution.y == 0 ? CONFGET(Float, "default_render_height", GetScreenHeight()) : g_override_resolution.y };
+    g_renderer.pixels = (size_t)g_renderer.dimensions.x * (size_t)g_renderer.dimensions.y;
 
     // initialize vulkan resources
 	VUTIL_SetVulkanUtilsContext(&g_renderer);
