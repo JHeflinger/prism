@@ -89,7 +89,11 @@ static int add_material_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
 }
 
 static int add_light_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
-    SubmitNamedLight((SceneLight){ 0 }, "New Light");
+    SceneLight defaultlight = { 0 };
+    defaultlight.color[0] = 5.0f;
+    defaultlight.color[1] = 5.0f;
+    defaultlight.color[2] = 5.0f;
+    SubmitNamedLight(defaultlight, "New Light");
     SetEditLight(NumLights() - 1);
     return 0;
 }
