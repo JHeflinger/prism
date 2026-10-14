@@ -37,9 +37,9 @@ BOOL VINIT_Scheduler(VulkanScheduler* scheduler);
 
 BOOL VINIT_Transfer(VulkanTransfer* transfer);
 
-BOOL VINIT_Bridge(VulkanDataBuffer* bridge);
+BOOL VINIT_Bridge(VulkanDataBuffer* bridges);
 
-BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridge);
+BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridges);
 
 BOOL VINIT_RenderContext(VulkanRenderContext* context);
 

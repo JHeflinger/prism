@@ -9,6 +9,7 @@
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
 #include "ui/panels/edit.h"
+#include <core/config.h>
 #include <util/logger.h>
 #include <GLFW/glfw3.h>
 #include <time.h>
@@ -319,32 +320,33 @@ void InitializeRenderer() {
     PollGPUCache(TRUE);
 
     // default material
-    SubmitNamedMaterial((SurfaceMaterial){
-        {0.0f, 0.0f, 0.0f},
-        {1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f},
-        {0.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f},
-        0.0f, 1.0f, 0.0f, 0, 10.0f, 2
-    }, "Default");
-    /*SurfaceMaterial wax = {
-        .emission = {0.0f, 0.0f, 0.0f},
-        .ambient = {1.0f, 1.0f, 1.0f},
-        .diffuse = {0.8f, 0.25f, 0.15f},
-        .specular = {0.04f, 0.04f, 0.04f},
-        .dispersion = {0.0f, 0.0f, 0.0f},
-        .ior = 1.45f,
-        .shiny = 20.0f,
-        .model = 11,
-        .scattering = {1.5f, 1.2f, 1.0f},
-        .absorbtion = {0.15f, 0.35f, 0.5f},
-        .anisotropy = 0.0f,
-        .scale = 1.0f,
-        .subsurface = 0.5f
-    };
-    SubmitNamedMaterial(wax, "Default");*/
+    SurfaceMaterial dsm = { 0 };
+    #define DSMSETV3(name, default) {\
+    const char* n1 = "default_material_" #name "r"; \
+    dsm.name[0] = CONFGET(Float, n1, default); \
+    const char* n2 = "default_material_" #name "g"; \
+    dsm.name[1] = CONFGET(Float, n2, default); \
+    const char* n3 = "default_material_" #name "b"; \
+    dsm.name[2] = CONFGET(Float, n3, default);}
+    #define DSMSETF(name, default) {\
+    const char* n = "default_material_" #name; \
+    dsm.name = CONFGET(Float, n, default);}
+    DSMSETV3(emission, 0.0f);
+    DSMSETV3(ambient, 1.0f);
+    DSMSETV3(diffuse, 1.0f);
+    DSMSETV3(specular, 0.0f);
+    DSMSETV3(absorbtion, 0.0f);
+    DSMSETV3(dispersion, 0.0f);
+    DSMSETV3(scattering, 0.0f);
+    DSMSETF(anisotropy, 0.0f);
+    DSMSETF(scale, 1.0f);
+    DSMSETF(subsurface, 0.0f);
+    DSMSETF(ior, 0.0f);
+    DSMSETF(shiny, 10.0f);
+    dsm.model = CONFGET(Int, "default_material_model", 2);
+    #undef DSMSETV3
+    #undef DSMSETF
+    SubmitNamedMaterial(dsm, "Default");
 
     // set overlay context
     SetOverlayContext(&g_renderer);

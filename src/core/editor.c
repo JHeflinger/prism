@@ -2,6 +2,7 @@
 #include "core/dev.h"
 #include "renderer/renderer.h"
 #include "renderer/trainer.h"
+#include "renderer/loader.h"
 #include "ui/panels/diagnostics.h"
 #include "ui/panels/simulate.h"
 #include "ui/panels/viewport.h"
@@ -23,6 +24,7 @@ static ARRLIST_Panel g_shared_panels = { 0 };
 static ARRLIST_UIConfig g_default_ui_config = { 0 };
 
 static void InitEditor() {
+    InitConfig();
 	SetTraceLogLevel(LOG_NONE);
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
@@ -117,6 +119,12 @@ void RunEditor() {
 
     // Initialize editor
     InitEditor();
+
+    // Default scene
+    const char* default_scene = CONFGET(String, "default_obj_scene_path", "");
+    if (strlen(default_scene) > 0) {
+        LoadOBJ(default_scene);
+    }
 
     // Run editor
     while (!WindowShouldClose()) {

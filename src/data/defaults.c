@@ -1,7 +1,12 @@
 #include "defaults.h"
+#include "data/commands.h"
 #include <core/entrypoint.h>
+#include <ui/panels/console.h>
 
-void DefaultPreload() { }
+void DefaultPreload() {
+    RegisterCommand((Command){ "help", HelpCommand, "help {usage|descriptions}", "Outputs help on console commands"});
+    RegisterCommand((Command){ "config", ConfigureCommand, "config {read|write} {name} {value", "Read or write to the renderer config" });
+}
 
 void DefaultPostload() { }
 
