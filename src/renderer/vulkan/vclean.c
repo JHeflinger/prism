@@ -122,7 +122,7 @@ void VCLEAN_RenderData(VulkanRenderData* renderdata) {
         vkDestroyDescriptorPool(g_vclean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].pool, NULL);
         vkDestroyDescriptorSetLayout(g_vclean_renderer_ref->vulkan.core.general.interface, renderdata->descriptors[i].layout, NULL);
     }
-    VCLEAN_OverlayBridge(&(renderdata->overlay_bridge));
+    VCLEAN_OverlayBridge(renderdata->overlay_bridge);
     EZ_FREE(renderdata->descriptors);
 }
 
@@ -142,14 +142,18 @@ void VCLEAN_RenderContext(VulkanRenderContext* context) {
     EZ_FREE(context->pipeline.layout);
 }
 
-void VCLEAN_Bridge(VulkanDataBuffer* bridge) {
-    vkUnmapMemory(g_vclean_renderer_ref->vulkan.core.general.interface, bridge->memory);
-    VUTIL_DestroyBuffer(*bridge);
+void VCLEAN_Bridge(VulkanDataBuffer* bridges) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        vkUnmapMemory(g_vclean_renderer_ref->vulkan.core.general.interface, bridges[i].memory);
+        VUTIL_DestroyBuffer(bridges[i]);
+    }
 }
 
-void VCLEAN_OverlayBridge(VulkanDataBuffer* bridge) {
-    vkUnmapMemory(g_vclean_renderer_ref->vulkan.core.general.interface, bridge->memory);
-    VUTIL_DestroyBuffer(*bridge);
+void VCLEAN_OverlayBridge(VulkanDataBuffer* bridges) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        vkUnmapMemory(g_vclean_renderer_ref->vulkan.core.general.interface, bridges[i].memory);
+        VUTIL_DestroyBuffer(bridges[i]);
+    }
 }
 
 void VCLEAN_Scheduler(VulkanScheduler* scheduler) {
@@ -170,7 +174,7 @@ void VCLEAN_Transfer(VulkanTransfer* transfer) {
 void VCLEAN_Core(VulkanCore* core) {
     VCLEAN_Transfer(&(core->transfer));
     VCLEAN_Geometry(&(core->geometry));
-    VCLEAN_Bridge(&(core->bridge));
+    VCLEAN_Bridge(core->bridge);
     VCLEAN_Scheduler(&(core->scheduler));
     VCLEAN_RenderContext(&(core->context));
     VCLEAN_General(&(core->general));

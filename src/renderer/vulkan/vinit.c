@@ -350,7 +350,7 @@ BOOL VINIT_RenderData(VulkanRenderData* renderdata) {
 	if (!VINIT_ShaderStorageBuffers(renderdata->ssbos)) return FALSE;
 	if (!VINIT_UniformBuffers(&(renderdata->ubos))) return FALSE;
 	if (!VINIT_OverlaySSBOs(renderdata->overlay_ssbos)) return FALSE;
-	if (!VINIT_OverlayBridge(&(renderdata->overlay_bridge))) return FALSE;
+	if (!VINIT_OverlayBridge(renderdata->overlay_bridge)) return FALSE;
 	if (!VINIT_Descriptors(renderdata->descriptors)) return FALSE;
     return TRUE;
 }
@@ -476,29 +476,27 @@ BOOL VINIT_Transfer(VulkanTransfer* transfer) {
     return TRUE;
 }
 
-BOOL VINIT_Bridge(VulkanDataBuffer* bridge) {
-    // create cross buffer
-    VUTIL_CreateBuffer(
-        g_vinit_renderer_ref->dimensions.x * g_vinit_renderer_ref->dimensions.y * 4, // Assuming VK_FORMAT_B8G8R8A8_SRGB
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-        bridge);
-
-    // map memory to buffer
-    vkMapMemory(g_vinit_renderer_ref->vulkan.core.general.interface, bridge->memory, 0, VK_WHOLE_SIZE, 0, &(g_vinit_renderer_ref->swapchain.reference));
+BOOL VINIT_Bridge(VulkanDataBuffer* bridges) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUTIL_CreateBuffer(
+            g_vinit_renderer_ref->dimensions.x * g_vinit_renderer_ref->dimensions.y * 4, // Assuming VK_FORMAT_B8G8R8A8_SRGB
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
+            &(bridges[i]));
+        vkMapMemory(g_vinit_renderer_ref->vulkan.core.general.interface, bridges[i].memory, 0, VK_WHOLE_SIZE, 0, &(g_vinit_renderer_ref->swapchain.reference[i]));
+    }
     return TRUE;
 }
 
-BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridge) {
-    // create cross buffer
-    VUTIL_CreateBuffer(
-        sizeof(OverlaySSBO),
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-        bridge);
-
-    // map memory to buffer
-    vkMapMemory(g_vinit_renderer_ref->vulkan.core.general.interface, bridge->memory, 0, VK_WHOLE_SIZE, 0, &(g_vinit_renderer_ref->vulkan.core.context.renderdata.overlay_mapped));
+BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridges) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUTIL_CreateBuffer(
+            sizeof(OverlaySSBO),
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
+            &(bridges[i]));
+        vkMapMemory(g_vinit_renderer_ref->vulkan.core.general.interface, bridges[i].memory, 0, VK_WHOLE_SIZE, 0, &(g_vinit_renderer_ref->vulkan.core.context.renderdata.overlay_mapped[i]));
+    }
     return TRUE;
 }
 
@@ -700,7 +698,7 @@ BOOL VINIT_TargetsHDR(VulkanImage* hdr_arr) {
             g_vinit_renderer_ref->dimensions.y,
             1,
             VK_SAMPLE_COUNT_1_BIT,
-            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_FORMAT_R32G32B32A32_SFLOAT,
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -708,7 +706,7 @@ BOOL VINIT_TargetsHDR(VulkanImage* hdr_arr) {
             &(hdr_arr[i]));
         VUTIL_TransitionImageLayout(
             hdr_arr[i].image,
-            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_FORMAT_R32G32B32A32_SFLOAT,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_GENERAL,
             1);
@@ -916,7 +914,7 @@ BOOL VINIT_Core(VulkanCore* core) {
 	if (!VINIT_Scheduler(&(core->scheduler))) return FALSE;
     if (!VINIT_ExtendedBuffers(&g_vinit_renderer_ref->ebuffers)) return FALSE;
 	if (!VINIT_Geometry(&(core->geometry))) return FALSE;
-	if (!VINIT_Bridge(&(core->bridge))) return FALSE;
+	if (!VINIT_Bridge(core->bridge)) return FALSE;
 	if (!VINIT_RenderContext(&(core->context))) return FALSE;
     return TRUE;
 }

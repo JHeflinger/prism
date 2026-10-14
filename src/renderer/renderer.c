@@ -852,7 +852,7 @@ void Render() {
 
         // submit command buffer
         uint64_t waitVal = g_renderer.vulkan.core.transfer.signal;
-        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
         g_renderer.vulkan.core.scheduler.signal++;
         uint64_t graphicsSignalVal = g_renderer.vulkan.core.scheduler.signal;
         VkTimelineSemaphoreSubmitInfo tsi = { 0 };
@@ -879,8 +879,19 @@ void Render() {
     if (!RendererCamera()->config.async || RendererCamera()->config.multiplier > 1)
         vkWaitForFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]), VK_TRUE, UINT64_MAX);
     if (vkGetFenceStatus(g_renderer.vulkan.core.general.interface, g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]) == VK_SUCCESS) {
-        // copy overlay results to host
-        memcpy((void*)ExposedOverlaySSBO(), g_renderer.vulkan.core.context.renderdata.overlay_mapped, sizeof(OverlaySSBO));
+        VkMappedMemoryRange invalidate[2] = { { 0 }, { 0 } };
+        invalidate[0].sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+        invalidate[0].memory = g_renderer.vulkan.core.bridge[new_ind].memory;
+        invalidate[0].offset = 0;
+        invalidate[0].size = VK_WHOLE_SIZE;
+        invalidate[1].sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+        invalidate[1].memory = g_renderer.vulkan.core.context.renderdata.overlay_bridge[new_ind].memory;
+        invalidate[1].offset = 0;
+        invalidate[1].size = VK_WHOLE_SIZE;
+        vkInvalidateMappedMemoryRanges(g_renderer.vulkan.core.general.interface, 2, invalidate);
+
+        // copy overlay results to host (from the buffer this frame's copy wrote into)
+        memcpy((void*)ExposedOverlaySSBO(), g_renderer.vulkan.core.context.renderdata.overlay_mapped[new_ind], sizeof(OverlaySSBO));
 
         // reset fences and update swapchain index
         vkResetFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]));
@@ -889,7 +900,7 @@ void Render() {
 
         // update render target
         glBindTexture(GL_TEXTURE_2D, g_renderer.swapchain.target[new_ind].texture.id);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_renderer.dimensions.x, g_renderer.dimensions.y, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_renderer.dimensions.x, g_renderer.dimensions.y, GL_RGBA, GL_UNSIGNED_BYTE, g_renderer.swapchain.reference[new_ind]);
         glBindTexture(GL_TEXTURE_2D, 0);
 
         // end profiling

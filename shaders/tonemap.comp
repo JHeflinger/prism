@@ -2,7 +2,7 @@
 
 layout(binding = 0) #import UniformBufferObjectDef ubo;
 layout(binding = 1, rgba8) #import OutputImageDef;
-layout(binding = 2, rgba16f) #import HDRImageDef;
+layout(binding = 2, rgba32f) #import HDRImageDef;
 
 void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));

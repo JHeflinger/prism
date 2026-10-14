@@ -14,7 +14,7 @@
 
 layout(binding = 0) readonly #import UniformBufferObjectDef ubo;
 layout(binding = 1) #import RayGeneratorSSBODef;
-layout(binding = 2, rgba16f) #import HDRImageDef;
+layout(binding = 2, rgba32f) #import HDRImageDef;
 layout(binding = 3) readonly #import TriangleSSBODef;
 layout(binding = 4) readonly #import MaterialSSBODef;
 layout(binding = 5) readonly #import BVHNodeSSBODef;

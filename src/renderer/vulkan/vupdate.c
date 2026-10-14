@@ -306,7 +306,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
         vkCmdCopyImageToBuffer(
             command,
             g_vupdt_renderer_ref->vulkan.core.context.targets[g_vupdt_renderer_ref->swapchain.index].image,
-            VK_IMAGE_LAYOUT_GENERAL, g_vupdt_renderer_ref->vulkan.core.bridge.buffer, 1, &region);
+            VK_IMAGE_LAYOUT_GENERAL, g_vupdt_renderer_ref->vulkan.core.bridge[g_vupdt_renderer_ref->swapchain.index].buffer, 1, &region);
     }
 
     // Copy overlay ssbo back over
@@ -332,7 +332,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
         vkCmdCopyBuffer(
             command,
             g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_ssbos[g_vupdt_renderer_ref->swapchain.index].buffer,
-            g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_bridge.buffer, 1, &copyRegion);
+            g_vupdt_renderer_ref->vulkan.core.context.renderdata.overlay_bridge[g_vupdt_renderer_ref->swapchain.index].buffer, 1, &copyRegion);
     }
 
     // End command

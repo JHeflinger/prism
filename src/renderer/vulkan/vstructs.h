@@ -163,8 +163,8 @@ typedef struct {
     UBOArray ubos;
     VulkanDataBuffer ssbos[CPUSWAP_LENGTH];
 	VulkanDataBuffer overlay_ssbos[CPUSWAP_LENGTH];
-    VulkanDataBuffer overlay_bridge;
-    void* overlay_mapped;
+    VulkanDataBuffer overlay_bridge[CPUSWAP_LENGTH];
+    void* overlay_mapped[CPUSWAP_LENGTH];
 } VulkanRenderData;
 
 typedef struct {
@@ -257,7 +257,7 @@ typedef struct {
 	ARRLIST_VulkanShaderPtr shaders;
     VulkanGeometry geometry;
     VulkanRenderContext context;
-    VulkanDataBuffer bridge;
+    VulkanDataBuffer bridge[CPUSWAP_LENGTH];
     VulkanScheduler scheduler;
     VulkanTarget target;
     VulkanTransfer transfer;

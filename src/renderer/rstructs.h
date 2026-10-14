@@ -136,7 +136,7 @@ typedef struct {
 typedef struct {
 	RenderTexture2D target[CPUSWAP_LENGTH];
 	size_t index;
-    void* reference;
+    void* reference[CPUSWAP_LENGTH]; // mapped readback buffer for each in-flight frame
 } CPUSwap;
 
 typedef struct {
