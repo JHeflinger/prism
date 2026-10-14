@@ -21,6 +21,20 @@
 
 static Renderer* g_vupdt_renderer_ref = NULL;
 
+static BOOL DenoiseActive() {
+    RendererConfig* cfg = &(RendererCamera()->config);
+    return cfg->denoise &&
+        (cfg->flags & PATHTRACE_SHADER_FLAG) &&
+        (cfg->flags & DENOISE_SHADER_FLAG) &&
+        cfg->debug == DEBUG_NONE;
+}
+
+static uint32_t DenoisePasses() {
+    size_t iterations = RendererCamera()->config.denoiseiterations;
+    if (iterations > 10) iterations = 10;
+    return 2u + (uint32_t)iterations;
+}
+
 void VUPDT_ExternalBuffer(ShaderBuffer* ebuffer) {
     vkDeviceWaitIdle(g_vupdt_renderer_ref->vulkan.core.general.interface);
     if (ebuffer->vbuffersize != ebuffer->size) {
@@ -219,6 +233,37 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     size_t nativeshaders = g_vupdt_renderer_ref->vulkan.core.shaders.size - g_vupdt_renderer_ref->externals.size;
     for (size_t i = 0; i < g_vupdt_renderer_ref->vulkan.core.shaders.size; i++) {
         if (i < nativeshaders && !(pflags & (1u << i))) continue;
+
+        if (i < nativeshaders && ((1u << i) & DENOISE_SHADER_FLAG)) {
+            if (!DenoiseActive()) continue;
+            uint32_t passes = DenoisePasses();
+            uint32_t pixels = (uint32_t)g_vupdt_renderer_ref->dimensions.x * (uint32_t)g_vupdt_renderer_ref->dimensions.y;
+            vkCmdBindPipeline(
+                command,
+                VK_PIPELINE_BIND_POINT_COMPUTE,
+                g_vupdt_renderer_ref->vulkan.core.context.pipeline.pipeline[i]);
+            vkCmdBindDescriptorSets(
+                command,
+                VK_PIPELINE_BIND_POINT_COMPUTE,
+                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
+                0,
+                1,
+                &(g_vupdt_renderer_ref->vulkan.core.context.renderdata.descriptors[i].sets[g_vupdt_renderer_ref->swapchain.index]),
+                0,
+                NULL);
+            for (uint32_t pass = 0; pass < passes; pass++) {
+                VulkanPushConstants pc = { pass, passes, 0 };
+                vkCmdPushConstants(
+                    command,
+                    g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
+                    VK_SHADER_STAGE_COMPUTE_BIT,
+                    0, sizeof(VulkanPushConstants), &pc);
+                vkCmdDispatch(command, ceil(pixels / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
+                VUTIL_RecordGeneralBarrier(command);
+            }
+            continue;
+        }
+        
         uint32_t invocations = (uint32_t)g_vupdt_renderer_ref->dimensions.x * (uint32_t)g_vupdt_renderer_ref->dimensions.y;
         uint32_t bvh_elements_size = !queue_update_splats_bvh ? g_vupdt_renderer_ref->geometry.splats.size : g_vupdt_renderer_ref->geometry.triangles.size;
         if (i >= nativeshaders) invocations = g_vupdt_renderer_ref->externals.data[i - nativeshaders].invocations;
@@ -482,6 +527,11 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.spectral = (uint32_t)RendererCamera()->config.spectral;
         ubo.screenspace = (uint32_t)RendererCamera()->config.screenspace;
         ubo.splatshadows = (uint32_t)RendererCamera()->config.splatshadows;
+        ubo.denoise = (uint32_t)DenoiseActive();
+        ubo.denoisepasses = DenoisePasses();
+        ubo.denoisecolor = RendererCamera()->config.denoisecolor;
+        ubo.denoisenormal = RendererCamera()->config.denoisenormal;
+        ubo.denoisedepth = RendererCamera()->config.denoisedepth;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

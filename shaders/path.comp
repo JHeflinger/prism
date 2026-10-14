@@ -23,8 +23,10 @@ layout(binding = 7) readonly #import TransformedVertexSSBODef;
 layout(binding = 8) readonly #import NormalSSBODef;
 layout(binding = 9) readonly #import LightSSBODef;
 layout(binding = 10) readonly #import SplatSSBODef;
+layout(binding = 11, rgba32f) writeonly #import GBufferImageDef;
 
 #import CutViewport
+#import GBufferSuite
 #import EpsilonOffset
 #import TriangleIntersectSuite
 #import QuatToMat
@@ -715,6 +717,10 @@ vec3 sample_direct_light_volume(vec3 pos, vec3 travel_dir, vec3 albedo) {
     return emission * albedo * hg_phase(dot(to_light, travel_dir), SPLAT_G) * vis / p_omega;
 }
 
+vec3 g_first_normal = vec3(0.0, 0.0, 1.0);
+float g_first_distance = -1.0;
+float g_first_surface = -1.0;
+
 vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     vec3 throughput = vec3(1.0);
     vec3 radiance = vec3(0.0);
@@ -733,6 +739,11 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
             firsthit = false;
             hit_id = hid;
             hit_distance = h.distance;
+            if (h.distance > 0.0) {
+                g_first_normal = dot(h.normal, ray.direction) > 0.0 ? -h.normal : h.normal;
+                g_first_distance = h.distance;
+                g_first_surface = float(h.material);
+            }
         }
         if (ubo.splats > 0) {
             float t_surface = h.distance > 0.0 ? h.distance : VOLUME_TFAR;
@@ -742,6 +753,9 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
                 vec3 albedo = splat_albedo(vol_id);
                 if (firstsplat && luminance(albedo) > 0.01) {
                     hit_id = vol_id + ubo.triangles;
+                    g_first_normal = -ray.direction;
+                    g_first_distance = t_vol;
+                    g_first_surface = -2.0;
                 }
                 if (ubo.splatshadows == 0) {
                     radiance += throughput * albedo;
@@ -844,6 +858,9 @@ void main() {
 
     // failures
     if (stack_failure) color = vec3(1.0, 0.0, 0.0);
+
+    // denoiser features
+    imageStore(gbufferImage, ivec2(rx, ry), vec4(encode_normal(normalize(g_first_normal)), g_first_distance, g_first_surface));
 
     // write to image
     if (ubo.reset != 0) {

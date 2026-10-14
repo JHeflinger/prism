@@ -78,6 +78,11 @@ typedef struct {
     alignas(4) float focus;
     alignas(4) uint32_t ortho;
     alignas(4) float orthosize;
+    alignas(4) uint32_t denoise;
+    alignas(4) uint32_t denoisepasses;
+    alignas(4) float denoisecolor;
+    alignas(4) float denoisenormal;
+    alignas(4) float denoisedepth;
 } UniformBufferObject;
 
 typedef struct {
@@ -172,6 +177,9 @@ typedef struct {
     VulkanRenderData renderdata;
     VulkanImage hdr[CPUSWAP_LENGTH];
     VulkanImage targets[CPUSWAP_LENGTH];
+    VulkanImage gbuffer[CPUSWAP_LENGTH];
+    VulkanImage denoise_a[CPUSWAP_LENGTH];
+    VulkanImage denoise_b[CPUSWAP_LENGTH];
 } VulkanRenderContext;
 
 typedef struct {

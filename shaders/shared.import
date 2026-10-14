@@ -159,6 +159,11 @@ export UniformBufferObjectDef {
         float focus;
         uint ortho;
         float orthosize;
+        uint denoise;
+        uint denoisepasses;
+        float denoisecolor;
+        float denoisenormal;
+        float denoisedepth;
     }
 }
 
@@ -304,6 +309,40 @@ export SceneLightDef {
 
 export HDRImageDef {
     uniform image2D hdrImage
+}
+
+export GBufferImageDef {
+    uniform image2D gbufferImage
+}
+
+export DenoiseImageADef {
+    uniform image2D denoiseImageA
+}
+
+export DenoiseImageBDef {
+    uniform image2D denoiseImageB
+}
+
+export GBufferSuite {
+    // gbuffer texel layout: xy = octahedral encoded normal, z = primary hit distance (< 0 on miss), w = surface id
+    // surface id: material index for triangles, -2 for splat volumes, -1 for misses
+    vec2 oct_wrap(vec2 v) {
+        return (1.0 - abs(v.yx)) * vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
+    }
+
+    vec2 encode_normal(vec3 n) {
+        n /= (abs(n.x) + abs(n.y) + abs(n.z));
+        n.xy = n.z >= 0.0 ? n.xy : oct_wrap(n.xy);
+        return n.xy;
+    }
+
+    vec3 decode_normal(vec2 e) {
+        vec3 n = vec3(e.x, e.y, 1.0 - abs(e.x) - abs(e.y));
+        float t = clamp(-n.z, 0.0, 1.0);
+        n.x += n.x >= 0.0 ? -t : t;
+        n.y += n.y >= 0.0 ? -t : t;
+        return normalize(n);
+    }
 }
 
 export MaterialSSBODef {

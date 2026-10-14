@@ -295,12 +295,14 @@ BOOL ResizeRenderer(size_t width, size_t height) {
         VUTIL_DestroyBuffer(g_renderer.vulkan.core.context.renderdata.ssbos[i]);
         UnloadRenderTexture(g_renderer.swapchain.target[i]);
     }
+    VCLEAN_DenoiseTargets(&(g_renderer.vulkan.core.context));
     VCLEAN_Bridge(g_renderer.vulkan.core.bridge);
     g_renderer.dimensions = (Vector2){ (float)width, (float)height };
     g_renderer.pixels = width * height;
     BOOL result =
         VINIT_TargetsHDR(g_renderer.vulkan.core.context.hdr) &&
         VINIT_Targets(g_renderer.vulkan.core.context.targets) &&
+        VINIT_DenoiseTargets(&(g_renderer.vulkan.core.context)) &&
         VINIT_ShaderStorageBuffers(g_renderer.vulkan.core.context.renderdata.ssbos) &&
         VINIT_Bridge(g_renderer.vulkan.core.bridge);
     EZ_ASSERT(result, "Failed to rebuild renderer resources at %zux%zu", width, height);
@@ -472,6 +474,11 @@ SceneCamera DefaultCamera() {
     sc.config.wireframe = TRUE;
     sc.config.normals = TRUE;
     sc.config.reset = FALSE;
+    sc.config.denoise = FALSE;
+    sc.config.denoiseiterations = 4;
+    sc.config.denoisecolor = 4.0f;
+    sc.config.denoisenormal = 64.0f;
+    sc.config.denoisedepth = 3.0f;
     sc.config.debug = DEBUG_NONE;
     sc.config.flags = PREVIEW_PIPELINE_FLAGS;
     sc.config.arap.iterations = 10;

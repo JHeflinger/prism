@@ -185,6 +185,20 @@ void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
     UIColumnHeader("Gamma", LEFT_COLUMN_WIDTH);
     UIDragFloat(&(cref->config.gamma), 0.01f, 999999999.0f, 0.1f, sboxwidth);
 
+    UIMoveCursor(0, 20.0f);
+    UIColumnHeader("Denoise", LEFT_COLUMN_WIDTH);
+    UICheckbox(&(cref->config.denoise));
+    if (!cref->config.denoise) DisableUI();
+    UIColumnHeader("Denoise Iterations", LEFT_COLUMN_WIDTH);
+    UIDragSize(&(cref->config.denoiseiterations), 0, 10, 1, sboxwidth);
+    UIColumnHeader("Color Sigma", LEFT_COLUMN_WIDTH);
+    UIDragFloat(&(cref->config.denoisecolor), 0.0f, 100.0f, 0.1f, sboxwidth);
+    UIColumnHeader("Normal Sigma", LEFT_COLUMN_WIDTH);
+    UIDragFloat(&(cref->config.denoisenormal), 0.0f, 512.0f, 1.0f, sboxwidth);
+    UIColumnHeader("Depth Sigma", LEFT_COLUMN_WIDTH);
+    UIDragFloat(&(cref->config.denoisedepth), 0.01f, 100.0f, 0.1f, sboxwidth);
+    EnableUI();
+
     SimpleCamera c = cref->core;
     SimpleCamera oldc = cref->core;
     BOOL used = FALSE;

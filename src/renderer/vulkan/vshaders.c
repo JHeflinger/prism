@@ -116,6 +116,33 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			},
 			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
 		};
+	} else if (strcmp(name, "gbufferImage") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_IMAGE,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.gbuffer[i].view)
+			},
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
+		};
+	} else if (strcmp(name, "denoiseImageA") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_IMAGE,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.denoise_a[i].view)
+			},
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
+		};
+	} else if (strcmp(name, "denoiseImageB") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_IMAGE,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.context.denoise_b[i].view)
+			},
+			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
+		};
 	} else if (strcmp(name, "outputImage") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_IMAGE,

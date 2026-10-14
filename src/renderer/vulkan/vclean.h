@@ -39,6 +39,8 @@ void VCLEAN_General(VulkanGeneral* general);
 
 void VCLEAN_RenderData(VulkanRenderData* renderdata);
 
+void VCLEAN_DenoiseTargets(VulkanRenderContext* context);
+
 void VCLEAN_RenderContext(VulkanRenderContext* context);
 
 void VCLEAN_Bridge(VulkanDataBuffer* bridges);

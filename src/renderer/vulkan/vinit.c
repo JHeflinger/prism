@@ -54,6 +54,10 @@ BOOL VINIT_Shaders(ARRLIST_VulkanShaderPtr* shaders) {
         "shaders/fluid.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
         g_vinit_renderer_ref,
+        "expanded/denoise.comp",
+        "shaders/denoise.comp.spv"));
+	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
+        g_vinit_renderer_ref,
         "expanded/tonemap.comp",
         "shaders/tonemap.comp.spv"));
 	ARRLIST_VulkanShaderPtr_add(shaders, GenerateShader(
@@ -384,7 +388,7 @@ BOOL VINIT_Pipeline(VulkanPipeline* pipeline) {
         layoutInfo.pSetLayouts = &(g_vinit_renderer_ref->vulkan.core.context.renderdata.descriptors[i].layout);
         layoutInfo.pushConstantRangeCount = 1;
         layoutInfo.pPushConstantRanges = &pushRange;
-        
+
         VkResult result = vkCreatePipelineLayout(
             g_vinit_renderer_ref->vulkan.core.general.interface,
             &(layoutInfo), NULL, &(pipeline->layout[i]));
@@ -503,6 +507,7 @@ BOOL VINIT_OverlayBridge(VulkanDataBuffer* bridges) {
 BOOL VINIT_RenderContext(VulkanRenderContext* context) {
     if (!VINIT_TargetsHDR(context->hdr)) return FALSE;
 	if (!VINIT_Targets(context->targets)) return FALSE;
+    if (!VINIT_DenoiseTargets(context)) return FALSE;
 	if (!VINIT_RenderData(&(context->renderdata))) return FALSE;
 	if (!VINIT_Pipeline(&(context->pipeline))) return FALSE;
     return TRUE;
@@ -711,6 +716,36 @@ BOOL VINIT_TargetsHDR(VulkanImage* hdr_arr) {
             VK_IMAGE_LAYOUT_GENERAL,
             1);
     }
+    return TRUE;
+}
+
+static BOOL VINIT_StorageImages(VulkanImage* arr, VkFormat format) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUTIL_CreateImage(
+            g_vinit_renderer_ref->dimensions.x,
+            g_vinit_renderer_ref->dimensions.y,
+            1,
+            VK_SAMPLE_COUNT_1_BIT,
+            format,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_STORAGE_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            &(arr[i]));
+        VUTIL_TransitionImageLayout(
+            arr[i].image,
+            format,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_GENERAL,
+            1);
+    }
+    return TRUE;
+}
+
+BOOL VINIT_DenoiseTargets(VulkanRenderContext* context) {
+    if (!VINIT_StorageImages(context->gbuffer, VK_FORMAT_R32G32B32A32_SFLOAT)) return FALSE;
+    if (!VINIT_StorageImages(context->denoise_a, VK_FORMAT_R16G16B16A16_SFLOAT)) return FALSE;
+    if (!VINIT_StorageImages(context->denoise_b, VK_FORMAT_R16G16B16A16_SFLOAT)) return FALSE;
     return TRUE;
 }
 

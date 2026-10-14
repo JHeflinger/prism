@@ -126,11 +126,20 @@ void VCLEAN_RenderData(VulkanRenderData* renderdata) {
     EZ_FREE(renderdata->descriptors);
 }
 
+void VCLEAN_DenoiseTargets(VulkanRenderContext* context) {
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
+        VUTIL_DestroyImage(context->gbuffer[i]);
+        VUTIL_DestroyImage(context->denoise_a[i]);
+        VUTIL_DestroyImage(context->denoise_b[i]);
+    }
+}
+
 void VCLEAN_RenderContext(VulkanRenderContext* context) {
     for (size_t i = 0; i < CPUSWAP_LENGTH; i++) {
         VUTIL_DestroyImage(context->targets[i]);
         VUTIL_DestroyImage(context->hdr[i]);
     }
+    VCLEAN_DenoiseTargets(context);
 
     VCLEAN_RenderData(&(context->renderdata));
 

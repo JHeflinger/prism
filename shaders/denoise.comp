@@ -1,0 +1,190 @@
+#import Boilerplate
+#import Definitions
+
+layout(binding = 0) readonly #import UniformBufferObjectDef ubo;
+layout(binding = 1, rgba32f) readonly #import HDRImageDef;
+layout(binding = 2, rgba32f) readonly #import GBufferImageDef;
+layout(binding = 3, rgba16f) #import DenoiseImageADef;
+layout(binding = 4, rgba16f) #import DenoiseImageBDef;
+
+layout(push_constant) uniform DenoisePushConstants {
+    uint stage;
+    uint stages;
+    uint unused;
+} pc;
+
+#import CutViewport
+#import GBufferSuite
+
+#define FIREFLY_SIGMA 2.0
+#define BILATERAL_SPATIAL_SIGMA 1.5
+#define DENOISE_EPS 1e-4
+
+const float b3_kernel[3] = float[3](3.0 / 8.0, 1.0 / 4.0, 1.0 / 16.0);
+
+struct Surface {
+    vec3 normal;
+    float distance;
+    float id;
+};
+
+float luminance(vec3 c) {
+    return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
+}
+
+bool valid_pixel(ivec2 p) {
+    return p.x >= 0 && p.y >= 0 && p.x < int(ubo.width) && p.y < int(ubo.height) && !cut_viewport(p.x, p.y);
+}
+
+Surface load_surface(ivec2 p) {
+    vec4 g = imageLoad(gbufferImage, p);
+    Surface s;
+    s.normal = decode_normal(g.xy);
+    s.distance = g.z;
+    s.id = g.w;
+    return s;
+}
+
+float pixel_footprint(float dist) {
+    if (ubo.ortho != 0u) return ubo.orthosize / ubo.height;
+    return 2.0 * dist * tan(ubo.fov * 0.5) / ubo.height;
+}
+
+float surface_weight(Surface p, Surface q, float pixel_dist) {
+    bool pmiss = p.distance <= 0.0;
+    bool qmiss = q.distance <= 0.0;
+    if (pmiss || qmiss) return (pmiss && qmiss) ? 1.0 : 0.0;
+    if (p.id != q.id) return 0.0;
+    float wn = pow(max(dot(p.normal, q.normal), 0.0), ubo.denoisenormal);
+    float dz = abs(p.distance - q.distance);
+    float wz = exp(-dz / (ubo.denoisedepth * pixel_footprint(p.distance) * pixel_dist + DENOISE_EPS));
+    return wn * wz;
+}
+
+bool writes_a(uint stage) {
+    return ((pc.stages - 1u - stage) & 1u) == 0u;
+}
+
+vec3 load_radiance(ivec2 p) {
+    float accumulated = float(ubo.samples) / ubo.swap;
+    return imageLoad(hdrImage, p).rgb / accumulated;
+}
+
+vec4 load_previous(ivec2 p) {
+    return writes_a(pc.stage) ? imageLoad(denoiseImageB, p) : imageLoad(denoiseImageA, p);
+}
+
+void store_result(ivec2 p, vec4 v) {
+    if (writes_a(pc.stage)) imageStore(denoiseImageA, p, v);
+    else imageStore(denoiseImageB, p, v);
+}
+
+vec4 prepass(ivec2 p, Surface sp) {
+    vec3 center = load_radiance(p);
+    float lc = luminance(center);
+    float sum = 0.0;
+    float sum2 = 0.0;
+    float count = 0.0;
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            if (x == 0 && y == 0) continue;
+            ivec2 q = p + ivec2(x, y);
+            if (!valid_pixel(q)) continue;
+            if (surface_weight(sp, load_surface(q), length(vec2(x, y))) < 0.5) continue;
+            float l = luminance(load_radiance(q));
+            sum += l;
+            sum2 += l * l;
+            count += 1.0;
+        }
+    }
+    if (count >= 3.0) {
+        float mean = sum / count;
+        float stddev = sqrt(max(sum2 / count - mean * mean, 0.0));
+        float limit = mean + FIREFLY_SIGMA * stddev + DENOISE_EPS;
+        if (lc > limit) {
+            center *= limit / lc;
+            lc = limit;
+        }
+    }
+    sum += lc;
+    sum2 += lc * lc;
+    count += 1.0;
+    float mean = sum / count;
+    float variance = max(sum2 / count - mean * mean, 0.0);
+    return vec4(center, variance);
+}
+
+vec4 bilateral(ivec2 p, Surface sp) {
+    vec4 center = load_previous(p);
+    float lp = luminance(center.rgb);
+    float range = 2.0 * ubo.denoisecolor * ubo.denoisecolor * center.a + DENOISE_EPS;
+    vec3 color = vec3(0.0);
+    float variance = 0.0;
+    float wsum = 0.0;
+    for (int y = -2; y <= 2; y++) {
+        for (int x = -2; x <= 2; x++) {
+            ivec2 q = p + ivec2(x, y);
+            if (!valid_pixel(q)) continue;
+            vec4 s = load_previous(q);
+            float d2 = float(x*x + y*y);
+            float dl = luminance(s.rgb) - lp;
+            float w = exp(-d2 / (2.0 * BILATERAL_SPATIAL_SIGMA * BILATERAL_SPATIAL_SIGMA))
+                    * exp(-(dl * dl) / range)
+                    * surface_weight(sp, load_surface(q), sqrt(d2));
+            color += w * s.rgb;
+            variance += w * w * s.a;
+            wsum += w;
+        }
+    }
+    return vec4(color / wsum, variance / (wsum * wsum));
+}
+
+vec4 atrous(ivec2 p, Surface sp, int step) {
+    vec4 center = load_previous(p);
+    float lp = luminance(center.rgb);
+    float blurred_variance = 0.0;
+    float vsum = 0.0;
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            ivec2 q = p + ivec2(x, y);
+            if (!valid_pixel(q)) continue;
+            float k = (x == 0 ? 0.5 : 0.25) * (y == 0 ? 0.5 : 0.25);
+            blurred_variance += k * load_previous(q).a;
+            vsum += k;
+        }
+    }
+    float sigma_l = ubo.denoisecolor * sqrt(max(blurred_variance / vsum, 0.0)) + DENOISE_EPS;
+    vec3 color = vec3(0.0);
+    float variance = 0.0;
+    float wsum = 0.0;
+    for (int y = -2; y <= 2; y++) {
+        for (int x = -2; x <= 2; x++) {
+            ivec2 offset = ivec2(x, y) * step;
+            ivec2 q = p + offset;
+            if (!valid_pixel(q)) continue;
+            vec4 s = load_previous(q);
+            float w = b3_kernel[abs(x)] * b3_kernel[abs(y)]
+                    * exp(-abs(luminance(s.rgb) - lp) / sigma_l)
+                    * surface_weight(sp, load_surface(q), length(vec2(offset)));
+            color += w * s.rgb;
+            variance += w * w * s.a;
+            wsum += w;
+        }
+    }
+    return vec4(color / wsum, variance / (wsum * wsum));
+}
+
+void main() {
+    if (gl_GlobalInvocationID.x >= uint(ubo.width) * uint(ubo.height)) return;
+    ivec2 p = ivec2(int(gl_GlobalInvocationID.x % uint(ubo.width)), int(gl_GlobalInvocationID.x / uint(ubo.width)));
+    if (cut_viewport(p.x, p.y)) {
+        store_result(p, vec4(0.0));
+        return;
+    }
+    Surface sp = load_surface(p);
+    vec4 result;
+    if (pc.stage == 0u) result = prepass(p, sp);
+    else if (pc.stage == 1u) result = bilateral(p, sp);
+    else result = atrous(p, sp, 1 << (pc.stage - 2u));
+    store_result(p, result);
+}
