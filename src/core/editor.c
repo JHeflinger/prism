@@ -26,7 +26,7 @@ static ARRLIST_UIConfig g_default_ui_config = { 0 };
 static void InitEditor() {
     InitConfig();
 	SetTraceLogLevel(LOG_NONE);
-    SetConfigFlags((CONFGET(Bool, "default_vsync", TRUE) ? FLAG_VSYNC_HINT : 0) | FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
+    SetConfigFlags((CONFGET(Bool, "default_vsync", TRUE) ? FLAG_VSYNC_HINT : 0) | FLAG_WINDOW_RESIZABLE);
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
     Image icon = LoadImage("assets/images/appico.png");
     SetWindowIcon(icon);
