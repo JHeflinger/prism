@@ -294,9 +294,9 @@ void InitializeRenderer() {
     SETVEC3(g_renderer.geometry.splatbounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
 
     // set up dimensions
-    g_renderer.dimensions = (Vector2){ 
-		g_override_resolution.x == 0 ? GetScreenWidth() : g_override_resolution.x,
-		g_override_resolution.y == 0 ? GetScreenHeight() : g_override_resolution.y };
+    g_renderer.dimensions = (Vector2){
+		g_override_resolution.x == 0 ? CONFGET(Float, "default_render_width", GetScreenWidth()) : g_override_resolution.x,
+		g_override_resolution.y == 0 ? CONFGET(Float, "default_render_height", GetScreenHeight()) : g_override_resolution.y };
 
     // initialize vulkan resources
 	VUTIL_SetVulkanUtilsContext(&g_renderer);

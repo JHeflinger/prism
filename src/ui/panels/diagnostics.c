@@ -1,6 +1,7 @@
 #include "diagnostics.h"
 #include "renderer/renderer.h"
 #include "ui/shared.h"
+#include <core/config.h>
 
 // WARN: this is mostly a scrap panel for temp controls and settings
 
@@ -74,6 +75,7 @@ static void DrawDevPanel(float width, float height) {
 }
 
 Panel GenerateDiagnosticsPanel() {
+    g_vsync_enabled = CONFGET(Bool, "default_vsync", TRUE);
 	Panel p = { 0 };
 	SetupPanel(&p, "Diagnostics");
 	p.draw = DrawDevPanel;
