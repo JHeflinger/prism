@@ -95,7 +95,7 @@ static void LoadRabbit() {
 }
 
 static void Screenshot() {
-    SaveRender("out.png");
+    SaveViewportRender("out.png");
 }
 
 static void ClearSoftScene() {

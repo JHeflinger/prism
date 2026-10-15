@@ -1608,10 +1608,23 @@ void UpdatePoses() {
     g_renderer.geometry.changes.update_poses = TRUE;
 }
 
+void SaveViewportRender(const char* filepath) {
+    Rectangle r = GetViewportRec();
+	RenderTexture rt = LoadRenderTexture(r.width, r.height);
+    BeginTextureMode(rt);
+    DrawHelper(0, 0, r.width, r.height, g_renderer.dimensions.x, g_renderer.dimensions.y);
+    EndTextureMode();
+    Image image = LoadImageFromTexture(rt.texture);
+    ImageFlipVertical(&image);
+    ExportImage(image, filepath);
+    UnloadImage(image);
+    UnloadRenderTexture(rt);
+}
+
 void SaveRender(const char* filepath) {
 	RenderTexture rt = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
     BeginTextureMode(rt);
-    DrawHelper(0, 0, g_renderer.dimensions.x, -g_renderer.dimensions.y, g_renderer.dimensions.x, g_renderer.dimensions.y);
+    DrawHelper(0, 0, -g_renderer.dimensions.x, g_renderer.dimensions.y, g_renderer.dimensions.x, g_renderer.dimensions.y);
     EndTextureMode();
     Image image = LoadImageFromTexture(rt.texture);
     ExportImage(image, filepath);

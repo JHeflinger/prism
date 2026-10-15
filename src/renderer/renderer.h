@@ -201,6 +201,8 @@ void UpdateSkins();
 
 void UpdatePoses();
 
+void SaveViewportRender(const char* filepath);
+
 void SaveRender(const char* filepath);
 
 BOOL CaptureRender(uint8_t* rgba);
