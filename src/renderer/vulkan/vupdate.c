@@ -263,7 +263,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             }
             continue;
         }
-        
+
         uint32_t invocations = (uint32_t)g_vupdt_renderer_ref->dimensions.x * (uint32_t)g_vupdt_renderer_ref->dimensions.y;
         uint32_t bvh_elements_size = !queue_update_splats_bvh ? g_vupdt_renderer_ref->geometry.splats.size : g_vupdt_renderer_ref->geometry.triangles.size;
         if (i >= nativeshaders) invocations = g_vupdt_renderer_ref->externals.data[i - nativeshaders].invocations;

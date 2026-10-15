@@ -13,10 +13,12 @@
 #include <ui/panels/console.h>
 #include <ui/panels/graph.h>
 #include <core/entrypoint.h>
+#include <util/logger.h>
 #include <core/config.h>
 #include <core/binds.h>
 #include <data/colors.h>
 #include <data/fonts.h>
+#include <easyfile.h>
 
 static UI* g_ui = NULL;
 static Vector2 g_windowsize = { -1.0f, -1.0f };
@@ -62,6 +64,9 @@ static void InitEditor() {
     SetUIConfig(&g_default_ui_config);
     LoadUIConfig(&g_ui, g_shared_panels);
     DevInitialize();
+    if (CONFGET(Bool, "persistent_session", TRUE) && ez_file_exists("session.prism"))
+        if (!LoadPRISM("session.prism"))
+            logerror("Unable to restore session");
 }
 
 static void UpdateEditor() {
@@ -89,6 +94,7 @@ static void EditorResized() {
 }
 
 static void CleanEditor() {
+    if (CONFGET(Bool, "persistent_session", TRUE)) SavePRISM("session.prism");
     CleanBinds();
     SaveUIConfig(g_ui);
     DestroyUI(g_ui);

@@ -1,6 +1,7 @@
 #include "loader.h"
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
+#include "data/defaults.h"
 #include <assimp/postprocess.h>
 #include <assimp/material.h>
 #include <assimp/cimport.h>
@@ -27,6 +28,8 @@
 #define MAX_PLY_HEADER_LINE 512
 #define MAX_PLY_PROPERTIES 128
 #define MAX_PLY_PROPERTY_NAME 64
+#define PRISM_MAGIC "PRSM"
+#define PRISM_VERSION 1u
 
 #define SET_MTL_FLOAT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
 #define SET_MTL_UINT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
@@ -35,6 +38,23 @@
     state->materials.data[state->materials.size - 1].field[1] = y; \
     state->materials.data[state->materials.size - 1].field[2] = z; \
 }
+#define PRISM_WRITE_LIST(s, list) { \
+    PrismWriteSize(s, (list).size); \
+    PrismWrite(s, (list).data, (list).size * sizeof(*((list).data))); }
+#define PRISM_READ_LIST(s, list) { \
+    size_t _n = PrismReadSize(s); \
+    (list).data = PrismReadElements(s, _n, sizeof(*((list).data))); \
+    (list).size = (list).data ? _n : 0; \
+    (list).maxsize = (list).size; }
+#define PRISM_WRITE_MAP(s, map) { \
+    PrismWriteSize(s, (map).capacity); \
+    PrismWrite(s, (map).entries, (map).capacity * sizeof(*((map).entries))); }
+#define PRISM_READ_MAP(s, map) { \
+    size_t _cap = PrismReadSize(s); \
+    if (_cap & (_cap - 1)) s->ok = FALSE; \
+    (map).entries = PrismReadElements(s, _cap, sizeof(*((map).entries))); \
+    (map).capacity = (map).entries ? _cap : 0; \
+    if ((map).capacity == 0) { (map).size = 0; (map).tombstones = 0; } }
 
 typedef struct {
     size_t face_index;
@@ -113,6 +133,12 @@ typedef struct {
     VertexID vstart;
     ARRLIST_Animation animations;
 } StateFBX;
+
+typedef struct {
+    FILE* file;
+    BOOL ok;
+    size_t remaining;
+} PrismStream;
 
 static void _aiv32v3(struct aiVector3D ai, vec3 out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; }
 static void _aiq2v(struct aiQuaternion ai, versor out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; out[3] = ai.w; }
@@ -768,6 +794,290 @@ static BOOL ConstructOBJ(const StateOBJ state) {
     return TRUE;
 }
 
+static void PrismWrite(PrismStream* s, const void* data, size_t size) {
+    if (!s->ok || size == 0) return;
+    if (fwrite(data, 1, size, s->file) != size) s->ok = FALSE;
+}
+
+static void PrismRead(PrismStream* s, void* data, size_t size) {
+    if (!s->ok || size == 0) return;
+    if (size > s->remaining || fread(data, 1, size, s->file) != size) { s->ok = FALSE; return; }
+    s->remaining -= size;
+}
+
+static BOOL PrismFits(PrismStream* s, size_t count, size_t elemsize) {
+    if (!s->ok) return FALSE;
+    if (elemsize != 0 && count > s->remaining / elemsize) { s->ok = FALSE; return FALSE; }
+    return TRUE;
+}
+
+static void PrismWriteSize(PrismStream* s, size_t v) {
+    uint64_t u = (uint64_t)v;
+    PrismWrite(s, &u, sizeof(u));
+}
+
+static size_t PrismReadSize(PrismStream* s) {
+    uint64_t u = 0;
+    PrismRead(s, &u, sizeof(u));
+    return s->ok ? (size_t)u : 0;
+}
+
+static void* PrismReadElements(PrismStream* s, size_t count, size_t elemsize) {
+    if (count == 0 || !PrismFits(s, count, elemsize)) return NULL;
+    void* ptr = EZ_ALLOC(count, elemsize);
+    PrismRead(s, ptr, count * elemsize);
+    return ptr;
+}
+
+static void PrismWriteString(PrismStream* s, const char* str) {
+    size_t len = str ? strlen(str) : 0;
+    PrismWriteSize(s, len);
+    PrismWrite(s, str, len);
+}
+
+static char* PrismReadString(PrismStream* s, size_t maxlen, size_t minsize) {
+    size_t len = PrismReadSize(s);
+    if (!s->ok) return NULL;
+    if (len > maxlen) { s->ok = FALSE; return NULL; }
+    size_t alloc = (len > minsize ? len : minsize) + 1;
+    char* str = EZ_ALLOC(alloc, sizeof(char));
+    PrismRead(s, str, len);
+    return str;
+}
+
+static void PrismWriteNames(PrismStream* s, ARRLIST_DynamicString* names) {
+    PrismWriteSize(s, names->size);
+    for (size_t i = 0; i < names->size; i++) PrismWriteString(s, names->data[i]);
+}
+
+static void PrismReadNames(PrismStream* s, ARRLIST_DynamicString* names, size_t maxlen) {
+    *names = (ARRLIST_DynamicString){ 0 };
+    size_t n = PrismReadSize(s);
+    if (n == 0 || !PrismFits(s, n, sizeof(uint64_t))) return;
+    names->data = EZ_ALLOC(n, sizeof(DynamicString));
+    names->size = n;
+    names->maxsize = n;
+    for (size_t i = 0; i < n && s->ok; i++) names->data[i] = PrismReadString(s, maxlen, maxlen);
+}
+
+static void PrismFreeNames(ARRLIST_DynamicString* names) {
+    if (names->data) for (size_t i = 0; i < names->size; i++) EZ_FREE(names->data[i]);
+    ARRLIST_DynamicString_clear(names);
+}
+
+static void PrismWriteAnimations(PrismStream* s, ARRLIST_MeshAnimation* anims) {
+    PrismWriteSize(s, anims->size);
+    for (size_t i = 0; i < anims->size; i++) {
+        MeshAnimation local;
+        memcpy(&local, &(anims->data[i]), sizeof(MeshAnimation));
+        MeshAnimation* ma = &local;
+        PrismWrite(s, ma, sizeof(MeshAnimation));
+        PrismWriteSize(s, ma->animations.size);
+        for (size_t j = 0; j < ma->animations.size; j++) {
+            Animation* a = &(ma->animations.data[j]);
+            PrismWrite(s, a, sizeof(Animation));
+            PrismWriteSize(s, a->channels.size);
+            for (size_t k = 0; k < a->channels.size; k++) {
+                BoneChannel* bc = &(a->channels.data[k]);
+                PrismWrite(s, bc, sizeof(BoneChannel));
+                PRISM_WRITE_LIST(s, bc->positions);
+                PRISM_WRITE_LIST(s, bc->rotations);
+                PRISM_WRITE_LIST(s, bc->scales);
+            }
+            PrismWriteString(s, j < ma->names.size ? ma->names.data[j] : a->name);
+        }
+    }
+}
+
+static void PrismFreeAnimations(ARRLIST_MeshAnimation* anims) {
+    if (anims->data) {
+        for (size_t i = 0; i < anims->size; i++) {
+            MeshAnimation local;
+            memcpy(&local, &(anims->data[i]), sizeof(MeshAnimation));
+            MeshAnimation* ma = &local;
+            if (ma->animations.data) {
+                for (size_t j = 0; j < ma->animations.size; j++) {
+                    Animation* a = &(ma->animations.data[j]);
+                    if (a->channels.data) {
+                        for (size_t k = 0; k < a->channels.size; k++) {
+                            ARRLIST_Vec3Key_clear(&(a->channels.data[k].positions));
+                            ARRLIST_QuatKey_clear(&(a->channels.data[k].rotations));
+                            ARRLIST_Vec3Key_clear(&(a->channels.data[k].scales));
+                        }
+                    }
+                    ARRLIST_BoneChannel_clear(&(a->channels));
+                }
+            }
+            ARRLIST_Animation_clear(&(ma->animations));
+            PrismFreeNames(&(ma->names));
+        }
+    }
+    ARRLIST_MeshAnimation_clear(anims);
+}
+
+static void PrismReadAnimations(PrismStream* s, ARRLIST_MeshAnimation* anims) {
+    *anims = (ARRLIST_MeshAnimation){ 0 };
+    size_t n = PrismReadSize(s);
+    if (n == 0 || !PrismFits(s, n, sizeof(MeshAnimation))) return;
+    anims->data = EZ_ALLOC(n, sizeof(MeshAnimation));
+    anims->size = n;
+    anims->maxsize = n;
+    for (size_t i = 0; i < n && s->ok; i++) {
+        MeshAnimation local;
+        MeshAnimation* ma = &local;
+        PrismRead(s, ma, sizeof(MeshAnimation));
+        ma->animations = (ARRLIST_Animation){ 0 };
+        ma->names = (ARRLIST_DynamicString){ 0 };
+        memcpy(&(anims->data[i]), ma, sizeof(MeshAnimation));
+        if (!s->ok) break;
+        size_t na = PrismReadSize(s);
+        if (na == 0 || !PrismFits(s, na, sizeof(Animation))) continue;
+        ma->animations.data = EZ_ALLOC(na, sizeof(Animation));
+        ma->animations.size = na;
+        ma->animations.maxsize = na;
+        ma->names.data = EZ_ALLOC(na, sizeof(DynamicString));
+        ma->names.size = na;
+        ma->names.maxsize = na;
+        memcpy(&(anims->data[i]), ma, sizeof(MeshAnimation));
+        for (size_t j = 0; j < na && s->ok; j++) {
+            Animation* a = &(ma->animations.data[j]);
+            PrismRead(s, a, sizeof(Animation));
+            a->channels = (ARRLIST_BoneChannel){ 0 };
+            if (!s->ok) break;
+            size_t nc = PrismReadSize(s);
+            if (nc > 0 && PrismFits(s, nc, sizeof(BoneChannel))) {
+                a->channels.data = EZ_ALLOC(nc, sizeof(BoneChannel));
+                a->channels.size = nc;
+                a->channels.maxsize = nc;
+                for (size_t k = 0; k < nc && s->ok; k++) {
+                    BoneChannel* bc = &(a->channels.data[k]);
+                    PrismRead(s, bc, sizeof(BoneChannel));
+                    bc->positions = (ARRLIST_Vec3Key){ 0 };
+                    bc->rotations = (ARRLIST_QuatKey){ 0 };
+                    bc->scales = (ARRLIST_Vec3Key){ 0 };
+                    PRISM_READ_LIST(s, bc->positions);
+                    PRISM_READ_LIST(s, bc->rotations);
+                    PRISM_READ_LIST(s, bc->scales);
+                }
+            }
+            ma->names.data[j] = PrismReadString(s, sizeof(a->name) - 1, 0);
+        }
+    }
+}
+
+static void PrismFreeGeometry(Geometry* g) {
+    ARRLIST_vec4_clear(&(g->vertices));
+    ARRLIST_vec4_clear(&(g->normals));
+    ARRLIST_SceneLight_clear(&(g->lights));
+    PrismFreeNames(&(g->lightnames));
+    ARRLIST_Triangle_clear(&(g->triangles));
+    ARRLIST_GaussianSplat_clear(&(g->splats));
+    ARRLIST_TriangleID_clear(&(g->emissives));
+    ARRLIST_SurfaceMaterial_clear(&(g->materials));
+    PrismFreeNames(&(g->materialnames));
+    ARRLIST_Skeleton_clear(&(g->skeletons));
+    PrismFreeAnimations(&(g->animations));
+    ARRLIST_VertexSkin_clear(&(g->skins));
+    ARRLIST_mat4_clear(&(g->poses));
+    HASHMAP_Locks_clear(&(g->locks));
+    HASHMAP_EdgeGlue_clear(&(g->glue));
+    ARRLIST_Edge_clear(&(g->edges));
+    ARRLIST_MeshDescriptor_clear(&(g->meshes));
+    PrismFreeNames(&(g->meshnames));
+    ARRLIST_SceneCamera_clear(&(g->cameras));
+    PrismFreeNames(&(g->cameranames));
+}
+
+static void PrismWriteGeometry(PrismStream* s, Geometry* g) {
+    PrismWrite(s, g, sizeof(Geometry));
+    PRISM_WRITE_LIST(s, g->vertices);
+    PRISM_WRITE_LIST(s, g->normals);
+    PRISM_WRITE_LIST(s, g->lights);
+    PrismWriteNames(s, &(g->lightnames));
+    PRISM_WRITE_LIST(s, g->triangles);
+    PRISM_WRITE_LIST(s, g->splats);
+    PRISM_WRITE_LIST(s, g->emissives);
+    PRISM_WRITE_LIST(s, g->materials);
+    PrismWriteNames(s, &(g->materialnames));
+    PRISM_WRITE_LIST(s, g->skeletons);
+    PrismWriteAnimations(s, &(g->animations));
+    PRISM_WRITE_LIST(s, g->skins);
+    PRISM_WRITE_LIST(s, g->poses);
+    PRISM_WRITE_MAP(s, g->locks);
+    PRISM_WRITE_MAP(s, g->glue);
+    PRISM_WRITE_LIST(s, g->edges);
+    PRISM_WRITE_LIST(s, g->meshes);
+    PrismWriteNames(s, &(g->meshnames));
+    PRISM_WRITE_LIST(s, g->cameras);
+    PrismWriteNames(s, &(g->cameranames));
+}
+
+static void PrismReadGeometry(PrismStream* s, Geometry* g) {
+    PrismRead(s, g, sizeof(Geometry));
+    g->manifold = (ManifoldMesh){ 0 };
+    g->arap = (ARAPData){ 0 };
+    g->fluid = (FluidSimulation){ 0 };
+    g->changes = (ChangeSet){ 0 };
+    g->vertices = (ARRLIST_vec4){ 0 };
+    g->normals = (ARRLIST_vec4){ 0 };
+    g->lights = (ARRLIST_SceneLight){ 0 };
+    g->lightnames = (ARRLIST_DynamicString){ 0 };
+    g->triangles = (ARRLIST_Triangle){ 0 };
+    g->splats = (ARRLIST_GaussianSplat){ 0 };
+    g->emissives = (ARRLIST_TriangleID){ 0 };
+    g->materials = (ARRLIST_SurfaceMaterial){ 0 };
+    g->materialnames = (ARRLIST_DynamicString){ 0 };
+    g->skeletons = (ARRLIST_Skeleton){ 0 };
+    g->animations = (ARRLIST_MeshAnimation){ 0 };
+    g->skins = (ARRLIST_VertexSkin){ 0 };
+    g->poses = (ARRLIST_mat4){ 0 };
+    HASHMAP_Locks locks = g->locks;
+    HASHMAP_EdgeGlue glue = g->glue;
+    g->locks = (HASHMAP_Locks){ 0 };
+    g->glue = (HASHMAP_EdgeGlue){ 0 };
+    g->edges = (ARRLIST_Edge){ 0 };
+    g->meshes = (ARRLIST_MeshDescriptor){ 0 };
+    g->meshnames = (ARRLIST_DynamicString){ 0 };
+    g->cameras = (ARRLIST_SceneCamera){ 0 };
+    g->cameranames = (ARRLIST_DynamicString){ 0 };
+    if (!s->ok) return;
+    PRISM_READ_LIST(s, g->vertices);
+    PRISM_READ_LIST(s, g->normals);
+    PRISM_READ_LIST(s, g->lights);
+    PrismReadNames(s, &(g->lightnames), MAX_LIGHT_NAME_SIZE);
+    PRISM_READ_LIST(s, g->triangles);
+    PRISM_READ_LIST(s, g->splats);
+    PRISM_READ_LIST(s, g->emissives);
+    PRISM_READ_LIST(s, g->materials);
+    PrismReadNames(s, &(g->materialnames), MAX_MATERIAL_NAME_SIZE);
+    PRISM_READ_LIST(s, g->skeletons);
+    PrismReadAnimations(s, &(g->animations));
+    PRISM_READ_LIST(s, g->skins);
+    PRISM_READ_LIST(s, g->poses);
+    g->locks.size = locks.size;
+    g->locks.tombstones = locks.tombstones;
+    PRISM_READ_MAP(s, g->locks);
+    g->glue.size = glue.size;
+    g->glue.tombstones = glue.tombstones;
+    PRISM_READ_MAP(s, g->glue);
+    PRISM_READ_LIST(s, g->edges);
+    PRISM_READ_LIST(s, g->meshes);
+    PrismReadNames(s, &(g->meshnames), MAX_MESH_NAME_SIZE);
+    PRISM_READ_LIST(s, g->cameras);
+    PrismReadNames(s, &(g->cameranames), MAX_CAMERA_NAME_SIZE);
+    if (!s->ok) return;
+    if (g->lightnames.size != g->lights.size ||
+        g->materialnames.size != g->materials.size ||
+        g->meshnames.size != g->meshes.size ||
+        g->cameranames.size != g->cameras.size) s->ok = FALSE;
+    for (size_t i = 0; s->ok && i < g->triangles.size; i++) {
+        Triangle t = g->triangles.data[i];
+        if (t.a >= g->vertices.size || t.b >= g->vertices.size || t.c >= g->vertices.size ||
+            t.material >= g->materials.size) s->ok = FALSE;
+    }
+    if (s->ok && g->cameras.size > 0 && g->primarycamera >= g->cameras.size) g->primarycamera = 0;
+}
+
 const char* GetOpenFile(const char* type) {
     nfdchar_t* outpath = NULL;
     nfdresult_t result = NFD_OpenDialog(type, NULL, &outpath);
@@ -1209,5 +1519,94 @@ BOOL LoadPLY(const char* filepath) {
     for (size_t i = 0; i < splats.size; i++) SubmitSplat(splats.data[i]);
     ARRLIST_GaussianSplat_clear(&splats);
     loginfo("Loaded %zu Gaussian splats from \"%s\"", header.vertex_count, filepath);
+    return TRUE;
+}
+
+BOOL LoadPRISM(const char* filepath) {
+    if (!filepath) {
+        logerror("Cannot load from a NULL filepath");
+        return FALSE;
+    }
+    FILE* file = fopen(filepath, "rb");
+    if (!file) {
+        logerror("Unable to open PRISM file \"%s\": %s", filepath, strerror(errno));
+        return FALSE;
+    }
+    PrismStream s = { file, TRUE, 0 };
+    if (fseek(file, 0, SEEK_END) == 0) {
+        long len = ftell(file);
+        s.remaining = len > 0 ? (size_t)len : 0;
+    }
+    fseek(file, 0, SEEK_SET);
+    char magic[4] = { 0 };
+    uint32_t version = 0;
+    uint64_t geomsize = 0;
+    PrismRead(&s, magic, sizeof(magic));
+    PrismRead(&s, &version, sizeof(version));
+    PrismRead(&s, &geomsize, sizeof(geomsize));
+    if (!s.ok || memcmp(magic, PRISM_MAGIC, 4) != 0) {
+        fclose(file);
+        logerror("\"%s\" is not a PRISM session file (or was written by an older, incompatible version)", filepath);
+        return FALSE;
+    }
+    if (version != PRISM_VERSION || geomsize != sizeof(Geometry)) {
+        fclose(file);
+        logerror("PRISM file \"%s\" was written by an incompatible build (version %u, layout %llu; expected version %u, layout %llu)",
+            filepath, version, (unsigned long long)geomsize, PRISM_VERSION, (unsigned long long)sizeof(Geometry));
+        return FALSE;
+    }
+    Geometry loaded = { 0 };
+    PrismReadGeometry(&s, &loaded);
+    fclose(file);
+    if (!s.ok) {
+        PrismFreeGeometry(&loaded);
+        logerror("PRISM file \"%s\" is truncated or corrupt", filepath);
+        return FALSE;
+    }
+    ClearScene(TRUE);
+    Renderer* renderer = RawRendererRef();
+    Geometry* live = &(renderer->geometry);
+    PrismFreeGeometry(live);
+    loaded.manifold = live->manifold;
+    loaded.arap = live->arap;
+    loaded.fluid = live->fluid;
+    loaded.changes = live->changes;
+    *live = loaded;
+    UpdateNormals();
+    UpdateVertices();
+    UpdateMaterials();
+    UpdateLights();
+    UpdateTriangles();
+    UpdateMeshes();
+    UpdateSkins();
+    UpdatePoses();
+    UpdateSplats();
+    loginfo("Successfully loaded prism session from \"%s\"", filepath);
+    return TRUE;
+}
+
+BOOL SavePRISM(const char* filepath) {
+    if (!filepath) {
+        logerror("Cannot save to a NULL filepath");
+        return FALSE;
+    }
+    FILE* file = fopen(filepath, "wb");
+    if (!file) {
+        logerror("Unable to open PRISM file \"%s\": %s", filepath, strerror(errno));
+        return FALSE;
+    }
+    PrismStream s = { file, TRUE, 0 };
+    uint32_t version = PRISM_VERSION;
+    uint64_t geomsize = sizeof(Geometry);
+    PrismWrite(&s, PRISM_MAGIC, 4);
+    PrismWrite(&s, &version, sizeof(version));
+    PrismWrite(&s, &geomsize, sizeof(geomsize));
+    PrismWriteGeometry(&s, &(RawRendererRef()->geometry));
+    if (fclose(file) != 0) s.ok = FALSE;
+    if (!s.ok) {
+        logerror("Failed while writing PRISM file \"%s\"", filepath);
+        return FALSE;
+    }
+    loginfo("Saved session to \"%s\"", filepath);
     return TRUE;
 }

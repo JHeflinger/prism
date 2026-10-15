@@ -13,4 +13,8 @@ BOOL LoadFBX(const char* filepath);
 
 BOOL LoadPLY(const char* filepath);
 
+BOOL LoadPRISM(const char* filepath);
+
+BOOL SavePRISM(const char* filepath);
+
 #endif

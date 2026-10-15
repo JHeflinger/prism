@@ -26,7 +26,7 @@ static cholmod_common g_cholmod = { 0 };
 
 static void CleanARAP() {
     #ifndef NO_MESH_MANIPULATION_SUPPORT
-    if (g_renderer.geometry.arap.values != NULL) {
+    {
         EZ_FREE(g_renderer.geometry.arap.values);
         EZ_FREE(g_renderer.geometry.arap.cindices);
         EZ_FREE(g_renderer.geometry.arap.rpointers);
@@ -44,8 +44,8 @@ static void CleanARAP() {
         EZ_FREE(g_renderer.geometry.arap.u);
         EZ_FREE(g_renderer.geometry.arap.normals);
         EZ_FREE(g_renderer.geometry.arap.areas);
-        cholmod_free_sparse(&g_renderer.geometry.arap.A, &g_cholmod);
-        cholmod_free_factor(&g_renderer.geometry.arap.L, &g_cholmod);
+        if (g_renderer.geometry.arap.A != NULL) cholmod_free_sparse(&g_renderer.geometry.arap.A, &g_cholmod);
+        if (g_renderer.geometry.arap.L != NULL) cholmod_free_factor(&g_renderer.geometry.arap.L, &g_cholmod);
     }
     g_renderer.geometry.arap.values = NULL;
     g_renderer.geometry.arap.cindices = NULL;
@@ -242,6 +242,10 @@ static void ReconstructARAP() {
     for (size_t i = 0; i < g_renderer.geometry.vertices.size; i++)
         glm_vec3_normalize(g_renderer.geometry.arap.normals[i]);
     #endif
+}
+
+Renderer* RawRendererRef() {
+    return &g_renderer;
 }
 
 PipelineFlags GetPipelineFlags() {

@@ -3,6 +3,8 @@
 
 #include "renderer/vulkan/vstructs.h"
 
+Renderer* RawRendererRef();
+
 PipelineFlags GetPipelineFlags();
 
 void SetPipelineFlags(PipelineFlags flags);
