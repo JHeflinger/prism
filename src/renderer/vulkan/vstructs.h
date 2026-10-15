@@ -106,6 +106,9 @@ typedef struct {
 	alignas(4) uint32_t divisor;
     alignas(4) uint32_t mode;
     alignas(4) uint32_t wireframe;
+    alignas(4) uint32_t single_selected_lid;
+    alignas(4) uint32_t light_base;
+    alignas(4) uint32_t light_count;
 } OverlayUniformBufferObject;
 
 typedef struct {

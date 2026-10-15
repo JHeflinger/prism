@@ -6,6 +6,7 @@ static Rectangle g_viewport_dims = { 0 };
 static OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (TriangleID)-1, { 0, 0 }, { 0, 0 } };
 static TriangleID g_single_selected_triangle = -1;
 static VertexID g_single_selected_vertex = -1;
+static LightID g_single_selected_light = -1;
 static OverlayMode g_overlay_mode = NO_SELECT_MODE;
 
 static void SelectNoneMode() {
@@ -20,6 +21,10 @@ static void SelectVertexMode() {
     g_overlay_mode = VERTEX_SELECT_MODE;
 }
 
+static void SelectLightMode() {
+    g_overlay_mode = LIGHT_SELECT_MODE;
+}
+
 void SetOverlayContext(Renderer* renderer) {
     g_overlay_renderer_ref = renderer;
     AddBind("no select mode", SelectNoneMode,
@@ -31,6 +36,9 @@ void SetOverlayContext(Renderer* renderer) {
     AddBind("vertex select mode", SelectVertexMode,
         (BindCommand){ IK_SELECT, BIND_KEY_DOWN },
         (BindCommand){ IK_SELECT_VERTEX, BIND_KEY_PRESSED });
+    AddBind("light select mode", SelectLightMode,
+        (BindCommand){ IK_SELECT, BIND_KEY_DOWN },
+        (BindCommand){ IK_SELECT_LIGHT, BIND_KEY_PRESSED });
 }
 
 void SetViewportRec(Rectangle rec) {
@@ -73,4 +81,19 @@ void SetSelectedVertex(VertexID vid) {
 
 VertexID GetSelectedVertex() {
     return g_single_selected_vertex;
+}
+
+LightID HoveredLight() {
+    if (g_overlay_mode != LIGHT_SELECT_MODE) return (LightID)-1;
+    LightID lid = g_exposed_overlay_ssbo.hovered_tid;
+    if (g_overlay_renderer_ref && lid >= g_overlay_renderer_ref->geometry.lights.size) return (LightID)-1;
+    return lid;
+}
+
+void SetSelectedLight(LightID lid) {
+    g_single_selected_light = lid;
+}
+
+LightID GetSelectedLight() {
+    return g_single_selected_light;
 }

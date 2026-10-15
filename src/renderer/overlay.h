@@ -7,6 +7,8 @@ typedef enum {
     NO_SELECT_MODE = 0,
     TRIANGLE_SELECT_MODE = 1,
     VERTEX_SELECT_MODE = 2,
+    SPLAT_SELECT_MODE = 3,
+    LIGHT_SELECT_MODE = 4,
 } OverlayMode;
 
 void SetOverlayContext(Renderer* renderer);
@@ -30,5 +32,11 @@ VertexID HoveredVertex();
 void SetSelectedVertex(VertexID vid);
 
 VertexID GetSelectedVertex();
+
+LightID HoveredLight();
+
+void SetSelectedLight(LightID lid);
+
+LightID GetSelectedLight();
 
 #endif

@@ -142,4 +142,10 @@ void main() {
 		highlight_triangle(o_ubo.single_selected_tid);
 	if (o_ubo.mode != VERTEX_SELECT || hovered_tid != o_ubo.single_selected_vid)
 		highlight_vertex(o_ubo.single_selected_vid, selected_vertex_position);
+    if (o_ubo.mode == LIGHT_SELECT) {
+        if (hovered_tid != uint(-1) && hovered_tid < o_ubo.light_count && hovered_tid != o_ubo.single_selected_lid)
+            highlight_triangle(o_ubo.light_base + hovered_tid);
+        if (o_ubo.single_selected_lid != uint(-1) && o_ubo.single_selected_lid < o_ubo.light_count)
+            highlight_triangle(o_ubo.light_base + o_ubo.single_selected_lid);
+    }
 }

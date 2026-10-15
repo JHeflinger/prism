@@ -461,6 +461,14 @@ static void UpdateViewportPanel(float width, float height) {
                     DeselectEditTarget();
                 }
                 break;
+            case LIGHT_SELECT_MODE:
+                LightID lindex = HoveredLight();
+                if (lindex != (LightID)-1) {
+                    SetEditLight(lindex);
+                } else {
+                    DeselectEditTarget();
+                }
+                break;
             default: DeselectEditTarget();
         }
     }

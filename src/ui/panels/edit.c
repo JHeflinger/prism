@@ -423,6 +423,7 @@ void SetEditCamera(size_t index) {
     g_edit_type = EDIT_CAMERA;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((VertexID)-1);
+    SetSelectedLight((LightID)-1);
 }
 
 void SetEditMaterial(size_t index) {
@@ -431,6 +432,7 @@ void SetEditMaterial(size_t index) {
     g_edit_type = EDIT_MATERIAL;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((VertexID)-1);
+    SetSelectedLight((LightID)-1);
 }
 
 void SetEditLight(size_t index) {
@@ -439,6 +441,7 @@ void SetEditLight(size_t index) {
     g_edit_type = EDIT_LIGHT;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((VertexID)-1);
+    SetSelectedLight((LightID)index);
 }
 
 void SetEditTriangle(size_t index) {
@@ -447,6 +450,7 @@ void SetEditTriangle(size_t index) {
     g_edit_type = EDIT_SINGLE_TRIANGLE;
     SetSelectedVertex((VertexID)-1);
     SetSelectedTriangle(index);
+    SetSelectedLight((LightID)-1);
 }
 
 void SetEditVertex(size_t index) {
@@ -455,6 +459,7 @@ void SetEditVertex(size_t index) {
     g_edit_type = EDIT_SINGLE_VERTEX;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex(index);
+    SetSelectedLight((LightID)-1);
 }
 
 void SetEditForce(size_t index) {
@@ -463,6 +468,7 @@ void SetEditForce(size_t index) {
     g_edit_type = EDIT_SINGLE_FORCE;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((VertexID)-1);
+    SetSelectedLight((LightID)-1);
 }
 
 void SetEditSource(size_t index) {
@@ -471,6 +477,7 @@ void SetEditSource(size_t index) {
     g_edit_type = EDIT_SINGLE_SOURCE;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((VertexID)-1);
+    SetSelectedLight((LightID)-1);
 }
 
 void SetEditMesh(size_t index) {
@@ -479,6 +486,7 @@ void SetEditMesh(size_t index) {
     g_edit_type = EDIT_MESH;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((VertexID)-1);
+    SetSelectedLight((LightID)-1);
 }
 
 BOOL GetEditTarget(EditType* type, size_t* index) {
@@ -492,6 +500,7 @@ void DeselectEditTarget() {
     g_item_selected = FALSE;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((VertexID)-1);
+    SetSelectedLight((LightID)-1);
 }
 
 Panel GenerateEditPanel() {

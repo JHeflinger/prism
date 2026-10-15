@@ -547,6 +547,9 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.divisor = RendererCamera()->config.flags & PATHTRACE_SHADER_FLAG ? CPUSWAP_LENGTH : 1;
         ubo.mode = GetOverlayMode();
         ubo.wireframe = (uint32_t)RendererCamera()->config.wireframe;
+        ubo.light_base = (uint32_t)(g_vupdt_renderer_ref->geometry.triangles.size + g_vupdt_renderer_ref->geometry.splats.size);
+        ubo.light_count = (uint32_t)g_vupdt_renderer_ref->geometry.lights.size;
+        ubo.single_selected_lid = GetSelectedLight() < g_vupdt_renderer_ref->geometry.lights.size ? GetSelectedLight() : (uint32_t)-1;
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
 

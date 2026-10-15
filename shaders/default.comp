@@ -7,6 +7,7 @@
 #import TriangleDef;
 #import HitDef;
 #import SplatDef;
+#import SceneLightDef;
 
 layout(binding = 0) #import UniformBufferObjectDef ubo;
 layout(binding = 1) #import RayGeneratorSSBODef;
@@ -16,8 +17,11 @@ layout(binding = 4) readonly #import TransformedVertexSSBODef;
 layout(binding = 5) readonly #import NormalSSBODef;
 layout(binding = 6) readonly #import BVHNodeSSBODef;
 layout(binding = 7) readonly #import SplatSSBODef;
+layout(binding = 8) readonly #import LightSSBODef;
+layout(binding = 9) #import OverlayUniformBufferObjectDef o_ubo;
 
 #import CreateSimpleRay
+#import LightGlyphSuite
 #import CutViewport
 #import TriangleIntersectSuite
 #import QuatToMat
@@ -157,6 +161,20 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
         color = mix(background_color, vec3(0.7), gridmix);
     }
     hit_distance = hit.distance;
+
+    if (o_ubo.mode == LIGHT_SELECT && ubo.lights > 0) {
+        float light_t;
+        vec3 light_n;
+        uint lid = trace_light_glyphs(ray, light_t, light_n);
+        if (lid != uint(-1)) {
+            vec3 glyph = light_glyph_color(lightIn[lid], ray, light_n);
+            bool occluded = hit.distance > 0.0 && hit.distance < light_t;
+            color = occluded ? mix(color, glyph, 0.05) : glyph;
+            hit_id = o_ubo.light_base + lid;
+            hit_distance = light_t;
+        }
+    }
+
     if (ubo.debugmode == DEBUG_BVH) {
         float bvhmix = float(bvh_counter) / 100.0;
         color = mix(color, vec3(0, 1, 0), pow(bvhmix, 3.0));

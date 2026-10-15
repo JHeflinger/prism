@@ -9,6 +9,7 @@ export Definitions {
     #define TRIANGLE_SELECT 1
     #define VERTEX_SELECT 2
     #define SPLAT_SELECT 3
+    #define LIGHT_SELECT 4
     #define EPS 0.000001
     #define DEBUG_NONE 0
     #define DEBUG_NORMALS 1
@@ -114,6 +115,9 @@ export OverlayUniformBufferObjectDef {
         uint divisor;
         uint mode;
         uint wireframe;
+        uint single_selected_lid;
+        uint light_base;
+        uint light_count;
     }
 }
 
@@ -437,6 +441,117 @@ export CreateSimpleRay {
             ray.position = ubo.position;
         }
         return ray;
+    }
+}
+
+export LightGlyphSuite {
+    const float LIGHT_GLYPH_SPHERE_PX = 9.0;
+    const float LIGHT_GLYPH_CONE_PX = 34.0;
+    const float LIGHT_GLYPH_MIN_HALF_ANGLE = 0.05;
+    const float LIGHT_GLYPH_MAX_HALF_ANGLE = 1.31;
+    const uint LIGHT_GLYPH_NONE = 0u;
+    const uint LIGHT_GLYPH_SPOT = 1u;
+    const uint LIGHT_GLYPH_POINT = 2u;
+
+    uint light_glyph_type(SceneLight light) {
+        if (light.direction == vec3(0)) return LIGHT_GLYPH_POINT;
+        if (light.angle != 0.0) return LIGHT_GLYPH_SPOT;
+        return LIGHT_GLYPH_NONE;
+    }
+
+    float glyph_world_per_pixel(vec3 point) {
+        if (ubo.ortho != 0u) return ubo.orthosize / ubo.height;
+        float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * (ubo.width / 2.0);
+        float depth = max(dot(point - ubo.position, -ubo.w), EPS);
+        return depth / d;
+    }
+
+    bool glyph_sphere(Ray ray, vec3 center, float radius, inout float t, inout vec3 n) {
+        vec3 oc = ray.position - center;
+        float b = dot(oc, ray.direction);
+        float c = dot(oc, oc) - radius * radius;
+        float h = b * b - c;
+        if (h < 0.0) return false;
+        h = sqrt(h);
+        float tt = -b - h;
+        if (tt <= EPS) tt = -b + h;
+        if (tt <= EPS || tt >= t) return false;
+        t = tt;
+        n = normalize(ray.position + ray.direction * tt - center);
+        return true;
+    }
+
+    bool glyph_cone(Ray ray, vec3 apex, vec3 axis, float halfangle, float height, inout float t, inout vec3 n) {
+        bool found = false;
+        float cosa = cos(halfangle);
+        float c2 = cosa * cosa;
+        vec3 co = ray.position - apex;
+        float dv = dot(ray.direction, axis);
+        float cv = dot(co, axis);
+        float a = dv * dv - c2;
+        float b = 2.0 * (dv * cv - c2 * dot(ray.direction, co));
+        float c = cv * cv - c2 * dot(co, co);
+        if (abs(a) > EPS) {
+            float disc = b * b - 4.0 * a * c;
+            if (disc >= 0.0) {
+                float sq = sqrt(disc);
+                float roots[2] = float[2]((-b - sq) / (2.0 * a), (-b + sq) / (2.0 * a));
+                for (int i = 0; i < 2; i++) {
+                    float tt = roots[i];
+                    if (tt <= EPS || tt >= t) continue;
+                    vec3 cp = co + ray.direction * tt;
+                    float h = dot(cp, axis);
+                    if (h < 0.0 || h > height) continue; // mirrored nappe or past the base
+                    t = tt;
+                    n = normalize(c2 * cp - h * axis);
+                    found = true;
+                }
+            }
+        }
+        if (abs(dv) > EPS) {
+            float tt = (height - cv) / dv;
+            if (tt > EPS && tt < t) {
+                vec3 radial = co + ray.direction * tt - axis * height;
+                float rb = height * tan(halfangle);
+                if (dot(radial, radial) <= rb * rb) {
+                    t = tt;
+                    n = axis;
+                    found = true;
+                }
+            }
+        }
+        return found;
+    }
+
+    uint trace_light_glyphs(Ray ray, out float t, out vec3 n) {
+        t = FLTMAX;
+        n = vec3(0, 0, 1);
+        uint id = uint(-1);
+        for (uint i = 0; i < ubo.lights; i++) {
+            SceneLight light = lightIn[i];
+            uint type = light_glyph_type(light);
+            bool hit = false;
+            if (type == LIGHT_GLYPH_POINT) {
+                hit = glyph_sphere(ray, light.position,
+                    LIGHT_GLYPH_SPHERE_PX * glyph_world_per_pixel(light.position), t, n);
+            } else if (type == LIGHT_GLYPH_SPOT) {
+                float halfangle = clamp(radians(abs(light.angle) / 2.0), LIGHT_GLYPH_MIN_HALF_ANGLE, LIGHT_GLYPH_MAX_HALF_ANGLE);
+                float slant = LIGHT_GLYPH_CONE_PX * glyph_world_per_pixel(light.position);
+                hit = glyph_cone(ray, light.position, normalize(light.direction), halfangle,
+                    slant * cos(halfangle), t, n);
+            }
+            if (hit) id = i;
+        }
+        if (dot(n, ray.direction) > 0.0) n = -n;
+        return id;
+    }
+
+    vec3 light_glyph_color(SceneLight light, Ray ray, vec3 n) {
+        float m = max(max(light.color.r, light.color.g), light.color.b);
+        vec3 hue = m > EPS ? max(light.color, vec3(0)) / m : vec3(0.6);
+        hue = mix(hue, vec3(1.0), 0.35);
+        float facing = max(dot(n, -ray.direction), 0.0);
+        return hue * (0.35 + 0.65 * facing);
     }
 }
 
