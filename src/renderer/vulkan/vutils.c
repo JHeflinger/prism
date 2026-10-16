@@ -129,6 +129,7 @@ void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize
 }
 
 void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {
+    if (size == 0) return;
     VkDeviceSize align  = 256;
     VkDeviceSize offset = (g_vutil_renderer_ref->vulkan.core.transfer.offset + align - 1) & ~(align - 1);
     if (offset + buffersize > g_vutil_renderer_ref->vulkan.core.transfer.size) {
