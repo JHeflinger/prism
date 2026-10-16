@@ -512,5 +512,6 @@ Panel GenerateViewportPanel() {
     AddBind("snap to -X", SnapNXAxis, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_ALIGN_X, BIND_KEY_PRESSED });
     AddBind("snap to -Y", SnapNYAxis, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_ALIGN_Y, BIND_KEY_PRESSED });
     AddBind("snap to -Z", SnapNZAxis, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_ALIGN_Z, BIND_KEY_PRESSED });
+    AddBind("delete selected", DeleteEditTarget, (BindCommand){ IK_DELETE, BIND_KEY_PRESSED });
     return p;
 }

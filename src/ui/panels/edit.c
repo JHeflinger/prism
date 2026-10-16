@@ -13,7 +13,7 @@ static BOOL g_item_selected = FALSE;
 static EditType g_edit_type = EDIT_MATERIAL;
 static const char* g_light_types[] = { "Directional", "Spot", "Point" };
 
-void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, float height) {
+static void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, float height) {
     BOOL edited = FALSE;
     UIMoveCursor((width - 20 - UITextWidth("Edit Material")) / 2.0f, 0);
     UIDrawText("Edit Material");
@@ -52,7 +52,7 @@ void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, float he
     if (edited) UpdateMaterials();
 }
 
-void DrawEditLight(SceneLight* lref, char* name, float width, float height) {
+static void DrawEditLight(SceneLight* lref, char* name, float width, float height) {
     BOOL edited = FALSE;
     int light_type = 0;
     if (lref->direction[0] == 0 && lref->direction[1] == 0 && lref->direction[2] == 0) {
@@ -80,7 +80,7 @@ void DrawEditLight(SceneLight* lref, char* name, float width, float height) {
     if (edited) UpdateLights();
 }
 
-void DrawEditMesh(MeshDescriptor* md, char* name, float width, float height) {
+static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float height) {
     BOOL edited = FALSE;
     UIMoveCursor((width - 20 - UITextWidth("Edit Object")) / 2.0f, 0);
     UIDrawText("Edit Object");
@@ -120,7 +120,7 @@ void DrawEditMesh(MeshDescriptor* md, char* name, float width, float height) {
     if (edited) UpdateObjectTransform(g_edit_item_index);
 }
 
-void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
+static void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
     UIMoveCursor((width - 20 - UITextWidth("Edit Camera")) / 2.0f, 0);
     UIDrawText("Edit Camera");
     UIMoveCursor(0, 15);
@@ -239,6 +239,7 @@ void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
 }
 
 static void DrawEditPanel(float width, float height) {
+    float cursory = UIGetCursor().y;
     if (g_item_selected) {
         if (g_edit_type == EDIT_MATERIAL) {
             SurfaceMaterial* matref = MaterialReference(g_edit_item_index);
@@ -411,9 +412,38 @@ static void DrawEditPanel(float width, float height) {
         } else {
             EZ_FATAL("Unhandled edit type detected");
         }
+        float drawnheight = UIGetCursor().y - cursory;
+        if (drawnheight > height - 70) {
+            UIMoveCursor(0, 20);
+            if (UIButton("Delete", width - 20)) DeleteEditTarget();
+        } else {
+            Vector2 backup = UIGetCursor();
+            UISetCursor(10, height - 60);
+            if (UIButton("Delete", width - 20)) DeleteEditTarget();
+            UISetCursor(backup.x, backup.y);
+        }
     } else {
         UISetCursor((width - UITextWidth("No Selected Element"))/2.0f, height / 2.0f - 20);
         UIDrawText("No Selected Element");
+    }
+}
+
+BOOL GetEditTarget(EditType* type, size_t* index) {
+    if (!g_item_selected) return FALSE;
+    *type = g_edit_type;
+    *index = g_edit_item_index;
+    return TRUE;
+}
+
+void FixDeleteEditTarget(EditType type, size_t index) {
+    if (!g_item_selected) return;
+    if (index > g_edit_item_index) return;
+    if (type == g_edit_type) {
+        if (index == g_edit_item_index) {
+            DeselectEditTarget();
+        } else {
+            g_edit_item_index--;
+        }
     }
 }
 
@@ -489,18 +519,42 @@ void SetEditMesh(size_t index) {
     SetSelectedLight((LightID)-1);
 }
 
-BOOL GetEditTarget(EditType* type, size_t* index) {
-    if (!g_item_selected) return FALSE;
-    *type = g_edit_type;
-    *index = g_edit_item_index;
-    return TRUE;
-}
-
 void DeselectEditTarget() {
     g_item_selected = FALSE;
     SetSelectedTriangle((TriangleID)-1);
     SetSelectedVertex((VertexID)-1);
     SetSelectedLight((LightID)-1);
+}
+
+void DeleteEditTarget() {
+    if (!g_item_selected) {
+        logwarn("Nothing selected to delete");
+        return;
+    }
+    switch (g_edit_type) {
+        case EDIT_MATERIAL:
+            if (!DeleteMaterial(g_edit_item_index)) return;
+            break;
+        case EDIT_LIGHT:
+            if (!DeleteLight(g_edit_item_index)) return;
+            break;
+        case EDIT_SINGLE_TRIANGLE:
+            if (!DeleteTriangle(g_edit_item_index)) return;
+            break;
+        case EDIT_SINGLE_VERTEX:
+            if (!DeleteVertex(g_edit_item_index)) return;
+            break;
+        case EDIT_MESH:
+            if (!DeleteMesh(g_edit_item_index)) return;
+            break;
+        case EDIT_CAMERA:
+            if (!DeleteCamera(g_edit_item_index)) return;
+            break;
+        default:
+            logerror("Deleting this element has not been supported yet");
+            return;
+    }
+    DeselectEditTarget();
 }
 
 Panel GenerateEditPanel() {

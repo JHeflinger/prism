@@ -235,4 +235,16 @@ void SubmitSplat(GaussianSplat splat);
 
 void UpdateSplats();
 
+BOOL DeleteMaterial(MaterialID id);
+
+BOOL DeleteLight(LightID id);
+
+BOOL DeleteTriangle(TriangleID id);
+
+BOOL DeleteVertex(VertexID id);
+
+BOOL DeleteMesh(size_t id);
+
+BOOL DeleteCamera(size_t id);
+
 #endif

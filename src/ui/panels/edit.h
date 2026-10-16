@@ -17,6 +17,8 @@ typedef enum {
 
 BOOL GetEditTarget(EditType* type, size_t* index);
 
+void FixDeleteEditTarget(EditType type, size_t index);
+
 void SetEditCamera(size_t index);
 
 void SetEditMaterial(size_t index);
@@ -35,14 +37,8 @@ void SetEditMesh(size_t index);
 
 void DeselectEditTarget();
 
+void DeleteEditTarget();
+
 Panel GenerateEditPanel();
-
-void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, float height);
-
-void DrawEditLight(SceneLight* lref, char* name, float width, float height);
-
-void DrawEditMesh(MeshDescriptor* md, char* name, float width, float height);
-
-void DrawEditCamera(SceneCamera* cref, char* name, float width, float height);
 
 #endif

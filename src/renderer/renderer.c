@@ -1759,3 +1759,41 @@ void SubmitSplat(GaussianSplat splat) {
 void UpdateSplats() {
     g_renderer.geometry.changes.update_splats = TRUE;
 }
+
+BOOL DeleteMaterial(MaterialID id) {
+    return TRUE;
+}
+
+BOOL DeleteLight(LightID id) {
+
+    return TRUE;
+}
+
+BOOL DeleteTriangle(TriangleID id) {
+
+    return TRUE;
+}
+
+BOOL DeleteVertex(VertexID id) {
+
+    return TRUE;
+}
+
+BOOL DeleteMesh(size_t id) {
+
+    return TRUE;
+}
+
+BOOL DeleteCamera(size_t id) {
+    EZ_ASSERT(id < g_renderer.geometry.cameras.size, "Cannot delete a non-existant camera");
+    if (id == 0) {
+        logerror("Cannot delete camera - there must be at least one camera to view the scene");
+        return FALSE;
+    }
+    EZ_FREE(g_renderer.geometry.cameranames.data[id]);
+    ARRLIST_DynamicString_remove(&(g_renderer.geometry.cameranames), id);
+    ARRLIST_SceneCamera_remove(&(g_renderer.geometry.cameras), id);
+    FixDeleteEditTarget(EDIT_CAMERA, id);
+    if (PrimaryCameraID() == id) SetCamera(0);
+    return TRUE;
+}
