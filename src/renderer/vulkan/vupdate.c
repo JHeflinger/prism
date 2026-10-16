@@ -507,7 +507,6 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.reset = cam_reset;
         ubo.samples = samples;
         ubo.direct = RendererCamera()->config.direct;
-        ubo.lightarea = g_vupdt_renderer_ref->geometry.lightarea;
         ubo.whitepoint = RendererCamera()->config.whitepoint*RendererCamera()->config.whitepoint;
         ubo.gamma = RendererCamera()->config.gamma;
         ubo.swap = CPUSWAP_LENGTH;

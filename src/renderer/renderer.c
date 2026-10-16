@@ -614,10 +614,7 @@ TriangleID SubmitTriangle(Triangle triangle) {
     glm_vec3_copy(g_renderer.geometry.materials.data[triangle.material].emission, emission);
     if (emission[0] != 0 || emission[1] != 0 || emission[2] != 0) {
         ARRLIST_TriangleID_add(&(g_renderer.geometry.emissives), g_renderer.geometry.triangles.size);
-        g_renderer.geometry.lightarea += TriangleArea(
-            g_renderer.geometry.vertices.data[triangle.a],
-            g_renderer.geometry.vertices.data[triangle.b],
-            g_renderer.geometry.vertices.data[triangle.c]);
+        UpdateEmissives();
     }
     TriangleID id = g_renderer.geometry.triangles.size;
     ARRLIST_Triangle_add(&(g_renderer.geometry.triangles), triangle);
@@ -645,6 +642,7 @@ void ClearTriangles() {
     if (g_renderer.geometry.triangles.maxsize == 0) return;
     ARRLIST_Triangle_clear(&(g_renderer.geometry.triangles));
     ARRLIST_TriangleID_clear(&(g_renderer.geometry.emissives));
+    ARRLIST_EmissionAlias_clear(&(g_renderer.geometry.aliases));
     HASHMAP_EdgeGlue_clear(&(g_renderer.geometry.glue));
     ARRLIST_Edge_clear(&(g_renderer.geometry.edges));
     UpdateTriangles();
@@ -777,6 +775,15 @@ void Render() {
 
     // animations
     g_renderer.geometry.changes.update_poses |= PlayAnimations(&(g_renderer.geometry));
+
+    // emissive alias refresh
+    if (g_renderer.geometry.changes.update_emissives) {
+        g_renderer.geometry.changes.update_emissives = TRUE;
+        ARRLIST_EmissionAlias_wipe(&(g_renderer.geometry.aliases));
+        for (size_t i = 0; i < g_renderer.geometry.emissives.size; i++) {
+            
+        }
+    }
 
     // helpers for readability
     #define TRANSFER_UPDATE(cname, sname, gname, gsname, oname, vname, tri) { \
@@ -1760,6 +1767,10 @@ void UpdateSplats() {
     g_renderer.geometry.changes.update_splats = TRUE;
 }
 
+void UpdateEmissives() {
+    g_renderer.geometry.changes.update_emissives = TRUE;
+}
+
 BOOL DeleteMaterial(MaterialID id) {
     EZ_ASSERT(id < g_renderer.geometry.materials.size, "Cannot delete a non-existant material");
     if (id == 0) {
@@ -1789,8 +1800,8 @@ BOOL DeleteMaterial(MaterialID id) {
         }
     }
     UpdateTriangles();
+    UpdateEmissives();
     UpdateMaterials();
-    // TODO: so basically figure it out - emptying something entirely breaks prolly coz its 0 now
     return TRUE;
 }
 
@@ -1801,7 +1812,6 @@ BOOL DeleteLight(LightID id) {
     ARRLIST_SceneLight_remove(&(g_renderer.geometry.lights), id);
     FixDeleteEditTarget(EDIT_LIGHT, id);
     UpdateLights();
-    // TODO: so basically figure it out - emptying something entirely breaks prolly coz its 0 now
     return TRUE;
 }
 
@@ -1809,16 +1819,26 @@ BOOL DeleteTriangle(TriangleID id) {
     // TODO: remove emissive area
     // TODO: update lightarea on triangle edit? tbh idek anymore, we don't even use lightarrea
     // TODO: maybe now is when we fix emission stuff for direct lighting....
+    UpdateNormals();
+    UpdateTriangles();
+    UpdateEmissives();
     return TRUE;
 }
 
 BOOL DeleteVertex(VertexID id) {
-
+    UpdateVertices();
+    UpdateTriangles();
+    UpdateEmissives();
     return TRUE;
 }
 
 BOOL DeleteMesh(size_t id) {
     // TODO: remove emissive area
+    UpdateNormals();
+    UpdateVertices();
+    UpdateTriangles();
+    UpdateEmissives();
+    UpdateMeshes();
     return TRUE;
 }
 

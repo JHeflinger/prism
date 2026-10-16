@@ -158,7 +158,6 @@ export UniformBufferObjectDef {
     	float frametime;
         float whitepoint;
         float gamma;
-        float lightarea;
         float aperature;
         float focus;
         uint ortho;

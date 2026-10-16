@@ -235,6 +235,8 @@ void SubmitSplat(GaussianSplat splat);
 
 void UpdateSplats();
 
+void UpdateEmissives();
+
 BOOL DeleteMaterial(MaterialID id);
 
 BOOL DeleteLight(LightID id);

@@ -973,6 +973,7 @@ static void PrismFreeGeometry(Geometry* g) {
     ARRLIST_Triangle_clear(&(g->triangles));
     ARRLIST_GaussianSplat_clear(&(g->splats));
     ARRLIST_TriangleID_clear(&(g->emissives));
+    ARRLIST_EmissionAlias_clear(&(g->aliases));
     ARRLIST_SurfaceMaterial_clear(&(g->materials));
     PrismFreeNames(&(g->materialnames));
     ARRLIST_Skeleton_clear(&(g->skeletons));
@@ -997,6 +998,7 @@ static void PrismWriteGeometry(PrismStream* s, Geometry* g) {
     PRISM_WRITE_LIST(s, g->triangles);
     PRISM_WRITE_LIST(s, g->splats);
     PRISM_WRITE_LIST(s, g->emissives);
+    PRISM_WRITE_LIST(s, g->aliases);
     PRISM_WRITE_LIST(s, g->materials);
     PrismWriteNames(s, &(g->materialnames));
     PRISM_WRITE_LIST(s, g->skeletons);
@@ -1025,6 +1027,7 @@ static void PrismReadGeometry(PrismStream* s, Geometry* g) {
     g->triangles = (ARRLIST_Triangle){ 0 };
     g->splats = (ARRLIST_GaussianSplat){ 0 };
     g->emissives = (ARRLIST_TriangleID){ 0 };
+    g->aliases = (ARRLIST_EmissionAlias){ 0 };
     g->materials = (ARRLIST_SurfaceMaterial){ 0 };
     g->materialnames = (ARRLIST_DynamicString){ 0 };
     g->skeletons = (ARRLIST_Skeleton){ 0 };
@@ -1048,6 +1051,7 @@ static void PrismReadGeometry(PrismStream* s, Geometry* g) {
     PRISM_READ_LIST(s, g->triangles);
     PRISM_READ_LIST(s, g->splats);
     PRISM_READ_LIST(s, g->emissives);
+    PRISM_READ_LIST(s, g->aliases);
     PRISM_READ_LIST(s, g->materials);
     PrismReadNames(s, &(g->materialnames), MAX_MATERIAL_NAME_SIZE);
     PRISM_READ_LIST(s, g->skeletons);

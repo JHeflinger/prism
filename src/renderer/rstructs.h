@@ -173,6 +173,7 @@ typedef struct {
     BOOL update_meshes;
     BOOL update_skins;
     BOOL update_poses;
+    BOOL update_emissives;
     size_t update_bvh;
 } ChangeSet;
 
@@ -461,6 +462,13 @@ typedef struct {
 DECLARE_ARRLIST(SceneCamera);
 
 typedef struct {
+    alignas(4) float probability;
+    alignas(4) uint32_t alias;
+    alignas(4) float pmf;
+} EmissionAlias;
+DECLARE_ARRLIST(EmissionAlias);
+
+typedef struct {
     ManifoldMesh manifold;
     ARRLIST_vec4 vertices;
     ARRLIST_vec4 normals;
@@ -469,6 +477,7 @@ typedef struct {
     ARRLIST_Triangle triangles;
     ARRLIST_GaussianSplat splats;
     ARRLIST_TriangleID emissives;
+    ARRLIST_EmissionAlias aliases;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;
     ARRLIST_Skeleton skeletons;
@@ -480,7 +489,6 @@ typedef struct {
     ARRLIST_Edge edges;
     ARAPData arap;
     FluidSimulation fluid;
-    float lightarea;
     ChangeSet changes;
     AxisAlignedBoundingBox bounds;
     AxisAlignedBoundingBox splatbounds;
