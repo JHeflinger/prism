@@ -1766,6 +1766,9 @@ BOOL DeleteMaterial(MaterialID id) {
         logerror("Cannot delete the default material");
         return FALSE;
     }
+    BOOL emissive = g_renderer.geometry.materials.data[id].emission[0] != 0 ||
+        g_renderer.geometry.materials.data[id].emission[1] != 0 ||
+        g_renderer.geometry.materials.data[id].emission[2] != 0;
     EZ_FREE(g_renderer.geometry.materialnames.data[id]);
     ARRLIST_DynamicString_remove(&(g_renderer.geometry.materialnames), id);
     ARRLIST_SurfaceMaterial_remove(&(g_renderer.geometry.materials), id);
@@ -1775,10 +1778,19 @@ BOOL DeleteMaterial(MaterialID id) {
             TriangleReference(i)->material--;
         } else if (TriangleReference(i)->material == id) {
             TriangleReference(i)->material = 0;
+            if (emissive) {
+                for (size_t j = 0; j < g_renderer.geometry.emissives.size; j++) {
+                    if (g_renderer.geometry.emissives.data[j] == i) {
+                        ARRLIST_TriangleID_remove(&(g_renderer.geometry.emissives), j);
+                        break;
+                    }
+                }
+            }
         }
     }
     UpdateTriangles();
     UpdateMaterials();
+    // TODO: so basically figure it out - emptying something entirely breaks prolly coz its 0 now
     return TRUE;
 }
 
@@ -1789,6 +1801,7 @@ BOOL DeleteLight(LightID id) {
     ARRLIST_SceneLight_remove(&(g_renderer.geometry.lights), id);
     FixDeleteEditTarget(EDIT_LIGHT, id);
     UpdateLights();
+    // TODO: so basically figure it out - emptying something entirely breaks prolly coz its 0 now
     return TRUE;
 }
 
