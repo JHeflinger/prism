@@ -1761,16 +1761,41 @@ void UpdateSplats() {
 }
 
 BOOL DeleteMaterial(MaterialID id) {
+    EZ_ASSERT(id < g_renderer.geometry.materials.size, "Cannot delete a non-existant material");
+    if (id == 0) {
+        logerror("Cannot delete the default material");
+        return FALSE;
+    }
+    EZ_FREE(g_renderer.geometry.materialnames.data[id]);
+    ARRLIST_DynamicString_remove(&(g_renderer.geometry.materialnames), id);
+    ARRLIST_SurfaceMaterial_remove(&(g_renderer.geometry.materials), id);
+    FixDeleteEditTarget(EDIT_MATERIAL, id);
+    for (size_t i = 0; i < g_renderer.geometry.triangles.size; i++) {
+        if (TriangleReference(i)->material > id) {
+            TriangleReference(i)->material--;
+        } else if (TriangleReference(i)->material == id) {
+            TriangleReference(i)->material = 0;
+        }
+    }
+    UpdateTriangles();
+    UpdateMaterials();
     return TRUE;
 }
 
 BOOL DeleteLight(LightID id) {
-
+    EZ_ASSERT(id < g_renderer.geometry.lights.size, "Cannot delete a non-existant light");
+    EZ_FREE(g_renderer.geometry.lightnames.data[id]);
+    ARRLIST_DynamicString_remove(&(g_renderer.geometry.lightnames), id);
+    ARRLIST_SceneLight_remove(&(g_renderer.geometry.lights), id);
+    FixDeleteEditTarget(EDIT_LIGHT, id);
+    UpdateLights();
     return TRUE;
 }
 
 BOOL DeleteTriangle(TriangleID id) {
-
+    // TODO: remove emissive area
+    // TODO: update lightarea on triangle edit? tbh idek anymore, we don't even use lightarrea
+    // TODO: maybe now is when we fix emission stuff for direct lighting....
     return TRUE;
 }
 
@@ -1780,7 +1805,7 @@ BOOL DeleteVertex(VertexID id) {
 }
 
 BOOL DeleteMesh(size_t id) {
-
+    // TODO: remove emissive area
     return TRUE;
 }
 
