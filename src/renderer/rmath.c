@@ -10,6 +10,16 @@ float TriangleArea(vec3 a, vec3 b, vec3 c) {
     return glm_vec3_norm(tcross) * 0.5f;
 }
 
+float TriangleTransformedArea(vec3 a, vec3 b, vec3 c, mat4 transform) {
+    mat4 m;
+    memcpy(m, transform, sizeof(mat4));
+    vec3 ta, tb, tc;
+    glm_mat4_mulv3(m, a, 1.0f, ta);
+    glm_mat4_mulv3(m, b, 1.0f, tb);
+    glm_mat4_mulv3(m, c, 1.0f, tc);
+    return TriangleArea(ta, tb, tc);
+}
+
 void Mat3Add(mat3 a, mat3 b, mat3 dest) {
     for (int i = 0; i < 3; ++i)
         for (int j = 0; j < 3; ++j)

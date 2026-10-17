@@ -237,6 +237,10 @@ void UpdateSplats();
 
 void UpdateEmissives();
 
+void RefreshEmissives();
+
+BOOL FindTriangleTransform(TriangleID tid, mat4 dest);
+
 BOOL DeleteMaterial(MaterialID id);
 
 BOOL DeleteLight(LightID id);

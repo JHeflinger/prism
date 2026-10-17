@@ -11,6 +11,8 @@
 
 float TriangleArea(vec3 a, vec3 b, vec3 c);
 
+float TriangleTransformedArea(vec3 a, vec3 b, vec3 c, mat4 transform);
+
 void Mat3Add(mat3 a, mat3 b, mat3 dest);
 
 void Mat4Add(mat4 a, mat4 b, mat4 dest);

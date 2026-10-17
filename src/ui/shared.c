@@ -359,7 +359,14 @@ size_t DropdownSelectSimVisual(void* data, size_t index, BOOL cancel) {
 size_t DropdownSelectMaterial(void* data, size_t index, BOOL cancel) {
     Triangle* triref = (Triangle*)data;
     if (index == (size_t)-1) return triref->material;
+    BOOL refresh_emission = MaterialReference(triref->material)->emission[0] != 0 ||
+        MaterialReference(triref->material)->emission[1] != 0 ||
+        MaterialReference(triref->material)->emission[2] != 0 ||
+        MaterialReference(index)->emission[0] != 0 ||
+        MaterialReference(index)->emission[1] != 0 ||
+        MaterialReference(index)->emission[2] != 0;
     triref->material = index;
+    if (refresh_emission) RefreshEmissives();
     if (NumTriangles() != 0) UpdateTriangles();
     return index;
 }

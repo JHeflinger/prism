@@ -146,6 +146,7 @@ typedef struct {
     size_t max_triangles;
     size_t max_splats;
     size_t max_emissives;
+    size_t max_aliases;
     size_t max_materials;
     size_t max_lights;
     size_t max_sim_size;
@@ -174,6 +175,7 @@ typedef struct {
     BOOL update_skins;
     BOOL update_poses;
     BOOL update_emissives;
+    BOOL refresh_emissives;
     size_t update_bvh;
 } ChangeSet;
 

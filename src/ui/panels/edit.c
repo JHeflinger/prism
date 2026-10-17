@@ -15,6 +15,7 @@ static const char* g_light_types[] = { "Directional", "Spot", "Point" };
 
 static void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, float height) {
     BOOL edited = FALSE;
+    BOOL was_emissive = matref->emission[0] != 0 || matref->emission[1] != 0 || matref->emission[2] != 0;
     UIMoveCursor((width - 20 - UITextWidth("Edit Material")) / 2.0f, 0);
     UIDrawText("Edit Material");
     UIMoveCursor(0, 15);
@@ -23,6 +24,7 @@ static void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, f
     UIColumnHeader("Emission", LEFT_COLUMN_WIDTH);
     BOOL emission_edited = UITriplet("rgb", UI_FLOATS, &(matref->emission[0]), &(matref->emission[1]), &(matref->emission[2]), (UIMultiValue){ ._float = 0 }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.05f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
     edited |= emission_edited;
+    BOOL is_emissive = matref->emission[0] != 0 || matref->emission[1] != 0 || matref->emission[2] != 0;
     UIColumnHeader("Absorbtion", LEFT_COLUMN_WIDTH);
     edited |= UITriplet("rgb", UI_FLOATS, &(matref->absorbtion[0]), &(matref->absorbtion[1]), &(matref->absorbtion[2]), (UIMultiValue){ ._float = 0 }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.001f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
     UIColumnHeader("Dispersion", LEFT_COLUMN_WIDTH);
@@ -52,6 +54,7 @@ static void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, f
     UIDropdownMenu(sboxwidth, 4, LightModelLabels(), DropdownSelectLightModel, matref);
     if (edited) UpdateMaterials();
     if (emission_edited) UpdateEmissives();
+    if (was_emissive != is_emissive) RefreshEmissives();
 }
 
 static void DrawEditLight(SceneLight* lref, char* name, float width, float height) {

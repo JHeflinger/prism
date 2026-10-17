@@ -761,6 +761,7 @@ void Render() {
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
     BOOL resized_buffers = FALSE;
     BOOL is_transferring = FALSE;
+    BOOL is_pathtraciing = RendererCamera()->config.flags & PATHTRACE_SHADER_FLAG;
 
     // update calculated sizes
     g_renderer.geometry.maxprimitives = g_renderer.geometry.triangles.size + g_renderer.geometry.splats.size;
@@ -778,15 +779,18 @@ void Render() {
     g_renderer.geometry.changes.update_poses |= PlayAnimations(&(g_renderer.geometry));
 
     // emissive alias refresh
-    // TODO: how to add to list of emissive tris on mat change or triangle change?
-    // TOTAL ORDER OF OPERATIONS:
-    // 1. make alias table for mesh retrieval
-    // 2. update emissive alias update to consider mesh transforms
-    // 3. assign/remove new emissives on material change
-    // 4. assign/remove new emissives on triangle material change
-    // 5. update emissiives on triangle area change (or later, mesh change)
     BOOL updated_emissives = FALSE;
-    if (g_renderer.geometry.changes.update_emissives) {
+    if (g_renderer.geometry.changes.refresh_emissives && is_pathtraciing) {
+        g_renderer.geometry.changes.refresh_emissives = FALSE;
+        ARRLIST_TriangleID_wipe(&(g_renderer.geometry.emissives));
+        for (size_t i = 0; i < g_renderer.geometry.triangles.size; i++)
+            if (MaterialReference(TriangleReference(i)->material)->emission[0] != 0.0f ||
+                MaterialReference(TriangleReference(i)->material)->emission[1] != 0.0f ||
+                MaterialReference(TriangleReference(i)->material)->emission[2] != 0.0f)
+                ARRLIST_TriangleID_add(&(g_renderer.geometry.emissives), i);
+        UpdateEmissives();
+    }
+    if (g_renderer.geometry.changes.update_emissives && is_pathtraciing) {
         g_renderer.geometry.changes.update_emissives = FALSE;
         updated_emissives = TRUE;
         ARRLIST_EmissionAlias_wipe(&(g_renderer.geometry.aliases));
@@ -795,11 +799,13 @@ void Render() {
         size_t nl = 0;
         float* areas = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(float));
         float* q = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(float));
-        size_t* small = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(float));
-        size_t* large = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(float));
+        size_t* small = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(size_t));
+        size_t* large = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(size_t));
         for (size_t i = 0; i < g_renderer.geometry.emissives.size; i++) {
-            Triangle* triangle = TriangleReference(g_renderer.geometry.emissives.data[i]); // TODO: need to apply the given mesh transformation to this too
-            float area = Luminance(g_renderer.geometry.materials.data[triangle->material].emission) * TriangleArea(VertexReference(triangle->a), VertexReference(triangle->b), VertexReference(triangle->c));
+            Triangle* triangle = TriangleReference(g_renderer.geometry.emissives.data[i]);
+            mat4 transform = { 0 };
+            if (!FindTriangleTransform(g_renderer.geometry.emissives.data[i], transform)) continue;
+            float area = Luminance(g_renderer.geometry.materials.data[triangle->material].emission) * TriangleTransformedArea(VertexReference(triangle->a), VertexReference(triangle->b), VertexReference(triangle->c), transform);
             total += area;
             areas[i] = area;
         }
@@ -837,6 +843,7 @@ void Render() {
         EZ_FREE(small);
         EZ_FREE(large);
     }
+    BOOL upload_emissives = updated_emissives;
 
     // helpers for readability
     #define TRANSFER_UPDATE(cname, sname, gname, gsname, oname, vname, tri) { \
@@ -865,31 +872,7 @@ void Render() {
                 if (!is_transferring) { is_transferring = TRUE; VUTIL_BeginTransferCommands(); } \
                 VUPDT_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
             } \
-            if (tri || updated_emissives) { \
-                updated_emissives = FALSE; \
-                if (g_renderer.geometry.changes.max_emissives != g_renderer.geometry.emissives.maxsize) { \
-                    g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize; \
-                    if (!resized_buffers) { \
-                        resized_buffers = TRUE; \
-                    	if (is_transferring) VUTIL_EndTransferCommands(); \
-                        is_transferring = TRUE; \
-                        VUTIL_BeginTransferCommands(); \
-                        vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface); \
-                    } \
-                    VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
-                    VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
-                    VCLEAN_Aliases(&(g_renderer.vulkan.core.geometry.aliases)); \
-                    VINIT_Aliases(&(g_renderer.vulkan.core.geometry.aliases)); \
-                } else { \
-                    if (g_renderer.geometry.changes.num_emissives != g_renderer.geometry.emissives.size) { \
-                        dupdate_queue = CPUSWAP_LENGTH; \
-                        g_renderer.geometry.changes.num_emissives = g_renderer.geometry.emissives.size; \
-                    } \
-                    if (!is_transferring) { is_transferring = TRUE; VUTIL_BeginTransferCommands(); } \
-                    VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
-                    VUPDT_Aliases(&(g_renderer.vulkan.core.geometry.aliases)); \
-                } \
-            } \
+            if (tri) upload_emissives = TRUE; \
         } \
     }
 
@@ -962,6 +945,34 @@ void Render() {
         TRANSFER_UPDATE(meshes, meshes, g_renderer.geometry.meshes.maxsize, g_renderer.geometry.meshes.size, transforms, Transforms, FALSE);
         TRANSFER_UPDATE(skins, skins, g_renderer.geometry.skins.maxsize, g_renderer.geometry.skins.size, skins, Skins, FALSE);
         TRANSFER_UPDATE(poses, poses, g_renderer.geometry.poses.maxsize, g_renderer.geometry.poses.size, poses, Poses, FALSE);
+
+        // upload emissives if needed
+        if (upload_emissives) {
+            if (g_renderer.geometry.changes.max_emissives != g_renderer.geometry.emissives.maxsize ||
+                g_renderer.geometry.changes.max_aliases != g_renderer.geometry.aliases.maxsize) {
+                g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize;
+                g_renderer.geometry.changes.max_aliases = g_renderer.geometry.aliases.maxsize;
+                if (!resized_buffers) {
+                    resized_buffers = TRUE;
+                    if (is_transferring) VUTIL_EndTransferCommands();
+                    is_transferring = TRUE;
+                    VUTIL_BeginTransferCommands();
+                    vkDeviceWaitIdle(g_renderer.vulkan.core.general.interface);
+                }
+                VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
+                VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
+                VCLEAN_Aliases(&(g_renderer.vulkan.core.geometry.aliases));
+                VINIT_Aliases(&(g_renderer.vulkan.core.geometry.aliases));
+            } else {
+                if (g_renderer.geometry.changes.num_emissives != g_renderer.geometry.emissives.size) {
+                    dupdate_queue = CPUSWAP_LENGTH;
+                    g_renderer.geometry.changes.num_emissives = g_renderer.geometry.emissives.size;
+                }
+                if (!is_transferring) { is_transferring = TRUE; VUTIL_BeginTransferCommands(); }
+                VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives));
+                VUPDT_Aliases(&(g_renderer.vulkan.core.geometry.aliases));
+            }
+        }
 
         // dispatch transfer commands
         if (is_transferring) VUTIL_EndTransferCommands();
@@ -1128,6 +1139,7 @@ void UpdateNormals() {
 
 void UpdateVertices() {
     g_renderer.geometry.changes.update_vertices = TRUE;
+    UpdateEmissives();
 }
 
 SurfaceMaterial* MaterialReference(size_t index) {
@@ -1826,6 +1838,29 @@ void UpdateSplats() {
 
 void UpdateEmissives() {
     g_renderer.geometry.changes.update_emissives = TRUE;
+}
+
+void RefreshEmissives() {
+    g_renderer.geometry.changes.refresh_emissives = TRUE;
+}
+
+BOOL FindTriangleTransform(TriangleID tid, mat4 dest) {
+    glm_mat4_identity(dest);
+    size_t lo = 0, hi = g_renderer.geometry.meshes.size;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (g_renderer.geometry.meshes.data[mid].tstart <= tid) lo = mid + 1;
+        else hi = mid;
+    }
+    if (lo == 0) return FALSE;
+    MeshDescriptor* md = &(g_renderer.geometry.meshes.data[lo - 1]);
+    if (md->tend < md->tstart || md->tend == (TriangleID)-1 || tid > md->tend) return FALSE;
+    if (md->disabled) {
+        glm_mat4_zero(dest);
+        return TRUE;
+    }
+    memcpy(dest, md->transform, sizeof(mat4));
+    return TRUE;
 }
 
 BOOL DeleteMaterial(MaterialID id) {
