@@ -310,6 +310,14 @@ export SceneLightDef {
     }
 }
 
+export EmissionAliasDef {
+    struct EmissionAlias {
+        float probability;
+        uint alias;
+        float pmf;
+    }
+}
+
 export HDRImageDef {
     uniform image2D hdrImage
 }
@@ -357,6 +365,12 @@ export MaterialSSBODef {
 export EmissiveSSBODef {
     buffer EmissiveSSBOIn {
         uint emissiveIn[ ];
+    }
+}
+
+export EmissionAliasSSBODef {
+    buffer EmissionAliasSSBOIn {
+        EmissionAlias aliasIn[ ];
     }
 }
 

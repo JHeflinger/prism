@@ -25,6 +25,8 @@ void VUPDT_Splats(VulkanDataBuffer* splats);
 
 void VUPDT_Emissives(VulkanDataBuffer* emissives);
 
+void VUPDT_Aliases(VulkanDataBuffer* aliases);
+
 void VUPDT_Materials(VulkanDataBuffer* materials);
 
 void VUPDT_RecordCommand(VkCommandBuffer command);

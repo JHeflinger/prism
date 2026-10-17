@@ -47,4 +47,6 @@ BOOL PointInQuad(const vec2 p, const vec2 q[4]);
 
 float Wrap180(float a);
 
+float Luminance(vec3 c);
+
 #endif

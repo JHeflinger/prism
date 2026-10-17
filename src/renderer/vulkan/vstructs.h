@@ -217,6 +217,7 @@ typedef struct {
     VulkanDataBuffer triangles;
     VulkanDataBuffer splats;
     VulkanDataBuffer emissives;
+    VulkanDataBuffer aliases;
     VulkanDataBuffer materials;
     VulkanDataBuffer lights;
     VulkanFluidSimulation fluid;

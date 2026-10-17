@@ -57,6 +57,8 @@ BOOL VINIT_Splats(VulkanDataBuffer* splats);
 
 BOOL VINIT_Emissives(VulkanDataBuffer* emissives);
 
+BOOL VINIT_Aliases(VulkanDataBuffer* aliases);
+
 BOOL VINIT_Materials(VulkanDataBuffer* materials);
 
 BOOL VINIT_TargetsHDR(VulkanImage* hdr_arr);

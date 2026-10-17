@@ -29,6 +29,8 @@ void VCLEAN_Splats(VulkanDataBuffer* splats);
 
 void VCLEAN_Emissives(VulkanDataBuffer* emissives);
 
+void VCLEAN_Aliases(VulkanDataBuffer* aliases);
+
 void VCLEAN_Materials(VulkanDataBuffer* materials);
 
 void VCLEAN_Geometry(VulkanGeometry* geometry);

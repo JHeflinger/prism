@@ -11,6 +11,7 @@
 #import SceneLightDef;
 #import SplatDef;
 #import SplatChordDef;
+#import EmissionAliasDef;
 
 layout(binding = 0) readonly #import UniformBufferObjectDef ubo;
 layout(binding = 1) #import RayGeneratorSSBODef;
@@ -24,6 +25,7 @@ layout(binding = 8) readonly #import NormalSSBODef;
 layout(binding = 9) readonly #import LightSSBODef;
 layout(binding = 10) readonly #import SplatSSBODef;
 layout(binding = 11, rgba32f) writeonly #import GBufferImageDef;
+layout(binding = 12) readonly #import EmissionAliasSSBODef;
 
 #import CutViewport
 #import GBufferSuite
@@ -203,8 +205,12 @@ vec3 sample_specular_phong_lobe(float shiny) {
     return vec3(cos(phi) * sintheta, sin(phi) * sintheta, costheta);
 }
 
-vec3 sample_direct_light_point(inout uint tid, inout float area) {
-    tid = emissiveIn[uint(random()*float(ubo.emissives))];
+vec3 sample_direct_light_point(inout uint tid, inout float area, inout float pmf) {
+    uint i = min(uint(random() * float(ubo.emissives)), ubo.emissives - 1u);
+    EmissionAlias e = aliasIn[i];
+    uint k = (random() < e.probability) ? i : e.alias;
+    pmf = aliasIn[k].pmf;
+    tid = emissiveIn[k];
     Triangle tri = triangleIn[tid];
     vec3 _a = vertexIn[tri.a].xyz;
     vec3 _b = vertexIn[tri.b].xyz;
@@ -245,7 +251,8 @@ vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, i
 vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     uint eid;
     float area;
-    vec3 pos = sample_direct_light_point(eid, area);
+    float pmf;
+    vec3 pos = sample_direct_light_point(eid, area, pmf);
     vec3 to_light = pos - h.position;
     float dist = length(to_light);
     to_light = normalize(to_light);
@@ -254,8 +261,7 @@ vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     Hit shit = trace(sray, tid);
     if (eid != tid || shit.distance <= 0.0) return vec3(0.0);
     vec3 emission = materialIn[shit.material].emission;
-    float p_triangle = 1.0 / float(ubo.emissives); // TODO: weight this according to triangle weight, not just unform chance from each triangle (do this after implementing sampling a point based on uniform area)
-    float p_area = p_triangle / area;
+    float p_area = pmf / area;
     float cos_light = max(dot(shit.normal, -to_light), 0.0);
     float p_omega = p_area * dist * dist / cos_light;
     float ks = luminance(material.specular);
@@ -700,7 +706,8 @@ vec3 sample_scene_lights_volume(vec3 pos, vec3 travel_dir, vec3 albedo) {
 vec3 sample_direct_light_volume(vec3 pos, vec3 travel_dir, vec3 albedo) {
     uint eid;
     float area;
-    vec3 light_pos = sample_direct_light_point(eid, area);
+    float pmf;
+    vec3 light_pos = sample_direct_light_point(eid, area, pmf);
     vec3 to_light = light_pos - pos;
     float dist = length(to_light);
     to_light = normalize(to_light);
@@ -711,7 +718,7 @@ vec3 sample_direct_light_volume(vec3 pos, vec3 travel_dir, vec3 albedo) {
     float cos_light = max(dot(shit.normal, -to_light), 0.0);
     if (cos_light <= 0.0) return vec3(0.0);
     vec3 emission = materialIn[shit.material].emission;
-    float p_area = (1.0 / float(ubo.emissives)) / area;
+    float p_area = pmf / area;
     float p_omega = p_area * dist * dist / cos_light;
     float vis = volume_transmittance(sray, shit.distance);
     return emission * albedo * hg_phase(dot(to_light, travel_dir), SPLAT_G) * vis / p_omega;

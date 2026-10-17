@@ -285,3 +285,7 @@ float Wrap180(float a) {
     while (a < -180.0f) a += 360.0f;
     return a;
 }
+
+float Luminance(vec3 c) {
+    return 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
+}

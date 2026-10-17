@@ -72,6 +72,10 @@ void VCLEAN_Emissives(VulkanDataBuffer* emissives) {
     VUTIL_DestroyBuffer(*emissives);
 }
 
+void VCLEAN_Aliases(VulkanDataBuffer* aliases) {
+    VUTIL_DestroyBuffer(*aliases);
+}
+
 void VCLEAN_Materials(VulkanDataBuffer* materials) {
     VUTIL_DestroyBuffer(*materials);
 }
@@ -83,6 +87,7 @@ void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Triangles(&(geometry->triangles));
     VCLEAN_Splats(&(geometry->splats));
     VCLEAN_Emissives(&(geometry->emissives));
+    VCLEAN_Aliases(&(geometry->aliases));
     VCLEAN_Materials(&(geometry->materials));
     VCLEAN_Lights(&(geometry->lights));
     VCLEAN_Transforms(&(geometry->transforms));

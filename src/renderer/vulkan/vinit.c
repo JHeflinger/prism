@@ -684,6 +684,18 @@ BOOL VINIT_Emissives(VulkanDataBuffer* emissives) {
     return TRUE;
 }
 
+BOOL VINIT_Aliases(VulkanDataBuffer* aliases) {
+    size_t arrsize = sizeof(EmissionAlias) * g_vinit_renderer_ref->geometry.aliases.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        aliases);
+    VUPDT_Aliases(aliases);
+    return TRUE;
+}
+
 BOOL VINIT_Materials(VulkanDataBuffer* materials) {
     size_t arrsize = sizeof(SurfaceMaterial) * g_vinit_renderer_ref->geometry.materials.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
@@ -921,6 +933,7 @@ BOOL VINIT_Geometry(VulkanGeometry* geometry) {
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;
 	if (!VINIT_Splats(&(geometry->splats))) return FALSE;
 	if (!VINIT_Emissives(&(geometry->emissives))) return FALSE;
+	if (!VINIT_Aliases(&(geometry->aliases))) return FALSE;
 	if (!VINIT_Materials(&(geometry->materials))) return FALSE;
 	if (!VINIT_Lights(&(geometry->lights))) return FALSE;
 	if (!VINIT_Simulation(&(geometry->fluid))) return FALSE;

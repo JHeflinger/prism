@@ -12,11 +12,12 @@
 #define TRANSFER_ACQUIRE_TRIANGLES  (1 << 2)
 #define TRANSFER_ACQUIRE_SPLATS     (1 << 3)
 #define TRANSFER_ACQUIRE_EMISSIVES  (1 << 4)
-#define TRANSFER_ACQUIRE_MATERIALS  (1 << 5)
-#define TRANSFER_ACQUIRE_LIGHTS     (1 << 6)
-#define TRANSFER_ACQUIRE_TRANSFORMS (1 << 7)
-#define TRANSFER_ACQUIRE_POSES      (1 << 8)
-#define TRANSFER_ACQUIRE_SKINS      (1 << 9)
+#define TRANSFER_ACQUIRE_ALIASES    (1 << 5)
+#define TRANSFER_ACQUIRE_MATERIALS  (1 << 6)
+#define TRANSFER_ACQUIRE_LIGHTS     (1 << 7)
+#define TRANSFER_ACQUIRE_TRANSFORMS (1 << 8)
+#define TRANSFER_ACQUIRE_POSES      (1 << 9)
+#define TRANSFER_ACQUIRE_SKINS      (1 << 10)
 #define PENDING(x) g_vupdt_renderer_ref->vulkan.core.transfer.pending |= x
 
 static Renderer* g_vupdt_renderer_ref = NULL;
@@ -156,6 +157,16 @@ void VUPDT_Emissives(VulkanDataBuffer* emissives) {
     PENDING(TRANSFER_ACQUIRE_EMISSIVES);
 }
 
+void VUPDT_Aliases(VulkanDataBuffer* aliases) {
+    if (sizeof(EmissionAlias) * g_vupdt_renderer_ref->geometry.aliases.maxsize == 0) return;
+    VUTIL_AsyncCopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.aliases.data,
+        sizeof(EmissionAlias) * g_vupdt_renderer_ref->geometry.aliases.size,
+        sizeof(EmissionAlias) * g_vupdt_renderer_ref->geometry.aliases.maxsize,
+        aliases->buffer);
+    PENDING(TRANSFER_ACQUIRE_ALIASES);
+}
+
 void VUPDT_Materials(VulkanDataBuffer* materials) {
     if (sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.maxsize == 0) return;
     VUTIL_AsyncCopyHostToBuffer(
@@ -194,6 +205,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_MATERIALS, g_vupdt_renderer_ref->vulkan.core.geometry.materials.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_LIGHTS, g_vupdt_renderer_ref->vulkan.core.geometry.lights.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_EMISSIVES, g_vupdt_renderer_ref->vulkan.core.geometry.emissives.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_ALIASES, g_vupdt_renderer_ref->vulkan.core.geometry.aliases.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRIANGLES, g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_SPLATS, g_vupdt_renderer_ref->vulkan.core.geometry.splats.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_NORMALS, g_vupdt_renderer_ref->vulkan.core.geometry.normals.buffer)

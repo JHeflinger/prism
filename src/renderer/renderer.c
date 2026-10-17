@@ -694,6 +694,7 @@ MaterialID SubmitNamedMaterial(SurfaceMaterial material, const char* name) {
     strncpy(b, name, MAX_MATERIAL_NAME_SIZE);
     ARRLIST_DynamicString_add(&(g_renderer.geometry.materialnames), b);
     UpdateMaterials();
+    if (material.emission[0] != 0 || material.emission[1] != 0 || material.emission[2] != 0) UpdateEmissives();
     return g_renderer.geometry.materials.size - 1;
 }
 
@@ -777,12 +778,64 @@ void Render() {
     g_renderer.geometry.changes.update_poses |= PlayAnimations(&(g_renderer.geometry));
 
     // emissive alias refresh
+    // TODO: how to add to list of emissive tris on mat change or triangle change?
+    // TOTAL ORDER OF OPERATIONS:
+    // 1. make alias table for mesh retrieval
+    // 2. update emissive alias update to consider mesh transforms
+    // 3. assign/remove new emissives on material change
+    // 4. assign/remove new emissives on triangle material change
+    // 5. update emissiives on triangle area change (or later, mesh change)
+    BOOL updated_emissives = FALSE;
     if (g_renderer.geometry.changes.update_emissives) {
-        g_renderer.geometry.changes.update_emissives = TRUE;
+        g_renderer.geometry.changes.update_emissives = FALSE;
+        updated_emissives = TRUE;
         ARRLIST_EmissionAlias_wipe(&(g_renderer.geometry.aliases));
+        float total = 0.0f;
+        size_t ns = 0;
+        size_t nl = 0;
+        float* areas = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(float));
+        float* q = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(float));
+        size_t* small = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(float));
+        size_t* large = EZ_ALLOC(g_renderer.geometry.emissives.size, sizeof(float));
         for (size_t i = 0; i < g_renderer.geometry.emissives.size; i++) {
-            
+            Triangle* triangle = TriangleReference(g_renderer.geometry.emissives.data[i]); // TODO: need to apply the given mesh transformation to this too
+            float area = Luminance(g_renderer.geometry.materials.data[triangle->material].emission) * TriangleArea(VertexReference(triangle->a), VertexReference(triangle->b), VertexReference(triangle->c));
+            total += area;
+            areas[i] = area;
         }
+        for (size_t i = 0; i < g_renderer.geometry.emissives.size; i++) {
+            EmissionAlias alias = { 0 };
+            alias.pmf = areas[i] / total;
+            q[i] = alias.pmf * (float)(g_renderer.geometry.emissives.size);
+            if (q[i] < 1.0f) small[ns++] = i;
+            else large[nl++] = i;
+            ARRLIST_EmissionAlias_add(&(g_renderer.geometry.aliases), alias);
+        }
+        while (ns && nl) {
+            size_t s = small[--ns];
+            size_t l = large[nl - 1];
+            g_renderer.geometry.aliases.data[s].probability = q[s];
+            g_renderer.geometry.aliases.data[s].alias = (uint32_t)l;
+            q[l] -= 1.0f - q[s];
+            if (q[l] < 1.0f) {
+                nl--;
+                small[ns++] = l;
+            }
+        }
+        while (nl) {
+            size_t l = large[--nl];
+            g_renderer.geometry.aliases.data[l].probability = 1.0f;
+            g_renderer.geometry.aliases.data[l].alias = (uint32_t)l;
+        }
+        while (ns) {
+            size_t s = small[--ns];
+            g_renderer.geometry.aliases.data[s].probability = 1.0f;
+            g_renderer.geometry.aliases.data[s].alias = (uint32_t)s;
+        }
+        EZ_FREE(areas);
+        EZ_FREE(q);
+        EZ_FREE(small);
+        EZ_FREE(large);
     }
 
     // helpers for readability
@@ -812,7 +865,8 @@ void Render() {
                 if (!is_transferring) { is_transferring = TRUE; VUTIL_BeginTransferCommands(); } \
                 VUPDT_##vname(&(g_renderer.vulkan.core.geometry.oname)); \
             } \
-            if (tri) { \
+            if (tri || updated_emissives) { \
+                updated_emissives = FALSE; \
                 if (g_renderer.geometry.changes.max_emissives != g_renderer.geometry.emissives.maxsize) { \
                     g_renderer.geometry.changes.max_emissives = g_renderer.geometry.emissives.maxsize; \
                     if (!resized_buffers) { \
@@ -824,6 +878,8 @@ void Render() {
                     } \
                     VCLEAN_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
                     VINIT_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
+                    VCLEAN_Aliases(&(g_renderer.vulkan.core.geometry.aliases)); \
+                    VINIT_Aliases(&(g_renderer.vulkan.core.geometry.aliases)); \
                 } else { \
                     if (g_renderer.geometry.changes.num_emissives != g_renderer.geometry.emissives.size) { \
                         dupdate_queue = CPUSWAP_LENGTH; \
@@ -831,6 +887,7 @@ void Render() {
                     } \
                     if (!is_transferring) { is_transferring = TRUE; VUTIL_BeginTransferCommands(); } \
                     VUPDT_Emissives(&(g_renderer.vulkan.core.geometry.emissives)); \
+                    VUPDT_Aliases(&(g_renderer.vulkan.core.geometry.aliases)); \
                 } \
             } \
         } \
