@@ -23,4 +23,4 @@ DEFINE PRISM
 WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
 
 # EXTRA MODULES AND EXTENSIONS
-MODULE crys https://github.com/JHeflinger/crys.git .
+# MODULE crys https://github.com/JHeflinger/crys.git .

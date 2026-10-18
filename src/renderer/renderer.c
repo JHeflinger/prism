@@ -469,8 +469,6 @@ void InitializeRenderer() {
     // initialize min/max BB
     SETVEC3(g_renderer.geometry.bounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
     SETVEC3(g_renderer.geometry.bounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
-    SETVEC3(g_renderer.geometry.splatbounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
-    SETVEC3(g_renderer.geometry.splatbounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
 
     // set up dimensions
     g_renderer.dimensions = (Vector2){
@@ -585,6 +583,7 @@ SceneCamera DefaultCamera() {
     sc.config.spectral = FALSE;
     sc.config.screenspace = FALSE;
     sc.config.splatshadows = TRUE;
+    sc.config.splatocclusion = TRUE;
     sc.config.wireframe = TRUE;
     sc.config.normals = TRUE;
     sc.config.reset = FALSE;
@@ -1030,8 +1029,6 @@ void Render() {
                 glm_vec3_minv(worldmin, g_renderer.geometry.bounds.min, g_renderer.geometry.bounds.min);
                 glm_vec3_maxv(worldmax, g_renderer.geometry.bounds.max, g_renderer.geometry.bounds.max);
             }
-            glm_vec3_minv(g_renderer.geometry.splatbounds.min, g_renderer.geometry.bounds.min, g_renderer.geometry.bounds.min);
-            glm_vec3_maxv(g_renderer.geometry.splatbounds.max, g_renderer.geometry.bounds.max, g_renderer.geometry.bounds.max);
         }
 
         // set bvh reconstruction
@@ -1909,9 +1906,14 @@ void ClearScene(BOOL hard) {
 
 void ClearSplats() {
     if (g_renderer.geometry.splats.maxsize == 0) return;
+    for (size_t i = 0; i < g_renderer.geometry.meshes.size; i++) {
+        if (!(g_renderer.geometry.meshes.data[i].send < g_renderer.geometry.meshes.data[i].sstart ||
+            g_renderer.geometry.meshes.data[i].send == (uint32_t)-1))
+            UpdateMeshes();
+        g_renderer.geometry.meshes.data[i].sstart = 0;
+        g_renderer.geometry.meshes.data[i].send = (uint32_t)-1;
+    }
     ARRLIST_GaussianSplat_clear(&(g_renderer.geometry.splats));
-    SETVEC3(g_renderer.geometry.splatbounds.min, FLT_MAX, FLT_MAX, FLT_MAX);
-    SETVEC3(g_renderer.geometry.splatbounds.max, -FLT_MAX, -FLT_MAX, -FLT_MAX);
     UpdateSplats();
 }
 
@@ -1921,14 +1923,54 @@ size_t NumSplats() {
 
 void SubmitSplat(GaussianSplat splat) {
     ARRLIST_GaussianSplat_add(&(g_renderer.geometry.splats), splat);
-    AxisAlignedBoundingBox box = SplatBounds(&splat);
-    glm_vec3_minv(box.min, g_renderer.geometry.splatbounds.min, g_renderer.geometry.splatbounds.min);
-    glm_vec3_maxv(box.max, g_renderer.geometry.splatbounds.max, g_renderer.geometry.splatbounds.max);
     UpdateSplats();
 }
 
 void UpdateSplats() {
     g_renderer.geometry.changes.update_splats = TRUE;
+}
+
+BOOL SubmitSplatMeshDescriptor(size_t start, size_t count, const char* name) {
+    if (count == 0 || start + count > g_renderer.geometry.splats.size) return FALSE;
+    vec3 min = { FLT_MAX, FLT_MAX, FLT_MAX };
+    vec3 max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+    for (size_t i = start; i < start + count; i++) {
+        AxisAlignedBoundingBox box = SplatBounds(&(g_renderer.geometry.splats.data[i]));
+        glm_vec3_minv(box.min, min, min);
+        glm_vec3_maxv(box.max, max, max);
+    }
+    MeshDescriptor md = { 0 };
+    md.disabled = FALSE;
+    md.start = (VertexID)NumVertices();
+    md.end = md.start - 1;
+    md.tstart = (TriangleID)NumTriangles();
+    md.tend = md.tstart - 1;
+    md.skinstart = (VertexID)NumSkins();
+    md.pose = (uint32_t)-1;
+    md.sstart = (uint32_t)start;
+    md.send = (uint32_t)(start + count - 1);
+    for (int i = 0; i < 3; i++) {
+        md.center[i] = (min[i] + max[i]) * 0.5f;
+        md.extents[i] = (max[i] - min[i]) * 0.5f;
+        md.scale[i] = 1.0f;
+    }
+    glm_mat4_identity(md.transform);
+    SubmitMeshDescriptor(md, name);
+    UpdateSplats();
+    return TRUE;
+}
+
+size_t FindMeshFromSplat(uint32_t sid) {
+    size_t lo = 0, hi = g_renderer.geometry.meshes.size;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (g_renderer.geometry.meshes.data[mid].sstart <= sid) lo = mid + 1;
+        else hi = mid;
+    }
+    if (lo == 0) return (size_t)-1;
+    MeshDescriptor* md = &(g_renderer.geometry.meshes.data[lo - 1]);
+    if ((md->send < md->sstart || md->send == (uint32_t)-1) || sid > md->send) return (size_t)-1;
+    return lo - 1;
 }
 
 void UpdateEmissives() {
@@ -2038,8 +2080,10 @@ BOOL DeleteTriangle(TriangleID id) {
     ARRLIST_Triangle_remove(&(g_renderer.geometry.triangles), id);
     for (size_t i = md; i < g_renderer.geometry.meshes.size; i++) {
         MeshDescriptor* md = MeshReference(i);
+        BOOL empty = md->tend < md->tstart || md->tend == (TriangleID)-1;
         if (md->tstart > id) md->tstart--;
-        if (md->tend >= id) md->tend--;
+        if (empty) md->tend = md->tstart - 1;
+        else if (md->tend >= id) md->tend--;
     }
     FixDeleteEditTarget(EDIT_SINGLE_TRIANGLE, id);
     UpdateMeshes();
@@ -2111,10 +2155,13 @@ BOOL DeleteMesh(size_t id) {
     memcpy(&md, &(g_renderer.geometry.meshes.data[id]), sizeof(MeshDescriptor));
     BOOL has_tris = !(md.tend < md.tstart || md.tend == (TriangleID)-1);
     BOOL has_verts = !(md.end < md.start || md.end == (VertexID)-1);
+    BOOL has_splats = !(md.send < md.sstart || md.send == (uint32_t)-1);
     size_t tcount = has_tris ? (size_t)md.tend - md.tstart + 1 : 0;
     size_t vcount = has_verts ? (size_t)md.end - md.start + 1 : 0;
-    if (md.tstart + tcount > g_renderer.geometry.triangles.size || md.start + vcount > g_renderer.geometry.vertices.size) {
-        logerror("Mesh %zu describes triangles/vertices outside of the scene", id);
+    size_t gcount = has_splats ? (size_t)md.send - md.sstart + 1 : 0;
+    if (md.tstart + tcount > g_renderer.geometry.triangles.size || md.start + vcount > g_renderer.geometry.vertices.size ||
+        md.sstart + gcount > g_renderer.geometry.splats.size) {
+        logerror("Mesh %zu describes triangles/vertices/splats outside of the scene", id);
         return FALSE;
     }
     uint32_t nmin = UINT32_MAX;
@@ -2157,6 +2204,7 @@ BOOL DeleteMesh(size_t id) {
     }
     ARRLIST_REMOVE_RANGE(g_renderer.geometry.vertices, md.start, vcount);
     if (ncount) ARRLIST_REMOVE_RANGE(g_renderer.geometry.normals, nmin, ncount);
+    if (gcount) ARRLIST_REMOVE_RANGE(g_renderer.geometry.splats, md.sstart, gcount);
     size_t scount = 0;
     if (md.pose != (uint32_t)-1 && (size_t)md.skinstart + vcount <= g_renderer.geometry.skins.size) {
         scount = vcount;
@@ -2191,6 +2239,10 @@ BOOL DeleteMesh(size_t id) {
             other->start -= (uint32_t)vcount;
             if (other->end != (VertexID)-1) other->end -= (uint32_t)vcount;
         }
+        if (gcount && other->sstart >= md.sstart + gcount) {
+            other->sstart -= (uint32_t)gcount;
+            if (other->send != (uint32_t)-1) other->send -= (uint32_t)gcount;
+        }
         if (scount && other->skinstart >= md.skinstart + scount) other->skinstart -= (uint32_t)scount;
         if (md.pose != (uint32_t)-1 && other->pose != (uint32_t)-1 && other->pose > md.pose) other->pose -= MAX_BONES;
     }
@@ -2209,6 +2261,7 @@ BOOL DeleteMesh(size_t id) {
     UpdateSkins();
     UpdatePoses();
     UpdateEmissives();
+    if (gcount) UpdateSplats();
     return TRUE;
 }
 

@@ -64,8 +64,9 @@ void VCLEAN_Triangles(VulkanDataBuffer* triangles) {
     VUTIL_DestroyBuffer(*triangles);
 }
 
-void VCLEAN_Splats(VulkanDataBuffer* splats) {
-    VUTIL_DestroyBuffer(*splats);
+void VCLEAN_Splats(VulkanSplats* splats) {
+    VUTIL_DestroyBuffer(splats->original);
+    VUTIL_DestroyBuffer(splats->transformed);
 }
 
 void VCLEAN_Emissives(VulkanDataBuffer* emissives) {

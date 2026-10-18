@@ -172,7 +172,22 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry.splats.buffer)
+				&(renderer->vulkan.core.geometry.splats.transformed.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.splats.size)
+				}, 0.0f,
+				sizeof(GaussianSplat)
+			}
+		};
+	} else if (strcmp(name, "SplatSourceSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.splats.original.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {

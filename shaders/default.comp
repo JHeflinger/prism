@@ -1,5 +1,6 @@
 #import Boilerplate
 #import Definitions
+#import SplatConstants
 
 #import BVHNodeDef;
 #import RayGeneratorDef;
@@ -52,9 +53,8 @@ float plane_intersect(Ray ray, vec3 planepoint, vec3 normal) {
 
 bool splat_intersect(Ray ray, uint gaussian_ind, inout Hit hit) {
     GaussianSplat gaussian = splatIn[gaussian_ind];
-    const float MIN_OPACITY = 0.3;
     float alpha = 1.0 / (1.0 + exp(-gaussian.opacity));
-    if (alpha < MIN_OPACITY) return false;
+    if (alpha < SPLAT_OCCLUSION_ALPHA) return false;
     vec3 scale = exp(gaussian.logscale);
     mat3 R = quat_to_mat3(normalize(gaussian.rotation));
     vec3 ro = transpose(R) * (ray.position - gaussian.position);
@@ -131,7 +131,7 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
         shit.distance = -1.0;
         uint shit_id = uint(-1);
         shit = splattrace(ray, shit_id);
-        if (hit.distance < 0 || (shit.distance > 0 && shit.distance < hit.distance)) {
+        if (shit.distance > 0 && (hit.distance < 0 || shit.distance < hit.distance)) {
             hit = shit;
             hit_id = shit_id + ubo.triangles;
         }
@@ -188,7 +188,11 @@ void main() {
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
 
 	// reject any rays outside of the viewport
-    if (cut_viewport(rx, ry)) return;
+    if (cut_viewport(rx, ry)) {
+        raygenIn[gl_GlobalInvocationID.x].tid = uint(-1);
+        raygenIn[gl_GlobalInvocationID.x].distance = -1.0;
+        return;
+    }
 
 	// calculate ray color
 	vec3 color = vec3(0);

@@ -137,13 +137,13 @@ void VUPDT_Triangles(VulkanDataBuffer* triangles) {
     PENDING(TRANSFER_ACQUIRE_TRIANGLES);
 }
 
-void VUPDT_Splats(VulkanDataBuffer* splats) {
+void VUPDT_Splats(VulkanSplats* splats) {
     if (sizeof(GaussianSplat) * g_vupdt_renderer_ref->geometry.splats.maxsize == 0) return;
     if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.splats.data,
         sizeof(GaussianSplat) * g_vupdt_renderer_ref->geometry.splats.size,
         sizeof(GaussianSplat) * g_vupdt_renderer_ref->geometry.splats.maxsize,
-        splats->buffer)) return;
+        splats->original.buffer)) return;
     PENDING(TRANSFER_ACQUIRE_SPLATS);
 }
 
@@ -187,7 +187,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vupdt_renderer_ref->vulkan.core.general.gpu);
     if (g_vupdt_renderer_ref->vulkan.core.transfer.pending) {
         if (families.transfer.value != families.graphics.value) {
-            VkBufferMemoryBarrier barriers[7] = { 0 };
+            VkBufferMemoryBarrier barriers[11] = { 0 };
             uint32_t count = 0;
             #define MAYBE_ACQUIRE(flag, buf) \
                 if (g_vupdt_renderer_ref->vulkan.core.transfer.pending & (flag)) { \
@@ -207,7 +207,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_EMISSIVES, g_vupdt_renderer_ref->vulkan.core.geometry.emissives.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_ALIASES, g_vupdt_renderer_ref->vulkan.core.geometry.aliases.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRIANGLES, g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer)
-            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_SPLATS, g_vupdt_renderer_ref->vulkan.core.geometry.splats.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_SPLATS, g_vupdt_renderer_ref->vulkan.core.geometry.splats.original.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_NORMALS, g_vupdt_renderer_ref->vulkan.core.geometry.normals.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRANSFORMS, g_vupdt_renderer_ref->vulkan.core.geometry.transforms.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_POSES, g_vupdt_renderer_ref->vulkan.core.geometry.poses.buffer)
@@ -281,8 +281,17 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
         if (i >= nativeshaders) invocations = g_vupdt_renderer_ref->externals.data[i - nativeshaders].invocations;
 
         if ((1u << i) & VERTEX_SHADER_FLAG) {
-            invocations = (uint32_t)g_vupdt_renderer_ref->geometry.vertices.size;
-            _record_push_constants(g_vupdt_renderer_ref->geometry.meshes.size);
+            // vertex.comp also applies mesh descriptors to gaussian splats, but only when the acceleration structure
+            // is being rebuilt (splats or descriptors changed) since the transformed splats are otherwise unchanged
+            uint32_t nverts = (uint32_t)g_vupdt_renderer_ref->geometry.vertices.size;
+            uint32_t nsplats = queue_update_splats_bvh ? (uint32_t)g_vupdt_renderer_ref->geometry.splats.size : 0;
+            invocations = nverts > nsplats ? nverts : nsplats;
+            VulkanPushConstants pc = { (uint32_t)g_vupdt_renderer_ref->geometry.meshes.size, nverts, nsplats };
+            vkCmdPushConstants(
+                command,
+                g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                0, sizeof(VulkanPushConstants), &pc);
         }
 
         if (((1u << i) & CENTROID_SHADER_FLAG) ||
@@ -470,8 +479,16 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         GetMouseX() - offset.x,
         GetMouseY() - offset.y
     };
-    uint32_t mx = (relm.x / scaled_rdims.x) * renderer_dimensions.x;
-    uint32_t my = (relm.y / scaled_rdims.y) * renderer_dimensions.y;
+    // only report a mouse position while it is over the viewport panel; otherwise send an out of image position so the
+    // overlay pass clears any hover (negative coordinates must not be cast straight to uint32_t)
+    uint32_t mx = (uint32_t)-1;
+    uint32_t my = (uint32_t)-1;
+    Vector2 mouse = GetMousePosition();
+    if (CheckCollisionPointRec(mouse, viewport_rec) && relm.x >= 0.0f && relm.y >= 0.0f &&
+        relm.x < scaled_rdims.x && relm.y < scaled_rdims.y) {
+        mx = (uint32_t)((relm.x / scaled_rdims.x) * renderer_dimensions.x);
+        my = (uint32_t)((relm.y / scaled_rdims.y) * renderer_dimensions.y);
+    }
 
     // check for camera reset
     static SimpleCamera old_camera = { 0 };
@@ -543,6 +560,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.denoisecolor = RendererCamera()->config.denoisecolor;
         ubo.denoisenormal = RendererCamera()->config.denoisenormal;
         ubo.denoisedepth = RendererCamera()->config.denoisedepth;
+        ubo.splatocclusion = (uint32_t)RendererCamera()->config.splatocclusion;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 
@@ -561,6 +579,34 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.light_base = (uint32_t)(g_vupdt_renderer_ref->geometry.triangles.size + g_vupdt_renderer_ref->geometry.splats.size);
         ubo.light_count = (uint32_t)g_vupdt_renderer_ref->geometry.lights.size;
         ubo.single_selected_lid = GetSelectedLight() < g_vupdt_renderer_ref->geometry.lights.size ? GetSelectedLight() : (uint32_t)-1;
+        ubo.hovered_tstart = 1;
+        ubo.hovered_sstart = 1;
+        ubo.selected_tstart = 1;
+        ubo.selected_sstart = 1;
+        size_t hovered = HoveredObject();
+        size_t selected = GetSelectedObject();
+        if (hovered != (size_t)-1) {
+            MeshDescriptor* md = MeshReference(hovered);
+            if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) {
+                ubo.hovered_tstart = md->tstart;
+                ubo.hovered_tend = md->tend;
+            }
+            if (!(md->send < md->sstart || md->send == (uint32_t)-1)) {
+                ubo.hovered_sstart = NumTriangles() + md->sstart;
+                ubo.hovered_send = NumTriangles() + md->send;
+            }
+        }
+        if (selected != (size_t)-1) {
+            MeshDescriptor* md = MeshReference(selected);
+            if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) {
+                ubo.selected_tstart = md->tstart;
+                ubo.selected_tend = md->tend;
+            }
+            if (!(md->send < md->sstart || md->send == (uint32_t)-1)) {
+                ubo.selected_sstart = NumTriangles() + md->sstart;
+                ubo.selected_send = NumTriangles() + md->send;
+            }
+        }
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
 

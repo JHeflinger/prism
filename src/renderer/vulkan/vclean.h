@@ -25,7 +25,7 @@ void VCLEAN_Vertices(VulkanVertices* vertices);
 
 void VCLEAN_Triangles(VulkanDataBuffer* triangles);
 
-void VCLEAN_Splats(VulkanDataBuffer* splats);
+void VCLEAN_Splats(VulkanSplats* splats);
 
 void VCLEAN_Emissives(VulkanDataBuffer* emissives);
 

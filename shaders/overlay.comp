@@ -17,7 +17,7 @@ vec4 lock_color;
 
 void calculate_highlight_color() {
     float divisor = float(o_ubo.divisor) * (1.0 - mixfactor);
-    highlight_color = vec4(1.0, 0.52, 0.0, 1.0) / divisor;
+    highlight_color = vec4(0.0, 1.0, 0.52, 1.0) / divisor;
     lock_color = vec4(0.9, 0.12, 0.05, 1.0) / divisor;
 }
 
@@ -49,6 +49,32 @@ void highlight_triangle(uint htid) {
 			vec4 oldc = imageLoad(outputImage, ivec2(rx, ry));
 			imageStore(outputImage, ivec2(rx, ry), mix(oldc, highlight_color, mixfactor));
 		}
+    }
+}
+
+bool in_object(uint id, uvec4 range) {
+    return id != uint(-1) && ((id >= range.x && id <= range.y) || (id >= range.z && id <= range.w));
+}
+
+void highlight_object(uvec4 range, float fill) {
+    if (range.x > range.y && range.z > range.w) return;
+	int rx = int(gl_GlobalInvocationID.x%o_ubo.image_width);
+    int ry = int(gl_GlobalInvocationID.x/o_ubo.image_width);
+    if (!in_object(raygenIn[gl_GlobalInvocationID.x].tid, range)) return;
+    int radius = 2;
+    int minx = max(rx - radius, 0);
+    int miny = max(ry - radius, 0);
+    int maxx = min(rx + radius, int(o_ubo.image_width) - 1);
+    int maxy = min(ry + radius, int(o_ubo.image_height) - 1);
+    bool border = false;
+    for (int x = minx; x <= maxx && !border; x++)
+        for (int y = miny; y <= maxy; y++)
+            if (!in_object(raygenIn[y*o_ubo.image_width + x].tid, range)) { border = true; break; }
+    if (border) {
+        imageStore(outputImage, ivec2(rx, ry), highlight_color);
+    } else {
+        vec4 oldc = imageLoad(outputImage, ivec2(rx, ry));
+        imageStore(outputImage, ivec2(rx, ry), mix(oldc, highlight_color, fill));
     }
 }
 
@@ -148,4 +174,9 @@ void main() {
         if (o_ubo.single_selected_lid != uint(-1) && o_ubo.single_selected_lid < o_ubo.light_count)
             highlight_triangle(o_ubo.light_base + o_ubo.single_selected_lid);
     }
+    uvec4 hovered_object = uvec4(o_ubo.hovered_tstart, o_ubo.hovered_tend, o_ubo.hovered_sstart, o_ubo.hovered_send);
+    uvec4 selected_object = uvec4(o_ubo.selected_tstart, o_ubo.selected_tend, o_ubo.selected_sstart, o_ubo.selected_send);
+    if (o_ubo.mode == OBJECT_SELECT && hovered_object != selected_object)
+        highlight_object(hovered_object, mixfactor * 0.5);
+    highlight_object(selected_object, mixfactor);
 }

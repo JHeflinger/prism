@@ -3,25 +3,36 @@
 
 #import MeshDescriptorDef;
 #import VertexSkinDef;
+#import SplatDef;
 
 layout(binding = 0) readonly #import VertexSSBODef;
 layout(binding = 1) #import TransformedVertexSSBODef;
 layout(binding = 2) readonly #import TransformsSSBODef;
 layout(binding = 3) readonly #import PoseSSBODef;
 layout(binding = 4) readonly #import SkinSSBODef;
-layout(push_constant) #import PushConstantDef pc;
+layout(binding = 5) readonly #import SplatSourceSSBODef;
+layout(binding = 6) writeonly #import SplatSSBODef;
 
-uint find_transform(uint i) {
-    float pct = float(i) / float(transformsIn[pc.elements - 1].end + 1);
-    if (pct >= 1.0) return -1;
-    uint ind = uint(pct * float(pc.elements));
-    for (int i = 0; i < pc.elements; i++) {
-        MeshDescriptor md = transformsIn[ind];
-        if (gl_GlobalInvocationID.x >= md.start && gl_GlobalInvocationID.x <= md.end) return ind;
-        else if (gl_GlobalInvocationID.x < md.start) ind--;
-        else ind++;
+layout(push_constant) uniform VertexPushConstants {
+    uint meshes;
+    uint vertices;
+    uint splats;
+} pc;
+
+#import QuatToMat
+
+uint find_transform(uint id) {
+    uint lo = 0;
+    uint hi = pc.meshes;
+    while (lo < hi) {
+        uint mid = lo + (hi - lo) / 2u;
+        if (transformsIn[mid].start <= id) lo = mid + 1u;
+        else hi = mid;
     }
-    return -1;
+    if (lo == 0u) return uint(-1);
+    MeshDescriptor md = transformsIn[lo - 1u];
+    if (md.end == uint(-1) || md.end < md.start || id > md.end) return uint(-1);
+    return lo - 1u;
 }
 
 void animate_vertex(inout vec4 vertex, uint poffset, VertexSkin skin) {
@@ -31,21 +42,149 @@ void animate_vertex(inout vec4 vertex, uint poffset, VertexSkin skin) {
     vertex = skin_mat * vec4(vertex.xyz, 1.0);
 }
 
-void main() {
-    if (pc.elements == 0) return;
-    vec4 vertex = originalVertexIn[gl_GlobalInvocationID.x];
-    uint mi = find_transform(gl_GlobalInvocationID.x);
+void transform_vertex(uint id) {
+    vec4 vertex = originalVertexIn[id];
+    if (pc.meshes == 0) {
+        vertexIn[id] = vertex;
+        return;
+    }
+    uint mi = find_transform(id);
     if (mi == -1) {
-        vertexIn[gl_GlobalInvocationID.x] = vertex;
+        vertexIn[id] = vertex;
         return;
     }
     MeshDescriptor md = transformsIn[mi];
     if (md.disabled != 0) {
-        vertexIn[gl_GlobalInvocationID.x] = vec4(0);
+        vertexIn[id] = vec4(0);
         return;
     }
     if (md.pose != -1)
-        animate_vertex(vertex, md.pose, skinIn[(gl_GlobalInvocationID.x - md.start) + md.skinstart]);
+        animate_vertex(vertex, md.pose, skinIn[(id - md.start) + md.skinstart]);
     vec3 newpos = (md.transform * vec4(vertex.xyz, 1.0)).xyz;
-    vertexIn[gl_GlobalInvocationID.x] = vec4(newpos, originalVertexIn[gl_GlobalInvocationID.x].w);
+    vertexIn[id] = vec4(newpos, originalVertexIn[id].w);
+}
+
+uint find_splat_transform(uint id) {
+    uint lo = 0;
+    uint hi = pc.meshes;
+    while (lo < hi) {
+        uint mid = lo + (hi - lo) / 2u;
+        if (transformsIn[mid].sstart <= id) lo = mid + 1u;
+        else hi = mid;
+    }
+    if (lo == 0u) return uint(-1);
+    MeshDescriptor md = transformsIn[lo - 1u];
+    if (md.send == uint(-1) || md.send < md.sstart || id > md.send) return uint(-1);
+    return lo - 1u;
+}
+
+// rotation matrix (column major) to the (w, x, y, z) quaternion layout used by GaussianSplat.rotation / quat_to_mat3
+vec4 mat3_to_quat(mat3 m) {
+    float r00 = m[0][0], r11 = m[1][1], r22 = m[2][2];
+    float r01 = m[1][0], r10 = m[0][1];
+    float r02 = m[2][0], r20 = m[0][2];
+    float r12 = m[2][1], r21 = m[1][2];
+    float trace = r00 + r11 + r22;
+    vec4 q;
+    if (trace > 0.0) {
+        float s = sqrt(trace + 1.0) * 2.0;
+        q = vec4(0.25 * s, (r21 - r12) / s, (r02 - r20) / s, (r10 - r01) / s);
+    } else if (r00 > r11 && r00 > r22) {
+        float s = sqrt(max(1.0 + r00 - r11 - r22, EPS)) * 2.0;
+        q = vec4((r21 - r12) / s, 0.25 * s, (r01 + r10) / s, (r02 + r20) / s);
+    } else if (r11 > r22) {
+        float s = sqrt(max(1.0 + r11 - r00 - r22, EPS)) * 2.0;
+        q = vec4((r02 - r20) / s, (r01 + r10) / s, 0.25 * s, (r12 + r21) / s);
+    } else {
+        float s = sqrt(max(1.0 + r22 - r00 - r11, EPS)) * 2.0;
+        q = vec4((r10 - r01) / s, (r02 + r20) / s, (r12 + r21) / s, 0.25 * s);
+    }
+    return normalize(q);
+}
+
+void orthogonalize_columns(inout mat3 U) {
+    for (int sweep = 0; sweep < 10; sweep++) {
+        bool rotated = false;
+        for (int p = 0; p < 2; p++) {
+            for (int q = p + 1; q < 3; q++) {
+                float a = dot(U[p], U[p]);
+                float b = dot(U[q], U[q]);
+                float g = dot(U[p], U[q]);
+                if (g == 0.0 || abs(g) <= 1e-7 * sqrt(a * b)) continue;
+                rotated = true;
+                float zeta = (b - a) / (2.0 * g);
+                float t = (zeta >= 0.0 ? 1.0 : -1.0) / (abs(zeta) + sqrt(1.0 + zeta * zeta));
+                float c = inversesqrt(1.0 + t * t);
+                float s = c * t;
+                vec3 up = U[p];
+                vec3 uq = U[q];
+                U[p] = c * up - s * uq;
+                U[q] = s * up + c * uq;
+            }
+        }
+        if (!rotated) break;
+    }
+}
+
+void transform_splat(uint id) {
+    GaussianSplat splat = splatSourceIn[id];
+    uint mi = pc.meshes == 0 ? uint(-1) : find_splat_transform(id);
+    if (mi == uint(-1)) {
+        splatIn[id] = splat;
+        return;
+    }
+    MeshDescriptor md = transformsIn[mi];
+    splat.position = (md.transform * vec4(splat.position, 1.0)).xyz;
+    if (md.disabled != 0) {
+        splat.logscale = vec3(-30.0);
+        splat.opacity = -1e4;
+        splatIn[id] = splat;
+        return;
+    }
+    mat3 A = mat3(md.transform);
+    vec3 scale = exp(splat.logscale);
+    mat3 R = quat_to_mat3(normalize(splat.rotation));
+    float n0 = length(A[0]);
+    float n1 = length(A[1]);
+    float n2 = length(A[2]);
+    float tol = 1e-4 * max(n0, max(n1, n2));
+    bool similarity = abs(n0 - n1) <= tol && abs(n0 - n2) <= tol &&
+        abs(dot(A[0], A[1])) <= tol * n0 && abs(dot(A[0], A[2])) <= tol * n0 && abs(dot(A[1], A[2])) <= tol * n0 &&
+        determinant(A) > 0.0 && n0 > 0.0;
+    if (similarity) {
+        splat.rotation = mat3_to_quat((A / n0) * R);
+        splat.logscale += vec3(log(n0));
+    } else {
+        mat3 U = A * mat3(R[0] * scale.x, R[1] * scale.y, R[2] * scale.z);
+        orthogonalize_columns(U);
+        vec3 len = vec3(length(U[0]), length(U[1]), length(U[2]));
+        float big = max(len.x, max(len.y, len.z));
+        if (big <= 0.0) {
+            splat.logscale = vec3(-30.0);
+            splatIn[id] = splat;
+            return;
+        }
+        int keep = len.x >= len.y && len.x >= len.z ? 0 : (len.y >= len.z ? 1 : 2);
+        mat3 B;
+        B[keep] = U[keep] / len[keep];
+        int i1 = (keep + 1) % 3;
+        int i2 = (keep + 2) % 3;
+        if (len[i1] < 1e-6 * big) {
+            vec3 helper = abs(B[keep].x) < 0.9 ? vec3(1, 0, 0) : vec3(0, 1, 0);
+            B[i1] = len[i2] >= 1e-6 * big ? normalize(cross(U[i2], B[keep])) : normalize(cross(B[keep], helper));
+        } else {
+            B[i1] = U[i1] / len[i1];
+        }
+        B[i2] = len[i2] >= 1e-6 * big ? U[i2] / len[i2] : normalize(cross(B[keep], B[i1]));
+        if (determinant(B) < 0.0) B[i2] = -B[i2];
+        splat.rotation = mat3_to_quat(B);
+        splat.logscale = log(max(len, vec3(1e-30)));
+    }
+    splatIn[id] = splat;
+}
+
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    if (id < pc.vertices) transform_vertex(id);
+    if (id < pc.splats) transform_splat(id);
 }

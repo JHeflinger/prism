@@ -660,14 +660,19 @@ BOOL VINIT_Triangles(VulkanDataBuffer* triangles) {
     return TRUE;
 }
 
-BOOL VINIT_Splats(VulkanDataBuffer* splats) {
+BOOL VINIT_Splats(VulkanSplats* splats) {
     size_t arrsize = sizeof(GaussianSplat) * g_vinit_renderer_ref->geometry.splats.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        splats);
+        &(splats->original));
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(splats->transformed));
     VUPDT_Splats(splats);
     return TRUE;
 }

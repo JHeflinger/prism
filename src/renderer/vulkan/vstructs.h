@@ -82,6 +82,7 @@ typedef struct {
     alignas(4) float denoisecolor;
     alignas(4) float denoisenormal;
     alignas(4) float denoisedepth;
+    alignas(4) uint32_t splatocclusion;
 } UniformBufferObject;
 
 typedef struct {
@@ -108,6 +109,14 @@ typedef struct {
     alignas(4) uint32_t single_selected_lid;
     alignas(4) uint32_t light_base;
     alignas(4) uint32_t light_count;
+    alignas(4) uint32_t hovered_tstart;
+    alignas(4) uint32_t hovered_tend;
+    alignas(4) uint32_t hovered_sstart;
+    alignas(4) uint32_t hovered_send;
+    alignas(4) uint32_t selected_tstart;
+    alignas(4) uint32_t selected_tend;
+    alignas(4) uint32_t selected_sstart;
+    alignas(4) uint32_t selected_send;
 } OverlayUniformBufferObject;
 
 typedef struct {
@@ -211,11 +220,16 @@ typedef struct {
 } VulkanVertices;
 
 typedef struct {
+    VulkanDataBuffer original;
+    VulkanDataBuffer transformed;
+} VulkanSplats;
+
+typedef struct {
     VulkanBVH bvh;
     VulkanDataBuffer normals;
     VulkanVertices vertices;
     VulkanDataBuffer triangles;
-    VulkanDataBuffer splats;
+    VulkanSplats splats;
     VulkanDataBuffer emissives;
     VulkanDataBuffer aliases;
     VulkanDataBuffer materials;

@@ -454,6 +454,7 @@ static GaussianSplat* SeedGaussians(uint32_t want, uint32_t* out_count, vec3 cen
     for (size_t i = 0; i < tri_count; i++) mesh_of[i] = -1;
     for (size_t m = 0; m < geo->meshes.size; m++) {
         const MeshDescriptor* md = &geo->meshes.data[m];
+        if (md->tend < md->tstart || md->tend == (TriangleID)-1) continue;
         for (size_t t = md->tstart; t <= md->tend && t < tri_count; t++) mesh_of[t] = (int32_t)m;
     }
     float (*tv)[3][3] = EZ_ALLOC(tri_count, sizeof(*tv));
@@ -566,6 +567,7 @@ static float (*CollectVisibleTriangles(size_t* out_count))[3][3] {
     for (size_t i = 0; i < tri_count; i++) mesh_of[i] = -1;
     for (size_t m = 0; m < geo->meshes.size; m++) {
         const MeshDescriptor* md = &geo->meshes.data[m];
+        if (md->tend < md->tstart || md->tend == (TriangleID)-1) continue;
         for (size_t t = md->tstart; t <= md->tend && t < tri_count; t++) mesh_of[t] = (int32_t)m;
     }
     float (*out)[3][3] = EZ_ALLOC(tri_count, sizeof(*out));
@@ -852,6 +854,7 @@ static void FinishTraining(TrainingJob* j) {
                 memcpy(s.shdc, result[i].shdc, 12);
                 SubmitSplat(s);
             }
+            SubmitSplatMeshDescriptor(NumSplats() - n, n, "Trained Splats");
             loginfo("Loaded %u trained gaussians into the renderer", n);
         }
         EZ_FREE(result);

@@ -53,7 +53,7 @@ BOOL VINIT_Vertices(VulkanVertices* vertices);
 
 BOOL VINIT_Triangles(VulkanDataBuffer* triangles);
 
-BOOL VINIT_Splats(VulkanDataBuffer* splats);
+BOOL VINIT_Splats(VulkanSplats* splats);
 
 BOOL VINIT_Emissives(VulkanDataBuffer* emissives);
 

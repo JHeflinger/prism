@@ -10,6 +10,7 @@
 #include <easyparse.h>
 #include <easyfile.h>
 #include <ctype.h>
+#include <stddef.h>
 #include <errno.h>
 #include <nfd.h>
 
@@ -1079,6 +1080,10 @@ static void PrismReadGeometry(PrismStream* s, Geometry* g) {
         if (t.a >= g->vertices.size || t.b >= g->vertices.size || t.c >= g->vertices.size ||
             t.material >= g->materials.size) s->ok = FALSE;
     }
+    for (size_t i = 0; s->ok && i < g->meshes.size; i++) {
+        MeshDescriptor* md = &(g->meshes.data[i]);
+        if (!(md->send < md->sstart || md->send == (uint32_t)-1) && md->send >= g->splats.size) s->ok = FALSE;
+    }
     if (s->ok && g->cameras.size > 0 && g->primarycamera >= g->cameras.size) g->primarycamera = 0;
 }
 
@@ -1147,7 +1152,8 @@ BOOL LoadOBJ(const char* filepath) {
         glm_vec3_sub(max, min, extent);
         glm_vec3_scale(extent, 0.5f, extent);
         SubmitMeshDescriptor((MeshDescriptor){
-            FALSE, startv, NumVertices() - 1, startt, NumTriangles() - 1, 0, (uint32_t)-1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
+            FALSE, startv, NumVertices() - 1, startt, NumTriangles() - 1, 0, (uint32_t)-1,
+            (uint32_t)NumSplats(), (uint32_t)NumSplats() - 1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
             { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, ez_strip_filename(filepath));
     }
     CleanStateOBJ(&state);
@@ -1422,6 +1428,7 @@ BOOL LoadFBX(const char* filepath) {
             FALSE, startv, NumVertices() - 1,
             startt, NumTriangles() - 1,
             starts, (uint32_t)-1,
+            (uint32_t)NumSplats(), (uint32_t)NumSplats() - 1,
             INLINEV3(center), INLINEV3(extent),
             { 0 }, { 0 },
             { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT
@@ -1520,7 +1527,9 @@ BOOL LoadPLY(const char* filepath) {
         ARRLIST_GaussianSplat_add(&splats, gaussian);
     }
     fclose(file);
+    size_t first = NumSplats();
     for (size_t i = 0; i < splats.size; i++) SubmitSplat(splats.data[i]);
+    SubmitSplatMeshDescriptor(first, splats.size, ez_strip_filename(filepath));
     ARRLIST_GaussianSplat_clear(&splats);
     loginfo("Loaded %zu Gaussian splats from \"%s\"", header.vertex_count, filepath);
     return TRUE;

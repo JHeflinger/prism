@@ -10,6 +10,7 @@ export Definitions {
     #define VERTEX_SELECT 2
     #define SPLAT_SELECT 3
     #define LIGHT_SELECT 4
+    #define OBJECT_SELECT 5
     #define EPS 0.000001
     #define DEBUG_NONE 0
     #define DEBUG_NORMALS 1
@@ -98,6 +99,12 @@ export SplatSSBODef {
     }
 }
 
+export SplatSourceSSBODef {
+    buffer SplatSourceSSBOIn {
+        GaussianSplat splatSourceIn[ ];
+    }
+}
+
 export TransformedVertexSSBODef {
     buffer TransformedVertexSSBOIn {
         vec4 vertexIn[ ];
@@ -118,6 +125,14 @@ export OverlayUniformBufferObjectDef {
         uint single_selected_lid;
         uint light_base;
         uint light_count;
+        uint hovered_tstart;
+        uint hovered_tend;
+        uint hovered_sstart;
+        uint hovered_send;
+        uint selected_tstart;
+        uint selected_tend;
+        uint selected_sstart;
+        uint selected_send;
     }
 }
 
@@ -167,6 +182,7 @@ export UniformBufferObjectDef {
         float denoisecolor;
         float denoisenormal;
         float denoisedepth;
+        uint splatocclusion;
     }
 }
 
@@ -395,6 +411,8 @@ export MeshDescriptorDef {
         uint tend;
         uint skinstart;
         uint pose;
+        uint sstart;
+        uint send;
         vec3 center;
         vec3 extents;
         vec3 translate;
@@ -696,6 +714,7 @@ export SplatConstants {
     const float SPLAT_DENSITY = 1.0; // global extinction multiplier
     const float SPLAT_G = 0.0; // Henyey-Greenstein anisotropy of the phase function (-1..1)
     const float VOLUME_TFAR = 1e30;
+    const float SPLAT_OCCLUSION_ALPHA = 0.3; // effective opacity at which a splat blocks surface shadow rays
     const float SQRT_2PI = 2.50662827463;
 }
 

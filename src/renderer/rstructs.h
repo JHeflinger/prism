@@ -322,6 +322,8 @@ typedef struct {
     alignas(4) TriangleID tend;
     alignas(4) VertexID skinstart;
     alignas(4) uint32_t pose;
+    alignas(4) uint32_t sstart;
+    alignas(4) uint32_t send;
     alignas(16) vec3 center;
     alignas(16) vec3 extents;
     alignas(16) vec3 translate;
@@ -448,6 +450,7 @@ typedef struct {
     BOOL wireframe;
     BOOL reset;
     BOOL denoise;
+    BOOL splatocclusion;
     size_t denoiseiterations;
     float denoisecolor;
     float denoisenormal;
@@ -493,7 +496,6 @@ typedef struct {
     FluidSimulation fluid;
     ChangeSet changes;
     AxisAlignedBoundingBox bounds;
-    AxisAlignedBoundingBox splatbounds;
     ARRLIST_MeshDescriptor meshes;
     ARRLIST_DynamicString meshnames;
     ARRLIST_SceneCamera cameras;

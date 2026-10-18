@@ -1,4 +1,6 @@
 #include "overlay.h"
+#include "renderer/renderer.h"
+#include "ui/panels/edit.h"
 #include <core/binds.h>
 
 static Renderer* g_overlay_renderer_ref = NULL;
@@ -25,6 +27,10 @@ static void SelectLightMode() {
     g_overlay_mode = LIGHT_SELECT_MODE;
 }
 
+static void SelectObjectMode() {
+    g_overlay_mode = OBJECT_SELECT_MODE;
+}
+
 void SetOverlayContext(Renderer* renderer) {
     g_overlay_renderer_ref = renderer;
     AddBind("no select mode", SelectNoneMode,
@@ -39,6 +45,9 @@ void SetOverlayContext(Renderer* renderer) {
     AddBind("light select mode", SelectLightMode,
         (BindCommand){ IK_SELECT, BIND_KEY_DOWN },
         (BindCommand){ IK_SELECT_LIGHT, BIND_KEY_PRESSED });
+    AddBind("object select mode", SelectObjectMode,
+        (BindCommand){ IK_SELECT, BIND_KEY_DOWN },
+        (BindCommand){ IK_SELECT_OBJECT, BIND_KEY_PRESSED });
 }
 
 void SetViewportRec(Rectangle rec) {
@@ -96,4 +105,24 @@ void SetSelectedLight(LightID lid) {
 
 LightID GetSelectedLight() {
     return g_single_selected_light;
+}
+
+size_t HoveredObject() {
+    if (g_overlay_mode != OBJECT_SELECT_MODE || !g_overlay_renderer_ref) return (size_t)-1;
+    uint32_t id = g_exposed_overlay_ssbo.hovered_tid;
+    if (id == (uint32_t)-1) return (size_t)-1;
+    size_t triangles = g_overlay_renderer_ref->geometry.triangles.size;
+    size_t splats = g_overlay_renderer_ref->geometry.splats.size;
+    size_t object = (size_t)-1;
+    if (id < triangles) object = FindMeshFromTriangle((TriangleID)id);
+    else if (id - triangles < splats) object = FindMeshFromSplat((uint32_t)(id - triangles));
+    if (object != (size_t)-1 && (object >= NumMeshes() || MeshReference(object)->disabled)) return (size_t)-1;
+    return object;
+}
+
+size_t GetSelectedObject() {
+    EditType type;
+    size_t index;
+    if (GetEditTarget(&type, &index) && type == EDIT_MESH && index < NumMeshes()) return index;
+    return (size_t)-1;
 }

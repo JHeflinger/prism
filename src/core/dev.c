@@ -88,7 +88,8 @@ static void LoadRabbit() {
         vec3 extent;
         glm_vec3_scale(scale, 0.5f, extent);
         SubmitMeshDescriptor((MeshDescriptor){
-            FALSE, vertex_base, NumVertices() - 1, triangle_base, NumTriangles() - 1, 0, (uint32_t)-1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
+            FALSE, vertex_base, NumVertices() - 1, triangle_base, NumTriangles() - 1, 0, (uint32_t)-1,
+            (uint32_t)NumSplats(), (uint32_t)NumSplats() - 1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
             { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, "Cube Light");
     }
     FitCamera();

@@ -159,6 +159,8 @@ static void DrawEditCamera(SceneCamera* cref, char* name, float width, float hei
     UICheckbox(&(cref->config.screenspace));
     UIColumnHeader("Splat Shading", LEFT_COLUMN_WIDTH);
     UICheckbox(&(cref->config.splatshadows));
+    UIColumnHeader("Splat Occlusion", LEFT_COLUMN_WIDTH);
+    if (UICheckbox(&(cref->config.splatocclusion))) cref->config.reset = TRUE;
     UIColumnHeader("Direct Lighting", LEFT_COLUMN_WIDTH);
     UICheckbox(&(cref->config.direct));
     UIColumnHeader("Direct Lighting Only", LEFT_COLUMN_WIDTH);

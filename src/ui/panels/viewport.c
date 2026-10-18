@@ -469,6 +469,14 @@ static void UpdateViewportPanel(float width, float height) {
                     DeselectEditTarget();
                 }
                 break;
+            case OBJECT_SELECT_MODE:
+                size_t oindex = HoveredObject();
+                if (oindex != (size_t)-1) {
+                    SetEditMesh(oindex);
+                } else {
+                    DeselectEditTarget();
+                }
+                break;
             default: DeselectEditTarget();
         }
     }

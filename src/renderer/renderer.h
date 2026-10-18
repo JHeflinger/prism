@@ -235,6 +235,10 @@ void SubmitSplat(GaussianSplat splat);
 
 void UpdateSplats();
 
+BOOL SubmitSplatMeshDescriptor(size_t start, size_t count, const char* name);
+
+size_t FindMeshFromSplat(uint32_t sid);
+
 void UpdateEmissives();
 
 void RefreshEmissives();

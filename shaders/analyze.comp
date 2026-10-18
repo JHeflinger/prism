@@ -37,7 +37,7 @@ vec2 project_vertex(vec3 vertex) {
 void main() {
     if (gl_GlobalInvocationID.x == 0 && o_ubo.single_selected_vid != -1)
         selected_vertex_position = project_vertex(vertexIn[o_ubo.single_selected_vid].xyz);
-    if (gl_GlobalInvocationID.x == 0 && o_ubo.mode == LIGHT_SELECT &&
+    if (gl_GlobalInvocationID.x == 0 &&
         (o_ubo.mouse_x >= o_ubo.image_width || o_ubo.mouse_y >= o_ubo.image_height))
         hovered_tid = uint(-1);
 	int rx = int(gl_GlobalInvocationID.x%int(o_ubo.image_width));
@@ -73,6 +73,9 @@ void main() {
             hovered_tid = uint(-1);
             if (tid != uint(-1) && tid >= o_ubo.light_base && tid - o_ubo.light_base < o_ubo.light_count)
                 hovered_tid = tid - o_ubo.light_base;
+        } else if (o_ubo.mode == OBJECT_SELECT) {
+            uint tid = raygenIn[gl_GlobalInvocationID.x].tid;
+            hovered_tid = tid < o_ubo.light_base ? tid : uint(-1);
         }
     }
 }
