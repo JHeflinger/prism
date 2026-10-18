@@ -244,6 +244,35 @@ static void ReconstructARAP() {
     #endif
 }
 
+static void UnglueTriangle(TriangleID id) {
+    Triangle t = *TriangleReference(id);
+    VertexID vs[3] = { t.a, t.b, t.c };
+    for (size_t i = 0; i < 3; i++) {
+        Edge e = { vs[i], vs[(i + 1) % 3] };
+        Edge alt = { e.b, e.a };
+        Edge key = HASHMAP_EdgeGlue_has(&(g_renderer.geometry.glue), e) ? e : alt;
+        EdgeMeta* em = HASHMAP_EdgeGlue_ref(&(g_renderer.geometry.glue), key);
+        if (!em) continue;
+        if (em->a == id) { em->a = em->b; em->b = (TriangleID)-1; }
+        else if (em->b == id) em->b = (TriangleID)-1;
+        if (em->a == (TriangleID)-1) {
+            HASHMAP_EdgeGlue_remove(&(g_renderer.geometry.glue), key);
+            for (size_t j = 0; j < g_renderer.geometry.edges.size; j++) {
+                if (g_renderer.geometry.edges.data[j].a == key.a && g_renderer.geometry.edges.data[j].b == key.b) {
+                    ARRLIST_Edge_remove(&(g_renderer.geometry.edges), j);
+                    break;
+                }
+            }
+        }
+    }
+    for (size_t i = 0; i < g_renderer.geometry.glue.capacity; i++) {
+        if (g_renderer.geometry.glue.entries[i].used != 1) continue;
+        EdgeMeta* em = &(g_renderer.geometry.glue.entries[i].value);
+        if (em->a != (TriangleID)-1 && em->a > id) em->a--;
+        if (em->b != (TriangleID)-1 && em->b > id) em->b--;
+    }
+}
+
 Renderer* RawRendererRef() {
     return &g_renderer;
 }
@@ -1844,23 +1873,32 @@ void RefreshEmissives() {
     g_renderer.geometry.changes.refresh_emissives = TRUE;
 }
 
-BOOL FindTriangleTransform(TriangleID tid, mat4 dest) {
-    glm_mat4_identity(dest);
+size_t FindMeshFromTriangle(TriangleID tid) {
     size_t lo = 0, hi = g_renderer.geometry.meshes.size;
     while (lo < hi) {
         size_t mid = lo + (hi - lo) / 2;
         if (g_renderer.geometry.meshes.data[mid].tstart <= tid) lo = mid + 1;
         else hi = mid;
     }
-    if (lo == 0) return FALSE;
+    if (lo == 0) return (size_t)-1;
     MeshDescriptor* md = &(g_renderer.geometry.meshes.data[lo - 1]);
-    if (md->tend < md->tstart || md->tend == (TriangleID)-1 || tid > md->tend) return FALSE;
-    if (md->disabled) {
-        glm_mat4_zero(dest);
+    if (md->tend < md->tstart || md->tend == (TriangleID)-1 || tid > md->tend) return (size_t)-1;
+    return lo - 1;
+}
+
+BOOL FindTriangleTransform(TriangleID tid, mat4 dest) {
+    glm_mat4_identity(dest);
+    size_t mid = FindMeshFromTriangle(tid);
+    if (mid != (size_t)-1) {
+        MeshDescriptor* md = MeshReference(mid);
+        if (md->disabled) {
+            glm_mat4_zero(dest);
+        } else {
+            memcpy(dest, md->transform, sizeof(mat4));
+        }
         return TRUE;
     }
-    memcpy(dest, md->transform, sizeof(mat4));
-    return TRUE;
+    return FALSE;
 }
 
 BOOL DeleteMaterial(MaterialID id) {
@@ -1908,12 +1946,20 @@ BOOL DeleteLight(LightID id) {
 }
 
 BOOL DeleteTriangle(TriangleID id) {
-    // TODO: remove emissive area
-    // TODO: update lightarea on triangle edit? tbh idek anymore, we don't even use lightarrea
-    // TODO: maybe now is when we fix emission stuff for direct lighting....
-    UpdateNormals();
+    EZ_ASSERT(id < g_renderer.geometry.triangles.size, "Cannot delete a non-existant triangle");
+    size_t md = FindMeshFromTriangle(id);
+    if (md == (size_t)-1) md = 0;
+    UnglueTriangle(id);
+    ARRLIST_Triangle_remove(&(g_renderer.geometry.triangles), id);
+    for (size_t i = md; i < g_renderer.geometry.meshes.size; i++) {
+        MeshDescriptor* md = MeshReference(i);
+        if (md->tstart > id) md->tstart--;
+        if (md->tend >= id) md->tend--;
+    }
+    FixDeleteEditTarget(EDIT_SINGLE_TRIANGLE, id);
+    UpdateMeshes();
     UpdateTriangles();
-    UpdateEmissives();
+    RefreshEmissives();
     return TRUE;
 }
 
