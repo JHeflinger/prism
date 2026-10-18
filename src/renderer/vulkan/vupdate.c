@@ -69,111 +69,111 @@ void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
 
 void VUPDT_Transforms(VulkanDataBuffer* transforms) {
     if (sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.meshes.data,
         sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.size,
         sizeof(MeshDescriptor) * g_vupdt_renderer_ref->geometry.meshes.maxsize,
-        transforms->buffer);
+        transforms->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_TRANSFORMS);
 }
 
 void VUPDT_Skins(VulkanDataBuffer* skins) {
     if (sizeof(VertexSkin) * g_vupdt_renderer_ref->geometry.skins.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.skins.data,
         sizeof(VertexSkin) * g_vupdt_renderer_ref->geometry.skins.size,
         sizeof(VertexSkin) * g_vupdt_renderer_ref->geometry.skins.maxsize,
-        skins->buffer);
+        skins->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_SKINS);
 }
 
 void VUPDT_Poses(VulkanDataBuffer* poses) {
     if (sizeof(mat4) * g_vupdt_renderer_ref->geometry.poses.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.poses.data,
         sizeof(mat4) * g_vupdt_renderer_ref->geometry.poses.size,
         sizeof(mat4) * g_vupdt_renderer_ref->geometry.poses.maxsize,
-        poses->buffer);
+        poses->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_POSES);
 }
 
 void VUPDT_Lights(VulkanDataBuffer* lights) {
     if (sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.lights.data,
         sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.size,
         sizeof(SceneLight) * g_vupdt_renderer_ref->geometry.lights.maxsize,
-        lights->buffer);
+        lights->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_LIGHTS);
 }
 
 void VUPDT_Normals(VulkanDataBuffer* normals) {
     if (sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.normals.data,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.size,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.maxsize,
-        normals->buffer);
+        normals->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_NORMALS);
 }
 
 void VUPDT_Vertices(VulkanVertices* vertices) {
     if (sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.vertices.data,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.size,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.maxsize,
-        vertices->original.buffer);
+        vertices->original.buffer)) return;
     PENDING(TRANSFER_ACQUIRE_VERTICES);
 }
 
 void VUPDT_Triangles(VulkanDataBuffer* triangles) {
     if (sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.triangles.data,
         sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.size,
         sizeof(Triangle) * g_vupdt_renderer_ref->geometry.triangles.maxsize,
-        triangles->buffer);
+        triangles->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_TRIANGLES);
 }
 
 void VUPDT_Splats(VulkanDataBuffer* splats) {
     if (sizeof(GaussianSplat) * g_vupdt_renderer_ref->geometry.splats.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.splats.data,
         sizeof(GaussianSplat) * g_vupdt_renderer_ref->geometry.splats.size,
         sizeof(GaussianSplat) * g_vupdt_renderer_ref->geometry.splats.maxsize,
-        splats->buffer);
+        splats->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_SPLATS);
 }
 
 void VUPDT_Emissives(VulkanDataBuffer* emissives) {
     if (sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.emissives.data,
         sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.size,
         sizeof(TriangleID) * g_vupdt_renderer_ref->geometry.emissives.maxsize,
-        emissives->buffer);
+        emissives->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_EMISSIVES);
 }
 
 void VUPDT_Aliases(VulkanDataBuffer* aliases) {
     if (sizeof(EmissionAlias) * g_vupdt_renderer_ref->geometry.aliases.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.aliases.data,
         sizeof(EmissionAlias) * g_vupdt_renderer_ref->geometry.aliases.size,
         sizeof(EmissionAlias) * g_vupdt_renderer_ref->geometry.aliases.maxsize,
-        aliases->buffer);
+        aliases->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_ALIASES);
 }
 
 void VUPDT_Materials(VulkanDataBuffer* materials) {
     if (sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.maxsize == 0) return;
-    VUTIL_AsyncCopyHostToBuffer(
+    if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.materials.data,
         sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.size,
         sizeof(SurfaceMaterial) * g_vupdt_renderer_ref->geometry.materials.maxsize,
-        materials->buffer);
+        materials->buffer)) return;
     PENDING(TRANSFER_ACQUIRE_MATERIALS);
 }
 

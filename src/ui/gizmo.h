@@ -130,6 +130,8 @@ typedef struct {
     int count;
     VertexID ids[3];
     vec3 points[3];
+    vec3 world_points[3];
+    mat4 to_object[3];
 } TargetSnapshot;
 
 void InitializeGizmo(Gizmo* g);

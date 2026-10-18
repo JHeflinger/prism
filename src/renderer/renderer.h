@@ -243,6 +243,8 @@ size_t FindMeshFromTriangle(TriangleID tid);
 
 BOOL FindTriangleTransform(TriangleID tid, mat4 dest);
 
+BOOL FindVertexTransform(VertexID vid, mat4 dest);
+
 BOOL DeleteMaterial(MaterialID id);
 
 BOOL DeleteLight(LightID id);

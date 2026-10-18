@@ -386,6 +386,20 @@ static BOOL TriangleVertices(size_t index, VertexID ids[3]) {
     return TRUE;
 }
 
+static BOOL VertexSpace(VertexID v, mat4 to_world, mat4 to_object) {
+    FindVertexTransform(v, to_world);
+    if (fabsf(glm_mat4_det(to_world)) < 1e-12f) return FALSE;
+    glm_mat4_inv(to_world, to_object);
+    return TRUE;
+}
+
+static BOOL VertexWorld(VertexID v, vec3 out) {
+    mat4 to_world, to_object;
+    if (!VertexSpace(v, to_world, to_object)) return FALSE;
+    glm_mat4_mulv3(to_world, VertexReference(v), 1.0f, out);
+    return TRUE;
+}
+
 static void WritePoints(const TargetSnapshot* snap, vec3 points[3]) {
     for (int i = 0; i < snap->count; i++) {
         float* v = VertexReference(snap->ids[i]);
@@ -761,13 +775,17 @@ TargetCaps TargetQuery() {
             if (index >= NumCameras() || index == PrimaryCameraID()) return caps;
             caps.can[GIZMO_TRANSLATE] = caps.can[GIZMO_ROTATE] = TRUE;
             break;
-        case EDIT_SINGLE_VERTEX:
-            if (index >= NumVertices()) return caps;
+        case EDIT_SINGLE_VERTEX: {
+            vec3 world;
+            if (index >= NumVertices() || !VertexWorld((VertexID)index, world)) return caps;
             caps.can[GIZMO_TRANSLATE] = TRUE;
             break;
+        }
         case EDIT_SINGLE_TRIANGLE: {
             VertexID ids[3];
+            vec3 world;
             if (!TriangleVertices(index, ids)) return caps;
+            for (int i = 0; i < 3; i++) if (!VertexWorld(ids[i], world)) return caps;
             caps.can[GIZMO_TRANSLATE] = caps.can[GIZMO_ROTATE] = caps.can[GIZMO_SCALE] = TRUE;
             break;
         }
@@ -817,12 +835,12 @@ BOOL TargetFrame(const TargetCaps* caps, GizmoMode mode, TransformSpace space, B
             return TRUE;
         }
         case EDIT_SINGLE_VERTEX:
-            glm_vec3_copy(VertexReference(caps->index), out->pivot);
-            return TRUE;
+            return VertexWorld((VertexID)caps->index, out->pivot);
         case EDIT_SINGLE_TRIANGLE: {
             VertexID ids[3];
+            vec3 a, b, c;
             if (!TriangleVertices(caps->index, ids)) return FALSE;
-            float *a = VertexReference(ids[0]), *b = VertexReference(ids[1]), *c = VertexReference(ids[2]);
+            if (!VertexWorld(ids[0], a) || !VertexWorld(ids[1], b) || !VertexWorld(ids[2], c)) return FALSE;
             for (int i = 0; i < 3; i++) out->pivot[i] = (a[i] + b[i] + c[i]) / 3.0f;
             if (local) {
                 vec3 e1, e2, n;
@@ -868,16 +886,21 @@ void TargetBegin(TargetSnapshot* snap, const TargetCaps* caps, const GizmoFrame*
             snap->camera = GetCamera(caps->index)->core;
             break;
         case EDIT_SINGLE_VERTEX:
-            snap->count = 1;
-            snap->ids[0] = (VertexID)caps->index;
-            glm_vec3_copy(VertexReference(snap->ids[0]), snap->points[0]);
-            break;
-        case EDIT_SINGLE_TRIANGLE:
-            if (TriangleVertices(caps->index, snap->ids)) {
+        case EDIT_SINGLE_TRIANGLE: {
+            if (caps->type == EDIT_SINGLE_VERTEX) {
+                snap->count = 1;
+                snap->ids[0] = (VertexID)caps->index;
+            } else if (TriangleVertices(caps->index, snap->ids)) {
                 snap->count = 3;
-                for (int i = 0; i < 3; i++) glm_vec3_copy(VertexReference(snap->ids[i]), snap->points[i]);
+            }
+            for (int i = 0; i < snap->count; i++) {
+                mat4 to_world;
+                glm_vec3_copy(VertexReference(snap->ids[i]), snap->points[i]);
+                if (!VertexSpace(snap->ids[i], to_world, snap->to_object[i])) { snap->count = 0; break; }
+                glm_mat4_mulv3(to_world, snap->points[i], 1.0f, snap->world_points[i]);
             }
             break;
+        }
         default: break;
     }
 }
@@ -949,13 +972,15 @@ void TargetApply(const TargetSnapshot* snap, GizmoMode mode, const GizmoResult* 
                 glm_mat3_transpose_to(a, at);
                 glm_mat3_mul(ad, at, scale_matrix);
             }
+            if (snap->count == 0) break;
             for (int i = 0; i < snap->count; i++) {
-                vec3 rel;
-                glm_vec3_sub((float*)snap->points[i], (float*)pivot, rel);
+                vec3 rel, world;
+                glm_vec3_sub((float*)snap->world_points[i], (float*)pivot, rel);
                 if (mode == GIZMO_ROTATE) glm_mat3_mulv(q, rel, rel);
                 else if (mode == GIZMO_SCALE) glm_mat3_mulv(scale_matrix, rel, rel);
                 else glm_vec3_add(rel, (float*)r->translation, rel);
-                glm_vec3_add((float*)pivot, rel, points[i]);
+                glm_vec3_add((float*)pivot, rel, world);
+                glm_mat4_mulv3((vec4*)snap->to_object[i], world, 1.0f, points[i]);
             }
             WritePoints(snap, points);
             break;

@@ -128,8 +128,8 @@ void VUTIL_CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize
     VUTIL_DestroyBuffer(stagingBuffer);
 }
 
-void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {
-    if (size == 0) return;
+BOOL VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {
+    if (size == 0) return FALSE;
     VkDeviceSize align  = 256;
     VkDeviceSize offset = (g_vutil_renderer_ref->vulkan.core.transfer.offset + align - 1) & ~(align - 1);
     if (offset + buffersize > g_vutil_renderer_ref->vulkan.core.transfer.size) {
@@ -176,6 +176,7 @@ void VUTIL_AsyncCopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffe
         release.size = VK_WHOLE_SIZE;
         vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 1, &release, 0, NULL);
     }
+    return TRUE;
 }
 
 void VUTIL_CopyBufferToHost(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {

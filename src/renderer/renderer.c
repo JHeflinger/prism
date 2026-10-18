@@ -273,6 +273,87 @@ static void UnglueTriangle(TriangleID id) {
     }
 }
 
+static void RebuildConnectivity() {
+    HASHMAP_EdgeGlue_clear(&(g_renderer.geometry.glue));
+    g_renderer.geometry.glue.tombstones = 0;
+    ARRLIST_Edge_clear(&(g_renderer.geometry.edges));
+    for (size_t id = 0; id < g_renderer.geometry.triangles.size; id++) {
+        Triangle t = g_renderer.geometry.triangles.data[id];
+        VertexID vs[] = { t.a, t.b, t.c };
+        for (size_t i = 0; i < 3; i++) {
+            Edge e = { vs[i], vs[(i + 1) % 3] };
+            Edge alternate = { e.b, e.a };
+            Edge primed = HASHMAP_EdgeGlue_has(&(g_renderer.geometry.glue), e) ? e : alternate;
+            if (!HASHMAP_EdgeGlue_has(&(g_renderer.geometry.glue), primed)) {
+                HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), primed, (EdgeMeta){ (TriangleID)id, (TriangleID)-1, 0.0f, { 0, 0, 0 } });
+                ARRLIST_Edge_add(&(g_renderer.geometry.edges), primed);
+            } else {
+                EdgeMeta em = HASHMAP_EdgeGlue_get(&(g_renderer.geometry.glue), primed);
+                em.b = (TriangleID)id;
+                HASHMAP_EdgeGlue_set(&(g_renderer.geometry.glue), primed, em);
+            }
+        }
+    }
+}
+
+static void RemoveLockRange(VertexID first, size_t count) {
+    if (count == 0) return;
+    HASHMAP_Locks old = g_renderer.geometry.locks;
+    g_renderer.geometry.locks = (HASHMAP_Locks){ 0 };
+    for (size_t i = 0; i < old.capacity; i++) {
+        if (old.entries[i].used != 1) continue;
+        VertexID v = old.entries[i].key;
+        if (v >= first && v < first + count) continue;
+        HASHMAP_Locks_set(&(g_renderer.geometry.locks), v >= first + count ? (VertexID)(v - count) : v, old.entries[i].value);
+    }
+    EZ_FREE(old.entries);
+}
+
+static void FreeMeshAnimation(MeshAnimation* ref) {
+    MeshAnimation ma = { 0 };
+    memcpy(&ma, ref, sizeof(MeshAnimation));
+    for (size_t j = 0; j < ma.animations.size; j++) {
+        ARRLIST_BoneChannel* channels = &(ma.animations.data[j].channels);
+        for (size_t k = 0; k < channels->size; k++) {
+            ARRLIST_Vec3Key_clear(&(channels->data[k].positions));
+            ARRLIST_QuatKey_clear(&(channels->data[k].rotations));
+            ARRLIST_Vec3Key_clear(&(channels->data[k].scales));
+        }
+        ARRLIST_BoneChannel_clear(channels);
+        if (j < ma.names.size) EZ_FREE(ma.names.data[j]);
+    }
+    ARRLIST_Animation_clear(&(ma.animations));
+    ARRLIST_DynamicString_clear(&(ma.names));
+    memcpy(ref, &ma, sizeof(MeshAnimation));
+}
+
+static size_t RemoveFlaggedTriangles(const uint8_t* doomed) {
+    size_t n = g_renderer.geometry.triangles.size;
+    uint32_t* before = EZ_ALLOC(n + 1, sizeof(uint32_t));
+    for (size_t i = 0; i < n; i++) before[i + 1] = before[i] + (doomed[i] ? 1 : 0);
+    size_t removed = before[n];
+    if (removed > 0) {
+        for (size_t m = 0; m < g_renderer.geometry.meshes.size; m++) {
+            MeshDescriptor* md = &(g_renderer.geometry.meshes.data[m]);
+            BOOL empty = md->tend < md->tstart || md->tend == (TriangleID)-1;
+            uint32_t tstart = md->tstart <= n ? md->tstart : (uint32_t)n;
+            uint32_t newstart = md->tstart - before[tstart];
+            uint32_t kept = empty ? 0 : (md->tend - md->tstart + 1) - (before[md->tend + 1] - before[md->tstart]);
+            md->tstart = newstart;
+            md->tend = newstart + kept - 1;
+        }
+        size_t w = 0;
+        for (size_t r = 0; r < n; r++) {
+            if (doomed[r]) continue;
+            if (w != r) memcpy(&(g_renderer.geometry.triangles.data[w]), &(g_renderer.geometry.triangles.data[r]), sizeof(Triangle));
+            w++;
+        }
+        g_renderer.geometry.triangles.size = w;
+    }
+    EZ_FREE(before);
+    return removed;
+}
+
 Renderer* RawRendererRef() {
     return &g_renderer;
 }
@@ -1681,23 +1762,8 @@ void SwitchAnimation(MeshAnimation* anim, size_t newind) {
 }
 
 void ClearAnimations() {
-    for (size_t i = 0; i < g_renderer.geometry.animations.size; i++) {
-        ARRLIST_Animation alist = g_renderer.geometry.animations.data[i].animations;
-        ARRLIST_DynamicString nlist = g_renderer.geometry.animations.data[i].names;
-        for (size_t j = 0; j < alist.size; j++) {
-            ARRLIST_BoneChannel blist = alist.data[j].channels;
-            for (size_t k = 0; k < blist.size; k++) {
-                BoneChannel bc = blist.data[k];
-                ARRLIST_Vec3Key_clear(&(bc.positions));
-                ARRLIST_QuatKey_clear(&(bc.rotations));
-                ARRLIST_Vec3Key_clear(&(bc.scales));
-            }
-            ARRLIST_BoneChannel_clear(&blist);
-            EZ_FREE(nlist.data[j]);
-        }
-        ARRLIST_Animation_clear(&alist);
-        ARRLIST_DynamicString_clear(&nlist);
-    }
+    for (size_t i = 0; i < g_renderer.geometry.animations.size; i++)
+        FreeMeshAnimation(AnimationReference(i));
     ARRLIST_MeshAnimation_clear(&(g_renderer.geometry.animations));
     ARRLIST_VertexSkin_clear(&(g_renderer.geometry.skins));
     ARRLIST_mat4_clear(&(g_renderer.geometry.poses));
@@ -1901,6 +1967,25 @@ BOOL FindTriangleTransform(TriangleID tid, mat4 dest) {
     return FALSE;
 }
 
+BOOL FindVertexTransform(VertexID vid, mat4 dest) {
+    glm_mat4_identity(dest);
+    size_t lo = 0, hi = g_renderer.geometry.meshes.size;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (g_renderer.geometry.meshes.data[mid].start <= vid) lo = mid + 1;
+        else hi = mid;
+    }
+    if (lo == 0) return FALSE;
+    MeshDescriptor* md = &(g_renderer.geometry.meshes.data[lo - 1]);
+    if (md->end < md->start || md->end == (VertexID)-1 || vid > md->end) return FALSE;
+    if (md->disabled) {
+        glm_mat4_zero(dest);
+        return TRUE;
+    }
+    memcpy(dest, md->transform, sizeof(mat4));
+    return TRUE;
+}
+
 BOOL DeleteMaterial(MaterialID id) {
     EZ_ASSERT(id < g_renderer.geometry.materials.size, "Cannot delete a non-existant material");
     if (id == 0) {
@@ -1964,19 +2049,166 @@ BOOL DeleteTriangle(TriangleID id) {
 }
 
 BOOL DeleteVertex(VertexID id) {
+    EZ_ASSERT(id < g_renderer.geometry.vertices.size, "Cannot delete a non-existant vertex");
+    uint8_t* doomed = EZ_ALLOC(g_renderer.geometry.triangles.size > 0 ? g_renderer.geometry.triangles.size : 1, sizeof(uint8_t));
+    for (size_t t = 0; t < g_renderer.geometry.triangles.size; t++) {
+        Triangle* tri = &(g_renderer.geometry.triangles.data[t]);
+        doomed[t] = tri->a == id || tri->b == id || tri->c == id;
+    }
+    size_t tremoved = RemoveFlaggedTriangles(doomed);
+    EZ_FREE(doomed);
+    for (size_t t = 0; t < g_renderer.geometry.triangles.size; t++) {
+        Triangle* tri = &(g_renderer.geometry.triangles.data[t]);
+        if (tri->a > id) tri->a--;
+        if (tri->b > id) tri->b--;
+        if (tri->c > id) tri->c--;
+    }
+    size_t owner = (size_t)-1;
+    for (size_t m = 0; m < g_renderer.geometry.meshes.size; m++) {
+        MeshDescriptor* md = &(g_renderer.geometry.meshes.data[m]);
+        BOOL empty = md->end < md->start || md->end == (VertexID)-1;
+        if (!empty && md->start <= id && id <= md->end) { owner = m; break; }
+    }
+    uint32_t skin = (uint32_t)-1;
+    if (owner != (size_t)-1) {
+        MeshDescriptor* md = &(g_renderer.geometry.meshes.data[owner]);
+        size_t s = (size_t)md->skinstart + (id - md->start);
+        if (md->pose != (uint32_t)-1 && s < g_renderer.geometry.skins.size) {
+            skin = (uint32_t)s;
+            ARRLIST_VertexSkin_remove(&(g_renderer.geometry.skins), s);
+        }
+    }
+    for (size_t m = 0; m < g_renderer.geometry.meshes.size; m++) {
+        MeshDescriptor* md = &(g_renderer.geometry.meshes.data[m]);
+        if (m == owner) {
+            md->end--;
+        } else if (md->start > id) {
+            BOOL empty = md->end < md->start || md->end == (VertexID)-1;
+            md->start--;
+            md->end = empty ? md->start - 1 : md->end - 1;
+        }
+        if (skin != (uint32_t)-1 && m != owner && md->skinstart > skin) md->skinstart--;
+    }
+    ARRLIST_vec4_remove(&(g_renderer.geometry.vertices), id);
+    RemoveLockRange(id, 1);
+    RebuildConnectivity();
+    if (tremoved > 0 && g_renderer.geometry.emissives.size > 0) RefreshEmissives();
+    EditType type;
+    size_t index;
+    if (tremoved > 0 && GetEditTarget(&type, &index) && type == EDIT_SINGLE_TRIANGLE) DeselectEditTarget();
+    FixDeleteEditTarget(EDIT_SINGLE_VERTEX, id);
     UpdateVertices();
     UpdateTriangles();
-    UpdateEmissives();
+    UpdateMeshes();
+    if (skin != (uint32_t)-1) UpdateSkins();
+    if (tremoved > 0) UpdateEmissives();
     return TRUE;
 }
 
 BOOL DeleteMesh(size_t id) {
-    // TODO: remove emissive area
+    EZ_ASSERT(id < g_renderer.geometry.meshes.size, "Cannot delete a non-existant mesh");
+    MeshDescriptor md = { 0 };
+    memcpy(&md, &(g_renderer.geometry.meshes.data[id]), sizeof(MeshDescriptor));
+    BOOL has_tris = !(md.tend < md.tstart || md.tend == (TriangleID)-1);
+    BOOL has_verts = !(md.end < md.start || md.end == (VertexID)-1);
+    size_t tcount = has_tris ? (size_t)md.tend - md.tstart + 1 : 0;
+    size_t vcount = has_verts ? (size_t)md.end - md.start + 1 : 0;
+    if (md.tstart + tcount > g_renderer.geometry.triangles.size || md.start + vcount > g_renderer.geometry.vertices.size) {
+        logerror("Mesh %zu describes triangles/vertices outside of the scene", id);
+        return FALSE;
+    }
+    uint32_t nmin = UINT32_MAX;
+    uint32_t nmax = 0;
+    for (size_t t = md.tstart; t < md.tstart + tcount; t++) {
+        uint32_t ns[] = { g_renderer.geometry.triangles.data[t].an, g_renderer.geometry.triangles.data[t].bn, g_renderer.geometry.triangles.data[t].cn };
+        for (size_t k = 0; k < 3; k++) {
+            if (ns[k] == (uint32_t)-1) continue;
+            if (ns[k] < nmin) nmin = ns[k];
+            if (ns[k] > nmax) nmax = ns[k];
+        }
+    }
+    size_t ncount = (nmin <= nmax && nmax < g_renderer.geometry.normals.size) ? (size_t)nmax - nmin + 1 : 0;
+    for (size_t t = 0; t < g_renderer.geometry.triangles.size; t++) {
+        if (t >= md.tstart && t < md.tstart + tcount) continue;
+        Triangle tri = g_renderer.geometry.triangles.data[t];
+        VertexID vs[] = { tri.a, tri.b, tri.c };
+        uint32_t ns[] = { tri.an, tri.bn, tri.cn };
+        for (size_t k = 0; k < 3; k++) {
+            if (vs[k] >= md.start && vs[k] < md.start + vcount) {
+                logerror("Cannot delete mesh %zu: triangle %zu outside of it uses its vertices", id, t);
+                return FALSE;
+            }
+            if (ncount && ns[k] != (uint32_t)-1 && ns[k] >= nmin && ns[k] <= nmax) ncount = 0;
+        }
+    }
+    ARRLIST_REMOVE_RANGE(g_renderer.geometry.triangles, md.tstart, tcount);
+    for (size_t t = 0; t < g_renderer.geometry.triangles.size; t++) {
+        Triangle* tri = &(g_renderer.geometry.triangles.data[t]);
+        if (vcount) {
+            if (tri->a >= md.start + vcount) tri->a -= (uint32_t)vcount;
+            if (tri->b >= md.start + vcount) tri->b -= (uint32_t)vcount;
+            if (tri->c >= md.start + vcount) tri->c -= (uint32_t)vcount;
+        }
+        if (ncount) {
+            if (tri->an != (uint32_t)-1 && tri->an > nmax) tri->an -= (uint32_t)ncount;
+            if (tri->bn != (uint32_t)-1 && tri->bn > nmax) tri->bn -= (uint32_t)ncount;
+            if (tri->cn != (uint32_t)-1 && tri->cn > nmax) tri->cn -= (uint32_t)ncount;
+        }
+    }
+    ARRLIST_REMOVE_RANGE(g_renderer.geometry.vertices, md.start, vcount);
+    if (ncount) ARRLIST_REMOVE_RANGE(g_renderer.geometry.normals, nmin, ncount);
+    size_t scount = 0;
+    if (md.pose != (uint32_t)-1 && (size_t)md.skinstart + vcount <= g_renderer.geometry.skins.size) {
+        scount = vcount;
+        ARRLIST_REMOVE_RANGE(g_renderer.geometry.skins, md.skinstart, scount);
+    }
+    if (md.pose != (uint32_t)-1) {
+        size_t aidx = md.pose / MAX_BONES;
+        if (aidx < g_renderer.geometry.animations.size) {
+            FreeMeshAnimation(&(g_renderer.geometry.animations.data[aidx]));
+            ARRLIST_MeshAnimation_remove(&(g_renderer.geometry.animations), aidx);
+        }
+        ARRLIST_REMOVE_RANGE(g_renderer.geometry.poses, md.pose, (size_t)MAX_BONES);
+    }
+    for (size_t i = 0; i < g_renderer.geometry.animations.size; i++) {
+        size_t meshid;
+        memcpy(&meshid, &(g_renderer.geometry.animations.data[i].meshid), sizeof(size_t));
+        if (meshid > id) {
+            meshid--;
+            memcpy(&(g_renderer.geometry.animations.data[i].meshid), &meshid, sizeof(size_t));
+        }
+    }
+    EZ_FREE(g_renderer.geometry.meshnames.data[id]);
+    ARRLIST_DynamicString_remove(&(g_renderer.geometry.meshnames), id);
+    ARRLIST_MeshDescriptor_remove(&(g_renderer.geometry.meshes), id);
+    for (size_t i = 0; i < g_renderer.geometry.meshes.size; i++) {
+        MeshDescriptor* other = &(g_renderer.geometry.meshes.data[i]);
+        if (tcount && other->tstart >= md.tstart + tcount) {
+            other->tstart -= (uint32_t)tcount;
+            if (other->tend != (TriangleID)-1) other->tend -= (uint32_t)tcount;
+        }
+        if (vcount && other->start >= md.start + vcount) {
+            other->start -= (uint32_t)vcount;
+            if (other->end != (VertexID)-1) other->end -= (uint32_t)vcount;
+        }
+        if (scount && other->skinstart >= md.skinstart + scount) other->skinstart -= (uint32_t)scount;
+        if (md.pose != (uint32_t)-1 && other->pose != (uint32_t)-1 && other->pose > md.pose) other->pose -= MAX_BONES;
+    }
+    RemoveLockRange(md.start, vcount);
+    RebuildConnectivity();
+    if (g_renderer.geometry.emissives.size > 0) RefreshEmissives();
+    EditType type;
+    size_t index;
+    if (GetEditTarget(&type, &index) && (type == EDIT_SINGLE_TRIANGLE || type == EDIT_SINGLE_VERTEX))
+        DeselectEditTarget();
+    FixDeleteEditTarget(EDIT_MESH, id);
     UpdateNormals();
     UpdateVertices();
     UpdateTriangles();
-    UpdateEmissives();
     UpdateMeshes();
+    UpdateSkins();
+    UpdatePoses();
+    UpdateEmissives();
     return TRUE;
 }
 
