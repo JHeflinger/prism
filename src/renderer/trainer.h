@@ -151,6 +151,14 @@ typedef struct {
     TrainerConfig trainer;
 } TrainingSceneConfig;
 
+typedef struct {
+    float eye[3];
+    float right[3];
+    float down[3];
+    float fwd[3];
+    float focal; // in pixels of the (training resolution) image
+} MaskCamera;
+
 TrainerConfig DefaultTrainerConfig();
 
 BOOL InitializeTrainer(Trainer* t, const TrainerConfig* cfg, uint32_t width, uint32_t height, uint32_t views);
