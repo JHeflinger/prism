@@ -41,12 +41,7 @@ typedef struct {
 static Cloud* g_clouds = NULL;
 static size_t g_cloud_count = 0;
 static TrainJob g_job = { 0 };
-static SubsurfaceSettings g_settings = { TRUE, TRUE };
 static ShaderBuffer g_buffer = { 0 };
-
-SubsurfaceSettings* SubsurfaceSettingsRef() {
-    return &g_settings;
-}
 
 ShaderBuffer* SubsurfaceBuffer() {
     return &g_buffer;

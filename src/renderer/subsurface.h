@@ -18,11 +18,6 @@ typedef enum {
 } SubsurfaceTrainPhase;
 
 typedef struct {
-    BOOL enabled;      // use trained clouds in the path tracer (FALSE = always random walk, for A/B comparisons)
-    BOOL exitlight;    // next event estimation at the exit point of a cloud sampled path
-} SubsurfaceSettings;
-
-typedef struct {
     BOOL linked;
     BOOL enabled;
     uint32_t triangles;
@@ -37,8 +32,6 @@ typedef struct {
     BOOL stale;        // the object or its material changed in a way the cloud does not account for
     char reason[128];
 } SubsurfaceCloudInfo;
-
-SubsurfaceSettings* SubsurfaceSettingsRef();
 
 SSSFitConfig SubsurfaceDefaultConfig();
 

@@ -600,6 +600,8 @@ SceneCamera DefaultCamera() {
     sc.config.arap.cube_lambda = 0.5f;
     sc.config.arap.cube_rho = 1e-4f;
     sc.config.arap.addm = 5;
+    sc.config.sssplats = TRUE;
+    sc.config.sssexitlight = FALSE;
     sc.core = (SimpleCamera){
         { 0.0f, 2.133f, 2.11f },
         { 0.0f, 0.0f, 0.0f },
