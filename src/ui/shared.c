@@ -10,7 +10,7 @@
 static char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric", "subsurface" };
 static char* g_arapmodel_labels[] = { "rigid", "cubic" };
 static char* g_sim_visual_labels[] = { "smoke", "fire", "water", "plasma" };
-static char* g_debugmode_labels[] = { "none", "normals", "bvh", "bounces" };
+static char* g_debugmode_labels[] = { "none", "normals", "bvh", "bounces", "sss path", "sss cost" };
 static FluidForce g_fluid_force = { 0 };
 static FluidSource g_fluid_source = { 0 };
 static vec3 g_cube_position = { 0 };

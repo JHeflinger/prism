@@ -426,7 +426,9 @@ typedef enum {
     DEBUG_NONE = 0,
     DEBUG_NORMALS = 1,
     DEBUG_BVH = 2,
-    DEBUG_BOUNCES = 3
+    DEBUG_BOUNCES = 3,
+    DEBUG_SSS_PATH = 4, // which subsurface method the first subsurface event of each pixel used
+    DEBUG_SSS_COST = 5  // BVH nodes visited inside subsurface handling, per pixel
 } DebugConfig;
 
 typedef struct {

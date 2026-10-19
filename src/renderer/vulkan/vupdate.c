@@ -259,7 +259,8 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             VK_SHADER_STAGE_COMPUTE_BIT, \
             0, sizeof(VulkanPushConstants), &pc);}
     PipelineFlags pflags = RendererCamera()->config.flags;
-    if (RendererCamera()->config.debug == DEBUG_BOUNCES) {
+    if (RendererCamera()->config.debug == DEBUG_BOUNCES || RendererCamera()->config.debug == DEBUG_SSS_PATH ||
+        RendererCamera()->config.debug == DEBUG_SSS_COST) {
         pflags |= (PATHTRACE_SHADER_FLAG | TONEMAP_SHADER_FLAG);
         pflags &= ~OVERLAY_SHADER_FLAG;
     }

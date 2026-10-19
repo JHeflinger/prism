@@ -534,6 +534,11 @@ struct SSSObject {
 
 // state handed from brdf() to pathtrace() for next event estimation at the exit point
 bool g_sss_exit = false;
+bool g_sss_projected = false;
+// debug views: method of the first subsurface event (1 cloud, 2 random walk, 3 cloud but projection failed) and the
+// BVH nodes visited inside subsurface handling over the whole path
+uint g_sss_debug_kind = 0u;
+uint g_sss_debug_cost = 0u;
 vec3 g_sss_exit_pos = vec3(0.0);
 vec3 g_sss_exit_normal = vec3(0.0, 0.0, 1.0);
 vec3 g_sss_exit_axis = vec3(0.0, 0.0, 1.0);
@@ -610,6 +615,11 @@ uint sss_pick_surface(uint base, uint lt, vec3 p, float r) {
     return sssIn[row];
 }
 
+// Short rays of the cloud path (exit point projection, exit shadow rays) use the distance limited query.
+Hit trace_bounded(Ray ray, float tmax, inout uint hit_id) {
+    return trace_max(ray, tmax, hit_id);
+}
+
 // closest hit along a world space ray that belongs to the object, looking through up to SSS_FOREIGN_SKIPS other surfaces
 bool sss_trace_own(SSSObject o, vec3 origin, vec3 dir, float tmax, out float t, out uint tri) {
     t = 0.0;
@@ -618,8 +628,8 @@ bool sss_trace_own(SSSObject o, vec3 origin, vec3 dir, float tmax, out float t, 
     Ray r = Ray(origin, dir);
     for (int i = 0; i <= SSS_FOREIGN_SKIPS; i++) {
         uint hid = uint(-1);
-        Hit h = trace(r, hid);
-        if (h.distance <= 0.0 || travelled + h.distance > tmax) return false;
+        Hit h = trace_bounded(r, tmax - travelled, hid);
+        if (h.distance <= 0.0) return false;
         travelled += h.distance;
         if (hid >= o.tstart && hid < o.tstart + o.tcount) {
             t = travelled;
@@ -673,6 +683,7 @@ void sss_length_model(uint base, vec3 p0, vec3 p1, out vec4 comps, out float w1)
         stack[sp++] = 0u;
         while (sp > 0) {
             uint nd = nodes + stack[--sp] * SSSG_NODE_STRIDE;
+            bvh_counter++;
             vec3 bmin = sss_v3(nd), bmax = sss_v3(nd + 4u);
             bool hit;
             if (point) {
@@ -818,6 +829,7 @@ bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throug
     h.position = xw;
     h.normal = n;
     g_sss_exit = true;
+    g_sss_projected = projected;
     g_sss_exit_pos = xw;
     g_sss_exit_normal = n;
     g_sss_exit_axis = axis;
@@ -852,8 +864,8 @@ vec3 sss_exit_scene_lights(vec3 pos, vec3 n, vec3 axis, float e) {
         if (ubo.scenelightshadows != 0) {
             Ray sray = { epsilon_offset(pos, n), incoming };
             uint tid;
-            Hit shit = trace(sray, tid);
-            if (shit.distance > 0 && shit.distance < distance_to_light) continue;
+            Hit shit = trace_bounded(sray, distance_to_light, tid);
+            if (shit.distance > 0) continue;
             if (splat_occluded(sray, distance_to_light)) continue;
         }
         intensity += pdf * light.color * falloff;
@@ -875,7 +887,7 @@ vec3 sss_exit_direct(vec3 pos, vec3 n, vec3 axis, float e) {
     if (pdf <= 0.0) return vec3(0.0);
     Ray sray = { epsilon_offset(pos, n), to_light };
     uint tid = 0;
-    Hit shit = trace(sray, tid);
+    Hit shit = trace_bounded(sray, dist * 1.001 + 1e-4, tid);
     if (eid != tid || shit.distance <= 0.0) return vec3(0.0);
     if (splat_occluded(sray, shit.distance)) return vec3(0.0);
     float cos_light = max(dot(shit.normal, -to_light), 0.0);
@@ -936,10 +948,13 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in uint tid, in Mater
             float p_sss = material.subsurface;
             float p_surface = 1.0 - p_sss;
             if (random() <= p_sss) {
+                uint cost_before = bvh_counter;
                 if (ubo.sssplats != 0u && sss_splat_scatter(h, tid, material, throughput, incoming)) {
                     // trained subsurface cloud: exit point, path length and exit direction in a handful of lookups
                     throughput /= p_sss;
                     pdf = 1.0;
+                    g_sss_debug_cost += bvh_counter - cost_before;
+                    if (g_sss_debug_kind == 0u) g_sss_debug_kind = g_sss_projected ? 1u : 3u;
                     break;
                 }
                 Ray ray;
@@ -949,6 +964,8 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in uint tid, in Mater
                 if (dot(ray.direction, h.normal) > 0.0) ray.direction = reflect(ray.direction, h.normal);
                 ray.position = epsilon_offset(h.position, ray.direction);
                 subsurface_walk(ray, throughput, h, material, medium);
+                g_sss_debug_cost += bvh_counter - cost_before;
+                if (g_sss_debug_kind == 0u) g_sss_debug_kind = 2u;
                 throughput /= p_sss;
                 incoming = h.normal;
                 pdf = 1.0;
@@ -1278,6 +1295,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         if (g_sss_exit) {
             // light arriving directly at the exit point of a subsurface cloud path
             g_sss_exit = false;
+            uint nee_before = bvh_counter;
             if (ubo.sssexitlight != 0u && pdf > 0.0) {
                 vec3 sss_weight = throughput * color / pdf;
                 if (ubo.scenelighting != 0 && ubo.lights > 0)
@@ -1285,6 +1303,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
                 if (ubo.direct != 0 && ubo.emissives > 0)
                     radiance += min(sss_weight * sss_exit_direct(g_sss_exit_pos, g_sss_exit_normal, g_sss_exit_axis, g_sss_exit_exponent), max_contribution);
             }
+            g_sss_debug_cost += bvh_counter - nee_before;
         }
         if (ubo.scenelighting != 0) {
             if (material.model == DIELECTRIC_MODEL && b4medium == -1 && b4medium == medium) {
@@ -1311,6 +1330,18 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         else count_emission = ubo.direct == 0;
     }
     if (ubo.debugmode == DEBUG_BOUNCES) return vec3(pow(float(i) / float(ubo.maxbounces), 2.0), 0, 0);
+    if (ubo.debugmode == DEBUG_SSS_PATH) {
+        // green: cloud, red: random walk, yellow: cloud whose exit projection failed, grey: no subsurface event
+        if (g_sss_debug_kind == 1u) return vec3(0.0, 1.0, 0.0);
+        if (g_sss_debug_kind == 2u) return vec3(1.0, 0.0, 0.0);
+        if (g_sss_debug_kind == 3u) return vec3(1.0, 1.0, 0.0);
+        return vec3(0.05);
+    }
+    if (ubo.debugmode == DEBUG_SSS_COST) {
+        // log scale heat map of BVH nodes visited for subsurface work: black 0, blue ~16, green ~256, red >= 4096
+        float t = clamp(log2(1.0 + float(g_sss_debug_cost)) / 12.0, 0.0, 1.0);
+        return clamp(vec3(3.0 * t - 1.5, 1.5 - abs(3.0 * t - 1.5), 1.5 - 3.0 * t) * step(0.5, float(g_sss_debug_cost)), 0.0, 1.0);
+    }
     return radiance;
 }
 

@@ -251,7 +251,7 @@ static void DrawEditCamera(SceneCamera* cref, char* name, float width, float hei
     UIColumnHeader("Debug Mode", LEFT_COLUMN_WIDTH);
     size_t pp = PrimaryCameraID();
     SetCamera(g_edit_item_index);
-    UIDropdownMenu(sboxwidth, 4, DebugModeLabels(), DropdownSelectDebugMode, NULL);
+    UIDropdownMenu(sboxwidth, 6, DebugModeLabels(), DropdownSelectDebugMode, NULL);
     SetCamera(pp);
     UIColumnHeader("Max Bounces", LEFT_COLUMN_WIDTH);
     UIDragSize(&(cref->config.maxbounces), 0, 999999999, 1, sboxwidth);

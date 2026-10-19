@@ -16,6 +16,8 @@ export Definitions {
     #define DEBUG_NORMALS 1
     #define DEBUG_BVH 2
     #define DEBUG_BOUNCES 3
+    #define DEBUG_SSS_PATH 4
+    #define DEBUG_SSS_COST 5
     #define FLTMAX 3.402823466e+38
     #define LAMBERTIAN_MODEL 2
     #define MIRROR_MODEL 5
@@ -665,35 +667,63 @@ export TriangleIntersectSuite {
         return tmax >= 0 && tmin <= tmax;
     }
 
-    Hit trace(Ray ray, inout uint hit_id) {
+    // slab test against the current search interval [0, tfar]; tnear is the entry distance
+    bool aabb_near(Ray ray, vec3 inv, uint node_ind, float tfar, out float tnear) {
+        vec3 t0 = (nodeIn[node_ind].minBB - ray.position) * inv;
+        vec3 t1 = (nodeIn[node_ind].maxBB - ray.position) * inv;
+        vec3 tlo = min(t0, t1);
+        vec3 thi = max(t0, t1);
+        tnear = max(max(tlo.x, tlo.y), max(tlo.z, 0.0));
+        return tnear <= min(min(thi.x, thi.y), min(thi.z, tfar));
+    }
+
+    // Closest triangle hit with distance in (EPS, tmax). Children are visited near to far and every node that starts
+    // beyond the closest hit found so far is skipped, so a query costs roughly what its nearest surface costs instead
+    // of every node the infinite ray passes through.
+    Hit trace_max(Ray ray, float tmax, inout uint hit_id) {
         Hit hit;
         hit.distance = -1.0;
         if (ubo.triangles == 0) return hit;
+        vec3 d = ray.direction;
+        vec3 inv = 1.0 / mix(d, mix(vec3(1e-20), vec3(-1e-20), lessThan(d, vec3(0.0))), lessThan(abs(d), vec3(1e-20)));
+        float best = tmax;
+        float tn, tl, tr;
         uint stack[MAX_RECURSIVE_DEPTH];
         int stack_ptr = 0;
-        stack[stack_ptr++] = 0;
+        if (!aabb_near(ray, inv, 0u, best, tn)) return hit;
+        stack[stack_ptr++] = 0u;
         while (stack_ptr > 0) {
             bvh_counter++;
             uint node_index = stack[--stack_ptr];
+            if (!aabb_near(ray, inv, node_index, best, tn)) continue; // a closer hit was found after it was pushed
             BVHNode node = nodeIn[node_index];
-            if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
-            if (!aabb_intersect(ray, node_index)) continue;
             if (node.right == 0xFFFFFFFF) {
                 Hit trihit;
-                if (triangle_intersect(ray, node.left, trihit)) {
-                    if (hit.distance == -1.0 || trihit.distance < hit.distance) {
-                        hit = trihit;
-    					hit_id = node.left;
-                    }
+                if (triangle_intersect(ray, node.left, trihit) && trihit.distance < best) {
+                    best = trihit.distance;
+                    hit = trihit;
+                    hit_id = node.left;
                 }
-            } else {
-                uint left = node.left;
-                uint right = node.right;
-                stack[stack_ptr++] = left;
-                stack[stack_ptr++] = right;
+                continue;
+            }
+            if (stack_ptr >= MAX_RECURSIVE_DEPTH - 2) { stack_failure = true; break; }
+            bool hl = aabb_near(ray, inv, node.left, best, tl);
+            bool hr = aabb_near(ray, inv, node.right, best, tr);
+            if (hl && hr) {
+                // push the farther child first so the nearer one is popped next
+                if (tl <= tr) { stack[stack_ptr++] = node.right; stack[stack_ptr++] = node.left; }
+                else { stack[stack_ptr++] = node.left; stack[stack_ptr++] = node.right; }
+            } else if (hl) {
+                stack[stack_ptr++] = node.left;
+            } else if (hr) {
+                stack[stack_ptr++] = node.right;
             }
         }
         return hit;
+    }
+
+    Hit trace(Ray ray, inout uint hit_id) {
+        return trace_max(ray, FLTMAX, hit_id);
     }
 }
 
