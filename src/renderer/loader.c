@@ -1571,8 +1571,11 @@ BOOL LoadPRISM(const char* filepath) {
     }
     Geometry loaded = { 0 };
     PrismReadGeometry(&s, &loaded);
+    size_t sss_words = PrismReadSize(&s);
+    uint32_t* sss = PrismReadElements(&s, sss_words, sizeof(uint32_t));
     fclose(file);
     if (!s.ok) {
+        EZ_FREE(sss);
         PrismFreeGeometry(&loaded);
         logerror("PRISM file \"%s\" is truncated or corrupt", filepath);
         return FALSE;
@@ -1595,9 +1598,8 @@ BOOL LoadPRISM(const char* filepath) {
     UpdateSkins();
     UpdatePoses();
     UpdateSplats();
-    char ssspath[1024];
-    snprintf(ssspath, sizeof(ssspath), "%s.sss", filepath);
-    if (ez_file_exists(ssspath)) SubsurfaceLoad(ssspath);
+    SubsurfaceDeserialize(sss, sss ? sss_words : 0);
+    EZ_FREE(sss);
     loginfo("Successfully loaded prism session from \"%s\"", filepath);
     return TRUE;
 }
@@ -1619,14 +1621,16 @@ BOOL SavePRISM(const char* filepath) {
     PrismWrite(&s, &version, sizeof(version));
     PrismWrite(&s, &geomsize, sizeof(geomsize));
     PrismWriteGeometry(&s, &(RawRendererRef()->geometry));
+    size_t sss_words = 0;
+    uint32_t* sss = SubsurfaceSerialize(&sss_words);
+    PrismWriteSize(&s, sss_words);
+    PrismWrite(&s, sss, sss_words * sizeof(uint32_t));
+    EZ_FREE(sss);
     if (fclose(file) != 0) s.ok = FALSE;
     if (!s.ok) {
         logerror("Failed while writing PRISM file \"%s\"", filepath);
         return FALSE;
     }
-    char ssspath[1024];
-    snprintf(ssspath, sizeof(ssspath), "%s.sss", filepath);
-    SubsurfaceSave(ssspath);
     loginfo("Saved session to \"%s\"", filepath);
     return TRUE;
 }

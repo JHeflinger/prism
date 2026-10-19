@@ -498,73 +498,75 @@ BOOL SubsurfacePreviewCloud(size_t mesh) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// persistence: "<session>.sss" side file
+// persistence: clouds are stored inside the PRISM session (see SavePRISM / LoadPRISM)
+// layout (uint32 words): count, then per cloud: mesh, enabled, tstart, tcount, material, sigma, g, scale (float bits),
+// blob word count, blob
 // ---------------------------------------------------------------------------------------------------------------------
 
-BOOL SubsurfaceSave(const char* path) {
-    if (g_cloud_count == 0) {
-        remove(path); // do not leave clouds of an older session behind
-        return TRUE;
+#define SSS_RECORD_WORDS 9u
+
+uint32_t* SubsurfaceSerialize(size_t* words) {
+    size_t total = 1;
+    for (size_t i = 0; i < g_cloud_count; i++) total += SSS_RECORD_WORDS + g_clouds[i].words;
+    uint32_t* out = EZ_ALLOC(total, sizeof(uint32_t));
+    out[0] = (uint32_t)g_cloud_count;
+    size_t w = 1;
+    for (size_t i = 0; i < g_cloud_count; i++) {
+        const Cloud* c = &g_clouds[i];
+        out[w++] = c->mesh;
+        out[w++] = c->enabled ? 1u : 0u;
+        out[w++] = c->tstart;
+        out[w++] = c->tcount;
+        out[w++] = c->material;
+        memcpy(&out[w++], &c->sigma, 4);
+        memcpy(&out[w++], &c->g, 4);
+        memcpy(&out[w++], &c->scale, 4);
+        out[w++] = c->words;
+        memcpy(&out[w], c->blob, (size_t)c->words * sizeof(uint32_t));
+        w += c->words;
     }
-    FILE* f = fopen(path, "wb");
-    if (!f) {
-        logerror("Unable to write subsurface clouds to \"%s\"", path);
-        return FALSE;
-    }
-    uint32_t version = SSS_FILE_VERSION, count = (uint32_t)g_cloud_count;
-    BOOL ok = fwrite(SSS_FILE_MAGIC, 1, 4, f) == 4 && fwrite(&version, 4, 1, f) == 1 && fwrite(&count, 4, 1, f) == 1;
-    for (size_t i = 0; ok && i < g_cloud_count; i++) {
-        Cloud* c = &g_clouds[i];
-        uint32_t head[6] = { c->mesh, (uint32_t)c->enabled, c->tstart, c->tcount, c->material, c->words };
-        float params[3] = { c->sigma, c->g, c->scale };
-        ok = fwrite(head, 4, 6, f) == 6 && fwrite(params, 4, 3, f) == 3 && fwrite(c->blob, 4, c->words, f) == c->words;
-    }
-    if (fclose(f) != 0) ok = FALSE;
-    if (!ok) logerror("Failed while writing subsurface clouds to \"%s\"", path);
-    return ok;
+    *words = total;
+    return out;
 }
 
-BOOL SubsurfaceLoad(const char* path) {
-    FILE* f = fopen(path, "rb");
-    if (!f) return FALSE;
-    char magic[4] = { 0 };
-    uint32_t version = 0, count = 0;
-    BOOL ok = fread(magic, 1, 4, f) == 4 && fread(&version, 4, 1, f) == 1 && fread(&count, 4, 1, f) == 1 &&
-        memcmp(magic, SSS_FILE_MAGIC, 4) == 0 && version == SSS_FILE_VERSION && count < 65536;
+BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words) {
+    SubsurfaceClear();
+    if (!data || words == 0) return TRUE;
     Geometry* geo = RendererGeometry();
-    size_t loaded = 0;
-    for (uint32_t i = 0; ok && i < count; i++) {
-        uint32_t head[6];
-        float params[3];
-        if (fread(head, 4, 6, f) != 6 || fread(params, 4, 3, f) != 3 || head[5] > (1u << 28)) { ok = FALSE; break; }
+    size_t count = data[0], w = 1, loaded = 0;
+    BOOL ok = TRUE;
+    for (size_t i = 0; i < count; i++) {
+        if (w + SSS_RECORD_WORDS > words) { ok = FALSE; break; }
         Cloud c = { 0 };
-        c.mesh = head[0];
-        c.enabled = head[1] != 0;
-        c.tstart = head[2];
-        c.tcount = head[3];
-        c.material = head[4];
-        c.words = head[5];
-        c.sigma = params[0];
-        c.g = params[1];
-        c.scale = params[2];
-        c.blob = EZ_ALLOC(c.words ? c.words : 1, sizeof(uint32_t));
-        if (fread(c.blob, 4, c.words, f) != c.words) { FreeCloud(&c); ok = FALSE; break; }
+        c.mesh = data[w];
+        c.enabled = data[w + 1] != 0;
+        c.tstart = data[w + 2];
+        c.tcount = data[w + 3];
+        c.material = data[w + 4];
+        memcpy(&c.sigma, &data[w + 5], 4);
+        memcpy(&c.g, &data[w + 6], 4);
+        memcpy(&c.scale, &data[w + 7], 4);
+        c.words = data[w + 8];
+        w += SSS_RECORD_WORDS;
+        if (c.words > words - w) { ok = FALSE; break; }
+        const uint32_t* blob = &data[w];
+        w += c.words;
         uint32_t s, n;
-        if (SSSBlobWords(c.blob, c.words) == 0 || c.blob[SSSG_H_TCOUNT] != c.tcount || c.mesh >= geo->meshes.size ||
+        if (SSSBlobWords(blob, c.words) == 0 || blob[SSSG_H_TCOUNT] != c.tcount || c.mesh >= geo->meshes.size ||
             !MeshTriangles(&geo->meshes.data[c.mesh], &s, &n) || n != c.tcount || FindCloud(c.mesh)) {
             logwarn("Skipping a saved subsurface cloud that no longer matches its object");
-            FreeCloud(&c);
             continue;
         }
+        c.blob = EZ_ALLOC(c.words, sizeof(uint32_t));
+        memcpy(c.blob, blob, (size_t)c.words * sizeof(uint32_t));
         g_clouds = g_clouds ? EZ_REALLOC(g_clouds, g_cloud_count + 1, sizeof(Cloud)) : EZ_ALLOC(1, sizeof(Cloud));
         g_clouds[g_cloud_count++] = c;
         loaded++;
     }
-    fclose(f);
-    if (!ok) logwarn("Subsurface cloud file \"%s\" is incompatible or truncated", path);
+    if (!ok) logwarn("The session's subsurface cloud data is truncated, some clouds were not restored");
     if (loaded > 0) {
         RebuildBuffer();
-        loginfo("Restored %zu subsurface cloud%s from \"%s\"", loaded, loaded == 1 ? "" : "s", path);
+        loginfo("Restored %zu subsurface cloud%s", loaded, loaded == 1 ? "" : "s");
     }
     return ok;
 }

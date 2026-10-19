@@ -426,12 +426,19 @@ vec3 sample_henyey_greenstein(vec3 outgoing, float g) {
 }
 
 void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium) {
+    // Free flight sampling with one density for all channels: d ~ sigma * exp(-sigma d), sigma = luminance(sigma_t).
+    // The sampling density already accounts for transmittance, so the per segment weights are the ratio of the true
+    // per channel quantities to it:
+    //   scatter at d:          (sigma_s / sigma) * exp(-(sigma_t - sigma) d)
+    //   reach the boundary t:  exp(-(sigma_t - sigma) t)     (leaving is not a scattering event, no albedo)
+    // For a grey medium this is the textbook walk: albedo per scatter, 1 at the exit. Transport scale multiplies the
+    // coefficients themselves (density and attenuation together).
     throughput = vec3(1.0);
-    vec3 sigma_s = material.scattering;
-    vec3 sigma_a = material.absorbtion;
+    vec3 sigma_s = material.scattering * material.scale;
+    vec3 sigma_a = material.absorbtion * material.scale;
     vec3 sigma_t = sigma_s + sigma_a;
-    float sigma = max(luminance(sigma_t) * material.scale, EPS);
-    vec3 sigma_mul = sigma_s / max(sigma, EPS);
+    float sigma = max(luminance(sigma_t), EPS);
+    vec3 sigma_mul = sigma_s / sigma;
     uint boundary_id = uint(-1);
     medium = hit.material;
     for (int bounce = 0; bounce < ubo.maxsssbounces; ++bounce) {
@@ -444,16 +451,13 @@ void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material 
         float free_distance = -log(1.0 - xi) / sigma;
         if (free_distance >= boundary.distance) { // exiting
             ray.position = epsilon_offset(ray.position, ray.direction) + ray.direction * boundary.distance;
-            vec3 transmittance = exp(-sigma_t * boundary.distance);
-            throughput *= transmittance;
-            throughput *= sigma_mul;
+            throughput *= exp(-(sigma_t - sigma) * boundary.distance);
             //medium = AIR_MEDIUM; // TODO: this should not exactly be air medium, but the previous participating medium
                                  // might need to edit material here to prev material?
             break;
         } else {
             vec3 scatter_position = ray.position + ray.direction * free_distance;
-            throughput *= exp(-sigma_t * free_distance);
-            throughput *= sigma_mul;
+            throughput *= exp(-(sigma_t - sigma) * free_distance) * sigma_mul;
             // phase function around the travel direction (g > 0 = forward scattering); this used to be sampled around
             // -ray.direction, which turned forward scattering into back scattering
             vec3 new_direction = sample_henyey_greenstein(ray.direction, material.anisotropy);
@@ -818,13 +822,15 @@ bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throug
     vec3 w = onb(axis, vec3(stt * cos(phi), stt * sin(phi), ct));
     float wn = dot(w, n);
     if (wn < 0.0) w -= 2.0 * wn * n;
-    // 6. throughput of the random walk this replaces: exp(-sigma_t L) * (sigma_s / sigma)^events, with the events
-    //    integrated out given the path length (calibrated per object, see calibrate_events in sssfit.c)
-    vec3 sigma_t = material.scattering + material.absorbtion;
-    float sigma = max(luminance(sigma_t) * material.scale, EPS);
-    vec3 albedo = max(material.scattering / sigma, vec3(0.0));
+    // 6. throughput of the random walk this replaces: (sigma_s / sigma)^scatters * exp(-(sigma_t - sigma) L), with the
+    //    scatter count integrated out given the path length. The blob's calibration models E[a^events | L] as
+    //    a^(1 + c) exp(-k sigma (1 - a) L); scatters = events - 1 (the exit is not a scatter), so divide by a.
+    vec3 sigma_s = material.scattering * material.scale;
+    vec3 sigma_t = (material.scattering + material.absorbtion) * material.scale;
+    float sigma = max(luminance(sigma_t), EPS);
+    vec3 albedo = max(sigma_s / sigma, vec3(1e-4));
     float k = sss_f(base + SSSG_H_EVK), c = sss_f(base + SSSG_H_EVC);
-    throughput = exp(-sigma_t * Lw) * pow(albedo, vec3(1.0 + c)) * exp(-k * sigma * (1.0 - albedo) * Lw);
+    throughput = pow(albedo, vec3(c)) * exp(-k * sigma * (1.0 - albedo) * Lw) * exp(-(sigma_t - sigma) * Lw);
     direction = w;
     h.position = xw;
     h.normal = n;

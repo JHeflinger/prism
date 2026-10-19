@@ -5,8 +5,7 @@
 // (see sssfit.h for what is learnt), links it to that object, and keeps every linked cloud packed in the
 // SubsurfaceSSBOIn buffer that path.comp samples instead of running the random walk.
 //
-// All state lives here rather than in Geometry so the PRISM session format is unchanged; clouds are saved next to
-// the session in a "<session>.sss" side file.
+// All state lives here rather than in Geometry; SavePRISM / LoadPRISM store the clouds after the geometry.
 
 #include "renderer/vulkan/vstructs.h"
 #include "renderer/sssfit.h"
@@ -79,9 +78,11 @@ void SubsurfaceMeshDeleted(size_t mesh);
 
 size_t SubsurfaceCloudCount();
 
-BOOL SubsurfaceSave(const char* path);
+// Session persistence (the clouds live inside the .prism file). Serialize returns an EZ_ALLOC'd word array.
+uint32_t* SubsurfaceSerialize(size_t* words);
 
-BOOL SubsurfaceLoad(const char* path);
+// Replaces every cloud with the serialized ones; call after the session geometry is in place.
+BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words);
 
 // GPU side: packed buffer bound as SubsurfaceSSBOIn
 ShaderBuffer* SubsurfaceBuffer();

@@ -885,12 +885,6 @@ void Render() {
         }
     }
 
-    // subsurface clouds (rare, synchronous upload; the buffer may be reallocated so every descriptor set is rewritten)
-    if (SubsurfaceBuffer()->update) {
-        VUPDT_Subsurface(SubsurfaceBuffer());
-        VUPDT_DescriptorSetsAll(g_renderer.vulkan.core.context.renderdata.descriptors);
-    }
-
     // animations
     g_renderer.geometry.changes.update_poses |= PlayAnimations(&(g_renderer.geometry));
 
@@ -1090,6 +1084,14 @@ void Render() {
 
         // dispatch transfer commands
         if (is_transferring) VUTIL_EndTransferCommands();
+
+        // subsurface clouds (rare, synchronous upload). This has to come after the geometry buffers above have been
+        // (re)allocated: rewriting every descriptor set while e.g. a freshly loaded session's vertex buffer is still the
+        // 1 byte placeholder would bind it with the new, larger range.
+        if (SubsurfaceBuffer()->update) {
+            VUPDT_Subsurface(SubsurfaceBuffer());
+            resized_buffers = TRUE;
+        }
 
         // update all descriptor sets if needed
         if (resized_buffers) {
