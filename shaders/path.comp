@@ -425,7 +425,18 @@ vec3 sample_henyey_greenstein(vec3 outgoing, float g) {
     return onb(outgoing, local);
 }
 
-void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium) {
+// true when the rgb extinctions differ enough to need per channel transport (matches SSS_SPECTRAL_SPREAD in subsurface.c)
+bool sss_spectral(vec3 sigma_t) {
+    float hi = max(sigma_t.r, max(sigma_t.g, sigma_t.b));
+    float lo = min(sigma_t.r, min(sigma_t.g, sigma_t.b));
+    return (hi - lo) > 0.05 * hi;
+}
+
+// exited / exit_normal: whether the walk left through the boundary (rather than being cut off by Russian roulette or
+// the bounce cap) and the outward geometric normal there
+void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium, out bool exited, out vec3 exit_normal) {
+    exited = false;
+    exit_normal = hit.normal;
     // Free flight sampling with one density for all channels: d ~ sigma * exp(-sigma d), sigma = luminance(sigma_t).
     // The sampling density already accounts for transmittance, so the per segment weights are the ratio of the true
     // per channel quantities to it:
@@ -433,11 +444,24 @@ void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material 
     //   reach the boundary t:  exp(-(sigma_t - sigma) t)     (leaving is not a scattering event, no albedo)
     // For a grey medium this is the textbook walk: albedo per scatter, 1 at the exit. Transport scale multiplies the
     // coefficients themselves (density and attenuation together).
+    //
+    // Coloured scattering (sigma_t differs across rgb by more than SSS_SPECTRAL_SPREAD, same test as the per channel
+    // clouds): a shared density makes the weight of a channel with sigma_s,c > sigma grow by sigma_s,c / sigma > 1 on
+    // every scatter, which overflows / gets clamped by max_contribution and loses that channel's energy. Instead one
+    // channel is picked per walk and walked at its own sigma_t,c (weights: albedo <= 1 per scatter, 1 at the exit),
+    // carrying light in that channel only (x3).
     throughput = vec3(1.0);
     vec3 sigma_s = material.scattering * material.scale;
     vec3 sigma_a = material.absorbtion * material.scale;
     vec3 sigma_t = sigma_s + sigma_a;
     float sigma = max(luminance(sigma_t), EPS);
+    int channel = -1;
+    if (sss_spectral(sigma_t)) {
+        channel = min(int(random() * 3.0), 2);
+        sigma = max(sigma_t[channel], EPS);
+        throughput = vec3(0.0);
+        throughput[channel] = 3.0;
+    }
     vec3 sigma_mul = sigma_s / sigma;
     uint boundary_id = uint(-1);
     medium = hit.material;
@@ -451,13 +475,16 @@ void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material 
         float free_distance = -log(1.0 - xi) / sigma;
         if (free_distance >= boundary.distance) { // exiting
             ray.position = epsilon_offset(ray.position, ray.direction) + ray.direction * boundary.distance;
-            throughput *= exp(-(sigma_t - sigma) * boundary.distance);
+            if (channel < 0) throughput *= exp(-(sigma_t - sigma) * boundary.distance);
+            exited = true;
+            exit_normal = -boundary.normal; // trace() faces the normal towards the ray origin, which is inside
             //medium = AIR_MEDIUM; // TODO: this should not exactly be air medium, but the previous participating medium
                                  // might need to edit material here to prev material?
             break;
         } else {
             vec3 scatter_position = ray.position + ray.direction * free_distance;
-            throughput *= exp(-(sigma_t - sigma) * free_distance) * sigma_mul;
+            if (channel < 0) throughput *= exp(-(sigma_t - sigma) * free_distance) * sigma_mul;
+            else throughput[channel] *= sigma_mul[channel];
             // phase function around the travel direction (g > 0 = forward scattering); this used to be sampled around
             // -ray.direction, which turned forward scattering into back scattering
             vec3 new_direction = sample_henyey_greenstein(ray.direction, material.anisotropy);
@@ -492,7 +519,8 @@ void sample_lambertian(vec3 outgoing, Hit h, Material material, out vec3 incomin
 // Subsurface gaussian clouds ("SSS splats"), trained on the CPU by src/renderer/sssfit.c.
 // sss_splat_scatter() is mirrored line by line by sssfit_sample() in that file (which is what the training validation
 // measures), so keep the two in sync. Layout of SubsurfaceSSBOIn:
-//   [0] object count, [4 + 4k] per object: blob base, mesh descriptor, enabled, first triangle; then the blobs.
+//   [0] object count, [4 + 8k] per object: blob base per colour channel (r, g, b; equal for a single cloud), mesh
+//   descriptor, enabled, first triangle, channel count (1 or 3), 0; then the blobs.
 // Every offset inside a blob is relative to its base; see sssfit.h for the record layouts.
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -524,9 +552,12 @@ const uint SSSG_NONE = 0xFFFFFFFFu;
 const float SSS_GAUSS_CUTOFF = 9.0;
 const int SSS_PROJECTION_TRIES = 3;
 const int SSS_FOREIGN_SKIPS = 4;
+const float SSS_MAX_EXCESS_MFP = 2000.0; // cap on the sampled extra path length (log normal tails are unbounded)
 
 struct SSSObject {
     uint base;
+    uvec3 bases; // per channel blobs (all equal for a single cloud)
+    uint channels;
     uint tstart;
     uint tcount;
     mat4 M;      // object -> world
@@ -556,16 +587,18 @@ bool sss_find_object(uint tid, out SSSObject o) {
     o.base = 0u;
     uint n = sssIn[0];
     for (uint k = 0u; k < n; k++) {
-        uint e = 4u + 4u * k;
-        if (sssIn[e + 2u] == 0u) continue;
+        uint e = 4u + 8u * k;
+        if (sssIn[e + 4u] == 0u) continue;
         uint base = sssIn[e];
-        uint tstart = sssIn[e + 3u];
+        uint tstart = sssIn[e + 5u];
         uint tcount = sssIn[base + SSSG_H_TCOUNT];
         if (tid < tstart || tid >= tstart + tcount) continue;
-        MeshDescriptor md = transformsIn[sssIn[e + 1u]];
+        MeshDescriptor md = transformsIn[sssIn[e + 3u]];
         // the cloud is only valid for the exact triangle range it was trained on
         if (md.disabled != 0u || md.tstart != tstart || md.tend == uint(-1) || md.tend - md.tstart + 1u != tcount) continue;
         o.base = base;
+        o.bases = uvec3(sssIn[e], sssIn[e + 1u], sssIn[e + 2u]);
+        o.channels = sssIn[e + 6u];
         o.tstart = tstart;
         o.tcount = tcount;
         o.M = md.transform;
@@ -744,6 +777,13 @@ bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throug
     direction = h.normal;
     SSSObject o;
     if (!sss_find_object(tid, o)) return false;
+    // Coloured scattering: one cloud per channel, each trained at that channel's own extinction. Pick a channel
+    // uniformly; the path then carries light in that channel only (x3), so every channel follows its own transport.
+    int channel = -1;
+    if (o.channels == 3u) {
+        channel = min(int(random() * 3.0), 2);
+        o.base = o.bases[channel];
+    }
     uint base = o.base;
     float mfp = sss_f(base + SSSG_H_MFP);
     vec3 p = (o.Minv * vec4(h.position, 1.0)).xyz;
@@ -807,7 +847,7 @@ bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throug
     float pick = random();
     float zz = pick < w1 ? comps.x + comps.y * normal_quantile(random()) : comps.z + comps.w * normal_quantile(random());
     float D = length(x - p);
-    float excess = max(exp(min(zz, 80.0)) - sss_f(base + SSSG_H_EPS), 0.0);
+    float excess = max(exp(min(zz, log(SSS_MAX_EXCESS_MFP * mfp))) - sss_f(base + SSSG_H_EPS), 0.0);
     float Lw = (D + excess) * o.scale;
     // 5. exit direction from the surface gaussian under the exit point
     vec3 n = sss_tri_normal(o, xt);
@@ -822,15 +862,24 @@ bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throug
     vec3 w = onb(axis, vec3(stt * cos(phi), stt * sin(phi), ct));
     float wn = dot(w, n);
     if (wn < 0.0) w -= 2.0 * wn * n;
-    // 6. throughput of the random walk this replaces: (sigma_s / sigma)^scatters * exp(-(sigma_t - sigma) L), with the
-    //    scatter count integrated out given the path length. The blob's calibration models E[a^events | L] as
-    //    a^(1 + c) exp(-k sigma (1 - a) L); scatters = events - 1 (the exit is not a scatter), so divide by a.
-    vec3 sigma_s = material.scattering * material.scale;
-    vec3 sigma_t = (material.scattering + material.absorbtion) * material.scale;
-    float sigma = max(luminance(sigma_t), EPS);
-    vec3 albedo = max(sigma_s / sigma, vec3(1e-4));
-    float k = sss_f(base + SSSG_H_EVK), c = sss_f(base + SSSG_H_EVC);
-    throughput = pow(albedo, vec3(c)) * exp(-k * sigma * (1.0 - albedo) * Lw) * exp(-(sigma_t - sigma) * Lw);
+    // 6. throughput: the walk weighs (sigma_s / sigma) per scatter and exp(-(sigma_t - sigma) d) per unit length. With
+    //    the scatter count along a path of length L treated as poisson(sigma L), its expectation is
+    //    exp(-(sigma (1 - a) + sigma_t - sigma) L) = exp(-(sigma_t - sigma_s) L) = exp(-sigma_a L), i.e. plain absorption
+    //    over the sampled path length. The cloud's path lengths are for the shared density sigma; a channel whose
+    //    sigma_t differs scatters on its own length scale, so (similarity: the same number of mean free paths) its
+    //    physical length is L * sigma / sigma_t,c. Without this, coloured scattering shifts hue (e.g. green dominant
+    //    scattering turns purple, because red and blue absorb over too short a distance).
+    vec3 sigma_a = material.absorbtion * material.scale;
+    if (channel >= 0) {
+        // the channel's own cloud: its path lengths are already in that channel's physics, and with poisson(sigma_t,c L)
+        // scatters the walk's expected weight is exactly exp(-sigma_a,c L)
+        throughput = vec3(0.0);
+        throughput[channel] = 3.0 * exp(-sigma_a[channel] * Lw);
+    } else {
+        vec3 sigma_tc = max((material.scattering + material.absorbtion) * material.scale, vec3(EPS));
+        float sigma_shared = max(luminance(sigma_tc), EPS);
+        throughput = exp(-sigma_a * (sigma_shared / sigma_tc) * Lw);
+    }
     direction = w;
     h.position = xw;
     h.normal = n;
@@ -969,12 +1018,27 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in uint tid, in Mater
                 ray.direction = sample_henyey_greenstein(-outgoing, material.anisotropy);
                 if (dot(ray.direction, h.normal) > 0.0) ray.direction = reflect(ray.direction, h.normal);
                 ray.position = epsilon_offset(h.position, ray.direction);
-                subsurface_walk(ray, throughput, h, material, medium);
+                bool exited;
+                vec3 exit_normal;
+                subsurface_walk(ray, throughput, h, material, medium, exited, exit_normal);
                 g_sss_debug_cost += bvh_counter - cost_before;
                 if (g_sss_debug_kind == 0u) g_sss_debug_kind = 2u;
                 throughput /= p_sss;
                 incoming = h.normal;
                 pdf = 1.0;
+                if (exited && ubo.sssexitlight != 0u) {
+                    // Diffuse exit (as in Cycles' random walk): keep the walk's exit point but replace its last direction by
+                    // a cosine sample around the outward normal, so the exit has a known lobe (cos / pi) and pathtrace() can
+                    // sample lights there. Weight stays 1: lobe value / sampling pdf. An approximation of the walk's true
+                    // exit direction distribution, which is close to lambertian in dense media.
+                    incoming = onb(exit_normal, sample_cosine_weighted_lobe());
+                    h.normal = exit_normal;
+                    g_sss_exit = true;
+                    g_sss_exit_pos = h.position;
+                    g_sss_exit_normal = exit_normal;
+                    g_sss_exit_axis = exit_normal; // folded cos^1 lobe around the normal == cos / pi
+                    g_sss_exit_exponent = 1.0;
+                }
             } else {
                 sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
                 throughput /= p_surface;

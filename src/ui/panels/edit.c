@@ -105,8 +105,9 @@ static void DrawSubsurfaceSection(size_t mesh, float width) {
     SubsurfaceCloudInfo info;
     BOOL linked = SubsurfaceCloudInfoFor(mesh, &info);
     if (linked) {
-        UIDrawTextWrapped(width - 20, "Linked cloud: %u surface gaussians (%u lobes), %u internal gaussians, %.0f KB",
-            info.surface_gaussians, info.lobes, info.internal_gaussians, info.bytes / 1024.0f);
+        UIDrawTextWrapped(width - 20, "Linked cloud%s: %u surface gaussians (%u lobes), %u internal gaussians, %.0f KB",
+            info.channels == 3 ? " (one per colour channel)" : "", info.surface_gaussians, info.lobes, info.internal_gaussians,
+            info.bytes / 1024.0f);
         if (info.stale) UIDrawTextWrapped(width - 20, "Out of date: %s", info.reason);
         UIColumnHeader("Use Cloud", LEFT_COLUMN_WIDTH);
         BOOL enabled = info.enabled;
@@ -242,9 +243,9 @@ static void DrawEditCamera(SceneCamera* cref, char* name, float width, float hei
     UIColumnHeader("Spectral Coloring", LEFT_COLUMN_WIDTH);
     UICheckbox(&(cref->config.spectral));
     UIColumnHeader("Subsurface Splats", LEFT_COLUMN_WIDTH);
-    UICheckbox(&(cref->config.sssplats));
+    if (UICheckbox(&(SubsurfaceSettingsRef()->enabled))) cref->config.reset = TRUE;
     UIColumnHeader("SSS Exit Lighting", LEFT_COLUMN_WIDTH);
-    UICheckbox(&(cref->config.sssexitlight));
+    if (UICheckbox(&(SubsurfaceSettingsRef()->exitlight))) cref->config.reset = TRUE;
 
     UIMoveCursor(0, 15);
     float sboxwidth = width - 20 - 160;

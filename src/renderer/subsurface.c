@@ -8,19 +8,21 @@
 
 #define SSS_MATERIAL_MODEL 11u // SUBSURFACE_MODEL in shaders/shared.import
 #define SSS_BUFFER_HEADER 4u   // words: object count, 3 reserved
-#define SSS_ENTRY_WORDS 4u     // per object: blob base, mesh index, flags, triangle start
-#define SSS_FILE_MAGIC "PSSS"
-#define SSS_FILE_VERSION 1u
+#define SSS_ENTRY_WORDS 8u     // per object: blob base per channel (3), mesh index, flags, triangle start, channels, 0
+#define SSS_SPECTRAL_SPREAD 0.05f // relative spread of sigma_t across rgb above which one cloud per channel is trained
 
+// A cloud is either one blob trained at the shared (luminance) density, or one blob per colour channel, each trained
+// at that channel's own extinction sigma_t,c (strongly coloured scattering: the channels diffuse differently).
 typedef struct {
     uint32_t mesh;
     BOOL enabled;
-    uint32_t* blob;
-    uint32_t words;
+    uint32_t channels; // 1 or 3
+    uint32_t* blob[3];
+    uint32_t words[3];
+    float sigma[3];    // world space density each blob was trained for
     uint32_t tstart;   // triangle range the cloud was trained on (re-synced when meshes move)
     uint32_t tcount;
     MaterialID material;
-    float sigma;       // world space density it was trained for
     float g;
     float scale;       // object scale it was trained at
 } Cloud;
@@ -31,7 +33,15 @@ typedef struct {
     size_t mesh;
     uint32_t tstart, tcount;
     MaterialID material;
-    float sigma, g, scale;
+    float g, scale;
+    uint32_t channels, channel; // channel currently being fitted
+    float sigma[3];
+    SSSFitConfig config;
+    float* pos;                 // object space mesh, kept for the per channel fits
+    uint32_t* idx;
+    uint32_t nverts;
+    uint32_t* blob[3];
+    uint32_t words[3];
     char status[192];
     SSSFitStats stats;
     BOOL have_stats;
@@ -41,7 +51,12 @@ typedef struct {
 static Cloud* g_clouds = NULL;
 static size_t g_cloud_count = 0;
 static TrainJob g_job = { 0 };
+static SubsurfaceSettings g_settings = { TRUE, TRUE };
 static ShaderBuffer g_buffer = { 0 };
+
+SubsurfaceSettings* SubsurfaceSettingsRef() {
+    return &g_settings;
+}
 
 ShaderBuffer* SubsurfaceBuffer() {
     return &g_buffer;
@@ -82,6 +97,19 @@ static float MaterialSigma(const SurfaceMaterial* m) {
     return s > 1e-6f ? s : 1e-6f;
 }
 
+// Densities the clouds of a material are trained for (world space): one shared or one per channel.
+static uint32_t MaterialDensities(const SurfaceMaterial* m, float* out) {
+    float t[3];
+    for (int k = 0; k < 3; k++) t[k] = fmaxf((m->scattering[k] + m->absorbtion[k]) * m->scale, 1e-6f);
+    float lo = fminf(t[0], fminf(t[1], t[2])), hi = fmaxf(t[0], fmaxf(t[1], t[2]));
+    if ((hi - lo) > SSS_SPECTRAL_SPREAD * hi) {
+        for (int k = 0; k < 3; k++) out[k] = t[k];
+        return 3;
+    }
+    out[0] = out[1] = out[2] = MaterialSigma(m);
+    return 1;
+}
+
 static MaterialID DominantMaterial(uint32_t start, uint32_t count) {
     Geometry* geo = RendererGeometry();
     MaterialID best = 0;
@@ -102,7 +130,7 @@ static Cloud* FindCloud(size_t mesh) {
 }
 
 static void FreeCloud(Cloud* c) {
-    EZ_FREE(c->blob);
+    for (int k = 0; k < 3; k++) EZ_FREE(c->blob[k]);
     memset(c, 0, sizeof(*c));
 }
 
@@ -116,7 +144,8 @@ static void ResetAccumulation() {
     if (NumCameras() > 0) RendererCamera()->config.reset = TRUE;
 }
 
-// Rebuilds the packed buffer: [count, 0, 0, 0] [base, mesh, flags, tstart] * count, blobs...
+// Rebuilds the packed buffer: [count, 0, 0, 0] [base r, base g, base b, mesh, flags, tstart, channels, 0] * count,
+// blobs... (a single channel cloud repeats its base three times)
 static void RebuildBuffer() {
     Geometry* geo = RendererGeometry();
     // follow the objects' triangle ranges (other meshes may have been deleted before this one)
@@ -128,7 +157,8 @@ static void RebuildBuffer() {
         }
     }
     size_t words = SSS_BUFFER_HEADER + SSS_ENTRY_WORDS * g_cloud_count;
-    for (size_t i = 0; i < g_cloud_count; i++) words += g_clouds[i].words;
+    for (size_t i = 0; i < g_cloud_count; i++)
+        for (uint32_t k = 0; k < g_clouds[i].channels; k++) words += g_clouds[i].words[k];
     EZ_FREE(g_buffer.data);
     g_buffer.data = EZ_ALLOC(words, sizeof(uint32_t));
     g_buffer.size = words * sizeof(uint32_t);
@@ -138,13 +168,17 @@ static void RebuildBuffer() {
     for (size_t i = 0; i < g_cloud_count; i++) {
         Cloud* c = &g_clouds[i];
         uint32_t* e = w + SSS_BUFFER_HEADER + SSS_ENTRY_WORDS * i;
-        e[0] = base;
-        e[1] = c->mesh;
-        e[2] = c->enabled ? 1u : 0u;
-        e[3] = c->tstart;
-        memcpy(w + base, c->blob, (size_t)c->words * sizeof(uint32_t));
-        w[base + SSSG_H_TSTART] = c->tstart;
-        base += c->words;
+        for (uint32_t k = 0; k < 3; k++) {
+            if (k >= c->channels) { e[k] = e[0]; continue; }
+            e[k] = base;
+            memcpy(w + base, c->blob[k], (size_t)c->words[k] * sizeof(uint32_t));
+            w[base + SSSG_H_TSTART] = c->tstart;
+            base += c->words[k];
+        }
+        e[3] = c->mesh;
+        e[4] = c->enabled ? 1u : 0u;
+        e[5] = c->tstart;
+        e[6] = c->channels;
     }
     g_buffer.update = TRUE;
     ResetAccumulation();
@@ -177,6 +211,9 @@ BOOL SubsurfaceTrainStart(size_t mesh, const SSSFitConfig* config) {
         return FALSE;
     }
     if (j->fitter) SSSFitDestroy(j->fitter);
+    EZ_FREE(j->pos);
+    EZ_FREE(j->idx);
+    for (int k = 0; k < 3; k++) EZ_FREE(j->blob[k]);
     memset(j, 0, sizeof(*j));
     Geometry* geo = RendererGeometry();
     j->mesh = mesh;
@@ -199,7 +236,7 @@ BOOL SubsurfaceTrainStart(size_t mesh, const SSSFitConfig* config) {
         j->phase = SUBSURFACE_FAILED;
         return FALSE;
     }
-    j->sigma = MaterialSigma(mat);
+    j->channels = MaterialDensities(mat, j->sigma);
     j->g = mat->anisotropy;
     j->scale = TransformScale(md);
     // object space copy of the mesh, vertices compacted to the ones the triangles use
@@ -222,12 +259,14 @@ BOOL SubsurfaceTrainStart(size_t mesh, const SSSFitConfig* config) {
             idx[t * 3 + k] = remap[v];
         }
     }
-    SSSFitInput in = { pos, idx, used, j->tcount, j->sigma * j->scale, j->g };
-    SSSFitConfig cfg = config ? *config : SSSFitDefaultConfig();
-    j->fitter = SSSFitCreate(&in, &cfg);
     EZ_FREE(remap);
-    EZ_FREE(idx);
-    EZ_FREE(pos);
+    j->pos = pos;
+    j->idx = idx;
+    j->nverts = used;
+    j->config = config ? *config : SSSFitDefaultConfig();
+    j->channel = 0;
+    SSSFitInput in = { j->pos, j->idx, j->nverts, j->tcount, j->sigma[0] * j->scale, j->g };
+    j->fitter = SSSFitCreate(&in, &j->config);
     if (!j->fitter) {
         snprintf(j->status, sizeof(j->status), "Failed: could not set up the fit");
         j->phase = SUBSURFACE_FAILED;
@@ -236,8 +275,12 @@ BOOL SubsurfaceTrainStart(size_t mesh, const SSSFitConfig* config) {
     j->started = GetTime();
     j->phase = SUBSURFACE_TRAINING;
     snprintf(j->status, sizeof(j->status), "Starting");
-    loginfo("Training subsurface splats for \"%s\": %u triangles, sigma %.3f (mean free path %.4g), g %.2f",
-        *MeshNameReference(mesh), j->tcount, j->sigma, 1.0 / j->sigma, j->g);
+    if (j->channels == 3)
+        loginfo("Training subsurface splats for \"%s\": %u triangles, coloured scattering -> one cloud per channel, sigma_t %.3f / %.3f / %.3f, g %.2f",
+            *MeshNameReference(mesh), j->tcount, j->sigma[0], j->sigma[1], j->sigma[2], j->g);
+    else
+        loginfo("Training subsurface splats for \"%s\": %u triangles, sigma %.3f (mean free path %.4g), g %.2f",
+            *MeshNameReference(mesh), j->tcount, j->sigma[0], 1.0 / j->sigma[0], j->g);
     return TRUE;
 }
 
@@ -259,41 +302,76 @@ static void LogStats(const SSSFitStats* s) {
     loginfo("    mean exit cosine %.3f / %.3f, projection failures %u", s->walk_cos, s->model_cos, s->projection_failures);
 }
 
-static void FinishJob(TrainJob* j) {
+static void ReleaseJobData(TrainJob* j) {
+    if (j->fitter) SSSFitDestroy(j->fitter);
+    j->fitter = NULL;
+    EZ_FREE(j->pos); j->pos = NULL;
+    EZ_FREE(j->idx); j->idx = NULL;
+    for (int k = 0; k < 3; k++) { EZ_FREE(j->blob[k]); j->blob[k] = NULL; j->words[k] = 0; }
+}
+
+// one channel's fit finished: keep its blob, start the next channel or link the cloud
+static void FinishChannel(TrainJob* j) {
+    static const char* names[3] = { "red", "green", "blue" };
     uint32_t words = 0;
     const uint32_t* blob = SSSFitBlob(j->fitter, &words);
     j->stats = *SSSFitGetStats(j->fitter);
     j->have_stats = TRUE;
+    if (j->channels == 3) loginfo("Subsurface splats, %s channel:", names[j->channel]);
+    LogStats(&j->stats);
+    j->blob[j->channel] = EZ_ALLOC(words ? words : 1, sizeof(uint32_t));
+    if (blob) memcpy(j->blob[j->channel], blob, (size_t)words * sizeof(uint32_t));
+    j->words[j->channel] = words;
+    SSSFitDestroy(j->fitter);
+    j->fitter = NULL;
+    if (!blob) {
+        snprintf(j->status, sizeof(j->status), "Failed: the fit produced no cloud");
+        ReleaseJobData(j);
+        j->phase = SUBSURFACE_FAILED;
+        return;
+    }
+    if (++j->channel < j->channels) {
+        SSSFitInput in = { j->pos, j->idx, j->nverts, j->tcount, j->sigma[j->channel] * j->scale, j->g };
+        j->fitter = SSSFitCreate(&in, &j->config);
+        if (!j->fitter) {
+            snprintf(j->status, sizeof(j->status), "Failed: could not set up the %s channel fit", names[j->channel]);
+            ReleaseJobData(j);
+            j->phase = SUBSURFACE_FAILED;
+        }
+        return;
+    }
     Geometry* geo = RendererGeometry();
     uint32_t s, n;
-    if (!blob || j->mesh >= geo->meshes.size || !MeshTriangles(&geo->meshes.data[j->mesh], &s, &n) || n != j->tcount) {
+    if (j->mesh >= geo->meshes.size || !MeshTriangles(&geo->meshes.data[j->mesh], &s, &n) || n != j->tcount) {
         snprintf(j->status, sizeof(j->status), "Failed: the object changed while it was being trained");
+        ReleaseJobData(j);
         j->phase = SUBSURFACE_FAILED;
-        SSSFitDestroy(j->fitter);
-        j->fitter = NULL;
         return;
     }
     Cloud c = { 0 };
     c.mesh = (uint32_t)j->mesh;
     c.enabled = TRUE;
-    c.words = words;
-    c.blob = EZ_ALLOC(words, sizeof(uint32_t));
-    memcpy(c.blob, blob, (size_t)words * sizeof(uint32_t));
+    c.channels = j->channels;
     c.tstart = s;
     c.tcount = n;
     c.material = j->material;
-    c.sigma = j->sigma;
     c.g = j->g;
     c.scale = j->scale;
-    c.blob[SSSG_H_TSTART] = s;
-    c.blob[SSSG_H_MATERIAL] = j->material;
-    memcpy(&c.blob[SSSG_H_SCALE], &j->scale, 4);
-    SSSFitDestroy(j->fitter);
-    j->fitter = NULL;
+    uint32_t total = 0;
+    for (uint32_t k = 0; k < j->channels; k++) {
+        c.blob[k] = j->blob[k];
+        c.words[k] = j->words[k];
+        c.sigma[k] = j->sigma[k];
+        j->blob[k] = NULL;
+        c.blob[k][SSSG_H_TSTART] = s;
+        c.blob[k][SSSG_H_MATERIAL] = j->material;
+        memcpy(&c.blob[k][SSSG_H_SCALE], &j->scale, 4);
+        total += c.words[k];
+    }
+    ReleaseJobData(j);
     StoreCloud(c);
-    LogStats(&j->stats);
-    snprintf(j->status, sizeof(j->status), "Done in %.0fs: %.1f KB cloud linked to \"%s\"",
-        GetTime() - j->started, words * 4.0 / 1024.0, *MeshNameReference(j->mesh));
+    snprintf(j->status, sizeof(j->status), "Done in %.0fs: %.1f KB cloud%s linked to \"%s\"",
+        GetTime() - j->started, total * 4.0 / 1024.0, c.channels == 3 ? " (per channel)" : "", *MeshNameReference(j->mesh));
     loginfo("%s", j->status);
     j->phase = SUBSURFACE_DONE;
 }
@@ -302,17 +380,21 @@ BOOL SubsurfaceTrainTick(double seconds) {
     TrainJob* j = &g_job;
     if (j->phase != SUBSURFACE_TRAINING || !j->fitter) return FALSE;
     SSSFitPhase p = SSSFitStep(j->fitter, seconds, Clock);
-    snprintf(j->status, sizeof(j->status), "%s", SSSFitStatus(j->fitter));
+    if (j->channels == 3) {
+        static const char* names[3] = { "red", "green", "blue" };
+        snprintf(j->status, sizeof(j->status), "[%s %u/3] %s", names[j->channel], j->channel + 1, SSSFitStatus(j->fitter));
+    } else {
+        snprintf(j->status, sizeof(j->status), "%s", SSSFitStatus(j->fitter));
+    }
     if (p == SSSFIT_FAILED) {
         logerror("Subsurface splat training failed: %s", SSSFitStatus(j->fitter));
-        SSSFitDestroy(j->fitter);
-        j->fitter = NULL;
+        ReleaseJobData(j);
         j->phase = SUBSURFACE_FAILED;
         return FALSE;
     }
     if (p == SSSFIT_DONE) {
-        FinishJob(j);
-        return FALSE;
+        FinishChannel(j);
+        return j->phase == SUBSURFACE_TRAINING;
     }
     return TRUE;
 }
@@ -320,8 +402,7 @@ BOOL SubsurfaceTrainTick(double seconds) {
 void SubsurfaceTrainCancel() {
     TrainJob* j = &g_job;
     if (j->phase != SUBSURFACE_TRAINING) return;
-    SSSFitDestroy(j->fitter);
-    j->fitter = NULL;
+    ReleaseJobData(j);
     j->phase = SUBSURFACE_IDLE;
     snprintf(j->status, sizeof(j->status), "Cancelled");
     loginfo("Subsurface splat training cancelled");
@@ -337,7 +418,8 @@ size_t SubsurfaceTrainMesh() {
 
 float SubsurfaceTrainProgress() {
     if (g_job.phase == SUBSURFACE_DONE) return 1.0f;
-    return g_job.fitter ? SSSFitProgress(g_job.fitter) : 0.0f;
+    if (!g_job.fitter || g_job.channels == 0) return 0.0f;
+    return ((float)g_job.channel + SSSFitProgress(g_job.fitter)) / (float)g_job.channels;
 }
 
 const char* SubsurfaceTrainStatus() {
@@ -356,15 +438,17 @@ BOOL SubsurfaceCloudInfoFor(size_t mesh, SubsurfaceCloudInfo* info) {
     memset(info, 0, sizeof(*info));
     Cloud* c = FindCloud(mesh);
     if (!c) return FALSE;
-    const uint32_t* b = c->blob;
+    const uint32_t* b = c->blob[0];
     info->linked = TRUE;
     info->enabled = c->enabled;
+    info->channels = c->channels;
     info->triangles = c->tcount;
     info->surface_gaussians = b[SSSG_H_NSURF];
     info->lobes = b[SSSG_H_NLOBE];
     info->internal_gaussians = b[SSSG_H_NGAUSS];
-    info->bytes = c->words * 4;
-    info->sigma = c->sigma;
+    info->bytes = 0;
+    for (uint32_t k = 0; k < c->channels; k++) info->bytes += c->words[k] * 4;
+    info->sigma = c->sigma[0];
     info->anisotropy = c->g;
     info->scale = c->scale;
     info->material = c->material;
@@ -378,14 +462,22 @@ BOOL SubsurfaceCloudInfoFor(size_t mesh, SubsurfaceCloudInfo* info) {
     MaterialID now = geo->triangles.data[s].material;
     if (now >= geo->materials.size) return TRUE;
     const SurfaceMaterial* m = &geo->materials.data[now];
-    float sigma = MaterialSigma(m);
+    float sigma[3];
+    uint32_t channels = MaterialDensities(m, sigma);
     float scale = TransformScale(&geo->meshes.data[mesh]);
+    BOOL density_changed = FALSE;
+    for (uint32_t k = 0; k < channels && channels == c->channels; k++)
+        if (fabsf(sigma[k] - c->sigma[k]) > 0.01f * c->sigma[k]) density_changed = TRUE;
     if (m->model != SSS_MATERIAL_MODEL) {
         info->stale = TRUE;
         snprintf(info->reason, sizeof(info->reason), "material is no longer a subsurface material");
-    } else if (fabsf(sigma - c->sigma) > 0.01f * c->sigma) {
+    } else if (channels != c->channels) {
         info->stale = TRUE;
-        snprintf(info->reason, sizeof(info->reason), "scattering density changed (%.3g, trained %.3g), retrain", sigma, c->sigma);
+        snprintf(info->reason, sizeof(info->reason), channels == 3 ?
+            "scattering became coloured, retrain for per channel clouds" : "scattering became grey, retrain");
+    } else if (density_changed) {
+        info->stale = TRUE;
+        snprintf(info->reason, sizeof(info->reason), "scattering density changed (%.3g, trained %.3g), retrain", sigma[0], c->sigma[0]);
     } else if (fabsf(m->anisotropy - c->g) > 0.01f) {
         info->stale = TRUE;
         snprintf(info->reason, sizeof(info->reason), "anisotropy changed (%.2f, trained %.2f), retrain", m->anisotropy, c->g);
@@ -448,19 +540,20 @@ BOOL SubsurfacePreviewCloud(size_t mesh) {
     if (!c || mesh >= geo->meshes.size) return FALSE;
     mat4 M;
     memcpy(M, geo->meshes.data[mesh].transform, sizeof(mat4));
-    uint32_t n = c->blob[SSSG_H_NGAUSS];
+    const uint32_t* pblob = c->blob[c->channels == 3 ? 1 : 0]; // green for per channel clouds
+    uint32_t n = pblob[SSSG_H_NGAUSS];
     float* le = EZ_ALLOC(n ? n : 1, sizeof(float));
     float lo = FLT_MAX, hi = -FLT_MAX;
     for (uint32_t i = 0; i < n; i++) {
         float mu[3], ax[9], sc[3];
-        SSSBlobGaussian(c->blob, i, mu, ax, sc, &le[i]);
+        SSSBlobGaussian(pblob, i, mu, ax, sc, &le[i]);
         if (le[i] < lo) lo = le[i];
         if (le[i] > hi) hi = le[i];
     }
     size_t first = NumSplats();
     for (uint32_t i = 0; i < n; i++) {
         float mu[3], ax[9], sc[3], unused;
-        SSSBlobGaussian(c->blob, i, mu, ax, sc, &unused);
+        SSSBlobGaussian(pblob, i, mu, ax, sc, &unused);
         GaussianSplat s = { 0 };
         vec3 lp = { mu[0], mu[1], mu[2] };
         glm_mat4_mulv3(M, lp, 1.0f, s.position);
@@ -494,15 +587,18 @@ BOOL SubsurfacePreviewCloud(size_t mesh) {
 
 // ---------------------------------------------------------------------------------------------------------------------
 // persistence: clouds are stored inside the PRISM session (see SavePRISM / LoadPRISM)
-// layout (uint32 words): count, then per cloud: mesh, enabled, tstart, tcount, material, sigma, g, scale (float bits),
-// blob word count, blob
+// layout (uint32 words): count, then per cloud: mesh, enabled, tstart, tcount, material, g, scale (float bits),
+// channels, then per channel: sigma (float bits), blob word count, blob
 // ---------------------------------------------------------------------------------------------------------------------
 
-#define SSS_RECORD_WORDS 9u
+#define SSS_RECORD_WORDS 8u
 
 uint32_t* SubsurfaceSerialize(size_t* words) {
     size_t total = 1;
-    for (size_t i = 0; i < g_cloud_count; i++) total += SSS_RECORD_WORDS + g_clouds[i].words;
+    for (size_t i = 0; i < g_cloud_count; i++) {
+        total += SSS_RECORD_WORDS;
+        for (uint32_t k = 0; k < g_clouds[i].channels; k++) total += 2 + g_clouds[i].words[k];
+    }
     uint32_t* out = EZ_ALLOC(total, sizeof(uint32_t));
     out[0] = (uint32_t)g_cloud_count;
     size_t w = 1;
@@ -513,12 +609,15 @@ uint32_t* SubsurfaceSerialize(size_t* words) {
         out[w++] = c->tstart;
         out[w++] = c->tcount;
         out[w++] = c->material;
-        memcpy(&out[w++], &c->sigma, 4);
         memcpy(&out[w++], &c->g, 4);
         memcpy(&out[w++], &c->scale, 4);
-        out[w++] = c->words;
-        memcpy(&out[w], c->blob, (size_t)c->words * sizeof(uint32_t));
-        w += c->words;
+        out[w++] = c->channels;
+        for (uint32_t k = 0; k < c->channels; k++) {
+            memcpy(&out[w++], &c->sigma[k], 4);
+            out[w++] = c->words[k];
+            memcpy(&out[w], c->blob[k], (size_t)c->words[k] * sizeof(uint32_t));
+            w += c->words[k];
+        }
     }
     *words = total;
     return out;
@@ -530,7 +629,7 @@ BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words) {
     Geometry* geo = RendererGeometry();
     size_t count = data[0], w = 1, loaded = 0;
     BOOL ok = TRUE;
-    for (size_t i = 0; i < count; i++) {
+    for (size_t i = 0; i < count && ok; i++) {
         if (w + SSS_RECORD_WORDS > words) { ok = FALSE; break; }
         Cloud c = { 0 };
         c.mesh = data[w];
@@ -538,22 +637,31 @@ BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words) {
         c.tstart = data[w + 2];
         c.tcount = data[w + 3];
         c.material = data[w + 4];
-        memcpy(&c.sigma, &data[w + 5], 4);
-        memcpy(&c.g, &data[w + 6], 4);
-        memcpy(&c.scale, &data[w + 7], 4);
-        c.words = data[w + 8];
+        memcpy(&c.g, &data[w + 5], 4);
+        memcpy(&c.scale, &data[w + 6], 4);
+        c.channels = data[w + 7];
         w += SSS_RECORD_WORDS;
-        if (c.words > words - w) { ok = FALSE; break; }
-        const uint32_t* blob = &data[w];
-        w += c.words;
+        if (c.channels != 1 && c.channels != 3) { ok = FALSE; break; }
+        BOOL valid = TRUE;
+        for (uint32_t k = 0; k < c.channels; k++) {
+            if (w + 2 > words) { ok = FALSE; break; }
+            memcpy(&c.sigma[k], &data[w], 4);
+            c.words[k] = data[w + 1];
+            w += 2;
+            if (c.words[k] > words - w) { ok = FALSE; break; }
+            const uint32_t* blob = &data[w];
+            w += c.words[k];
+            if (SSSBlobWords(blob, c.words[k]) == 0 || blob[SSSG_H_TCOUNT] != c.tcount) { valid = FALSE; continue; }
+            c.blob[k] = EZ_ALLOC(c.words[k], sizeof(uint32_t));
+            memcpy(c.blob[k], blob, (size_t)c.words[k] * sizeof(uint32_t));
+        }
         uint32_t s, n;
-        if (SSSBlobWords(blob, c.words) == 0 || blob[SSSG_H_TCOUNT] != c.tcount || c.mesh >= geo->meshes.size ||
-            !MeshTriangles(&geo->meshes.data[c.mesh], &s, &n) || n != c.tcount || FindCloud(c.mesh)) {
-            logwarn("Skipping a saved subsurface cloud that no longer matches its object");
+        if (!ok || !valid || c.mesh >= geo->meshes.size || !MeshTriangles(&geo->meshes.data[c.mesh], &s, &n) ||
+            n != c.tcount || FindCloud(c.mesh)) {
+            if (ok) logwarn("Skipping a saved subsurface cloud that no longer matches its object");
+            FreeCloud(&c);
             continue;
         }
-        c.blob = EZ_ALLOC(c.words, sizeof(uint32_t));
-        memcpy(c.blob, blob, (size_t)c.words * sizeof(uint32_t));
         g_clouds = g_clouds ? EZ_REALLOC(g_clouds, g_cloud_count + 1, sizeof(Cloud)) : EZ_ALLOC(1, sizeof(Cloud));
         g_clouds[g_cloud_count++] = c;
         loaded++;

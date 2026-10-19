@@ -427,8 +427,8 @@ typedef enum {
     DEBUG_NORMALS = 1,
     DEBUG_BVH = 2,
     DEBUG_BOUNCES = 3,
-    DEBUG_SSS_PATH = 4,
-    DEBUG_SSS_COST = 5
+    DEBUG_SSS_PATH = 4, // which subsurface method the first subsurface event of each pixel used
+    DEBUG_SSS_COST = 5  // BVH nodes visited inside subsurface handling, per pixel
 } DebugConfig;
 
 typedef struct {
@@ -453,8 +453,6 @@ typedef struct {
     BOOL reset;
     BOOL denoise;
     BOOL splatocclusion;
-    BOOL sssplats;
-    BOOL sssexitlight;
     size_t denoiseiterations;
     float denoisecolor;
     float denoisenormal;

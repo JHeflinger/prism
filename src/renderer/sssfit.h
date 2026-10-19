@@ -133,6 +133,10 @@ const uint32_t* SSSFitBlob(const SSSFitter* f, uint32_t* words);
 
 void SSSFitDestroy(SSSFitter* f);
 
+// Debugging / research: held out reference walks (after SSSFIT_DONE) and a model sample from the same entry point.
+uint32_t SSSFitHeldOut(const SSSFitter* f);
+int SSSFitCompare(SSSFitter* f, uint32_t i, float* walk_length, uint32_t* walk_events, float* model_length);
+
 // ---- reference sampler (C mirror of shaders/path.comp) ------------------------------------------------------------
 // Ray caster used by the sampler for the exit point projection: closest hit of the object's own triangles.
 typedef struct {

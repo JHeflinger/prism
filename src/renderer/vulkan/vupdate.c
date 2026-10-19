@@ -583,8 +583,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.denoisenormal = RendererCamera()->config.denoisenormal;
         ubo.denoisedepth = RendererCamera()->config.denoisedepth;
         ubo.splatocclusion = (uint32_t)RendererCamera()->config.splatocclusion;
-        ubo.sssplats = (uint32_t)RendererCamera()->config.sssplats;
-        ubo.sssexitlight = (uint32_t)RendererCamera()->config.sssexitlight;
+        ubo.sssplats = (uint32_t)SubsurfaceSettingsRef()->enabled;
+        ubo.sssexitlight = (uint32_t)SubsurfaceSettingsRef()->exitlight;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

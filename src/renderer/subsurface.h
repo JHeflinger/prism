@@ -18,20 +18,28 @@ typedef enum {
 } SubsurfaceTrainPhase;
 
 typedef struct {
+    BOOL enabled;      // use trained clouds in the path tracer (FALSE = always random walk, for A/B comparisons)
+    BOOL exitlight;    // next event estimation at the exit point of a cloud sampled path
+} SubsurfaceSettings;
+
+typedef struct {
     BOOL linked;
     BOOL enabled;
+    uint32_t channels;       // 1, or 3 for per channel clouds (coloured scattering)
     uint32_t triangles;
     uint32_t surface_gaussians;
     uint32_t lobes;
     uint32_t internal_gaussians;
     uint32_t bytes;
-    float sigma;       // world space free flight density it was trained for
+    float sigma;       // world space free flight density it was trained for (red channel for per channel clouds)
     float anisotropy;
     float scale;       // object scale it was trained at
     MaterialID material;
     BOOL stale;        // the object or its material changed in a way the cloud does not account for
     char reason[128];
 } SubsurfaceCloudInfo;
+
+SubsurfaceSettings* SubsurfaceSettingsRef();
 
 SSSFitConfig SubsurfaceDefaultConfig();
 

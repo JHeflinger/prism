@@ -29,7 +29,8 @@ static inline size_t sss_atleast1(size_t n) { return n ? n : 1; }
 #define SSS_DMIN_FRACTION 0.01f   // chords shorter than this (in mean free paths) are evaluated as a point
 #define SSS_GAUSS_CUTOFF 9.0f
 #define SSS_PROJECTION_TRIES 3
-#define SSS_Q 7     // squared mahalanobis support of an internal gaussian (3 sigma)
+#define SSS_Q 7
+#define SSS_MAX_EXCESS_MFP 2000.0f // cap on the sampled extra path length (log normal tails are unbounded)     // squared mahalanobis support of an internal gaussian (3 sigma)
 
 // ================================================================================================================
 // small helpers
@@ -682,6 +683,22 @@ void SSSFitDestroy(SSSFitter* f) {
 SSSFitPhase SSSFitPhaseNow(const SSSFitter* f) { return f ? f->phase : SSSFIT_FAILED; }
 const char* SSSFitStatus(const SSSFitter* f) { return f ? f->status : "No fitter"; }
 const SSSFitStats* SSSFitGetStats(const SSSFitter* f) { return f ? &f->stats : NULL; }
+
+uint32_t SSSFitHeldOut(const SSSFitter* f) {
+    return f && f->phase == SSSFIT_DONE ? f->nrec - f->holdout : 0;
+}
+
+int SSSFitCompare(SSSFitter* f, uint32_t i, float* walk_length, uint32_t* walk_events, float* model_length) {
+    if (!f || f->phase != SSSFIT_DONE || f->holdout + i >= f->nrec) return 0;
+    const WalkRec* w = &f->rec[f->holdout + i];
+    SSSCaster cs = { caster_trace, &f->bvh, f->pos, f->idx };
+    SSSSample smp;
+    sssfit_sample(f->blob, &cs, w->in, w->tin, rng_cb, &f->rng, &smp);
+    *walk_length = w->length;
+    *walk_events = w->events;
+    *model_length = smp.length;
+    return 1;
+}
 
 const uint32_t* SSSFitBlob(const SSSFitter* f, uint32_t* words) {
     if (!f || f->phase != SSSFIT_DONE) { if (words) *words = 0; return NULL; }
@@ -1955,7 +1972,7 @@ void sssfit_sample(const uint32_t* blob, const SSSCaster* cs, const float* p, ui
     float d3[3];
     sub3(x, p, d3);
     float D = len3(d3);
-    float excess = fmaxf(expf(fminf(zz, 80.0f)) - u2f(blob[SSSG_H_EPS]), 0.0f);
+    float excess = fmaxf(expf(fminf(zz, logf(SSS_MAX_EXCESS_MFP * mfp))) - u2f(blob[SSSG_H_EPS]), 0.0f);
     // 5. exit direction from the surface gaussian under the exit point
     float n[3];
     blob_tri_normal(blob, cs, xt, n);
