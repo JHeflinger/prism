@@ -1,5 +1,6 @@
 #include "vclean.h"
 #include "renderer/vulkan/vutils.h"
+#include "renderer/subsurface.h"
 
 static Renderer* g_vclean_renderer_ref = NULL;
 
@@ -81,6 +82,11 @@ void VCLEAN_Materials(VulkanDataBuffer* materials) {
     VUTIL_DestroyBuffer(*materials);
 }
 
+void VCLEAN_Subsurface(ShaderBuffer* buffer) {
+    if (buffer->vbuffersize != 0) VUTIL_DestroyBuffer(buffer->vbuffer);
+    buffer->vbuffersize = 0;
+}
+
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_BVH(&(geometry->bvh));
     VCLEAN_Normals(&(geometry->normals));
@@ -95,6 +101,7 @@ void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Simulation(&(geometry->fluid));
     VCLEAN_Poses(&(geometry->poses));
     VCLEAN_Skins(&(geometry->skins));
+    VCLEAN_Subsurface(SubsurfaceBuffer());
 }
 
 void VCLEAN_Metadata(VulkanMetadata* metadata) {

@@ -3,6 +3,7 @@
 #include <easyobjects.h>
 #include <easybasics.h>
 #include <util/logger.h>
+#include "renderer/subsurface.h"
 
 static char* last_relevant_word(char* str, int len) {
 	for (int i = len - 1; i >= 0; i--) {
@@ -480,6 +481,21 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 					&(renderer->geometry.lights.size)
 				}, 0.0f,
 				sizeof(SceneLight)
+			}
+		};
+	} else if (strcmp(name, "SubsurfaceSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(SubsurfaceBuffer()->vbuffer.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(SubsurfaceBuffer()->vbuffersize)
+				}, 0.0f,
+				sizeof(char)
 			}
 		};
 	} else if (strcmp(name, "OverlaySSBO") == 0) {

@@ -183,6 +183,8 @@ export UniformBufferObjectDef {
         float denoisenormal;
         float denoisedepth;
         uint splatocclusion;
+        uint sssplats;
+        uint sssexitlight;
     }
 }
 
@@ -444,6 +446,12 @@ export TransformsSSBODef {
 export PoseSSBODef {
     buffer PoseSSBOIn {
         mat4 poseIn[ ];
+    }
+}
+
+export SubsurfaceSSBODef {
+    buffer SubsurfaceSSBOIn {
+        uint sssIn[ ];
     }
 }
 

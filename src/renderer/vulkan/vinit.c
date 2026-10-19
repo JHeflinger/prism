@@ -2,6 +2,7 @@
 #include "renderer/vulkan/vutils.h"
 #include "renderer/vulkan/vupdate.h"
 #include "renderer/vulkan/vshaders.h"
+#include "renderer/subsurface.h"
 #include <GLFW/glfw3.h>
 #include <util/logger.h>
 
@@ -153,6 +154,12 @@ BOOL VINIT_Lights(VulkanDataBuffer* lights) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         lights);
     VUPDT_Lights(lights);
+    return TRUE;
+}
+
+BOOL VINIT_Subsurface(ShaderBuffer* buffer) {
+    buffer->vbuffersize = 0;
+    VUPDT_Subsurface(buffer);
     return TRUE;
 }
 
@@ -945,6 +952,7 @@ BOOL VINIT_Geometry(VulkanGeometry* geometry) {
 	if (!VINIT_Transforms(&(geometry->transforms))) return FALSE;
 	if (!VINIT_Poses(&(geometry->poses))) return FALSE;
 	if (!VINIT_Skins(&(geometry->skins))) return FALSE;
+	if (!VINIT_Subsurface(SubsurfaceBuffer())) return FALSE;
     return TRUE;
 }
 

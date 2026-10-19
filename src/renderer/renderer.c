@@ -8,6 +8,7 @@
 #include "renderer/simulator.h"
 #include "renderer/overlay.h"
 #include "renderer/trainer.h"
+#include "renderer/subsurface.h"
 #include "renderer/rmath.h"
 #include "ui/panels/edit.h"
 #include <core/config.h>
@@ -882,6 +883,12 @@ void Render() {
             g_renderer.ebuffers.data[i].update = FALSE;
             VUPDT_ExternalBuffer(&(g_renderer.ebuffers.data[i]));
         }
+    }
+
+    // subsurface clouds (rare, synchronous upload; the buffer may be reallocated so every descriptor set is rewritten)
+    if (SubsurfaceBuffer()->update) {
+        VUPDT_Subsurface(SubsurfaceBuffer());
+        VUPDT_DescriptorSetsAll(g_renderer.vulkan.core.context.renderdata.descriptors);
     }
 
     // animations
@@ -1900,6 +1907,7 @@ void ClearScene(BOOL hard) {
     ClearAnimations();
     ClearSimulation();
     ClearSplats();
+    SubsurfaceClear();
     DeselectEditTarget();
     if (hard) ClearCameras();
 }
@@ -2254,6 +2262,7 @@ BOOL DeleteMesh(size_t id) {
     if (GetEditTarget(&type, &index) && (type == EDIT_SINGLE_TRIANGLE || type == EDIT_SINGLE_VERTEX))
         DeselectEditTarget();
     FixDeleteEditTarget(EDIT_MESH, id);
+    SubsurfaceMeshDeleted(id);
     UpdateNormals();
     UpdateVertices();
     UpdateTriangles();

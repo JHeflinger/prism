@@ -2,6 +2,7 @@
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
+#include "renderer/subsurface.h"
 #include "ui/shared.h"
 #include <ui/extra.h>
 #include <util/logger.h>
@@ -85,6 +86,72 @@ static void DrawEditLight(SceneLight* lref, char* name, float width, float heigh
     if (edited) UpdateLights();
 }
 
+static void DrawSubsurfaceSection(size_t mesh, float width) {
+    static BOOL s_init = FALSE;
+    static size_t s_surface = 0, s_internal = 0, s_walks = 0, s_lobes = 0;
+    if (!s_init) {
+        SSSFitConfig d = SubsurfaceDefaultConfig();
+        s_surface = d.surface_gaussians;
+        s_internal = d.internal_gaussians;
+        s_walks = d.walks;
+        s_lobes = d.lobes;
+        s_init = TRUE;
+    }
+    float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
+    UIMoveCursor(0, 25);
+    UIDrawText("Subsurface Splats");
+    UIDivider(width - 20);
+    UIMoveCursor(0, 5);
+    SubsurfaceCloudInfo info;
+    BOOL linked = SubsurfaceCloudInfoFor(mesh, &info);
+    if (linked) {
+        UIDrawTextWrapped(width - 20, "Linked cloud: %u surface gaussians (%u lobes), %u internal gaussians, %.0f KB",
+            info.surface_gaussians, info.lobes, info.internal_gaussians, info.bytes / 1024.0f);
+        if (info.stale) UIDrawTextWrapped(width - 20, "Out of date: %s", info.reason);
+        UIColumnHeader("Use Cloud", LEFT_COLUMN_WIDTH);
+        BOOL enabled = info.enabled;
+        if (UICheckbox(&enabled)) SubsurfaceSetCloudEnabled(mesh, enabled);
+    } else {
+        UIDrawTextWrapped(width - 20, "No cloud linked, subsurface scattering uses the random walk");
+    }
+    SubsurfaceTrainPhase phase = SubsurfaceTrainPhaseNow();
+    BOOL training = phase == SUBSURFACE_TRAINING;
+    BOOL ours = training && SubsurfaceTrainMesh() == mesh;
+    UIMoveCursor(0, 10);
+    if (training) DisableUI();
+    UIColumnHeader("Surface Gaussians", LEFT_COLUMN_WIDTH);
+    UIDragSize(&s_surface, 16, 65536, 8, sboxwidth);
+    UIColumnHeader("Exit Lobes", LEFT_COLUMN_WIDTH);
+    UIDragSize(&s_lobes, 1, 8, 1, sboxwidth);
+    UIColumnHeader("Internal Gaussians", LEFT_COLUMN_WIDTH);
+    UIDragSize(&s_internal, 16, 262144, 16, sboxwidth);
+    UIColumnHeader("Reference Walks", LEFT_COLUMN_WIDTH);
+    UIDragSize(&s_walks, 10000, 20000000, 10000, sboxwidth);
+    UIMoveCursor(0, 5);
+    if (UIButton(linked ? "Retrain Subsurface Splats" : "Train Subsurface Splats", width - 20)) {
+        SSSFitConfig cfg = SubsurfaceDefaultConfig();
+        cfg.surface_gaussians = (uint32_t)s_surface;
+        cfg.lobes = (uint32_t)s_lobes;
+        cfg.internal_gaussians = (uint32_t)s_internal;
+        cfg.walks = (uint32_t)s_walks;
+        SubsurfaceTrainStart(mesh, &cfg);
+    }
+    EnableUI();
+    if (ours) {
+        if (UIButton("Cancel", width - 20)) SubsurfaceTrainCancel();
+        UIDrawTextWrapped(width - 20, "%s (%.0f%%)", SubsurfaceTrainStatus(), 100.0f * SubsurfaceTrainProgress());
+    } else if (training) {
+        UIDrawTextWrapped(width - 20, "Another object is being trained");
+    } else if (phase == SUBSURFACE_DONE || phase == SUBSURFACE_FAILED) {
+        UIDrawTextWrapped(width - 20, "%s", SubsurfaceTrainStatus());
+    }
+    if (linked) {
+        UIMoveCursor(0, 5);
+        if (UIButton("Preview Internal Cloud", width - 20)) SubsurfacePreviewCloud(mesh);
+        if (UIButton("Remove Cloud", width - 20)) SubsurfaceRemoveCloud(mesh);
+    }
+}
+
 static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float height) {
     BOOL edited = FALSE;
     UIMoveCursor((width - 20 - UITextWidth("Edit Object")) / 2.0f, 0);
@@ -123,6 +190,7 @@ static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float heig
     edited |= disabled != (md->disabled != 0);
     md->disabled = disabled;
     if (edited) UpdateObjectTransform(g_edit_item_index);
+    if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) DrawSubsurfaceSection(g_edit_item_index, width);
 }
 
 static void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
@@ -173,6 +241,10 @@ static void DrawEditCamera(SceneCamera* cref, char* name, float width, float hei
     UICheckbox(&(cref->config.scenelightshadows));
     UIColumnHeader("Spectral Coloring", LEFT_COLUMN_WIDTH);
     UICheckbox(&(cref->config.spectral));
+    UIColumnHeader("Subsurface Splats", LEFT_COLUMN_WIDTH);
+    if (UICheckbox(&(SubsurfaceSettingsRef()->enabled))) cref->config.reset = TRUE;
+    UIColumnHeader("SSS Exit Lighting", LEFT_COLUMN_WIDTH);
+    if (UICheckbox(&(SubsurfaceSettingsRef()->exitlight))) cref->config.reset = TRUE;
 
     UIMoveCursor(0, 15);
     float sboxwidth = width - 20 - 160;

@@ -15,6 +15,8 @@ void VCLEAN_Poses(VulkanDataBuffer* poses);
 
 void VCLEAN_Lights(VulkanDataBuffer* lights);
 
+void VCLEAN_Subsurface(ShaderBuffer* buffer);
+
 void VCLEAN_BVH(VulkanBVH* bvh);
 
 void VCLEAN_Simulation(VulkanFluidSimulation* vfs);

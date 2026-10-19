@@ -6,6 +6,7 @@
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
+#include "renderer/subsurface.h"
 
 #define TRANSFER_ACQUIRE_VERTICES   (1 << 0)
 #define TRANSFER_ACQUIRE_NORMALS    (1 << 1)
@@ -53,6 +54,26 @@ void VUPDT_ExternalBuffer(ShaderBuffer* ebuffer) {
             ebuffer->size, ebuffer->size,
             ebuffer->vbuffer.buffer);
     }
+}
+
+// Uploads the packed subsurface clouds (synchronous, they only change when a cloud is trained or removed). The buffer
+// is never smaller than 16 zeroed bytes so the shader always reads a valid (possibly empty) object count.
+void VUPDT_Subsurface(ShaderBuffer* sb) {
+    static uint32_t empty[4] = { 0, 0, 0, 0 };
+    vkDeviceWaitIdle(g_vupdt_renderer_ref->vulkan.core.general.interface);
+    BOOL has = sb->data != NULL && sb->size >= sizeof(empty);
+    size_t bytes = has ? sb->size : sizeof(empty);
+    if (sb->vbuffersize != bytes) {
+        if (sb->vbuffersize != 0) VUTIL_DestroyBuffer(sb->vbuffer);
+        VUTIL_CreateBuffer(
+            bytes,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &(sb->vbuffer));
+        sb->vbuffersize = bytes;
+    }
+    VUTIL_CopyHostToBuffer(has ? sb->data : (void*)empty, bytes, bytes, sb->vbuffer.buffer);
+    sb->update = FALSE;
 }
 
 void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
@@ -561,6 +582,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.denoisenormal = RendererCamera()->config.denoisenormal;
         ubo.denoisedepth = RendererCamera()->config.denoisedepth;
         ubo.splatocclusion = (uint32_t)RendererCamera()->config.splatocclusion;
+        ubo.sssplats = (uint32_t)SubsurfaceSettingsRef()->enabled;
+        ubo.sssexitlight = (uint32_t)SubsurfaceSettingsRef()->exitlight;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

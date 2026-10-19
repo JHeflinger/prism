@@ -83,6 +83,8 @@ typedef struct {
     alignas(4) float denoisenormal;
     alignas(4) float denoisedepth;
     alignas(4) uint32_t splatocclusion;
+    alignas(4) uint32_t sssplats;
+    alignas(4) uint32_t sssexitlight;
 } UniformBufferObject;
 
 typedef struct {

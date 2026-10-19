@@ -1,6 +1,7 @@
 #include "loader.h"
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
+#include "renderer/subsurface.h"
 #include "data/defaults.h"
 #include <assimp/postprocess.h>
 #include <assimp/material.h>
@@ -1594,6 +1595,9 @@ BOOL LoadPRISM(const char* filepath) {
     UpdateSkins();
     UpdatePoses();
     UpdateSplats();
+    char ssspath[1024];
+    snprintf(ssspath, sizeof(ssspath), "%s.sss", filepath);
+    if (ez_file_exists(ssspath)) SubsurfaceLoad(ssspath);
     loginfo("Successfully loaded prism session from \"%s\"", filepath);
     return TRUE;
 }
@@ -1620,6 +1624,9 @@ BOOL SavePRISM(const char* filepath) {
         logerror("Failed while writing PRISM file \"%s\"", filepath);
         return FALSE;
     }
+    char ssspath[1024];
+    snprintf(ssspath, sizeof(ssspath), "%s.sss", filepath);
+    SubsurfaceSave(ssspath);
     loginfo("Saved session to \"%s\"", filepath);
     return TRUE;
 }
