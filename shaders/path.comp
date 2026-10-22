@@ -425,7 +425,6 @@ vec3 sample_henyey_greenstein(vec3 outgoing, float g) {
     return onb(outgoing, local);
 }
 
-// true when the rgb extinctions differ enough to need per channel transport (matches SSS_SPECTRAL_SPREAD in subsurface.c)
 bool sss_spectral(vec3 sigma_t) {
     float hi = max(sigma_t.r, max(sigma_t.g, sigma_t.b));
     float lo = min(sigma_t.r, min(sigma_t.g, sigma_t.b));
