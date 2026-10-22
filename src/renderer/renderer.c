@@ -597,9 +597,11 @@ SceneCamera DefaultCamera() {
     sc.config.flags = PREVIEW_PIPELINE_FLAGS;
     sc.config.arap.iterations = 10;
     sc.config.arap.style = 0;
+
     sc.config.arap.cube_lambda = 0.5f;
     sc.config.arap.cube_rho = 1e-4f;
     sc.config.arap.addm = 5;
+    sc.config.resolution = (Vector2){ 1600, 900 };
     sc.core = (SimpleCamera){
         { 0.0f, 2.133f, 2.11f },
         { 0.0f, 0.0f, 0.0f },
@@ -866,6 +868,12 @@ void ClearCameras() {
 }
 
 void Render() {
+    // resize resolution if needed
+    Vector2 targetres = RendererCamera()->config.resolution;
+    if (g_renderer.dimensions.x != targetres.x || g_renderer.dimensions.y != targetres.y) {
+        ResizeRenderer(targetres.x, targetres.y);
+    }
+
     static BOOL async_update = TRUE;
     static size_t dupdate_queue = 0;
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;

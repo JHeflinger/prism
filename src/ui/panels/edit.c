@@ -316,6 +316,12 @@ static void DrawEditCamera(SceneCamera* cref, char* name, float width, float hei
     }
 	if (memcmp(&c, &oldc, sizeof(SimpleCamera))) cref->core = c;
     cref->config.showdof = used;
+    UIColumnHeader("Resolution", LEFT_COLUMN_WIDTH);
+    size_t w = cref->config.resolution.x;
+    size_t h = cref->config.resolution.y;
+    UIDoublet("wh", UI_SIZES, &w, &h, (UIMultiValue){ ._size = 10 }, (UIMultiValue){ ._size = 8000 }, (UIMultiValue){ ._size = 1 }, (UIMultiValue){ ._size = 900 }, width - LEFT_COLUMN_WIDTH - 10);
+    cref->config.resolution.x = w;
+    cref->config.resolution.y = h;
 }
 
 static void DrawEditPanel(float width, float height) {

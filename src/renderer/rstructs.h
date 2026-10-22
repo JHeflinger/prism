@@ -460,6 +460,7 @@ typedef struct {
     DebugConfig debug;
     PipelineFlags flags;
     ARAPConfig arap;
+    Vector2 resolution;
 } RendererConfig;
 
 typedef struct {
