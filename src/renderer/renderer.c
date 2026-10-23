@@ -1178,7 +1178,7 @@ void Render() {
     } else {
         async_update = FALSE;
     }
-    
+
     // resize resolution if needed
     Vector2 targetres = RendererCamera()->config.resolution;
     if (g_renderer.dimensions.x != targetres.x || g_renderer.dimensions.y != targetres.y) {
