@@ -868,12 +868,6 @@ void ClearCameras() {
 }
 
 void Render() {
-    // resize resolution if needed
-    Vector2 targetres = RendererCamera()->config.resolution;
-    if (g_renderer.dimensions.x != targetres.x || g_renderer.dimensions.y != targetres.y) {
-        ResizeRenderer(targetres.x, targetres.y);
-    }
-
     static BOOL async_update = TRUE;
     static size_t dupdate_queue = 0;
 	size_t new_ind = (g_renderer.swapchain.index + 1) % CPUSWAP_LENGTH;
@@ -1183,6 +1177,12 @@ void Render() {
         ez_end_profile(&(g_renderer.stats.profile));
     } else {
         async_update = FALSE;
+    }
+    
+    // resize resolution if needed
+    Vector2 targetres = RendererCamera()->config.resolution;
+    if (g_renderer.dimensions.x != targetres.x || g_renderer.dimensions.y != targetres.y) {
+        ResizeRenderer(targetres.x, targetres.y);
     }
 
     #undef TRANSFER_UPDATE

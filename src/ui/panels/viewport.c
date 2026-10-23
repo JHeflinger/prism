@@ -469,6 +469,14 @@ static void UpdateViewportPanel(float width, float height) {
                     DeselectEditTarget();
                 }
                 break;
+            case CAMERA_SELECT_MODE:
+                size_t cindex = HoveredCamera();
+                if (cindex != (size_t)-1) {
+                    SetEditCamera(cindex);
+                } else {
+                    DeselectEditTarget();
+                }
+                break;
             case OBJECT_SELECT_MODE:
                 size_t oindex = HoveredObject();
                 if (oindex != (size_t)-1) {

@@ -31,6 +31,10 @@ static void SelectObjectMode() {
     g_overlay_mode = OBJECT_SELECT_MODE;
 }
 
+static void SelectCameraMode() {
+    g_overlay_mode = CAMERA_SELECT_MODE;
+}
+
 void SetOverlayContext(Renderer* renderer) {
     g_overlay_renderer_ref = renderer;
     AddBind("no select mode", SelectNoneMode,
@@ -48,6 +52,9 @@ void SetOverlayContext(Renderer* renderer) {
     AddBind("object select mode", SelectObjectMode,
         (BindCommand){ IK_SELECT, BIND_KEY_DOWN },
         (BindCommand){ IK_SELECT_OBJECT, BIND_KEY_PRESSED });
+    AddBind("camera select mode", SelectCameraMode,
+        (BindCommand){ IK_SELECT, BIND_KEY_DOWN },
+        (BindCommand){ IK_SELECT_CAMERA, BIND_KEY_PRESSED });
 }
 
 void SetViewportRec(Rectangle rec) {
@@ -124,5 +131,19 @@ size_t GetSelectedObject() {
     EditType type;
     size_t index;
     if (GetEditTarget(&type, &index) && type == EDIT_MESH && index < NumMeshes()) return index;
+    return (size_t)-1;
+}
+
+size_t HoveredCamera() {
+    if (g_overlay_mode != CAMERA_SELECT_MODE) return (size_t)-1;
+    uint32_t cid = g_exposed_overlay_ssbo.hovered_tid;
+    if (cid == (uint32_t)-1 || cid >= NumCameras() || cid >= MAX_CAMERA_GLYPHS || cid == PrimaryCameraID()) return (size_t)-1;
+    return (size_t)cid;
+}
+
+size_t GetSelectedCamera() {
+    EditType type;
+    size_t index;
+    if (GetEditTarget(&type, &index) && type == EDIT_CAMERA && index < NumCameras()) return index;
     return (size_t)-1;
 }

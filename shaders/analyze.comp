@@ -73,6 +73,12 @@ void main() {
             hovered_tid = uint(-1);
             if (tid != uint(-1) && tid >= o_ubo.light_base && tid - o_ubo.light_base < o_ubo.light_count)
                 hovered_tid = tid - o_ubo.light_base;
+        } else if (o_ubo.mode == CAMERA_SELECT) {
+            uint tid = raygenIn[gl_GlobalInvocationID.x].tid;
+            hovered_tid = uint(-1);
+            if (tid != uint(-1) && tid >= o_ubo.camera_base && tid - o_ubo.camera_base < o_ubo.camera_count &&
+                tid - o_ubo.camera_base != o_ubo.primary_cid)
+                hovered_tid = tid - o_ubo.camera_base;
         } else if (o_ubo.mode == OBJECT_SELECT) {
             uint tid = raygenIn[gl_GlobalInvocationID.x].tid;
             hovered_tid = tid < o_ubo.light_base ? tid : uint(-1);

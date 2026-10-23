@@ -603,6 +603,32 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.light_base = (uint32_t)(g_vupdt_renderer_ref->geometry.triangles.size + g_vupdt_renderer_ref->geometry.splats.size);
         ubo.light_count = (uint32_t)g_vupdt_renderer_ref->geometry.lights.size;
         ubo.single_selected_lid = GetSelectedLight() < g_vupdt_renderer_ref->geometry.lights.size ? GetSelectedLight() : (uint32_t)-1;
+        ubo.camera_base = ubo.light_base + ubo.light_count;
+        ubo.primary_cid = (uint32_t)PrimaryCameraID();
+        size_t selected_camera = GetSelectedCamera();
+        ubo.single_selected_cid = selected_camera < MAX_CAMERA_GLYPHS ? (uint32_t)selected_camera : (uint32_t)-1;
+        if (ubo.mode == CAMERA_SELECT_MODE) {
+            size_t ncams = NumCameras();
+            if (ncams > MAX_CAMERA_GLYPHS) ncams = MAX_CAMERA_GLYPHS;
+            ubo.camera_count = (uint32_t)ncams;
+            for (size_t i = 0; i < ncams; i++) {
+                SceneCamera* cam = GetCamera(i);
+                vec3 u, v, w;
+                CameraUVW(cam->core, u, v, w);
+                float halffov = glm_rad(cam->core.fov) * 0.5f;
+                if (halffov < 0.05f) halffov = 0.05f;
+                if (halffov > 1.31f) halffov = 1.31f;
+                float aspect = cam->config.resolution.y > 0.0f ? cam->config.resolution.x / cam->config.resolution.y : 1.0f;
+                vec4 glyph[4];
+                glm_vec4(cam->core.position, tanf(halffov), glyph[0]);
+                glm_vec4(u, aspect, glyph[1]);
+                glm_vec4(v, cam->core.ortho ? 1.0f : 0.0f, glyph[2]);
+                glm_vec4(w, 0.0f, glyph[3]);
+                memcpy(&(ubo.camera_glyphs[i * 4]), glyph, sizeof(glyph));
+            }
+        } else {
+            ubo.camera_count = 0;
+        }
         ubo.hovered_tstart = 1;
         ubo.hovered_sstart = 1;
         ubo.selected_tstart = 1;

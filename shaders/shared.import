@@ -11,6 +11,8 @@ export Definitions {
     #define SPLAT_SELECT 3
     #define LIGHT_SELECT 4
     #define OBJECT_SELECT 5
+    #define CAMERA_SELECT 6
+    #define MAX_CAMERA_GLYPHS 64
     #define EPS 0.000001
     #define DEBUG_NONE 0
     #define DEBUG_NORMALS 1
@@ -135,6 +137,12 @@ export OverlayUniformBufferObjectDef {
         uint selected_tend;
         uint selected_sstart;
         uint selected_send;
+        uint camera_base;
+        uint camera_count;
+        uint primary_cid;
+        uint single_selected_cid;
+        // per camera (indexed by camera id): [0] position + tan(half fov x), [1] u + aspect, [2] v + ortho flag, [3] w
+        vec4 camera_glyphs[MAX_CAMERA_GLYPHS * 4];
     }
 }
 
@@ -593,6 +601,206 @@ export LightGlyphSuite {
         hue = mix(hue, vec3(1.0), 0.35);
         float facing = max(dot(n, -ray.direction), 0.0);
         return hue * (0.35 + 0.65 * facing);
+    }
+}
+
+export CameraGlyphSuite {
+    // Viewport glyphs for the non-primary scene cameras: a small body box sitting behind the lens, a translucent view
+    // frustum with solid edges, and an "up" tick above the far plane. Sizes are in screen pixels so glyphs stay readable
+    // at any zoom. Requires RayDef, ubo (UniformBufferObjectDef) and o_ubo (OverlayUniformBufferObjectDef).
+    const float CAMERA_GLYPH_BODY_W = 7.0;      // body hext extents (px)
+    const float CAMERA_GLYPH_BODY_H = 5.0;
+    const float CAMERA_GLYPH_BODY_D = 8.0;
+    const float CAMERA_GLYPH_FRUSTUM_PX = 42.0; // frustum depth / max far hext width (px)
+    const float CAMERA_GLYPH_EDGE_PX = 1.25;    // hext thickness of frustum edge lines (px)
+    const float CAMERA_GLYPH_ORTHO_HALF = 0.45; // ortho frustum hext height as a fraction of its depth
+    const uint CAMERA_GLYPH_NONE = 0u;
+    const uint CAMERA_GLYPH_SOLID = 1u;         // body, up tick, frustum edges
+    const uint CAMERA_GLYPH_FACE = 2u;          // translucent frustum sides
+
+    struct CameraGlyph {
+        vec3 position;
+        vec3 u;
+        vec3 v;
+        vec3 w;
+        float tanx;
+        float tany;
+        bool ortho;
+        float aspect;
+    };
+
+    CameraGlyph load_camera_glyph(uint i) {
+        CameraGlyph g;
+        vec4 a = o_ubo.camera_glyphs[i * 4u + 0u];
+        vec4 b = o_ubo.camera_glyphs[i * 4u + 1u];
+        vec4 c = o_ubo.camera_glyphs[i * 4u + 2u];
+        vec4 d = o_ubo.camera_glyphs[i * 4u + 3u];
+        g.position = a.xyz;
+        g.u = b.xyz;
+        g.v = c.xyz;
+        g.w = d.xyz;
+        g.aspect = clamp(b.w, 0.25, 4.0);
+        g.tanx = a.w;
+        g.tany = a.w / g.aspect;
+        g.ortho = c.w != 0.0;
+        return g;
+    }
+
+    float camera_glyph_wpp(vec3 point) {
+        if (ubo.ortho != 0u) return ubo.orthosize / ubo.height;
+        float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * (ubo.width / 2.0);
+        float depth = max(dot(point - ubo.position, -ubo.w), EPS);
+        return depth / d;
+    }
+
+    // oriented box slab test; edge is set when the hit lies within an edge band on two axes
+    bool cg_box(Ray ray, vec3 center, vec3 ax, vec3 ay, vec3 az, vec3 hext, float band, float tmax,
+                out float t, out vec3 n, out bool edge) {
+        t = FLTMAX; n = vec3(0); edge = false;
+        vec3 rel = ray.position - center;
+        vec3 o = vec3(dot(rel, ax), dot(rel, ay), dot(rel, az));
+        vec3 d = vec3(dot(ray.direction, ax), dot(ray.direction, ay), dot(ray.direction, az));
+        d = mix(d, mix(vec3(1e-20), vec3(-1e-20), lessThan(d, vec3(0.0))), lessThan(abs(d), vec3(1e-20)));
+        vec3 inv = 1.0 / d;
+        vec3 t0 = (-hext - o) * inv;
+        vec3 t1 = (hext - o) * inv;
+        vec3 tlo = min(t0, t1);
+        vec3 thi = max(t0, t1);
+        float tn = max(max(tlo.x, tlo.y), tlo.z);
+        float tf = min(min(thi.x, thi.y), thi.z);
+        if (tn > tf || tf <= EPS) return false;
+        float tt = tn > EPS ? tn : tf;
+        if (tt >= tmax) return false;
+        t = tt;
+        vec3 lp = o + d * tt;
+        vec3 q = abs(lp / hext);
+        vec3 ln = (q.x > q.y && q.x > q.z) ? vec3(sign(lp.x), 0, 0) : (q.y > q.z ? vec3(0, sign(lp.y), 0) : vec3(0, 0, sign(lp.z)));
+        n = ax * ln.x + ay * ln.y + az * ln.z;
+        vec3 gap = hext - abs(lp);
+        int near_faces = int(gap.x < band) + int(gap.y < band) + int(gap.z < band);
+        edge = near_faces >= 2;
+        return true;
+    }
+
+    // two sided ray / triangle, returns the hit distance or -1
+    float cg_triangle(Ray ray, vec3 a, vec3 b, vec3 c) {
+        vec3 e1 = b - a;
+        vec3 e2 = c - a;
+        vec3 h = cross(ray.direction, e2);
+        float det = dot(e1, h);
+        if (abs(det) < 1e-12) return -1.0;
+        float f = 1.0 / det;
+        vec3 s = ray.position - a;
+        float bu = f * dot(s, h);
+        if (bu < 0.0 || bu > 1.0) return -1.0;
+        vec3 q = cross(s, e1);
+        float bv = f * dot(ray.direction, q);
+        if (bv < 0.0 || bu + bv > 1.0) return -1.0;
+        float t = f * dot(e2, q);
+        return t > EPS ? t : -1.0;
+    }
+
+    float cg_segment_distance(vec3 p, vec3 a, vec3 b) {
+        vec3 ab = b - a;
+        float len2 = dot(ab, ab);
+        float h = len2 > 0.0 ? clamp(dot(p - a, ab) / len2, 0.0, 1.0) : 0.0;
+        return length(p - a - ab * h);
+    }
+
+    // quad (n0, n1, f1, f0); n0 == n1 for a perspective frustum side. Classifies the hit as edge or face.
+    void cg_frustum_side(Ray ray, uint id, vec3 n0, vec3 n1, vec3 f0, vec3 f1, float edgew,
+                         inout float ts, inout uint ids, inout vec3 ns, inout float tf, inout uint idf) {
+        float t = cg_triangle(ray, n0, f0, f1);
+        if (distance(n0, n1) > EPS) {
+            float t2 = cg_triangle(ray, n0, f1, n1);
+            if (t2 > 0.0 && (t < 0.0 || t2 < t)) t = t2;
+        }
+        if (t < 0.0) return;
+        vec3 p = ray.position + ray.direction * t;
+        float wpp = edgew * camera_glyph_wpp(p);
+        float de = min(min(cg_segment_distance(p, n0, f0), cg_segment_distance(p, n1, f1)),
+                       min(cg_segment_distance(p, f0, f1), cg_segment_distance(p, n0, n1)));
+        if (de < wpp) {
+            if (t < ts) { ts = t; ids = id; ns = -ray.direction; }
+        } else if (t < tf) {
+            tf = t; idf = id;
+        }
+    }
+
+    // Traces every non-primary camera glyph. Returns the camera id to report for this pixel (solid parts win over
+    // translucent frustum faces), the nearest solid hit (ts, ns) and the nearest frustum face hit (tf).
+    uint trace_camera_glyphs(Ray ray, out float ts, out vec3 ns, out bool sedge, out float tf, out uint idf) {
+        ts = FLTMAX; tf = FLTMAX;
+        ns = vec3(0, 0, 1);
+        sedge = false;
+        uint ids = uint(-1);
+        idf = uint(-1);
+        uint count = min(o_ubo.camera_count, uint(MAX_CAMERA_GLYPHS));
+        for (uint i = 0; i < count; i++) {
+            if (i == o_ubo.primary_cid) continue;
+            CameraGlyph g = load_camera_glyph(i);
+            float wpp = camera_glyph_wpp(g.position);
+
+            // body box behind the lens
+            vec3 hext = vec3(CAMERA_GLYPH_BODY_W, CAMERA_GLYPH_BODY_H, CAMERA_GLYPH_BODY_D) * wpp;
+            float bt; vec3 bn; bool be;
+            if (cg_box(ray, g.position + g.w * hext.z, g.u, g.v, g.w, hext, CAMERA_GLYPH_EDGE_PX * wpp, ts, bt, bn, be)) {
+                ts = bt; ns = bn; ids = i; sedge = be;
+            }
+
+            // frustum
+            float depth;
+            float hw;
+            float hh;
+            vec3 nc[4];
+            vec3 fc[4];
+            vec2 corners[4] = vec2[4](vec2(-1, -1), vec2(1, -1), vec2(1, 1), vec2(-1, 1));
+            if (g.ortho) {
+                depth = CAMERA_GLYPH_FRUSTUM_PX * wpp;
+                hh = CAMERA_GLYPH_ORTHO_HALF * depth;
+                hw = hh * g.aspect;
+                for (int k = 0; k < 4; k++) {
+                    nc[k] = g.position + g.u * (corners[k].x * hw) + g.v * (corners[k].y * hh);
+                    fc[k] = nc[k] - g.w * depth;
+                }
+            } else {
+                depth = CAMERA_GLYPH_FRUSTUM_PX * wpp / max(1.0, max(g.tanx, g.tany));
+                hw = g.tanx * depth;
+                hh = g.tany * depth;
+                for (int k = 0; k < 4; k++) {
+                    nc[k] = g.position;
+                    fc[k] = g.position - g.w * depth + g.u * (corners[k].x * hw) + g.v * (corners[k].y * hh);
+                }
+            }
+            float scratch_ts = ts;
+            uint scratch_ids = ids;
+            vec3 scratch_ns = ns;
+            for (int k = 0; k < 4; k++) {
+                int j = (k + 1) % 4;
+                cg_frustum_side(ray, i, nc[k], nc[j], fc[k], fc[j], CAMERA_GLYPH_EDGE_PX, scratch_ts, scratch_ids, scratch_ns, tf, idf);
+            }
+            if (scratch_ts < ts) { ts = scratch_ts; ids = scratch_ids; ns = scratch_ns; sedge = true; }
+
+            // up tick above the far plane
+            vec3 farc = g.position - g.w * depth;
+            float tb = 0.55 * min(hw, 2.0 * hh);
+            vec3 tbase = farc + g.v * (hh + 0.12 * hh + 2.0 * wpp);
+            float ut = cg_triangle(ray, tbase - g.u * tb, tbase + g.u * tb, tbase + g.v * (0.8 * tb));
+            if (ut > 0.0 && ut < ts) {
+                ts = ut; ids = i; sedge = false;
+                ns = dot(g.w, ray.direction) > 0.0 ? -g.w : g.w;
+            }
+        }
+        if (dot(ns, ray.direction) > 0.0) ns = -ns;
+        return ids != uint(-1) ? ids : idf;
+    }
+
+    const vec3 CAMERA_GLYPH_COLOR = vec3(0.78, 0.84, 0.95);
+
+    vec3 camera_glyph_solid_color(Ray ray, vec3 n, bool edge) {
+        if (edge) return CAMERA_GLYPH_COLOR;
+        float facing = max(dot(n, -ray.direction), 0.0);
+        return CAMERA_GLYPH_COLOR * (0.3 + 0.55 * facing);
     }
 }
 

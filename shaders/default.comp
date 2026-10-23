@@ -23,6 +23,7 @@ layout(binding = 9) #import OverlayUniformBufferObjectDef o_ubo;
 
 #import CreateSimpleRay
 #import LightGlyphSuite
+#import CameraGlyphSuite
 #import CutViewport
 #import TriangleIntersectSuite
 #import QuatToMat
@@ -172,6 +173,28 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
             color = occluded ? mix(color, glyph, 0.05) : glyph;
             hit_id = o_ubo.light_base + lid;
             hit_distance = light_t;
+        }
+    }
+
+    if (o_ubo.mode == CAMERA_SELECT && o_ubo.camera_count > 1) {
+        float solid_t, face_t;
+        vec3 solid_n;
+        bool solid_edge;
+        uint face_id;
+        uint cid = trace_camera_glyphs(ray, solid_t, solid_n, solid_edge, face_t, face_id);
+        if (cid != uint(-1)) {
+            bool solid = solid_t < FLTMAX;
+            if (solid) {
+                vec3 glyph = camera_glyph_solid_color(ray, solid_n, solid_edge);
+                bool occluded = hit.distance > 0.0 && hit.distance < solid_t;
+                color = occluded ? mix(color, glyph, 0.05) : glyph;
+            }
+            if (face_id != uint(-1) && (!solid || face_t < solid_t)) {
+                bool occluded = hit.distance > 0.0 && hit.distance < face_t;
+                color = mix(color, CAMERA_GLYPH_COLOR, occluded ? 0.03 : 0.12);
+            }
+            hit_id = o_ubo.camera_base + cid;
+            hit_distance = solid ? solid_t : face_t;
         }
     }
 
