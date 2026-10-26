@@ -31,6 +31,7 @@ static void InitEditor() {
 	SetTraceLogLevel(LOG_NONE);
     SetConfigFlags((CONFGET(Bool, "default_vsync", TRUE) ? FLAG_VSYNC_HINT : 0) | FLAG_WINDOW_RESIZABLE);
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
+    SetExitKey(KEY_NULL);
     Image icon = LoadImage("assets/images/appico.png");
     SetWindowIcon(icon);
     UnloadImage(icon);
