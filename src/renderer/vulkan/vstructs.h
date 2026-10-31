@@ -4,9 +4,6 @@
 #include "renderer/rstructs.h"
 #include <stddef.h>
 
-// keep in sync with MAX_CAMERA_GLYPHS in shaders/shared.import
-#define MAX_CAMERA_GLYPHS 64
-
 typedef struct {
     VkImage image;
     VkImageView view;
@@ -127,11 +124,9 @@ typedef struct {
     alignas(4) uint32_t camera_count;
     alignas(4) uint32_t primary_cid;
     alignas(4) uint32_t single_selected_cid;
-    // per camera: [0] position + tan(half fov x), [1] u + aspect, [2] v + ortho flag, [3] w (matches shared.import)
-    alignas(16) vec4 camera_glyphs[MAX_CAMERA_GLYPHS * 4];
+    alignas(16) vec4 camera_glyphs[MAX_CAMERA_GLYPHS * 4]; // per camera: [0] position + tan(half fov x), [1] u + aspect, [2] v + ortho flag, [3] w
 } OverlayUniformBufferObject;
-_Static_assert(offsetof(OverlayUniformBufferObject, camera_glyphs) == 96,
-    "OverlayUniformBufferObject must match the std140 layout in shaders/shared.import");
+_Static_assert(offsetof(OverlayUniformBufferObject, camera_glyphs) == 96, "OverlayUniformBufferObject must match the std140 layout in shaders/shared.import");
 
 typedef struct {
 	alignas(4) TriangleID hovered_tid;

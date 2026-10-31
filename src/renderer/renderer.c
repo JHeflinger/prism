@@ -1087,9 +1087,7 @@ void Render() {
         // dispatch transfer commands
         if (is_transferring) VUTIL_EndTransferCommands();
 
-        // subsurface clouds (rare, synchronous upload). This has to come after the geometry buffers above have been
-        // (re)allocated: rewriting every descriptor set while e.g. a freshly loaded session's vertex buffer is still the
-        // 1 byte placeholder would bind it with the new, larger range.
+        // subsurface clouds (rare, synchronous upload)
         if (SubsurfaceBuffer()->update) {
             VUPDT_Subsurface(SubsurfaceBuffer());
             resized_buffers = TRUE;

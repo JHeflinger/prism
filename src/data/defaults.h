@@ -27,6 +27,8 @@
 #define MAX_LIGHT_NAME_SIZE 256
 #define MAX_MESH_NAME_SIZE 256
 
+#define MAX_CAMERA_GLYPHS 64
+
 void DefaultPreload();
 
 void DefaultPostload();

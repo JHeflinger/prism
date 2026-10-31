@@ -177,10 +177,11 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
     }
 
     if (o_ubo.mode == CAMERA_SELECT && o_ubo.camera_count > 1) {
-        float solid_t, face_t;
-        vec3 solid_n;
-        bool solid_edge;
-        uint face_id;
+        float solid_t = 0;
+        float face_t = 0;
+        vec3 solid_n = vec3(0);
+        bool solid_edge = false;
+        uint face_id = 0;
         uint cid = trace_camera_glyphs(ray, solid_t, solid_n, solid_edge, face_t, face_id);
         if (cid != uint(-1)) {
             bool solid = solid_t < FLTMAX;
@@ -202,6 +203,7 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
         float bvhmix = float(bvh_counter) / 100.0;
         color = mix(color, vec3(0, 1, 0), pow(bvhmix, 3.0));
     }
+
 	return color;
 }
 
