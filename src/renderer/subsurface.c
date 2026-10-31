@@ -51,16 +51,7 @@ typedef struct {
 static Cloud* g_clouds = NULL;
 static size_t g_cloud_count = 0;
 static TrainJob g_job = { 0 };
-static SubsurfaceSettings g_settings = { TRUE, TRUE };
-static ShaderBuffer g_buffer = { 0 };
-
-SubsurfaceSettings* SubsurfaceSettingsRef() {
-    return &g_settings;
-}
-
-ShaderBuffer* SubsurfaceBuffer() {
-    return &g_buffer;
-}
+static BOOL g_update_gsss = FALSE;
 
 SSSFitConfig SubsurfaceDefaultConfig() {
     return SSSFitDefaultConfig();
@@ -159,10 +150,8 @@ static void RebuildBuffer() {
     size_t words = SSS_BUFFER_HEADER + SSS_ENTRY_WORDS * g_cloud_count;
     for (size_t i = 0; i < g_cloud_count; i++)
         for (uint32_t k = 0; k < g_clouds[i].channels; k++) words += g_clouds[i].words[k];
-    EZ_FREE(g_buffer.data);
-    g_buffer.data = EZ_ALLOC(words, sizeof(uint32_t));
-    g_buffer.size = words * sizeof(uint32_t);
-    uint32_t* w = (uint32_t*)g_buffer.data;
+    ARRLIST_uint32_t_zero(&(geo->gsss), words);
+    uint32_t* w = (uint32_t*)geo->gsss.data;
     w[0] = (uint32_t)g_cloud_count;
     uint32_t base = (uint32_t)(SSS_BUFFER_HEADER + SSS_ENTRY_WORDS * g_cloud_count);
     for (size_t i = 0; i < g_cloud_count; i++) {
@@ -180,7 +169,7 @@ static void RebuildBuffer() {
         e[5] = c->tstart;
         e[6] = c->channels;
     }
-    g_buffer.update = TRUE;
+    g_update_gsss = TRUE;
     ResetAccumulation();
 }
 
@@ -510,14 +499,9 @@ void SubsurfaceClear() {
     for (size_t i = 0; i < g_cloud_count; i++) FreeCloud(&g_clouds[i]);
     EZ_FREE(g_clouds);
     g_clouds = NULL;
-    BOOL had = g_cloud_count > 0;
     g_cloud_count = 0;
-    if (had || g_buffer.data) {
-        EZ_FREE(g_buffer.data);
-        g_buffer.data = NULL;
-        g_buffer.size = 0;
-        g_buffer.update = TRUE;
-    }
+    ARRLIST_uint32_t_clear(&(RendererGeometry()->gsss));
+    g_update_gsss = TRUE;
 }
 
 void SubsurfaceMeshDeleted(size_t mesh) {
@@ -672,4 +656,12 @@ BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words) {
         loginfo("Restored %zu subsurface cloud%s", loaded, loaded == 1 ? "" : "s");
     }
     return ok;
+}
+
+BOOL SubsurfaceNeedsUpdate() {
+    return g_update_gsss;
+}
+
+void ResolveSubsurfaceUpdate() {
+    g_update_gsss = FALSE;
 }

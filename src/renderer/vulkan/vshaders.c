@@ -488,14 +488,14 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(SubsurfaceBuffer()->vbuffer.buffer)
+				&(renderer->vulkan.core.geometry.gsss.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
 					TRUE,
-					&(SubsurfaceBuffer()->vbuffersize)
+					&(renderer->geometry.gsss.size)
 				}, 0.0f,
-				sizeof(char)
+				sizeof(uint32_t)
 			}
 		};
 	} else if (strcmp(name, "OverlaySSBO") == 0) {

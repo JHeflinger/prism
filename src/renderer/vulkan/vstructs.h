@@ -247,6 +247,7 @@ typedef struct {
     VulkanDataBuffer transforms;
     VulkanDataBuffer poses;
     VulkanDataBuffer skins;
+    VulkanDataBuffer gsss;
 } VulkanGeometry;
 
 typedef struct {

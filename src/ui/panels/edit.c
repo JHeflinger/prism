@@ -243,9 +243,9 @@ static void DrawEditCamera(SceneCamera* cref, char* name, float width, float hei
     UIColumnHeader("Spectral Coloring", LEFT_COLUMN_WIDTH);
     UICheckbox(&(cref->config.spectral));
     UIColumnHeader("Subsurface Splats", LEFT_COLUMN_WIDTH);
-    if (UICheckbox(&(SubsurfaceSettingsRef()->enabled))) cref->config.reset = TRUE;
+    if (UICheckbox(&(cref->config.gsssenabled))) cref->config.reset = TRUE;
     UIColumnHeader("SSS Exit Lighting", LEFT_COLUMN_WIDTH);
-    if (UICheckbox(&(SubsurfaceSettingsRef()->exitlight))) cref->config.reset = TRUE;
+    if (UICheckbox(&(cref->config.exitsss))) cref->config.reset = TRUE;
 
     UIMoveCursor(0, 15);
     float sboxwidth = width - 20 - 160;

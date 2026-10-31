@@ -3379,12 +3379,6 @@ index 0000000..829e286
 +static Cloud* g_clouds = NULL;
 +static size_t g_cloud_count = 0;
 +static TrainJob g_job = { 0 };
-+static SubsurfaceSettings g_settings = { TRUE, TRUE };
-+static ShaderBuffer g_buffer = { 0 };
-+
-+SubsurfaceSettings* SubsurfaceSettingsRef() {
-+    return &g_settings;
-+}
 +
 +ShaderBuffer* SubsurfaceBuffer() {
 +    return &g_buffer;
@@ -4027,11 +4021,6 @@ index 0000000..2564b79
 +} SubsurfaceTrainPhase;
 +
 +typedef struct {
-+    BOOL enabled;      // use trained clouds in the path tracer (FALSE = always random walk, for A/B comparisons)
-+    BOOL exitlight;    // next event estimation at the exit point of a cloud sampled path
-+} SubsurfaceSettings;
-+
-+typedef struct {
 +    BOOL linked;
 +    BOOL enabled;
 +    uint32_t channels;       // 1, or 3 for per channel clouds (coloured scattering)
@@ -4047,8 +4036,6 @@ index 0000000..2564b79
 +    BOOL stale;        // the object or its material changed in a way the cloud does not account for
 +    char reason[128];
 +} SubsurfaceCloudInfo;
-+
-+SubsurfaceSettings* SubsurfaceSettingsRef();
 +
 +SSSFitConfig SubsurfaceDefaultConfig();
 +

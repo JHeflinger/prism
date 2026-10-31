@@ -589,6 +589,8 @@ SceneCamera DefaultCamera() {
     sc.config.normals = TRUE;
     sc.config.reset = FALSE;
     sc.config.denoise = FALSE;
+    sc.config.gsssenabled = TRUE;
+    sc.config.exitsss = TRUE;
     sc.config.denoiseiterations = 4;
     sc.config.denoisecolor = 4.0f;
     sc.config.denoisenormal = 64.0f;
@@ -1088,8 +1090,8 @@ void Render() {
         if (is_transferring) VUTIL_EndTransferCommands();
 
         // subsurface clouds (rare, synchronous upload)
-        if (SubsurfaceBuffer()->update) {
-            VUPDT_Subsurface(SubsurfaceBuffer());
+        if (SubsurfaceNeedsUpdate()) {
+            VUPDT_Subsurface(&(g_renderer.vulkan.core.geometry.gsss));
             resized_buffers = TRUE;
         }
 

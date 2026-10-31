@@ -56,24 +56,20 @@ void VUPDT_ExternalBuffer(ShaderBuffer* ebuffer) {
     }
 }
 
-// Uploads the packed subsurface clouds (synchronous, they only change when a cloud is trained or removed). The buffer
-// is never smaller than 16 zeroed bytes so the shader always reads a valid (possibly empty) object count.
-void VUPDT_Subsurface(ShaderBuffer* sb) {
+void VUPDT_Subsurface(VulkanDataBuffer* sb) {
     static uint32_t empty[4] = { 0, 0, 0, 0 };
+    const size_t gssssize = g_vupdt_renderer_ref->geometry.gsss.size;
     vkDeviceWaitIdle(g_vupdt_renderer_ref->vulkan.core.general.interface);
-    BOOL has = sb->data != NULL && sb->size >= sizeof(empty);
-    size_t bytes = has ? sb->size : sizeof(empty);
-    if (sb->vbuffersize != bytes) {
-        if (sb->vbuffersize != 0) VUTIL_DestroyBuffer(sb->vbuffer);
-        VUTIL_CreateBuffer(
-            bytes,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            &(sb->vbuffer));
-        sb->vbuffersize = bytes;
-    }
-    VUTIL_CopyHostToBuffer(has ? sb->data : (void*)empty, bytes, bytes, sb->vbuffer.buffer);
-    sb->update = FALSE;
+    BOOL has = gssssize >= 4;
+    size_t bytes = has ? gssssize * sizeof(uint32_t) : sizeof(empty);
+    VUTIL_DestroyBuffer(*sb);
+    VUTIL_CreateBuffer(
+        bytes,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        sb);
+    VUTIL_CopyHostToBuffer(has ? g_vupdt_renderer_ref->geometry.gsss.data : (void*)empty, bytes, bytes, sb->buffer);
+    ResolveSubsurfaceUpdate();
 }
 
 void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
@@ -583,8 +579,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.denoisenormal = RendererCamera()->config.denoisenormal;
         ubo.denoisedepth = RendererCamera()->config.denoisedepth;
         ubo.splatocclusion = (uint32_t)RendererCamera()->config.splatocclusion;
-        ubo.sssplats = (uint32_t)SubsurfaceSettingsRef()->enabled;
-        ubo.sssexitlight = (uint32_t)SubsurfaceSettingsRef()->exitlight;
+        ubo.sssplats = (uint32_t)RendererCamera()->config.gsssenabled;
+        ubo.sssexitlight = (uint32_t)RendererCamera()->config.exitsss;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

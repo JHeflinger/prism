@@ -82,9 +82,8 @@ void VCLEAN_Materials(VulkanDataBuffer* materials) {
     VUTIL_DestroyBuffer(*materials);
 }
 
-void VCLEAN_Subsurface(ShaderBuffer* buffer) {
-    if (buffer->vbuffersize != 0) VUTIL_DestroyBuffer(buffer->vbuffer);
-    buffer->vbuffersize = 0;
+void VCLEAN_Subsurface(VulkanDataBuffer* subsurfaces) {
+    VUTIL_DestroyBuffer(*subsurfaces);
 }
 
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
@@ -101,7 +100,7 @@ void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Simulation(&(geometry->fluid));
     VCLEAN_Poses(&(geometry->poses));
     VCLEAN_Skins(&(geometry->skins));
-    VCLEAN_Subsurface(SubsurfaceBuffer());
+    VCLEAN_Subsurface(&(geometry->gsss));
 }
 
 void VCLEAN_Metadata(VulkanMetadata* metadata) {

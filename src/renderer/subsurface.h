@@ -18,11 +18,6 @@ typedef enum {
 } SubsurfaceTrainPhase;
 
 typedef struct {
-    BOOL enabled;      // use trained clouds in the path tracer (FALSE = always random walk, for A/B comparisons)
-    BOOL exitlight;    // next event estimation at the exit point of a cloud sampled path
-} SubsurfaceSettings;
-
-typedef struct {
     BOOL linked;
     BOOL enabled;
     uint32_t channels;       // 1, or 3 for per channel clouds (coloured scattering)
@@ -38,8 +33,6 @@ typedef struct {
     BOOL stale;        // the object or its material changed in a way the cloud does not account for
     char reason[128];
 } SubsurfaceCloudInfo;
-
-SubsurfaceSettings* SubsurfaceSettingsRef();
 
 SSSFitConfig SubsurfaceDefaultConfig();
 
@@ -85,7 +78,8 @@ uint32_t* SubsurfaceSerialize(size_t* words);
 // Replaces every cloud with the serialized ones; call after the session geometry is in place.
 BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words);
 
-// GPU side: packed buffer bound as SubsurfaceSSBOIn
-ShaderBuffer* SubsurfaceBuffer();
+BOOL SubsurfaceNeedsUpdate();
+
+void ResolveSubsurfaceUpdate();
 
 #endif

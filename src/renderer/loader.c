@@ -1045,6 +1045,7 @@ static void PrismReadGeometry(PrismStream* s, Geometry* g) {
     g->meshnames = (ARRLIST_DynamicString){ 0 };
     g->cameras = (ARRLIST_SceneCamera){ 0 };
     g->cameranames = (ARRLIST_DynamicString){ 0 };
+    g->gsss = (ARRLIST_uint32_t){ 0 };
     if (!s->ok) return;
     PRISM_READ_LIST(s, g->vertices);
     PRISM_READ_LIST(s, g->normals);

@@ -7,6 +7,7 @@
 #include "renderer/vulkan/vconfig.h"
 #include <vulkan/vulkan.h>
 #include <easyprofile.h>
+#include <easybasics.h>
 #include <cglm/cglm.h>
 #include <raylib.h>
 
@@ -453,6 +454,8 @@ typedef struct {
     BOOL reset;
     BOOL denoise;
     BOOL splatocclusion;
+    BOOL gsssenabled;
+    BOOL exitsss;
     size_t denoiseiterations;
     float denoisecolor;
     float denoisenormal;
@@ -503,6 +506,7 @@ typedef struct {
     ARRLIST_DynamicString meshnames;
     ARRLIST_SceneCamera cameras;
     ARRLIST_DynamicString cameranames;
+    ARRLIST_uint32_t gsss;
     size_t primarycamera;
     size_t maxprimitives;
     size_t mostprimitives;
