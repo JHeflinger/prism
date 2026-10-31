@@ -73,9 +73,7 @@ static void InitEditor() {
 
 static void UpdateEditor() {
     UpdateUI(g_ui);
-    // Gaussian splat training runs in small time slices so the editor stays interactive
     if (TrainingScenePhaseNow() == TRAINSCENE_CAPTURING || TrainingScenePhaseNow() == TRAINSCENE_TRAINING) TrainingSceneTick(0.03);
-    // subsurface cloud training (CPU) is time sliced the same way
     if (SubsurfaceTrainPhaseNow() == SUBSURFACE_TRAINING) SubsurfaceTrainTick(0.03);
 }
 
