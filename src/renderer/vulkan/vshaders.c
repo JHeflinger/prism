@@ -1,9 +1,8 @@
 #include "vshaders.h"
+#include "renderer/subsurface.h"
 #include <easymemory.h>
 #include <easyobjects.h>
-#include <easybasics.h>
 #include <util/logger.h>
-#include "renderer/subsurface.h"
 
 static char* last_relevant_word(char* str, int len) {
 	for (int i = len - 1; i >= 0; i--) {

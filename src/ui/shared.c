@@ -376,25 +376,25 @@ size_t DropdownSelectLightModel(void* data, size_t index, BOOL cancel) {
     SurfaceMaterial* matref = (SurfaceMaterial*)data;
     if (index == (size_t)-1) {
         switch (matref->model) {
-            case 2: return 0;
-            case 5: return 1;
-            case 7: return 2;
-            case 11: return 3;
+            case LAMBERTIAN_MODEL: return 0;
+            case MIRROR_MODEL: return 1;
+            case DIELECTRIC_MODEL: return 2;
+            case SUBSURFACE_MODEL: return 3;
             default: return 0;
         }
     } else {
         switch (index) {
             case 0:
-                matref->model = 2;
+                matref->model = LAMBERTIAN_MODEL;
                 break;
             case 1:
-                matref->model = 5;
+                matref->model = MIRROR_MODEL;
                 break;
             case 2:
-                matref->model = 7;
+                matref->model = DIELECTRIC_MODEL;
                 break;
             case 3:
-                matref->model = 11;
+                matref->model = SUBSURFACE_MODEL;
                 break;
             default: break;
         }

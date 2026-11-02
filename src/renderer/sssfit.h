@@ -37,16 +37,15 @@
 #define SSSG_NONE 0xFFFFFFFFu
 
 // header words
-enum {
+typedef enum {
     SSSG_H_MAGIC = 0, SSSG_H_VERSION, SSSG_H_TCOUNT, SSSG_H_TABLE,
     SSSG_H_SURF, SSSG_H_NSURF, SSSG_H_LOBE, SSSG_H_NLOBE,
     SSSG_H_GAUSS, SSSG_H_NGAUSS, SSSG_H_NODE, SSSG_H_NNODE,
     SSSG_H_SIGMA, SSSG_H_G, SSSG_H_MFP, SSSG_H_EPS,
     SSSG_H_BG,                      // 7 background coefficients of the path length field (16..22)
     SSSG_H_BGW = SSSG_H_BG + 7, SSSG_H_DMIN, SSSG_H_TSTART, SSSG_H_MATERIAL, SSSG_H_SCALE,
-    SSSG_H_EVK, SSSG_H_EVC,         // calibrated event count model (see SSSFitStats.albedo_*)
-    SSSG_H_WORDS                    // 30, must stay <= SSSG_HEADER_WORDS
-};
+    SSSG_H_WORDS                    // 28, must stay <= SSSG_HEADER_WORDS (28..31 are zero / unused)
+} CloudHeaderMarks;
 // surface gaussian words: 0-2 centre, 3 tangential sigma, 4-6 outward normal, 7 normal sigma,
 //                         8-10 exit direction axis, 11 exit direction exponent, 12 first lobe, 13 lobe count,
 //                         14 training samples (entries), 15 training samples (exits)
@@ -92,10 +91,7 @@ typedef struct {
     uint32_t walks_kept;
     uint32_t walks_lost;       // leaked out of a non watertight mesh or hit the step limit
     double mean_steps;
-    double events_per_length;  // sum (events - 1) / sum (sigma * L), ~1 for the poisson throughput model
-    double albedo_true[3];     // E[a^events] over the walks for a = 0.5, 0.9, 0.99 (exact per walk throughput)
-    double albedo_model[3];    // E[a^(1 + c) exp(-k sigma (1 - a) L)], the calibrated length only model the renderer uses
-    double event_k, event_c;   // calibration of that model
+    double events_per_length;  // sum (scatters) / sum (sigma * L), ~1 when scattering behaves like a poisson process
     // fit
     double nll_initial, nll_final;
     double r2_mean;            // fraction of log excess path length variance explained by the cloud
@@ -104,15 +100,17 @@ typedef struct {
     uint32_t projection_failures;
     double walk_dist_q[4], model_dist_q[4]; // exit distance quantiles 25 / 50 / 75 / 90 %, in mean free paths
     double walk_len_q[4], model_len_q[4];   // path length quantiles, in mean free paths
-    double walk_atten[3], model_atten[3];   // E[exp(-k L)] for k = 0.01, 0.1, 1 times sigma
+    // mean throughput at albedo a = 0.5, 0.9, 0.99 (SSS_TP_ALBEDOS), in the units the renderer uses:
+    //   tp_walk:    a^scatters of the held out walks (what the random walk computes, the ground truth)
+    //   tp_length:  exp(-(1 - a) L) with the walks' own path lengths L in mfp (the length only formula, exact lengths)
+    //   tp_model:   exp(-(1 - a) L) with the cloud's sampled path lengths (what the cloud path computes)
+    double tp_walk[3], tp_length[3], tp_model[3];
     double walk_cos, model_cos;             // mean cosine between exit direction and outward normal
 } SSSFitStats;
 
 typedef struct SSSFitter SSSFitter;
 
 typedef double (*SSSClockFn)(void);
-
-SSSFitConfig SSSFitDefaultConfig();
 
 // Copies the mesh. Returns NULL when the input is unusable (no triangles, sigma <= 0).
 SSSFitter* SSSFitCreate(const SSSFitInput* input, const SSSFitConfig* config);

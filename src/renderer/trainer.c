@@ -67,14 +67,14 @@ typedef struct {
     char status[160];
     char message[160];
     double started_at;
-} TrainingJob;
+} GaussianSplatTrainJob;
 
 typedef struct {
     float x, y, z;
 } CamPt;
 
 static uint32_t g_seed = 1;
-static TrainingJob g_job;
+static GaussianSplatTrainJob g_job;
 static const char* g_kernel_names[] = {
     "preprocess",
     "scan_block",
@@ -788,7 +788,7 @@ static float (*CollectVisibleTriangles(size_t* out_count))[3][3] {
     return out;
 }
 
-static void PlanCameras(TrainingJob* j) {
+static void PlanCameras(GaussianSplatTrainJob* j) {
     const TrainingSceneConfig* c = &j->config;
     j->cameras = EZ_ALLOC(c->views, sizeof(SimpleCamera));
     float fov_h = c->fov * (float)M_PI / 180.0f;
@@ -835,7 +835,7 @@ static void DownscaleRGBA(const uint8_t* src, uint32_t sw, uint32_t sh, uint8_t*
 }
 
 // The exact pinhole the trainer will use for this view (mirrors SetTrainerView).
-static void MakeMaskCamera(const TrainingJob* j, const SimpleCamera* cam, MaskCamera* out) {
+static void MakeMaskCamera(const GaussianSplatTrainJob* j, const SimpleCamera* cam, MaskCamera* out) {
     vec3 u = { 0 }, v = { 0 }, w = { 0 }, forward = { 0 };
     glm_vec3_sub((float*)(cam->look), (float*)(cam->position), forward);
     glm_vec3_normalize(forward);
@@ -847,7 +847,7 @@ static void MakeMaskCamera(const TrainingJob* j, const SimpleCamera* cam, MaskCa
     out->focal = ((float)j->width * 0.5f) / tanf(cam->fov * (float)M_PI / 360.0f);
 }
 
-static void BeginCaptureState(TrainingJob* j) {
+static void BeginCaptureState(GaussianSplatTrainJob* j) {
     SceneCamera* cam = RendererCamera();
     j->saved_camera = *cam;
     j->flags_before = cam->config.flags;
@@ -860,7 +860,7 @@ static void BeginCaptureState(TrainingJob* j) {
     cam->config.debug = DEBUG_NONE;
 }
 
-static void EndCaptureState(TrainingJob* j) {
+static void EndCaptureState(GaussianSplatTrainJob* j) {
     SceneCamera* cam = RendererCamera();
     cam->core = j->saved_camera.core;
     cam->config.flags = j->saved_camera.config.flags;
@@ -909,7 +909,7 @@ static void FlipImage(uint8_t* img, uint32_t w, uint32_t h, int fx, int fy) {
     }
 }
 
-static BOOL CaptureView(TrainingJob* j, uint32_t index) {
+static BOOL CaptureView(GaussianSplatTrainJob* j, uint32_t index) {
     SceneCamera* cam = RendererCamera();
     cam->core.position[0] = j->cameras[index].position[0];
     cam->core.position[1] = j->cameras[index].position[1];
@@ -952,7 +952,7 @@ static BOOL CaptureView(TrainingJob* j, uint32_t index) {
     return SetTrainerView(&j->trainer, index, &j->cameras[index], j->scaled);
 }
 
-static void ReleaseJob(TrainingJob* j) {
+static void ReleaseJob(GaussianSplatTrainJob* j) {
     if (j->trainer_alive) DestroyTrainer(&j->trainer);
     j->trainer_alive = FALSE;
     EZ_FREE(j->cameras); j->cameras = NULL;
@@ -968,7 +968,7 @@ static void ReleaseJob(TrainingJob* j) {
     j->seed_count = 0;
 }
 
-static void FailJob(TrainingJob* j, const char* why) {
+static void FailJob(GaussianSplatTrainJob* j, const char* why) {
     logerror("Gaussian splat training failed: %s", why);
     snprintf(j->status, sizeof(j->status), "Failed: %s", why);
     if (j->captured > 0 || j->phase == TRAINSCENE_CAPTURING) EndCaptureState(j);
@@ -976,7 +976,7 @@ static void FailJob(TrainingJob* j, const char* why) {
     j->phase = TRAINSCENE_FAILED;
 }
 
-static void FinishCapture(TrainingJob* j) {
+static void FinishCapture(GaussianSplatTrainJob* j) {
     EndCaptureState(j);
     // The captured images are premultiplied (background removed), so the trainer renders over black.
     for (int k = 0; k < 3; k++) {
@@ -1023,7 +1023,7 @@ static void FinishCapture(TrainingJob* j) {
     j->seed_count = 0;
 }
 
-static void FinishTraining(TrainingJob* j) {
+static void FinishTraining(GaussianSplatTrainJob* j) {
     uint32_t before = j->trainer.count;
     if (FinalPrune(&j->trainer, 0.02f)) loginfo("Removed %u nearly transparent gaussians", before - j->trainer.count);
     double psnr = 0;
@@ -1410,7 +1410,7 @@ TrainingSceneConfig TrainingSceneDefaultConfig() {
 }
 
 BOOL TrainingSceneStart(const TrainingSceneConfig* config) {
-    TrainingJob* j = &g_job;
+    GaussianSplatTrainJob* j = &g_job;
     if (j->phase == TRAINSCENE_CAPTURING || j->phase == TRAINSCENE_TRAINING) return FALSE;
     ReleaseJob(j);
     memset(j, 0, sizeof(*j));
@@ -1478,7 +1478,7 @@ BOOL TrainingSceneStart(const TrainingSceneConfig* config) {
 }
 
 BOOL TrainingSceneTick(double seconds) {
-    TrainingJob* j = &g_job;
+    GaussianSplatTrainJob* j = &g_job;
     double start = GetTime();
     if (j->phase == TRAINSCENE_CAPTURING) {
         while (j->captured < j->config.views) {
@@ -1506,7 +1506,7 @@ BOOL TrainingSceneTick(double seconds) {
 }
 
 void TrainingSceneCancel() {
-    TrainingJob* j = &g_job;
+    GaussianSplatTrainJob* j = &g_job;
     if (j->phase != TRAINSCENE_CAPTURING && j->phase != TRAINSCENE_TRAINING) return;
     if (j->phase == TRAINSCENE_CAPTURING) EndCaptureState(j);
     ReleaseJob(j);
@@ -1520,7 +1520,7 @@ TrainingScenePhase TrainingScenePhaseNow() {
 }
 
 float TrainingSceneProgress() {
-    const TrainingJob* j = &g_job;
+    const GaussianSplatTrainJob* j = &g_job;
     float cap = j->config.views > 0 ? (float)j->captured / (float)j->config.views : 0.0f;
     float tr = j->trainer_alive && j->trainer.cfg.iterations > 0 ? (float)j->trainer.iteration / (float)j->trainer.cfg.iterations : 0.0f;
     switch (j->phase) {

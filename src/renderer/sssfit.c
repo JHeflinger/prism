@@ -537,8 +537,8 @@ struct SSSFitter {
     SSSFitStats stats;
     Rng rng;
     // mesh
-    float* pos;
-    uint32_t* idx;
+    const float* pos;
+    const uint32_t* idx;
     uint32_t nv, nt;
     float* tn;       // outward unit normal per triangle
     uint8_t* flip;
@@ -574,7 +574,6 @@ struct SSSFitter {
     uint32_t nrec, target, attempts;
     uint32_t holdout;    // records [holdout, nrec) are held out for validation
     double steps_sum, events_sum, length_sum;
-    double poisson_true[3], poisson_model[3];
     float* interior;
     uint32_t ninterior;
     uint64_t interior_seen;
@@ -595,7 +594,6 @@ struct SSSFitter {
     uint32_t nentries, entrycap;
     uint32_t feat_cursor;
     float init_q[SSS_Q];
-    float ev_k, ev_c; // calibrated event count model: E[a^n | L] ~ a^(1 + c) exp(-k sigma (1 - a) L)
     AdamSlot* adam;
     float* grad;
     uint32_t epoch;
@@ -611,19 +609,6 @@ struct SSSFitter {
     uint32_t blob_words;
 };
 
-SSSFitConfig SSSFitDefaultConfig() {
-    SSSFitConfig c = { 0 };
-    c.surface_gaussians = 384;
-    c.internal_gaussians = 1024;
-    c.walks = 300000;
-    c.lobes = 6;
-    c.max_steps = 20000;
-    c.epochs = 250;
-    c.validation = 20000;
-    c.seed = 0x5EED5u;
-    return c;
-}
-
 static void set_status(SSSFitter* f, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -638,6 +623,8 @@ static void fail(SSSFitter* f, const char* why) {
 
 SSSFitter* SSSFitCreate(const SSSFitInput* in, const SSSFitConfig* cfg) {
     if (!in || !cfg || in->triangle_count == 0 || in->vertex_count == 0 || !(in->sigma > 0.0f)) return NULL;
+    if (!in->positions || !in->indices) return NULL;
+    for (size_t i = 0; i < (size_t)in->triangle_count * 3; i++) if (in->indices[i] >= in->vertex_count) return NULL;
     SSSFitter* f = SSS_ALLOC(1, sizeof(SSSFitter));
     f->cfg = *cfg;
     if (f->cfg.surface_gaussians < 4) f->cfg.surface_gaussians = 4;
@@ -648,11 +635,8 @@ SSSFitter* SSSFitCreate(const SSSFitInput* in, const SSSFitConfig* cfg) {
     if (f->cfg.max_steps < 64) f->cfg.max_steps = 64;
     f->nv = in->vertex_count;
     f->nt = in->triangle_count;
-    f->pos = SSS_ALLOC((size_t)f->nv * 3, sizeof(float));
-    f->idx = SSS_ALLOC((size_t)f->nt * 3, sizeof(uint32_t));
-    memcpy(f->pos, in->positions, (size_t)f->nv * 3 * sizeof(float));
-    memcpy(f->idx, in->indices, (size_t)f->nt * 3 * sizeof(uint32_t));
-    for (size_t i = 0; i < (size_t)f->nt * 3; i++) if (f->idx[i] >= f->nv) f->idx[i] = 0;
+    f->pos = in->positions;
+    f->idx = in->indices;
     f->sigma = in->sigma;
     f->g = clampf(in->g, -0.99f, 0.99f);
     f->mfp = 1.0f / in->sigma;
@@ -664,7 +648,7 @@ SSSFitter* SSSFitCreate(const SSSFitInput* in, const SSSFitConfig* cfg) {
 
 void SSSFitDestroy(SSSFitter* f) {
     if (!f) return;
-    SSS_FREE(f->pos); SSS_FREE(f->idx); SSS_FREE(f->tn); SSS_FREE(f->flip); SSS_FREE(f->cdf);
+    SSS_FREE(f->tn); SSS_FREE(f->flip); SSS_FREE(f->cdf);
     tribvh_free(&f->bvh);
     SSS_FREE(f->sc); SSS_FREE(f->snrm); SSS_FREE(f->st); SSS_FREE(f->sn); SSS_FREE(f->table);
     SSS_FREE(f->daxis); SSS_FREE(f->dexp); SSS_FREE(f->lfirst); SSS_FREE(f->lcount); SSS_FREE(f->nin); SSS_FREE(f->nout);
@@ -1016,11 +1000,6 @@ static void phase_walks(SSSFitter* f, double budget, SSSClockFn clock) {
             if (trace_walk(f, &w)) {
                 f->events_sum += (double)(w.events - 1);
                 f->length_sum += (double)f->sigma * w.length;
-                for (int k = 0; k < 3; k++) {
-                    double a = k == 0 ? 0.5 : (k == 1 ? 0.9 : 0.99);
-                    f->poisson_true[k] += pow(a, (double)w.events);
-                    f->poisson_model[k] += a * exp(-(double)f->sigma * (1.0 - a) * w.length);
-                }
                 f->rec[f->nrec++] = w;
             } else {
                 f->stats.walks_lost++;
@@ -1036,10 +1015,6 @@ static void phase_walks(SSSFitter* f, double budget, SSSClockFn clock) {
     f->stats.walks_kept = f->nrec;
     f->stats.mean_steps = f->steps_sum / (double)(f->attempts ? f->attempts : 1);
     f->stats.events_per_length = f->events_sum / fmax(f->length_sum, 1e-9);
-    for (int k = 0; k < 3; k++) {
-        f->stats.albedo_true[k] = f->poisson_true[k] / (double)(f->nrec ? f->nrec : 1);
-        f->stats.albedo_model[k] = f->poisson_model[k] / (double)(f->nrec ? f->nrec : 1);
-    }
     f->holdout = f->nrec - f->nrec / 10;
     f->phase = SSSFIT_LOBES;
     set_status(f, "Fitting exit lobes");
@@ -1172,58 +1147,10 @@ static uint32_t fit_gmm(SSSFitter* f, const float* pts, const float* nrm, uint32
     return used;
 }
 
-// Fits the length only throughput model E[a^n | L] ~ a^(1 + c) exp(-k sigma (1 - a) L) to the walks. With k = 1,
-// c = 0 this is the poisson approximation (scattering events at rate sigma along the path); the calibration absorbs
-// how far real walks deviate from it (short walks scatter more often per unit length than a poisson process).
-static void calibrate_events(SSSFitter* f) {
-    const double as[6] = { 0.3, 0.5, 0.7, 0.85, 0.95, 0.99 };
-    uint32_t n = f->holdout < 6000 ? f->holdout : 6000;
-    double truth[6] = { 0 };
-    for (uint32_t i = 0; i < n; i++) {
-        const WalkRec* w = &f->rec[(uint32_t)(((uint64_t)i * f->holdout) / n)];
-        for (int a = 0; a < 6; a++) truth[a] += pow(as[a], (double)w->events) / n;
-    }
-    double bestk = 1.0, bestc = 0.0, besterr = DBL_MAX;
-    for (int ki = 0; ki <= 60; ki++) {
-        double k = 0.5 + 0.025 * ki;
-        double M[6] = { 0 };
-        for (uint32_t i = 0; i < n; i++) {
-            const WalkRec* w = &f->rec[(uint32_t)(((uint64_t)i * f->holdout) / n)];
-            for (int a = 0; a < 6; a++) M[a] += as[a] * exp(-k * f->sigma * (1.0 - as[a]) * w->length) / n;
-        }
-        double num = 0, den = 0;
-        for (int a = 0; a < 6; a++) {
-            double la = log(as[a]);
-            num += la * (log(truth[a]) - log(M[a]));
-            den += la * la;
-        }
-        double c = fmin(fmax(num / den, -0.9), 3.0);
-        double err = 0;
-        for (int a = 0; a < 6; a++) {
-            double r = log(truth[a]) - (log(M[a]) + c * log(as[a]));
-            err += r * r;
-        }
-        if (err < besterr) { besterr = err; bestk = k; bestc = c; }
-    }
-    f->ev_k = (float)bestk;
-    f->ev_c = (float)bestc;
-    // report the calibrated model on the same three albedos as the walk statistics
-    const double rep[3] = { 0.5, 0.9, 0.99 };
-    for (int a = 0; a < 3; a++) {
-        double m = 0;
-        for (uint32_t i = 0; i < f->holdout; i++)
-            m += pow(rep[a], 1.0 + bestc) * exp(-bestk * f->sigma * (1.0 - rep[a]) * f->rec[i].length);
-        f->stats.albedo_model[a] = m / (f->holdout ? f->holdout : 1);
-    }
-    f->stats.event_k = bestk;
-    f->stats.event_c = bestc;
-}
-
 static void phase_lobes(SSSFitter* f, double budget, SSSClockFn clock) {
     double tstart = clock();
     uint32_t ns = f->ns, ntrain = f->holdout;
     if (!f->lbucket_start) {
-    calibrate_events(f);
     f->nin = SSS_ALLOC(ns, sizeof(uint32_t));
     f->nout = SSS_ALLOC(ns, sizeof(uint32_t));
     for (uint32_t i = 0; i < f->nrec; i++) {
@@ -1777,8 +1704,6 @@ static void pack_blob(SSSFitter* f) {
     b[SSSG_H_EPS] = f2u(SSS_EPS_FRACTION * f->mfp);
     for (int k = 0; k < SSS_Q; k++) b[SSSG_H_BG + k] = f2u(f->bg[k]);
     b[SSSG_H_BGW] = f2u(SSS_BG_WEIGHT);
-    b[SSSG_H_EVK] = f2u(f->ev_k > 0.0f ? f->ev_k : 1.0f);
-    b[SSSG_H_EVC] = f2u(f->ev_c);
     b[SSSG_H_DMIN] = f2u(SSS_DMIN_FRACTION * f->mfp);
     b[SSSG_H_TSTART] = SSSG_NONE;
     b[SSSG_H_MATERIAL] = SSSG_NONE;
@@ -2013,6 +1938,8 @@ static void quantiles(float* v, uint32_t n, double* q) {
     for (int i = 0; i < 4; i++) q[i] = n ? v[(uint32_t)(ps[i] * (n - 1))] : 0.0;
 }
 
+static const double SSS_TP_ALBEDOS[3] = { 0.5, 0.9, 0.99 };
+
 static void phase_validate(SSSFitter* f, double budget, SSSClockFn clock) {
     double start = clock();
     SSSCaster cs = { caster_trace, &f->bvh, f->pos, f->idx };
@@ -2029,10 +1956,13 @@ static void phase_validate(SSSFitter* f, double budget, SSSClockFn clock) {
             f->val_model_d[i] = s.chord / f->mfp;
             f->val_model_l[i] = s.length / f->mfp;
             if (!s.projected) f->stats.projection_failures++;
+            // throughput at a few albedos: the walk's exact weight (albedo per scattering event, w->events counts the
+            // free flights including the final one that leaves) vs exp(-(1 - a) L) with the walk's and the cloud's lengths
             for (int k = 0; k < 3; k++) {
-                double kk = (k == 0 ? 0.01 : (k == 1 ? 0.1 : 1.0));
-                f->stats.walk_atten[k] += exp(-kk * f->val_walk_l[i]);
-                f->stats.model_atten[k] += exp(-kk * f->val_model_l[i]);
+                double a = SSS_TP_ALBEDOS[k];
+                f->stats.tp_walk[k] += pow(a, (double)(w->events - 1));
+                f->stats.tp_length[k] += exp(-(1.0 - a) * f->val_walk_l[i]);
+                f->stats.tp_model[k] += exp(-(1.0 - a) * f->val_model_l[i]);
             }
             f->val_cos_walk += dot3(w->dir, &f->tn[w->tout * 3]);
             f->val_cos_model += dot3(s.dir, s.normal);
@@ -2043,7 +1973,7 @@ static void phase_validate(SSSFitter* f, double budget, SSSClockFn clock) {
     }
     uint32_t n = f->val_count;
     f->stats.validation_samples = n;
-    for (int k = 0; k < 3; k++) { f->stats.walk_atten[k] /= n; f->stats.model_atten[k] /= n; }
+    for (int k = 0; k < 3; k++) { f->stats.tp_walk[k] /= n; f->stats.tp_length[k] /= n; f->stats.tp_model[k] /= n; }
     f->stats.walk_cos = f->val_cos_walk / n;
     f->stats.model_cos = f->val_cos_model / n;
     quantiles(f->val_walk_d, n, f->stats.walk_dist_q);

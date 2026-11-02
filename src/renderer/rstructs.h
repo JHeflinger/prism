@@ -15,6 +15,11 @@
 #include <cholmod.h>
 #endif
 
+#define LAMBERTIAN_MODEL 2
+#define MIRROR_MODEL 5
+#define DIELECTRIC_MODEL 7
+#define SUBSURFACE_MODEL 11
+
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
 typedef uint32_t VertexID;

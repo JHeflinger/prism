@@ -82,8 +82,8 @@ void VCLEAN_Materials(VulkanDataBuffer* materials) {
     VUTIL_DestroyBuffer(*materials);
 }
 
-void VCLEAN_Subsurface(VulkanDataBuffer* subsurfaces) {
-    VUTIL_DestroyBuffer(*subsurfaces);
+void VCLEAN_Subsurface(VulkanDataBuffer* gsss) {
+    VUTIL_DestroyBuffer(*gsss);
 }
 
 void VCLEAN_Geometry(VulkanGeometry* geometry) {

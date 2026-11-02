@@ -56,19 +56,19 @@ void VUPDT_ExternalBuffer(ShaderBuffer* ebuffer) {
     }
 }
 
-void VUPDT_Subsurface(VulkanDataBuffer* sb) {
+void VUPDT_Subsurface(VulkanDataBuffer* gsss) {
     static uint32_t empty[4] = { 0, 0, 0, 0 };
     const size_t gssssize = g_vupdt_renderer_ref->geometry.gsss.size;
     vkDeviceWaitIdle(g_vupdt_renderer_ref->vulkan.core.general.interface);
     BOOL has = gssssize >= 4;
     size_t bytes = has ? gssssize * sizeof(uint32_t) : sizeof(empty);
-    VUTIL_DestroyBuffer(*sb);
+    VUTIL_DestroyBuffer(*gsss);
     VUTIL_CreateBuffer(
         bytes,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        sb);
-    VUTIL_CopyHostToBuffer(has ? g_vupdt_renderer_ref->geometry.gsss.data : (void*)empty, bytes, bytes, sb->buffer);
+        gsss);
+    VUTIL_CopyHostToBuffer(has ? g_vupdt_renderer_ref->geometry.gsss.data : (void*)empty, bytes, bytes, gsss->buffer);
     ResolveSubsurfaceUpdate();
 }
 

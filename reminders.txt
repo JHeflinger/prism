@@ -1,6 +1,6 @@
 clean up sss
 clean up ui for sss and gs training
-make cameras visible like lights are
+add in better more visual status progression
 
 abosrbtion 5.73, 1.94, 5.03
 scattering 25, 20, 40 
@@ -9,3 +9,5 @@ shiny 10
 subsurface 1 
 transport 1 
 ani 0
+
+

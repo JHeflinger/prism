@@ -103,7 +103,7 @@ static void DrawSubsurfaceSection(size_t mesh, float width) {
     UIDivider(width - 20);
     UIMoveCursor(0, 5);
     SubsurfaceCloudInfo info;
-    BOOL linked = SubsurfaceCloudInfoFor(mesh, &info);
+    BOOL linked = QuerySubsurfaceCloudInfo(mesh, &info);
     if (linked) {
         UIDrawTextWrapped(width - 20, "Linked cloud%s: %u surface gaussians (%u lobes), %u internal gaussians, %.0f KB",
             info.channels == 3 ? " (one per colour channel)" : "", info.surface_gaussians, info.lobes, info.internal_gaussians,
