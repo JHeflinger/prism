@@ -90,7 +90,7 @@ static void DrawSubsurfaceSection(size_t mesh, float width) {
     static BOOL s_init = FALSE;
     static size_t s_surface = 0, s_internal = 0, s_walks = 0, s_lobes = 0;
     if (!s_init) {
-        SSSFitConfig d = SubsurfaceDefaultConfig();
+        GSSSConfig d = SubsurfaceDefaultConfig();
         s_surface = d.surface_gaussians;
         s_internal = d.internal_gaussians;
         s_walks = d.walks;
@@ -130,7 +130,7 @@ static void DrawSubsurfaceSection(size_t mesh, float width) {
     UIDragSize(&s_walks, 10000, 20000000, 10000, sboxwidth);
     UIMoveCursor(0, 5);
     if (UIButton(linked ? "Retrain Subsurface Splats" : "Train Subsurface Splats", width - 20)) {
-        SSSFitConfig cfg = SubsurfaceDefaultConfig();
+        GSSSConfig cfg = SubsurfaceDefaultConfig();
         cfg.surface_gaussians = (uint32_t)s_surface;
         cfg.lobes = (uint32_t)s_lobes;
         cfg.internal_gaussians = (uint32_t)s_internal;

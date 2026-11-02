@@ -3,11 +3,15 @@
 
 #include "renderer/rstructs.h"
 
+#define SQRT_2PI 2.50662827463f
+
 #define SETVEC3(v, x, y, z) {v[0] = x; v[1] = y; v[2] = z;}
-#define CLAMP(x, min, max) (x < min ? min : (x > max ? max : x))
+#define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 #define MIN(x, y) (x < y ? x : y)
 #define MAX(x, y) (x > y ? x : y)
 #define INLINEV3(v) { v[0], v[1], v[2] }
+
+typedef struct { uint64_t seed; } LittleRNG;
 
 float TriangleArea(vec3 a, vec3 b, vec3 c);
 
@@ -50,5 +54,15 @@ BOOL PointInQuad(const vec2 p, const vec2 q[4]);
 float Wrap180(float a);
 
 float Luminance(vec3 c);
+
+float U2F(uint32_t u);
+
+uint32_t F2U(float f);
+
+uint32_t RandomU32(LittleRNG* r);
+
+float RandomFloat(LittleRNG* r);
+
+float RandomCallback(void* st);
 
 #endif

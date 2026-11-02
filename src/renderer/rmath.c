@@ -299,3 +299,32 @@ float Wrap180(float a) {
 float Luminance(vec3 c) {
     return 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
 }
+
+inline float U2F(uint32_t u) {
+    float f;
+    memcpy(&f, &u, sizeof(float));
+    return f;
+}
+
+inline uint32_t F2U(float f) {
+    uint32_t u;
+    memcpy(&u, &f, sizeof(uint32_t));
+    return u;
+}
+
+inline uint32_t RandomU32(LittleRNG* r) {
+    // pcg32
+    uint64_t old = r->seed;
+    r->seed = old * 6364136223846793005ull + 1442695040888963407ull;
+    uint32_t xs = (uint32_t)(((old >> 18u) ^ old) >> 27u);
+    uint32_t rot = (uint32_t)(old >> 59u);
+    return (xs >> rot) | (xs << ((32u - rot) & 31u));
+}
+
+inline float RandomFloat(LittleRNG* r) {
+    return (float)(RandomU32(r) >> 8) * (1.0f / 16777216.0f);
+}
+
+float RandomCallback(void* st) {
+    return RandomFloat((LittleRNG*)st);
+}
