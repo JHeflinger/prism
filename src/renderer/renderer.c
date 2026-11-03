@@ -355,6 +355,36 @@ static size_t RemoveFlaggedTriangles(const uint8_t* doomed) {
     return removed;
 }
 
+static void SubmitDefaultMaterial() {
+    SurfaceMaterial dsm = { 0 };
+    #define DSMSETV3(name, default) {\
+    const char* n1 = "default_material_" #name "r"; \
+    dsm.name[0] = CONFGET(Float, n1, default); \
+    const char* n2 = "default_material_" #name "g"; \
+    dsm.name[1] = CONFGET(Float, n2, default); \
+    const char* n3 = "default_material_" #name "b"; \
+    dsm.name[2] = CONFGET(Float, n3, default);}
+    #define DSMSETF(name, default) {\
+    const char* n = "default_material_" #name; \
+    dsm.name = CONFGET(Float, n, default);}
+    DSMSETV3(emission, 0.0f);
+    DSMSETV3(ambient, 1.0f);
+    DSMSETV3(diffuse, 1.0f);
+    DSMSETV3(specular, 0.0f);
+    DSMSETV3(absorbtion, 0.0f);
+    DSMSETV3(dispersion, 0.0f);
+    DSMSETV3(scattering, 0.0f);
+    DSMSETF(anisotropy, 0.0f);
+    DSMSETF(scale, 1.0f);
+    DSMSETF(subsurface, 0.0f);
+    DSMSETF(ior, 0.0f);
+    DSMSETF(shiny, 10.0f);
+    dsm.model = CONFGET(Int, "default_material_model", 2);
+    #undef DSMSETV3
+    #undef DSMSETF
+    SubmitNamedMaterial(dsm, "Default");
+}
+
 Renderer* RawRendererRef() {
     return &g_renderer;
 }
@@ -499,33 +529,7 @@ void InitializeRenderer() {
     PollGPUCache(TRUE);
 
     // default material
-    SurfaceMaterial dsm = { 0 };
-    #define DSMSETV3(name, default) {\
-    const char* n1 = "default_material_" #name "r"; \
-    dsm.name[0] = CONFGET(Float, n1, default); \
-    const char* n2 = "default_material_" #name "g"; \
-    dsm.name[1] = CONFGET(Float, n2, default); \
-    const char* n3 = "default_material_" #name "b"; \
-    dsm.name[2] = CONFGET(Float, n3, default);}
-    #define DSMSETF(name, default) {\
-    const char* n = "default_material_" #name; \
-    dsm.name = CONFGET(Float, n, default);}
-    DSMSETV3(emission, 0.0f);
-    DSMSETV3(ambient, 1.0f);
-    DSMSETV3(diffuse, 1.0f);
-    DSMSETV3(specular, 0.0f);
-    DSMSETV3(absorbtion, 0.0f);
-    DSMSETV3(dispersion, 0.0f);
-    DSMSETV3(scattering, 0.0f);
-    DSMSETF(anisotropy, 0.0f);
-    DSMSETF(scale, 1.0f);
-    DSMSETF(subsurface, 0.0f);
-    DSMSETF(ior, 0.0f);
-    DSMSETF(shiny, 10.0f);
-    dsm.model = CONFGET(Int, "default_material_model", 2);
-    #undef DSMSETV3
-    #undef DSMSETF
-    SubmitNamedMaterial(dsm, "Default");
+    SubmitDefaultMaterial();
 
     // set overlay context
     SetOverlayContext(&g_renderer);
@@ -1175,6 +1179,7 @@ void Render() {
 
         // end profiling
         ez_end_profile(&(g_renderer.stats.profile));
+        g_renderer.stats.accumulation++;
     } else {
         async_update = FALSE;
     }
@@ -1911,7 +1916,9 @@ void ClearScene(BOOL hard) {
     ClearTriangles();
     ClearVertices();
     ClearNormals();
-    if (hard) ClearMaterials();
+    ClearMaterials();
+    if (!hard) SubmitDefaultMaterial();
+    UpdateMaterials();
     ClearLights();
     ClearMeshDescriptors();
     ClearAnimations();
@@ -2296,4 +2303,8 @@ BOOL DeleteCamera(size_t id) {
     FixDeleteEditTarget(EDIT_CAMERA, id);
     if (PrimaryCameraID() == id) SetCamera(0);
     return TRUE;
+}
+
+RendererStats GetRenderStats() {
+    return g_renderer.stats;
 }

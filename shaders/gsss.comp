@@ -1,0 +1,221 @@
+#import Boilerplate
+#import Definitions
+#import SplatConstants
+
+#import RayDef;
+#import HitDef;
+#import TriangleDef;
+#import BVHNodeDef;
+
+// Subsurface cloud trainer (driven by src/renderer/subsurface.c through tgpu). The object being trained is the whole
+// "scene" here, in its own object space: bindings 0-2 hold its triangles, vertices and a one triangle per leaf BVH in
+// the scene layout, so trace() / trace_max() and SubsurfaceSuite run exactly as they do in path.comp.
+//   mode 0  orient    per triangle: parity of the surface crossings along 3 rays leaving its front -> flip flag
+//   mode 1  walks     one reference random walk per item (geometric: absorption is applied at render time)
+//   mode 2  chords    count the internal gaussians each training walk's entry -> exit chord passes, and its length
+//   mode 3  chords    write them (gaussian, line integral) from the first entry the CPU assigned to the walk
+//   mode 4  validate  one cloud sample per held out walk, from that walk's entry point
+// Modes 1-4 work on one batch at a time: records, chord_meta and validation are indexed from the start of the batch
+// (`offset` only decorrelates the random streams); orient indexes the triangles directly.
+
+struct SSSWalkRecord {
+    vec4 entry;    // xyz entry point
+    vec4 exit;     // xyz exit point (on the surface), w path length
+    vec4 dir;      // xyz exit direction
+    vec4 interior; // xyz one of the walk's scattering locations (uniformly chosen), w 1 when the walk scattered at all
+    uvec4 tris;    // entry triangle, exit triangle, entry surface gaussian, exit surface gaussian
+    uvec4 info;    // free flights (scattering events + 1), 1 when the walk left through the outside of the surface,
+                   // why it was lost otherwise (1 escaped through a crack, 2 reached the surface from outside, 3 step cap)
+};
+
+struct SSSValidationSample {
+    vec4 exit;     // xyz exit point, w 1 when the exit point projection succeeded
+    vec4 dir;      // xyz exit direction, w path length
+    vec4 normal;   // xyz outward normal at the exit, w chord length
+};
+
+layout(std430, binding = 0) readonly #import TriangleSSBODef;
+layout(std430, binding = 1) readonly #import TransformedVertexSSBODef;
+layout(std430, binding = 2) readonly #import BVHNodeSSBODef;
+layout(std430, binding = 3) readonly #import NormalSSBODef;
+layout(std430, binding = 4) readonly #import SubsurfaceSSBODef;
+layout(std430, binding = 5) readonly buffer SSSAreaCDF { float area_cdf[]; };
+layout(std430, binding = 6) buffer SSSRecords { SSSWalkRecord records[]; };
+layout(std430, binding = 7) writeonly buffer SSSFlips { uint flips[]; };
+layout(std430, binding = 8) buffer SSSChordMeta { uvec4 chord_meta[]; };       // count, first entry, chord length bits, 0
+layout(std430, binding = 9) writeonly buffer SSSChordEntries { uvec2 chord_entries[]; }; // gaussian, line integral bits
+layout(std430, binding = 10) writeonly buffer SSSValidation { SSSValidationSample validation[]; };
+
+// named ubo because TriangleIntersectSuite reads ubo.triangles and ubo.normals
+layout(push_constant) uniform SubsurfaceTrainPC {
+    uint triangles;  // object triangle count
+    uint normals;    // 0: geometric normals
+    uint mode;
+    uint count;      // work items in this dispatch
+    uint offset;     // index of the first item
+    uint seed;
+    uint max_steps;  // free flights before a walk is abandoned
+    uint pad0;
+    float sigma;     // free flight density, object space
+    float g;         // Henyey-Greenstein anisotropy
+    float eps;       // ray offset of the crossing count (orient)
+    float pad1;
+} ubo;
+
+// chord visitor (modes 2 and 3), called by sss_cloud_chord for every internal gaussian with a nonzero line integral
+bool g_chord_write = false;
+uint g_chord_count = 0u;
+uint g_chord_first = 0u;
+uint g_chord_limit = 0u;
+
+void sss_chord_visit(uint g, float c) {
+    if (g_chord_write && g_chord_count < g_chord_limit) chord_entries[g_chord_first + g_chord_count] = uvec2(g, floatBitsToUint(c));
+    g_chord_count++;
+}
+#define SSS_CHORD_VISIT(i, c) sss_chord_visit(i, c)
+
+#import EpsilonOffset
+#import TriangleIntersectSuite
+#import RandomSuite
+#import SamplingSuite
+#import SubsurfaceSuite
+
+// uniform triangle by area: binary search in the normalised cumulative areas
+uint pick_triangle(float r) {
+    uint lo = 0u, hi = ubo.triangles - 1u;
+    while (lo < hi) {
+        uint mid = (lo + hi) / 2u;
+        if (area_cdf[mid] < r) lo = mid + 1u;
+        else hi = mid;
+    }
+    return lo;
+}
+
+vec3 triangle_point(uint t, float r1, float r2) {
+    Triangle tri = triangleIn[t];
+    float s = sqrt(r1);
+    return (1.0 - s) * vertexIn[tri.a].xyz + s * (1.0 - r2) * vertexIn[tri.b].xyz + s * r2 * vertexIn[tri.c].xyz;
+}
+
+// A ray leaving through the outward side of the surface crosses it an even number of times; the majority of three
+// jittered rays leaving the front (winding) side decides whether the winding normal points inwards.
+void orient(uint t) {
+    Triangle tri = triangleIn[t];
+    vec3 a = vertexIn[tri.a].xyz, b = vertexIn[tri.b].xyz, c = vertexIn[tri.c].xyz;
+    vec3 n = cross(b - a, c - a);
+    float l = length(n);
+    if (!(l > 0.0)) {
+        flips[t] = 0u;
+        return;
+    }
+    n /= l;
+    int inward = 0;
+    for (int v = 0; v < 3; v++) {
+        vec3 jitter = vec3(random(), random(), random()) - 0.5;
+        vec3 o = triangle_point(t, random(), random());
+        vec3 dir = normalize(n + 0.3 * jitter);
+        if (dot(dir, n) < 0.2) dir = n;
+        uint crossings = 0u;
+        Ray r = Ray(o + dir * ubo.eps, dir);
+        for (int k = 0; k < 4096; k++) {
+            uint hid = uint(-1);
+            Hit h = trace(r, hid);
+            if (h.distance <= 0.0) break;
+            crossings++;
+            r.position = h.position + dir * ubo.eps;
+        }
+        if ((crossings & 1u) != 0u) inward++;
+    }
+    flips[t] = inward >= 2 ? 1u : 0u;
+}
+
+// One geometric reference walk: light enters a uniformly chosen surface point with a cosine distribution, then follows
+// the same entry convention and free flights as subsurface_walk() in path.comp. Needs the blob's triangle table (flip
+// flags) and surface gaussians in sssIn.
+void walk(uint i) {
+    SSSObject o = sss_object_identity(0u, ubo.triangles);
+    uint t = pick_triangle(random());
+    vec3 p = triangle_point(t, random(), random());
+    vec3 n = sss_tri_normal(o, t);
+    vec3 incident = onb(-n, sample_cosine_weighted_lobe());
+    Ray ray = sss_walk_enter(p, n, incident, ubo.g);
+    uint boundary_id = uint(-1);
+    float L = 0.0;
+    uint flights = 0u;
+    bool kept = false;
+    uint lost = 3u;
+    bool scattered = false;
+    vec3 interior = vec3(0.0);
+    vec3 exit_point = p;
+    uint exit_tri = t;
+    for (uint step = 0u; step < ubo.max_steps; step++) {
+        float segment;
+        Hit boundary;
+        int flight = sss_walk_flight(ray, ubo.sigma, ubo.g, boundary_id, segment, boundary);
+        flights++;
+        if (flight == SSS_FLIGHT_ESCAPED) {
+            lost = 1u;
+            break;
+        }
+        L += segment;
+        if (flight == SSS_FLIGHT_EXITED) {
+            // reaching the surface from its outside means the walk had leaked out through a crack
+            kept = dot(ray.direction, sss_tri_normal(o, boundary_id)) > 0.0;
+            lost = kept ? 0u : 2u;
+            exit_point = boundary.position;
+            exit_tri = boundary_id;
+            break;
+        }
+        // one scattering location per walk, uniformly chosen over its events (reservoir of one)
+        if (random() * float(flights) < 1.0) {
+            interior = ray.position;
+            scattered = true;
+        }
+    }
+    SSSWalkRecord rec;
+    rec.entry = vec4(p, 0.0);
+    rec.exit = vec4(exit_point, L);
+    rec.dir = vec4(ray.direction, 0.0);
+    rec.interior = vec4(interior, scattered ? 1.0 : 0.0);
+    uint sg_in = kept ? sss_pick_surface(0u, t, p, random()) : 0u;
+    uint sg_out = kept ? sss_pick_surface(0u, exit_tri, exit_point, random()) : 0u;
+    rec.tris = uvec4(t, exit_tri, sg_in, sg_out);
+    rec.info = uvec4(flights, kept ? 1u : 0u, lost, 0u);
+    records[i] = rec;
+}
+
+void chords(uint i) {
+    SSSWalkRecord r = records[i];
+    g_chord_write = ubo.mode == 3u;
+    g_chord_count = 0u;
+    g_chord_first = chord_meta[i].y;
+    g_chord_limit = chord_meta[i].x;
+    float C;
+    float Q[7];
+    float len = sss_cloud_chord(0u, r.entry.xyz, r.exit.xyz, C, Q);
+    if (!g_chord_write) chord_meta[i] = uvec4(g_chord_count, 0u, floatBitsToUint(len), 0u);
+}
+
+void validate(uint i) {
+    SSSWalkRecord r = records[i];
+    SSSObject o = sss_object_identity(0u, ubo.triangles);
+    SSSCloudSample s = sss_cloud_sample(o, 0u, r.entry.xyz, r.tris.x);
+    SSSValidationSample v;
+    v.exit = vec4(s.local, s.projected ? 1.0 : 0.0);
+    v.dir = vec4(s.direction, s.path_length);
+    v.normal = vec4(s.normal, s.chord);
+    validation[i] = v;
+}
+
+void main() {
+    uint k = gl_GlobalInvocationID.x;
+    if (k >= ubo.count) return;
+    uint item = ubo.offset + k;
+    seed = uvec4(item, ubo.seed, ubo.mode, 0x9E3779B9u);
+    pcg4d(seed);
+    pcg4d(seed);
+    if (ubo.mode == 0u) orient(item);
+    else if (ubo.mode == 1u) walk(k);
+    else if (ubo.mode == 2u || ubo.mode == 3u) chords(k);
+    else if (ubo.mode == 4u) validate(k);
+}

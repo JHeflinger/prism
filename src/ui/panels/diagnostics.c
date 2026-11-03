@@ -65,7 +65,8 @@ static void DrawDevPanel(float width, float height) {
 
     UIMoveCursor(0, 20.0f);
     UIDrawText("Renderer FPS: %d", (int)(1.0f / ((float)RenderTime() * RenderConfig()->multiplier / 1000.0f)));
-    UIDrawText("Render time: %.6f ms", (float)RenderTime() * RenderConfig()->multiplier);
+    UIDrawText("Render Time: %.6f ms", (float)RenderTime() * RenderConfig()->multiplier);
+    UIDrawText("Render Accumulation: %lu", (long unsigned int)GetRenderStats().accumulation);
     UIDrawText("Triangles: %d", (int)NumTriangles());
     UIDrawText("Vertices: %d", (int)NumVertices());
     UIDrawText("Normals: %d", (int)NumNormals());

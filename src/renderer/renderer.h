@@ -261,4 +261,6 @@ BOOL DeleteMesh(size_t id);
 
 BOOL DeleteCamera(size_t id);
 
+RendererStats GetRenderStats();
+
 #endif

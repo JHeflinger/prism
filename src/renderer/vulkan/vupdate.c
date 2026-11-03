@@ -522,6 +522,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     old_flags = RendererCamera()->config.flags;
     BOOL cam_reset = reset_count != 0;
     if (reset_count > 0) reset_count--;
+    if (cam_reset) g_vupdt_renderer_ref->stats.accumulation = 0;
 
     // persistant vars
     static uint32_t samples = 0;

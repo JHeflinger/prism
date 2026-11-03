@@ -196,6 +196,7 @@ typedef struct {
 typedef struct {
     ez_Profiler profile;
     GPUStatCache cache;
+    size_t accumulation;
 } RendererStats;
 
 typedef struct {

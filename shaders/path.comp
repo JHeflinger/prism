@@ -35,9 +35,11 @@ layout(binding = 14) readonly #import SubsurfaceSSBODef;
 #import EpsilonOffset
 #import TriangleIntersectSuite
 #import QuatToMat
+#import RandomSuite
+#import SamplingSuite
+#import SubsurfaceSuite
 
 const float max_contribution = 10;
-uvec4 seed = uvec4(0);
 const uint SOBOL_DIRS[2][32] = uint[2][32](
     uint[32](
         0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,
@@ -122,24 +124,6 @@ void init_random(int x, int y) {
     seed = uvec4(x, y, ubo.seed, x + y);
 }
 
-void pcg4d(inout uvec4 v) {
-    v = v * 1664525u + 1013904223u;
-    v.x += v.y * v.w;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    v.w += v.y * v.z;
-    v = v ^ (v >> 16u);
-    v.x += v.y * v.w;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    v.w += v.y * v.z;
-}
-
-float random() {
-    pcg4d(seed);
-    return float(seed.x) / float(0xffffffffu);
-}
-
 float luminance(vec3 c) {
     return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
 }
@@ -181,22 +165,6 @@ Ray create_ray(vec2 rg) {
 
 float russian_roulette(vec3 throughput) {
     return clamp(max(max(throughput.x, throughput.y), throughput.z), 0.05, 0.999);
-}
-
-vec3 onb(vec3 normal, vec3 local) {
-	vec3 w = normal;
-	vec3 a = (abs(w.x) > 0.9) ? vec3(0, 1, 0) : vec3(1, 0, 0);
-	vec3 v = normalize(cross(w, a));
-	vec3 u = normalize(cross(w, v));
-	return normalize(local.x*u + local.y*v + local.z*w);
-}
-
-vec3 sample_cosine_weighted_lobe() {
-    float r1 = random();
-    float r2 = random();
-    float sqr2 = sqrt(r2);
-    float phi = 2.0 * PI * r1;
-    return vec3(cos(phi)*sqr2, sin(phi)*sqr2, sqrt(1.0 - r2));
 }
 
 vec3 sample_specular_phong_lobe(float shiny) {
@@ -249,10 +217,6 @@ vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, i
         (material.specular * (material.shiny + 2.0) /
         (2.0 * PI) * pow(max(dot(reflect(-outgoing, normal), incoming), 0.0), material.shiny))) *
         max(0.0, dot(incoming, normal));
-}
-
-vec3 safe_inverse(vec3 d) {
-    return 1.0 / mix(d, vec3(1e-20), lessThan(abs(d), vec3(1e-20)));
 }
 
 bool aabb_range(Ray ray, vec3 inv, uint node_ind, float tfar, out float tnear) {
@@ -408,23 +372,6 @@ vec3 cheap_spectral_color(in vec3 rgb) {
     return cheap_wavelength_to_rgb(lambdaR) * rgb.r + cheap_wavelength_to_rgb(lambdaG) * rgb.g + cheap_wavelength_to_rgb(lambdaB) * rgb.b;
 }
 
-vec3 sample_henyey_greenstein(vec3 outgoing, float g) {
-    float xi1 = random();
-    float xi2 = random();
-    float cos_theta = 0.0;
-    if (abs(g) < 0.001) {
-        cos_theta = 1.0 - 2.0 * xi1;
-    } else {
-        float sqr = (1.0 - g * g) / (1.0 - g + 2.0 * g * xi1);
-        cos_theta = (1.0 + g * g - sqr * sqr) / (2.0 * g);
-        cos_theta = clamp(cos_theta, -1.0, 1.0);
-    }
-    float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
-    float phi = 2.0 * PI * xi2;
-    vec3 local = vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
-    return onb(outgoing, local);
-}
-
 bool sss_spectral(vec3 sigma_t) {
     float hi = max(sigma_t.r, max(sigma_t.g, sigma_t.b));
     float lo = min(sigma_t.r, min(sigma_t.g, sigma_t.b));
@@ -465,31 +412,23 @@ void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material 
     uint boundary_id = uint(-1);
     medium = hit.material;
     for (int bounce = 0; bounce < ubo.maxsssbounces; ++bounce) {
-        Hit boundary = trace(ray, boundary_id);
-        if (boundary.distance <= 0.0) { // escaped through a crack (or started outside): no valid exit
+        float segment;
+        Hit boundary;
+        int flight = sss_walk_flight(ray, sigma, material.anisotropy, boundary_id, segment, boundary);
+        if (flight == SSS_FLIGHT_ESCAPED) { // escaped through a crack (or started outside): no valid exit
             throughput = vec3(0.0);
             break;
         }
-        float xi = max(random(), 1e-6);
-        float free_distance = -log(1.0 - xi) / sigma;
-        if (free_distance >= boundary.distance) { // exiting
-            ray.position = epsilon_offset(ray.position, ray.direction) + ray.direction * boundary.distance;
-            if (channel < 0) throughput *= exp(-(sigma_t - sigma) * boundary.distance);
+        if (flight == SSS_FLIGHT_EXITED) {
+            if (channel < 0) throughput *= exp(-(sigma_t - sigma) * segment);
             exited = true;
             exit_normal = -boundary.normal; // trace() faces the normal towards the ray origin, which is inside
             //medium = AIR_MEDIUM; // TODO: this should not exactly be air medium, but the previous participating medium
                                  // might need to edit material here to prev material?
             break;
-        } else {
-            vec3 scatter_position = ray.position + ray.direction * free_distance;
-            if (channel < 0) throughput *= exp(-(sigma_t - sigma) * free_distance) * sigma_mul;
-            else throughput[channel] *= sigma_mul[channel];
-            // phase function around the travel direction (g > 0 = forward scattering); this used to be sampled around
-            // -ray.direction, which turned forward scattering into back scattering
-            vec3 new_direction = sample_henyey_greenstein(ray.direction, material.anisotropy);
-            ray.position = scatter_position;
-            ray.direction = new_direction;
         }
+        if (channel < 0) throughput *= exp(-(sigma_t - sigma) * segment) * sigma_mul;
+        else throughput[channel] *= sigma_mul[channel];
         float p = russian_roulette(throughput);
         if (random() > p) break; // TODO: how to propogate this termination?
         throughput /= p;
@@ -515,54 +454,12 @@ void sample_lambertian(vec3 outgoing, Hit h, Material material, out vec3 incomin
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Subsurface gaussian clouds ("SSS splats"), trained on the CPU by src/renderer/sssfit.c.
-// sss_splat_scatter() is mirrored line by line by sssfit_sample() in that file (which is what the training validation
-// measures), so keep the two in sync. Layout of SubsurfaceSSBOIn:
+// Subsurface gaussian clouds ("SSS splats"). Training: src/renderer/subsurface.c with shaders/sss_train.comp; the cloud
+// sampler and the random walk's flight are shared with the trainer through SubsurfaceSuite in shared.import. Layout of
+// SubsurfaceSSBOIn:
 //   [0] object count, [4 + 8k] per object: blob base per colour channel (r, g, b; equal for a single cloud), mesh
 //   descriptor, enabled, first triangle, channel count (1 or 3), 0; then the blobs.
-// Every offset inside a blob is relative to its base; see sssfit.h for the record layouts.
 // ---------------------------------------------------------------------------------------------------------------------
-
-float normal_cdf(float x);
-float normal_quantile(float p);
-
-const uint SSSG_H_TCOUNT = 2u;
-const uint SSSG_H_TABLE = 3u;
-const uint SSSG_H_SURF = 4u;
-const uint SSSG_H_LOBE = 6u;
-const uint SSSG_H_GAUSS = 8u;
-const uint SSSG_H_NODE = 10u;
-const uint SSSG_H_NNODE = 11u;
-const uint SSSG_H_MFP = 14u;
-const uint SSSG_H_EPS = 15u;
-const uint SSSG_H_BG = 16u;
-const uint SSSG_H_BGW = 23u;
-const uint SSSG_H_DMIN = 24u;
-const uint SSSG_TABLE_STRIDE = 4u;
-const uint SSSG_SURF_STRIDE = 16u;
-const uint SSSG_LOBE_STRIDE = 16u;
-const uint SSSG_GAUSS_STRIDE = 20u;
-const uint SSSG_NODE_STRIDE = 8u;
-const uint SSSG_TRI_FLIP = 1u;
-const uint SSSG_LEAF = 0x80000000u;
-const uint SSSG_NONE = 0xFFFFFFFFu;
-const float SSS_GAUSS_CUTOFF = 9.0;
-const int SSS_PROJECTION_TRIES = 3;
-const int SSS_FOREIGN_SKIPS = 4;
-const float SSS_MAX_EXCESS_MFP = 2000.0; // cap on the sampled extra path length (log normal tails are unbounded)
-
-struct SSSObject {
-    uint base;
-    uvec3 bases; // per channel blobs (all equal for a single cloud)
-    uint channels;
-    uint tstart;
-    uint tcount;
-    mat4 M;      // object -> world
-    mat4 Minv;
-    mat3 M3;
-    float scale; // cube root of |det M3|, converts object space lengths to world space
-    float handed; // sign of det M3: mirrored transforms flip triangle winding
-};
 
 // state handed from brdf() to pathtrace() for next event estimation at the exit point
 bool g_sss_exit = false;
@@ -575,10 +472,6 @@ vec3 g_sss_exit_pos = vec3(0.0);
 vec3 g_sss_exit_normal = vec3(0.0, 0.0, 1.0);
 vec3 g_sss_exit_axis = vec3(0.0, 0.0, 1.0);
 float g_sss_exit_exponent = 1.0;
-
-float sss_f(uint i) { return uintBitsToFloat(sssIn[i]); }
-vec3 sss_v3(uint i) { return vec3(sss_f(i), sss_f(i + 1u), sss_f(i + 2u)); }
-mat3 sss_m3(uint i) { return mat3(sss_v3(i), sss_v3(i + 3u), sss_v3(i + 6u)); } // column major
 
 bool sss_find_object(uint tid, out SSSObject o) {
     o.base = 0u;
@@ -609,164 +502,6 @@ bool sss_find_object(uint tid, out SSSObject o) {
     return false;
 }
 
-// outward world space normal of a triangle of the object
-vec3 sss_tri_normal(SSSObject o, uint tid) {
-    Triangle tri = triangleIn[tid];
-    vec3 n = normalize(cross(vertexIn[tri.b].xyz - vertexIn[tri.a].xyz, vertexIn[tri.c].xyz - vertexIn[tri.a].xyz));
-    if ((sssIn[o.base + sssIn[o.base + SSSG_H_TABLE] + (tid - o.tstart) * SSSG_TABLE_STRIDE + 3u] & SSSG_TRI_FLIP) != 0u) n = -n;
-    return n * o.handed;
-}
-
-float sss_surface_weight(uint s, vec3 p) {
-    vec3 d = p - sss_v3(s);
-    vec3 n = sss_v3(s + 4u);
-    float st = sss_f(s + 3u), sn = sss_f(s + 7u);
-    float dn = dot(d, n);
-    float dt2 = max(dot(d, d) - dn * dn, 0.0);
-    return exp(-0.5 * (dt2 / (st * st) + dn * dn / (sn * sn)));
-}
-
-// stochastic O(1) lookup of the surface gaussian under object space point p on local triangle lt
-uint sss_pick_surface(uint base, uint lt, vec3 p, float r) {
-    uint row = base + sssIn[base + SSSG_H_TABLE] + lt * SSSG_TABLE_STRIDE;
-    uint surf = base + sssIn[base + SSSG_H_SURF];
-    float w[3] = float[3](0.0, 0.0, 0.0);
-    float total = 0.0;
-    for (int k = 0; k < 3; k++) {
-        uint id = sssIn[row + uint(k)];
-        if (id == SSSG_NONE) continue;
-        w[k] = sss_surface_weight(surf + id * SSSG_SURF_STRIDE, p);
-        total += w[k];
-    }
-    if (!(total > 1e-30)) return sssIn[row];
-    float x = r * total;
-    for (int k = 0; k < 3; k++) {
-        uint id = sssIn[row + uint(k)];
-        if (id == SSSG_NONE) continue;
-        if (x <= w[k]) return id;
-        x -= w[k];
-    }
-    return sssIn[row];
-}
-
-// Short rays of the cloud path (exit point projection, exit shadow rays) use the distance limited query.
-Hit trace_bounded(Ray ray, float tmax, inout uint hit_id) {
-    return trace_max(ray, tmax, hit_id);
-}
-
-// closest hit along a world space ray that belongs to the object, looking through up to SSS_FOREIGN_SKIPS other surfaces
-bool sss_trace_own(SSSObject o, vec3 origin, vec3 dir, float tmax, out float t, out uint tri) {
-    t = 0.0;
-    tri = 0u;
-    float travelled = 0.0;
-    Ray r = Ray(origin, dir);
-    for (int i = 0; i <= SSS_FOREIGN_SKIPS; i++) {
-        uint hid = uint(-1);
-        Hit h = trace_bounded(r, tmax - travelled, hid);
-        if (h.distance <= 0.0) return false;
-        travelled += h.distance;
-        if (hid >= o.tstart && hid < o.tstart + o.tcount) {
-            t = travelled;
-            tri = hid;
-            return true;
-        }
-        r.position = epsilon_offset(h.position, dir);
-    }
-    return false;
-}
-
-float sss_gauss_chord(uint g, vec3 p0, vec3 p1, float D) {
-    mat3 W = sss_m3(g + 4u);
-    vec3 o = W * (p0 - sss_v3(g));
-    vec3 dv = W * (p1 - p0);
-    float A = dot(dv, dv);
-    float od = dot(o, dv);
-    float tc = -od / A;
-    float h2 = max(dot(o, o) - od * od / A, 0.0);
-    if (h2 > SSS_GAUSS_CUTOFF) return 0.0;
-    float sa = sqrt(A);
-    float za = -tc * sa, zb = (1.0 - tc) * sa;
-    if (zb < -3.0 || za > 3.0) return 0.0;
-    return D * exp(-0.5 * h2) * SQRT_2PI / sa * (normal_cdf(zb) - normal_cdf(za));
-}
-
-float sss_gauss_point(uint g, vec3 p) {
-    vec3 o = sss_m3(g + 4u) * (p - sss_v3(g));
-    float q = dot(o, o);
-    if (q > SSS_GAUSS_CUTOFF) return 0.0;
-    return exp(-0.5 * q);
-}
-
-// Ray traces the internal cloud along the chord p0 -> p1 (object space) and blends the path length field.
-// Returns the distribution of log(excess length + eps) as two log normal components (m1, s1, m2, s2) and the weight
-// of the first one.
-void sss_length_model(uint base, vec3 p0, vec3 p1, out vec4 comps, out float w1) {
-    uint gs = base + sssIn[base + SSSG_H_GAUSS];
-    uint nodes = base + sssIn[base + SSSG_H_NODE];
-    float dmin = sss_f(base + SSSG_H_DMIN);
-    vec3 e = p1 - p0;
-    float D = length(e);
-    bool point = D < dmin;
-    float len = point ? dmin : D;
-    vec3 inv = safe_inverse(e);
-    float C = 0.0;
-    float Q[7] = float[7](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-    if (sssIn[base + SSSG_H_NNODE] > 0u) {
-        uint stack[64];
-        int sp = 0;
-        stack[sp++] = 0u;
-        while (sp > 0) {
-            uint nd = nodes + stack[--sp] * SSSG_NODE_STRIDE;
-            bvh_counter++;
-            vec3 bmin = sss_v3(nd), bmax = sss_v3(nd + 4u);
-            bool hit;
-            if (point) {
-                hit = all(greaterThanEqual(p0, bmin)) && all(lessThanEqual(p0, bmax));
-            } else {
-                vec3 t0 = (bmin - p0) * inv, t1 = (bmax - p0) * inv;
-                vec3 tlo = min(t0, t1), thi = max(t0, t1);
-                hit = max(max(tlo.x, tlo.y), max(tlo.z, 0.0)) <= min(min(thi.x, thi.y), min(thi.z, 1.0));
-            }
-            if (!hit) continue;
-            uint w7 = sssIn[nd + 7u];
-            if ((w7 & SSSG_LEAF) != 0u) {
-                uint first = sssIn[nd + 3u], count = w7 & ~SSSG_LEAF;
-                for (uint i = first; i < first + count; i++) {
-                    uint g = gs + i * SSSG_GAUSS_STRIDE;
-                    float c = point ? dmin * sss_gauss_point(g, p0) : sss_gauss_chord(g, p0, p1, D);
-                    if (!(c > 0.0)) continue;
-                    C += c;
-                    for (int k = 0; k < 7; k++) Q[k] += c * sss_f(g + 13u + uint(k));
-                }
-            } else if (sp < 62) {
-                stack[sp++] = sssIn[nd + 3u];
-                stack[sp++] = w7;
-            }
-        }
-    }
-    float cbg = sss_f(base + SSSG_H_BGW) * len;
-    for (int k = 0; k < 7; k++) Q[k] += cbg * sss_f(base + SSSG_H_BG + uint(k));
-    C += cbg;
-    float u = log(1.0 + D / sss_f(base + SSSG_H_MFP));
-    float invC = 1.0 / C;
-    comps.x = (Q[0] + u * Q[1]) * invC;
-    comps.y = exp(clamp(Q[2] * invC, -6.0, 4.0));
-    comps.z = (Q[3] + u * Q[4]) * invC;
-    comps.w = exp(clamp(Q[5] * invC, -6.0, 4.0));
-    w1 = 1.0 / (1.0 + exp(-clamp(Q[6] * invC, -20.0, 20.0)));
-}
-
-// density (solid angle) of the exit direction: cosine power lobe around `axis`, folded onto the outward hemisphere
-float sss_dir_pdf(vec3 w, vec3 n, vec3 axis, float e) {
-    float wn = dot(w, n);
-    if (wn <= 0.0) return 0.0;
-    vec3 wr = w - 2.0 * wn * n;
-    float norm = (e + 1.0) / (2.0 * PI);
-    float c0 = dot(axis, w), c1 = dot(axis, wr);
-    e = max(e, 1e-3); // pow(0, 0) is undefined in GLSL
-    return norm * ((c0 > 0.0 ? pow(c0, e) : 0.0) + (c1 > 0.0 ? pow(c1, e) : 0.0));
-}
-
 // Replaces subsurface_walk(): entry hit h on triangle tid -> exit point (h.position), outward normal (h.normal), exit
 // direction and the path's throughput. Returns false when the triangle has no usable cloud.
 bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throughput, out vec3 direction) {
@@ -781,91 +516,15 @@ bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throug
         channel = min(int(random() * 3.0), 2);
         o.base = o.bases[channel];
     }
-    uint base = o.base;
-    float mfp = sss_f(base + SSSG_H_MFP);
-    vec3 p = (o.Minv * vec4(h.position, 1.0)).xyz;
-    uint lt = tid - o.tstart;
-    // 1. surface gaussian under the entry point
-    uint sgi = sss_pick_surface(base, lt, p, random());
-    uint sg = base + sssIn[base + SSSG_H_SURF] + sgi * SSSG_SURF_STRIDE;
-    uint lfirst = sssIn[sg + 12u], lcount = sssIn[sg + 13u];
-    uint lobes = base + sssIn[base + SSSG_H_LOBE];
-    // 2. + 3. sample an exit lobe and project the sample onto the surface along the lobe axis (redrawn on a miss)
-    vec3 xw = h.position;
-    uint xt = tid;
-    bool projected = false;
-    for (int attempt = 0; attempt < SSS_PROJECTION_TRIES && !projected; attempt++) {
-        float u = random();
-        uint li = lfirst;
-        for (uint j = 0u; j < lcount; j++) {
-            li = lfirst + j;
-            if (u <= sss_f(lobes + li * SSSG_LOBE_STRIDE + 3u)) break;
-        }
-        uint lb = lobes + li * SSSG_LOBE_STRIDE;
-        mat3 L = sss_m3(lb + 4u);
-        float u1 = max(random(), 1e-7), u2 = random(), u3 = max(random(), 1e-7), u4 = random();
-        float r1 = sqrt(-2.0 * log(u1)), r2 = sqrt(-2.0 * log(u3));
-        vec3 z = vec3(r1 * cos(2.0 * PI * u2), r1 * sin(2.0 * PI * u2), r2 * cos(2.0 * PI * u4));
-        vec3 a = sss_v3(lb + 13u);
-        vec3 q = p + sss_v3(lb) + L * z;
-        float H = 3.0 * length(transpose(L) * a) + 0.5 * mfp;
-        // world space: rigid transforms keep distances up to o.scale
-        vec3 aw = normalize(o.M3 * a);
-        vec3 qw = (o.M * vec4(q, 1.0)).xyz;
-        float Hw = H * o.scale;
-        float t;
-        uint ht;
-        if (sss_trace_own(o, qw + aw * Hw, -aw, 2.0 * Hw, t, ht)) {
-            xw = qw + aw * Hw - aw * t;
-            xt = ht;
-            projected = true;
-        } else {
-            float best = FLTMAX;
-            for (int sgn = 0; sgn < 2; sgn++) {
-                vec3 dd = sgn == 0 ? aw : -aw;
-                if (sss_trace_own(o, qw, dd, Hw, t, ht) && t < best) {
-                    best = t;
-                    xw = qw + dd * t;
-                    xt = ht;
-                    projected = true;
-                }
-            }
-        }
-    }
-    if (!projected) {
-        xw = h.position;
-        xt = tid;
-    }
-    vec3 x = (o.Minv * vec4(xw, 1.0)).xyz;
-    // 4. path length: ray trace the internal cloud between the entry and the exit point
-    vec4 comps;
-    float w1;
-    sss_length_model(base, p, x, comps, w1);
-    float pick = random();
-    float zz = pick < w1 ? comps.x + comps.y * normal_quantile(random()) : comps.z + comps.w * normal_quantile(random());
-    float D = length(x - p);
-    float excess = max(exp(min(zz, log(SSS_MAX_EXCESS_MFP * mfp))) - sss_f(base + SSSG_H_EPS), 0.0);
-    float Lw = (D + excess) * o.scale;
-    // 5. exit direction from the surface gaussian under the exit point
-    vec3 n = sss_tri_normal(o, xt);
-    uint so = sss_pick_surface(base, xt - o.tstart, x, random());
-    uint sgo = base + sssIn[base + SSSG_H_SURF] + so * SSSG_SURF_STRIDE;
-    vec3 axis = normalize(o.M3 * sss_v3(sgo + 8u));
-    float e = sss_f(sgo + 11u);
-    float xi1 = random(), xi2 = random();
-    float ct = pow(max(xi1, 1e-7), 1.0 / (e + 1.0));
-    float stt = sqrt(max(0.0, 1.0 - ct * ct));
-    float phi = 2.0 * PI * xi2;
-    vec3 w = onb(axis, vec3(stt * cos(phi), stt * sin(phi), ct));
-    float wn = dot(w, n);
-    if (wn < 0.0) w -= 2.0 * wn * n;
-    // 6. throughput: the walk weighs (sigma_s / sigma) per scatter and exp(-(sigma_t - sigma) d) per unit length. With
-    //    the scatter count along a path of length L treated as poisson(sigma L), its expectation is
-    //    exp(-(sigma (1 - a) + sigma_t - sigma) L) = exp(-(sigma_t - sigma_s) L) = exp(-sigma_a L), i.e. plain absorption
-    //    over the sampled path length. The cloud's path lengths are for the shared density sigma; a channel whose
-    //    sigma_t differs scatters on its own length scale, so (similarity: the same number of mean free paths) its
-    //    physical length is L * sigma / sigma_t,c. Without this, coloured scattering shifts hue (e.g. green dominant
-    //    scattering turns purple, because red and blue absorb over too short a distance).
+    SSSCloudSample s = sss_cloud_sample(o, o.base, h.position, tid);
+    float Lw = s.path_length * o.scale;
+    // Throughput: the walk weighs (sigma_s / sigma) per scatter and exp(-(sigma_t - sigma) d) per unit length. With
+    // the scatter count along a path of length L treated as poisson(sigma L), its expectation is
+    // exp(-(sigma (1 - a) + sigma_t - sigma) L) = exp(-(sigma_t - sigma_s) L) = exp(-sigma_a L), i.e. plain absorption
+    // over the sampled path length. The cloud's path lengths are for the shared density sigma; a channel whose
+    // sigma_t differs scatters on its own length scale, so (similarity: the same number of mean free paths) its
+    // physical length is L * sigma / sigma_t,c. Without this, coloured scattering shifts hue (e.g. green dominant
+    // scattering turns purple, because red and blue absorb over too short a distance).
     vec3 sigma_a = material.absorbtion * material.scale;
     if (channel >= 0) {
         // the channel's own cloud: its path lengths are already in that channel's physics, and with poisson(sigma_t,c L)
@@ -877,15 +536,15 @@ bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throug
         float sigma_shared = max(luminance(sigma_tc), EPS);
         throughput = exp(-sigma_a * (sigma_shared / sigma_tc) * Lw);
     }
-    direction = w;
-    h.position = xw;
-    h.normal = n;
+    direction = s.direction;
+    h.position = s.position;
+    h.normal = s.normal;
     g_sss_exit = true;
-    g_sss_projected = projected;
-    g_sss_exit_pos = xw;
-    g_sss_exit_normal = n;
-    g_sss_exit_axis = axis;
-    g_sss_exit_exponent = e;
+    g_sss_projected = s.projected;
+    g_sss_exit_pos = s.position;
+    g_sss_exit_normal = s.normal;
+    g_sss_exit_axis = s.axis;
+    g_sss_exit_exponent = s.exponent;
     return true;
 }
 
@@ -1009,12 +668,9 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in uint tid, in Mater
                     if (g_sss_debug_kind == 0u) g_sss_debug_kind = g_sss_projected ? 1u : 3u;
                     break;
                 }
-                Ray ray;
                 // enter along the incident direction (h.normal faces the viewer, so the medium is on -h.normal);
                 // a phase sample that points back out is mirrored into the medium
-                ray.direction = sample_henyey_greenstein(-outgoing, material.anisotropy);
-                if (dot(ray.direction, h.normal) > 0.0) ray.direction = reflect(ray.direction, h.normal);
-                ray.position = epsilon_offset(h.position, ray.direction);
+                Ray ray = sss_walk_enter(h.position, h.normal, -outgoing, material.anisotropy);
                 bool exited;
                 vec3 exit_normal;
                 subsurface_walk(ray, throughput, h, material, medium, exited, exit_normal);
@@ -1043,52 +699,6 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in uint tid, in Mater
             break;
         default: break;
     }
-}
-
-float erf_approx(float x) { // Abramowitz & Stegun 7.1.26, abs error < 1.5e-7
-    float s = sign(x);
-    x = abs(x);
-    float t = 1.0 / (1.0 + 0.3275911 * x);
-    float y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-x * x);
-    return s * y;
-}
-
-float normal_cdf(float x) {
-    return 0.5 * (1.0 + erf_approx(x * 0.70710678));
-}
-
-float erfinv_approx(float x) { // M. Giles, single precision
-    float w = -log((1.0 - x) * (1.0 + x));
-    float p;
-    if (w < 5.0) {
-        w = w - 2.5;
-        p = 2.81022636e-08;
-        p = 3.43273939e-07 + p * w;
-        p = -3.5233877e-06 + p * w;
-        p = -4.39150654e-06 + p * w;
-        p = 0.00021858087 + p * w;
-        p = -0.00125372503 + p * w;
-        p = -0.00417768164 + p * w;
-        p = 0.246640727 + p * w;
-        p = 1.50140941 + p * w;
-    } else {
-        w = sqrt(w) - 3.0;
-        p = -0.000200214257;
-        p = 0.000100950558 + p * w;
-        p = 0.00134934322 + p * w;
-        p = -0.00367342844 + p * w;
-        p = 0.00573950773 + p * w;
-        p = -0.0076224613 + p * w;
-        p = 0.00943887047 + p * w;
-        p = 1.00167406 + p * w;
-        p = 2.83297682 + p * w;
-    }
-    return p * x;
-}
-
-float normal_quantile(float p) {
-    p = clamp(p, 1e-7, 1.0 - 1e-7);
-    return 1.41421356 * erfinv_approx(2.0 * p - 1.0);
 }
 
 vec3 splat_albedo(uint id) {

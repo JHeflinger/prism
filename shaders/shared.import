@@ -1131,3 +1131,510 @@ export TrainerSuite {
         return p.det > 0.0;
     }
 }
+
+export RandomSuite {
+    // pcg4d stream shared by every shader that samples: path.comp seeds it per pixel, sss_train.comp per work item
+    uvec4 seed = uvec4(0);
+
+    void pcg4d(inout uvec4 v) {
+        v = v * 1664525u + 1013904223u;
+        v.x += v.y * v.w;
+        v.y += v.z * v.x;
+        v.z += v.x * v.y;
+        v.w += v.y * v.z;
+        v = v ^ (v >> 16u);
+        v.x += v.y * v.w;
+        v.y += v.z * v.x;
+        v.z += v.x * v.y;
+        v.w += v.y * v.z;
+    }
+
+    float random() {
+        pcg4d(seed);
+        return float(seed.x) / float(0xffffffffu);
+    }
+}
+
+export SamplingSuite {
+    // needs: Definitions, RandomSuite
+
+    vec3 onb(vec3 normal, vec3 local) {
+        vec3 w = normal;
+        vec3 a = (abs(w.x) > 0.9) ? vec3(0, 1, 0) : vec3(1, 0, 0);
+        vec3 v = normalize(cross(w, a));
+        vec3 u = normalize(cross(w, v));
+        return normalize(local.x * u + local.y * v + local.z * w);
+    }
+
+    vec3 sample_cosine_weighted_lobe() {
+        float r1 = random();
+        float r2 = random();
+        float sqr2 = sqrt(r2);
+        float phi = 2.0 * PI * r1;
+        return vec3(cos(phi) * sqr2, sin(phi) * sqr2, sqrt(1.0 - r2));
+    }
+
+    vec3 sample_henyey_greenstein(vec3 outgoing, float g) {
+        float xi1 = random();
+        float xi2 = random();
+        float cos_theta = 0.0;
+        if (abs(g) < 0.001) {
+            cos_theta = 1.0 - 2.0 * xi1;
+        } else {
+            float sqr = (1.0 - g * g) / (1.0 - g + 2.0 * g * xi1);
+            cos_theta = (1.0 + g * g - sqr * sqr) / (2.0 * g);
+            cos_theta = clamp(cos_theta, -1.0, 1.0);
+        }
+        float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+        float phi = 2.0 * PI * xi2;
+        vec3 local = vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
+        return onb(outgoing, local);
+    }
+
+    vec3 safe_inverse(vec3 d) {
+        return 1.0 / mix(d, vec3(1e-20), lessThan(abs(d), vec3(1e-20)));
+    }
+
+    float erf_approx(float x) { // Abramowitz & Stegun 7.1.26, abs error < 1.5e-7
+        float s = sign(x);
+        x = abs(x);
+        float t = 1.0 / (1.0 + 0.3275911 * x);
+        float y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-x * x);
+        return s * y;
+    }
+
+    float normal_cdf(float x) {
+        return 0.5 * (1.0 + erf_approx(x * 0.70710678));
+    }
+
+    float erfinv_approx(float x) { // M. Giles, single precision
+        float w = -log((1.0 - x) * (1.0 + x));
+        float p;
+        if (w < 5.0) {
+            w = w - 2.5;
+            p = 2.81022636e-08;
+            p = 3.43273939e-07 + p * w;
+            p = -3.5233877e-06 + p * w;
+            p = -4.39150654e-06 + p * w;
+            p = 0.00021858087 + p * w;
+            p = -0.00125372503 + p * w;
+            p = -0.00417768164 + p * w;
+            p = 0.246640727 + p * w;
+            p = 1.50140941 + p * w;
+        } else {
+            w = sqrt(w) - 3.0;
+            p = -0.000200214257;
+            p = 0.000100950558 + p * w;
+            p = 0.00134934322 + p * w;
+            p = -0.00367342844 + p * w;
+            p = 0.00573950773 + p * w;
+            p = -0.0076224613 + p * w;
+            p = 0.00943887047 + p * w;
+            p = 1.00167406 + p * w;
+            p = 2.83297682 + p * w;
+        }
+        return p * x;
+    }
+
+    float normal_quantile(float p) {
+        p = clamp(p, 1e-7, 1.0 - 1e-7);
+        return 1.41421356 * erfinv_approx(2.0 * p - 1.0);
+    }
+}
+
+export SubsurfaceSuite {
+    // Subsurface scattering shared by the path tracer (path.comp) and the subsurface cloud trainer (sss_train.comp):
+    // the random walk's free flight, the trained cloud sampler and the traversal of a cloud's internal gaussians. The
+    // trainer runs exactly this code against the object alone (object space, identity SSSObject), so whatever changes
+    // here changes the reference walks, the training features and the validation report together.
+    //
+    // needs: Definitions, SplatConstants, RayDef, HitDef, TriangleDef, EpsilonOffset, TriangleIntersectSuite
+    //        (trace / trace_max over triangleIn, vertexIn, nodeIn), RandomSuite, SamplingSuite, and the cloud buffer sssIn.
+    //
+    // Blob layout (uint words, floats as raw bits; offsets relative to the blob's base). Header words:
+    //   2 triangle count, 3 table, 4 surface gaussians, 5 count, 6 lobes, 7 count, 8 internal gaussians, 9 count,
+    //   10 nodes, 11 count, 12 sigma, 13 g, 14 mean free path, 15 excess length floor, 16..22 background path length
+    //   coefficients, 23 background weight, 24 point chord length, 25 first triangle, 26 material, 27 trained scale.
+    // Records: table 4 words per triangle (3 candidate surface gaussians, flags), surface gaussian 16, lobe 16,
+    // internal gaussian 20, node 8 (see the CPU packer in src/renderer/subsurface.c).
+    // Define SSS_CHORD_VISIT(i, c) before importing to see every internal gaussian a chord passes (trainer only).
+
+    const uint SSSG_H_TCOUNT = 2u;
+    const uint SSSG_H_TABLE = 3u;
+    const uint SSSG_H_SURF = 4u;
+    const uint SSSG_H_LOBE = 6u;
+    const uint SSSG_H_GAUSS = 8u;
+    const uint SSSG_H_NODE = 10u;
+    const uint SSSG_H_NNODE = 11u;
+    const uint SSSG_H_MFP = 14u;
+    const uint SSSG_H_EPS = 15u;
+    const uint SSSG_H_BG = 16u;
+    const uint SSSG_H_BGW = 23u;
+    const uint SSSG_H_DMIN = 24u;
+    const uint SSSG_TABLE_STRIDE = 4u;
+    const uint SSSG_SURF_STRIDE = 16u;
+    const uint SSSG_LOBE_STRIDE = 16u;
+    const uint SSSG_GAUSS_STRIDE = 20u;
+    const uint SSSG_NODE_STRIDE = 8u;
+    const uint SSSG_TRI_FLIP = 1u;
+    const uint SSSG_LEAF = 0x80000000u;
+    const uint SSSG_NONE = 0xFFFFFFFFu;
+    const float SSS_GAUSS_CUTOFF = 9.0;
+    const int SSS_PROJECTION_TRIES = 3;
+    const int SSS_FOREIGN_SKIPS = 4;
+    const float SSS_MAX_EXCESS_MFP = 2000.0; // cap on the sampled extra path length (log normal tails are unbounded)
+    const int SSS_FLIGHT_SCATTERED = 0;
+    const int SSS_FLIGHT_EXITED = 1;
+    const int SSS_FLIGHT_ESCAPED = 2;
+
+    struct SSSObject {
+        uint base;
+        uvec3 bases;  // per channel blobs (all equal for a single cloud)
+        uint channels;
+        uint tstart;
+        uint tcount;
+        mat4 M;       // object -> world
+        mat4 Minv;
+        mat3 M3;
+        float scale;  // cube root of |det M3|, converts object space lengths to world space
+        float handed; // sign of det M3: mirrored transforms flip triangle winding
+    };
+
+    // a cloud evaluated where its object is the whole scene, in object space (the trainer)
+    SSSObject sss_object_identity(uint base, uint tcount) {
+        SSSObject o;
+        o.base = base;
+        o.bases = uvec3(base);
+        o.channels = 1u;
+        o.tstart = 0u;
+        o.tcount = tcount;
+        o.M = mat4(1.0);
+        o.Minv = mat4(1.0);
+        o.M3 = mat3(1.0);
+        o.scale = 1.0;
+        o.handed = 1.0;
+        return o;
+    }
+
+    float sss_f(uint i) { return uintBitsToFloat(sssIn[i]); }
+    vec3 sss_v3(uint i) { return vec3(sss_f(i), sss_f(i + 1u), sss_f(i + 2u)); }
+    mat3 sss_m3(uint i) { return mat3(sss_v3(i), sss_v3(i + 3u), sss_v3(i + 6u)); } // column major
+
+    // ---- random walk ------------------------------------------------------------------------------------------------
+
+    // First direction of a walk entering at `position`: Henyey-Greenstein around the incident direction; a sample that
+    // points back out (towards `outside`, the normal on the side the light came from) is mirrored into the medium.
+    // The origin is pushed into the medium along the normal, not along the direction: for a grazing direction an offset
+    // along it is smaller than the rounding error of the entry point itself, and the first flight would then hit the
+    // entry triangle from outside (about 5% of walks on a smooth sphere).
+    Ray sss_walk_enter(vec3 position, vec3 outside, vec3 incident, float g) {
+        Ray ray;
+        ray.direction = sample_henyey_greenstein(incident, g);
+        if (dot(ray.direction, outside) > 0.0) ray.direction = reflect(ray.direction, outside);
+        ray.position = epsilon_offset(position, -outside);
+        return ray;
+    }
+
+    // One free flight with density sigma (d ~ sigma exp(-sigma d)) towards the boundary along `ray`.
+    //   SSS_FLIGHT_SCATTERED: ray moved to the scattering point, its direction resampled from the phase function
+    //   SSS_FLIGHT_EXITED:    the flight reached the boundary first; ray.position is the exit point, `boundary` the hit
+    //   SSS_FLIGHT_ESCAPED:   no boundary along the ray (a crack, or the walk started outside)
+    // `segment` is the distance travelled. Weighting (absorption, colour) is up to the caller.
+    int sss_walk_flight(inout Ray ray, float sigma, float g, inout uint boundary_id, out float segment, out Hit boundary) {
+        segment = 0.0;
+        boundary = trace(ray, boundary_id);
+        if (boundary.distance <= 0.0) return SSS_FLIGHT_ESCAPED;
+        float xi = max(random(), 1e-6);
+        float free_distance = -log(1.0 - xi) / sigma;
+        if (free_distance >= boundary.distance) {
+            segment = boundary.distance;
+            ray.position = epsilon_offset(ray.position, ray.direction) + ray.direction * boundary.distance;
+            return SSS_FLIGHT_EXITED;
+        }
+        segment = free_distance;
+        // phase function around the travel direction (g > 0 = forward scattering)
+        ray.position += ray.direction * free_distance;
+        ray.direction = sample_henyey_greenstein(ray.direction, g);
+        return SSS_FLIGHT_SCATTERED;
+    }
+
+    // ---- trained cloud ----------------------------------------------------------------------------------------------
+
+    // outward world space normal of a triangle of the object
+    vec3 sss_tri_normal(SSSObject o, uint tid) {
+        Triangle tri = triangleIn[tid];
+        vec3 n = normalize(cross(vertexIn[tri.b].xyz - vertexIn[tri.a].xyz, vertexIn[tri.c].xyz - vertexIn[tri.a].xyz));
+        if ((sssIn[o.base + sssIn[o.base + SSSG_H_TABLE] + (tid - o.tstart) * SSSG_TABLE_STRIDE + 3u] & SSSG_TRI_FLIP) != 0u) n = -n;
+        return n * o.handed;
+    }
+
+    float sss_surface_weight(uint s, vec3 p) {
+        vec3 d = p - sss_v3(s);
+        vec3 n = sss_v3(s + 4u);
+        float st = sss_f(s + 3u), sn = sss_f(s + 7u);
+        float dn = dot(d, n);
+        float dt2 = max(dot(d, d) - dn * dn, 0.0);
+        return exp(-0.5 * (dt2 / (st * st) + dn * dn / (sn * sn)));
+    }
+
+    // stochastic O(1) lookup of the surface gaussian under object space point p on local triangle lt
+    uint sss_pick_surface(uint base, uint lt, vec3 p, float r) {
+        uint row = base + sssIn[base + SSSG_H_TABLE] + lt * SSSG_TABLE_STRIDE;
+        uint surf = base + sssIn[base + SSSG_H_SURF];
+        float w[3] = float[3](0.0, 0.0, 0.0);
+        float total = 0.0;
+        for (int k = 0; k < 3; k++) {
+            uint id = sssIn[row + uint(k)];
+            if (id == SSSG_NONE) continue;
+            w[k] = sss_surface_weight(surf + id * SSSG_SURF_STRIDE, p);
+            total += w[k];
+        }
+        if (!(total > 1e-30)) return sssIn[row];
+        float x = r * total;
+        for (int k = 0; k < 3; k++) {
+            uint id = sssIn[row + uint(k)];
+            if (id == SSSG_NONE) continue;
+            if (x <= w[k]) return id;
+            x -= w[k];
+        }
+        return sssIn[row];
+    }
+
+    // Short rays of the cloud path (exit point projection, exit shadow rays) use the distance limited query.
+    Hit trace_bounded(Ray ray, float tmax, inout uint hit_id) {
+        return trace_max(ray, tmax, hit_id);
+    }
+
+    // closest hit along a world space ray that belongs to the object, looking through up to SSS_FOREIGN_SKIPS other surfaces
+    bool sss_trace_own(SSSObject o, vec3 origin, vec3 dir, float tmax, out float t, out uint tri) {
+        t = 0.0;
+        tri = 0u;
+        float travelled = 0.0;
+        Ray r = Ray(origin, dir);
+        for (int i = 0; i <= SSS_FOREIGN_SKIPS; i++) {
+            uint hid = uint(-1);
+            Hit h = trace_bounded(r, tmax - travelled, hid);
+            if (h.distance <= 0.0) return false;
+            travelled += h.distance;
+            if (hid >= o.tstart && hid < o.tstart + o.tcount) {
+                t = travelled;
+                tri = hid;
+                return true;
+            }
+            r.position = epsilon_offset(h.position, dir);
+        }
+        return false;
+    }
+
+    float sss_gauss_chord(uint g, vec3 p0, vec3 p1, float D) {
+        mat3 W = sss_m3(g + 4u);
+        vec3 o = W * (p0 - sss_v3(g));
+        vec3 dv = W * (p1 - p0);
+        float A = dot(dv, dv);
+        float od = dot(o, dv);
+        float tc = -od / A;
+        float h2 = max(dot(o, o) - od * od / A, 0.0);
+        if (h2 > SSS_GAUSS_CUTOFF) return 0.0;
+        float sa = sqrt(A);
+        float za = -tc * sa, zb = (1.0 - tc) * sa;
+        if (zb < -3.0 || za > 3.0) return 0.0;
+        return D * exp(-0.5 * h2) * SQRT_2PI / sa * (normal_cdf(zb) - normal_cdf(za));
+    }
+
+    float sss_gauss_point(uint g, vec3 p) {
+        vec3 o = sss_m3(g + 4u) * (p - sss_v3(g));
+        float q = dot(o, o);
+        if (q > SSS_GAUSS_CUTOFF) return 0.0;
+        return exp(-0.5 * q);
+    }
+
+    // Ray traces the internal cloud along the chord p0 -> p1 (object space). C is the summed line integral of the
+    // gaussians the chord passes, Q the line integral weighted sums of their 7 path length coefficients. Returns the
+    // chord length the background term is weighted with (chords shorter than the blob's point length are evaluated as
+    // a point).
+    float sss_cloud_chord(uint base, vec3 p0, vec3 p1, out float C, out float Q[7]) {
+        uint gs = base + sssIn[base + SSSG_H_GAUSS];
+        uint nodes = base + sssIn[base + SSSG_H_NODE];
+        float dmin = sss_f(base + SSSG_H_DMIN);
+        vec3 e = p1 - p0;
+        float D = length(e);
+        bool point = D < dmin;
+        float len = point ? dmin : D;
+        vec3 inv = safe_inverse(e);
+        C = 0.0;
+        for (int k = 0; k < 7; k++) Q[k] = 0.0;
+        if (sssIn[base + SSSG_H_NNODE] == 0u) return len;
+        uint stack[64];
+        int sp = 0;
+        stack[sp++] = 0u;
+        while (sp > 0) {
+            uint nd = nodes + stack[--sp] * SSSG_NODE_STRIDE;
+            bvh_counter++;
+            vec3 bmin = sss_v3(nd), bmax = sss_v3(nd + 4u);
+            bool hit;
+            if (point) {
+                hit = all(greaterThanEqual(p0, bmin)) && all(lessThanEqual(p0, bmax));
+            } else {
+                vec3 t0 = (bmin - p0) * inv, t1 = (bmax - p0) * inv;
+                vec3 tlo = min(t0, t1), thi = max(t0, t1);
+                hit = max(max(tlo.x, tlo.y), max(tlo.z, 0.0)) <= min(min(thi.x, thi.y), min(thi.z, 1.0));
+            }
+            if (!hit) continue;
+            uint w7 = sssIn[nd + 7u];
+            if ((w7 & SSSG_LEAF) != 0u) {
+                uint first = sssIn[nd + 3u], count = w7 & ~SSSG_LEAF;
+                for (uint i = first; i < first + count; i++) {
+                    uint g = gs + i * SSSG_GAUSS_STRIDE;
+                    float c = point ? dmin * sss_gauss_point(g, p0) : sss_gauss_chord(g, p0, p1, D);
+                    if (!(c > 0.0)) continue;
+#ifdef SSS_CHORD_VISIT
+                    SSS_CHORD_VISIT(i, c);
+#endif
+                    C += c;
+                    for (int k = 0; k < 7; k++) Q[k] += c * sss_f(g + 13u + uint(k));
+                }
+            } else if (sp < 62) {
+                stack[sp++] = sssIn[nd + 3u];
+                stack[sp++] = w7;
+            }
+        }
+        return len;
+    }
+
+    // Distribution of log(excess length + eps) along the chord p0 -> p1: two normal components (m1, s1, m2, s2) and the
+    // weight of the first. Path length field per gaussian (and the background), blended with the line integrals:
+    //   q0 + q1 u, q2 : mean / log std of the first component      q3 + q4 u, q5 : the second      q6 : logit of w1
+    // with u = log(1 + chord / mfp).
+    void sss_length_model(uint base, vec3 p0, vec3 p1, out vec4 comps, out float w1) {
+        float C;
+        float Q[7];
+        float len = sss_cloud_chord(base, p0, p1, C, Q);
+        float cbg = sss_f(base + SSSG_H_BGW) * len;
+        for (int k = 0; k < 7; k++) Q[k] += cbg * sss_f(base + SSSG_H_BG + uint(k));
+        C += cbg;
+        float u = log(1.0 + length(p1 - p0) / sss_f(base + SSSG_H_MFP));
+        float invC = 1.0 / C;
+        comps.x = (Q[0] + u * Q[1]) * invC;
+        comps.y = exp(clamp(Q[2] * invC, -6.0, 4.0));
+        comps.z = (Q[3] + u * Q[4]) * invC;
+        comps.w = exp(clamp(Q[5] * invC, -6.0, 4.0));
+        w1 = 1.0 / (1.0 + exp(-clamp(Q[6] * invC, -20.0, 20.0)));
+    }
+
+    // density (solid angle) of the exit direction: cosine power lobe around `axis`, folded onto the outward hemisphere
+    float sss_dir_pdf(vec3 w, vec3 n, vec3 axis, float e) {
+        float wn = dot(w, n);
+        if (wn <= 0.0) return 0.0;
+        vec3 wr = w - 2.0 * wn * n;
+        float norm = (e + 1.0) / (2.0 * PI);
+        float c0 = dot(axis, w), c1 = dot(axis, wr);
+        e = max(e, 1e-3); // pow(0, 0) is undefined in GLSL
+        return norm * ((c0 > 0.0 ? pow(c0, e) : 0.0) + (c1 > 0.0 ? pow(c1, e) : 0.0));
+    }
+
+    struct SSSCloudSample {
+        vec3 position;   // exit point, world space
+        vec3 local;      // exit point, object space
+        uint triangle;   // exit triangle
+        vec3 normal;     // outward normal at the exit, world space
+        vec3 direction;  // exit direction, world space
+        vec3 axis;       // exit direction lobe: axis (world space) and cosine power
+        float exponent;
+        float chord;     // entry -> exit distance, object space
+        float path_length; // sampled path length, object space
+        bool projected;  // false when the exit projection failed and the path leaves where it entered
+    };
+
+    // The cloud's replacement for a random walk: entry point (world space) on triangle tid -> exit point, path length
+    // and exit direction, from the blob at `base`.
+    SSSCloudSample sss_cloud_sample(SSSObject o, uint base, vec3 entry, uint tid) {
+        SSSCloudSample s;
+        float mfp = sss_f(base + SSSG_H_MFP);
+        vec3 p = (o.Minv * vec4(entry, 1.0)).xyz;
+        uint lt = tid - o.tstart;
+        // 1. surface gaussian under the entry point
+        uint sgi = sss_pick_surface(base, lt, p, random());
+        uint sg = base + sssIn[base + SSSG_H_SURF] + sgi * SSSG_SURF_STRIDE;
+        uint lfirst = sssIn[sg + 12u], lcount = sssIn[sg + 13u];
+        uint lobes = base + sssIn[base + SSSG_H_LOBE];
+        // 2. + 3. sample an exit lobe and project the sample onto the surface along the lobe axis (redrawn on a miss)
+        vec3 xw = entry;
+        uint xt = tid;
+        bool projected = false;
+        for (int attempt = 0; attempt < SSS_PROJECTION_TRIES && !projected; attempt++) {
+            float u = random();
+            uint li = lfirst;
+            for (uint j = 0u; j < lcount; j++) {
+                li = lfirst + j;
+                if (u <= sss_f(lobes + li * SSSG_LOBE_STRIDE + 3u)) break;
+            }
+            uint lb = lobes + li * SSSG_LOBE_STRIDE;
+            mat3 L = sss_m3(lb + 4u);
+            float u1 = max(random(), 1e-7), u2 = random(), u3 = max(random(), 1e-7), u4 = random();
+            float r1 = sqrt(-2.0 * log(u1)), r2 = sqrt(-2.0 * log(u3));
+            vec3 z = vec3(r1 * cos(2.0 * PI * u2), r1 * sin(2.0 * PI * u2), r2 * cos(2.0 * PI * u4));
+            vec3 a = sss_v3(lb + 13u);
+            vec3 q = p + sss_v3(lb) + L * z;
+            float H = 3.0 * length(transpose(L) * a) + 0.5 * mfp;
+            // world space: rigid transforms keep distances up to o.scale
+            vec3 aw = normalize(o.M3 * a);
+            vec3 qw = (o.M * vec4(q, 1.0)).xyz;
+            float Hw = H * o.scale;
+            float t;
+            uint ht;
+            if (sss_trace_own(o, qw + aw * Hw, -aw, 2.0 * Hw, t, ht)) {
+                xw = qw + aw * Hw - aw * t;
+                xt = ht;
+                projected = true;
+            } else {
+                float best = FLTMAX;
+                for (int sgn = 0; sgn < 2; sgn++) {
+                    vec3 dd = sgn == 0 ? aw : -aw;
+                    if (sss_trace_own(o, qw, dd, Hw, t, ht) && t < best) {
+                        best = t;
+                        xw = qw + dd * t;
+                        xt = ht;
+                        projected = true;
+                    }
+                }
+            }
+        }
+        if (!projected) {
+            xw = entry;
+            xt = tid;
+        }
+        vec3 x = (o.Minv * vec4(xw, 1.0)).xyz;
+        // 4. path length: ray trace the internal cloud between the entry and the exit point
+        vec4 comps;
+        float w1;
+        sss_length_model(base, p, x, comps, w1);
+        float pick = random();
+        float zz = pick < w1 ? comps.x + comps.y * normal_quantile(random()) : comps.z + comps.w * normal_quantile(random());
+        float D = length(x - p);
+        float excess = max(exp(min(zz, log(SSS_MAX_EXCESS_MFP * mfp))) - sss_f(base + SSSG_H_EPS), 0.0);
+        // 5. exit direction from the surface gaussian under the exit point
+        vec3 n = sss_tri_normal(o, xt);
+        uint so = sss_pick_surface(base, xt - o.tstart, x, random());
+        uint sgo = base + sssIn[base + SSSG_H_SURF] + so * SSSG_SURF_STRIDE;
+        vec3 axis = normalize(o.M3 * sss_v3(sgo + 8u));
+        float e = sss_f(sgo + 11u);
+        float xi1 = random(), xi2 = random();
+        float ct = pow(max(xi1, 1e-7), 1.0 / (e + 1.0));
+        float stt = sqrt(max(0.0, 1.0 - ct * ct));
+        float phi = 2.0 * PI * xi2;
+        vec3 w = onb(axis, vec3(stt * cos(phi), stt * sin(phi), ct));
+        float wn = dot(w, n);
+        if (wn < 0.0) w -= 2.0 * wn * n;
+        s.position = xw;
+        s.local = x;
+        s.triangle = xt;
+        s.normal = n;
+        s.direction = w;
+        s.axis = axis;
+        s.exponent = e;
+        s.chord = D;
+        s.path_length = D + excess;
+        s.projected = projected;
+        return s;
+    }
+}
