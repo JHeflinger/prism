@@ -1,4 +1,5 @@
 PROS:
+1. only cost of increasing params seems to be training time and memory footprint
 
 CONS:
 1. per-channel cannot do full spectral wavelengths at the moment, maybe yes later with enough addjustment to the algorithm?

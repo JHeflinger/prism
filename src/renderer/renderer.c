@@ -2308,3 +2308,8 @@ BOOL DeleteCamera(size_t id) {
 RendererStats GetRenderStats() {
     return g_renderer.stats;
 }
+
+void ResetAccumulation() {
+    g_renderer.stats.accumulation = 0;
+    RendererCamera()->config.reset = TRUE;
+}

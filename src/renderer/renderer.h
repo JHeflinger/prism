@@ -263,4 +263,6 @@ BOOL DeleteCamera(size_t id);
 
 RendererStats GetRenderStats();
 
+void ResetAccumulation();
+
 #endif
