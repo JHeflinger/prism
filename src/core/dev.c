@@ -48,6 +48,11 @@ static BOOL g_testing = FALSE;
 static BOOL g_training = FALSE;
 static float g_timer = 0.0f;
 
+static void ChangeAllToDefault() {
+    for (size_t i = 0; i < NumTriangles(); i++) TriangleReference(i)->material = 0;
+    UpdateTriangles();
+}
+
 static void ChangeToWax() {
     SurfaceMaterial* m = MaterialReference(0);
     SETVEC3(m->emission, 0, 0, 0);
@@ -173,11 +178,6 @@ static void CreateBoxLight(float x, float y, float z) {
         FALSE, vertex_base, NumVertices() - 1, triangle_base, NumTriangles() - 1, 0, (uint32_t)-1,
         (uint32_t)NumSplats(), (uint32_t)NumSplats() - 1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
         { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, "Cube Light");
-}
-
-static void LoadBox() {
-    LoadOBJ("assets/models/OBJ/dressed/CornellBox-Original.obj");
-    FitCamera();
 }
 
 static void ResetCamera() {
@@ -590,7 +590,7 @@ static void ClearSoftScene() {
 }
 
 void DevInitialize() {
-    AddBind("load cornell box", LoadBox,
+    AddBind("set triangles to default material", ChangeAllToDefault,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_L_OVERRIDE, BIND_KEY_DOWN },
         (BindCommand){ IK_B_OVERRIDE, BIND_KEY_PRESSED });
@@ -604,6 +604,15 @@ void DevInitialize() {
     AddBind("screenshot", Screenshot,
         (BindCommand){ IK_DEV, BIND_KEY_DOWN },
         (BindCommand){ IK_S_OVERRIDE, BIND_KEY_PRESSED });
+    AddBind("set wax material", ChangeToWax,
+        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
+        (BindCommand){ IK_ALIGN_Z, BIND_KEY_PRESSED });
+    AddBind("set flesh material", ChangeToFlesh,
+        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
+        (BindCommand){ IK_ALIGN_X, BIND_KEY_PRESSED });
+    AddBind("set jade material", ChangeToJade,
+        (BindCommand){ IK_DEV, BIND_KEY_DOWN },
+        (BindCommand){ IK_ALIGN_Y, BIND_KEY_PRESSED });
 }
 
 void DevUpdate() { TestSuite(); }

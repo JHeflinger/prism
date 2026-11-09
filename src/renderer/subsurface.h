@@ -13,7 +13,7 @@ typedef struct {
     uint32_t epochs;
     uint32_t validation;
     uint32_t seed;
-    int gpu_index; // Vulkan device used for training, -1 = pick the best one
+    int gpu_index;
 } GSSSConfig;
 
 typedef enum {

@@ -16,7 +16,7 @@
 #define SSS_SPECTRAL_SPREAD 0.05f // relative spread of sigma_t across rgb above which one cloud per channel is trained
 
 // cloud blob (see the layout below)
-#define SSSG_MAGIC 0x47535353u // "SSSG"
+#define SSSG_MAGIC 0x47535353u // literally the string "SSSG"
 #define SSSG_VERSION 1u
 #define SSSG_HEADER_WORDS 32u
 #define SSSG_TABLE_STRIDE 4u // per triangle: 3 candidate surface gaussians (0xFFFFFFFF = none), flags
@@ -32,17 +32,17 @@
 #define SSS_INTERIOR_CAP 200000u
 #define SSS_EM_MAX_POINTS 2048u
 #define SSS_SURFACE_SAMPLES_PER 24u
-#define SSS_BG_WEIGHT 0.05f      // line density of the background term, relative to the peak of a gaussian
-#define SSS_EPS_FRACTION 0.1f     // excess length floor, in mean free paths
-#define SSS_DMIN_FRACTION 0.01f   // chords shorter than this (in mean free paths) are evaluated as a point
+#define SSS_BG_WEIGHT 0.05f // line density of the background term, relative to the peak of a gaussian
+#define SSS_EPS_FRACTION 0.1f // excess length floor, in mean free paths
+#define SSS_DMIN_FRACTION 0.01f // chords shorter than this (in mean free paths) are evaluated as a point
 #define SSS_Q 7
 
 // GPU side of the fit (shaders/gsss.comp, one pipeline, mode in the push constants)
 #define SSS_KERNEL_PATH "shaders/gsss.comp.spv"
 #define SSS_GROUP 256u
-#define SSS_BATCH_FIRST 4096u     // items in the first submission of a phase; later ones adapt to SSS_SUBMIT_SECONDS
+#define SSS_BATCH_FIRST 4096u // items in the first submission of a phase; later ones adapt to SSS_SUBMIT_SECONDS
 #define SSS_BATCH_MAX 262144u
-#define SSS_SUBMIT_SECONDS 0.012  // target duration of one submission (each one blocks the editor until it is done)
+#define SSS_SUBMIT_SECONDS 0.012 // target duration of one submission (each one blocks the editor until it is done)
 
 enum {
     SSS_MODE_ORIENT = 0,
@@ -606,7 +606,7 @@ static void grid_build(Grid* g, const vec3* pts, uint32_t n, float h) {
     EZ_FREE(cellof);
 }
 
-static void grid_free(Grid* g) {
+static void FreeGrid(Grid* g) {
     EZ_FREE(g->start);
     EZ_FREE(g->items);
     memset(g, 0, sizeof(*g));
@@ -893,7 +893,7 @@ static void phase_surface(SSSFitter* f) {
             }
             assign[i] = best;
         }
-        grid_free(&grid);
+        FreeGrid(&grid);
         memset(acc, 0, (size_t)ns * 7 * sizeof(double));
         for (uint32_t i = 0; i < m; i++) {
             double* a = &acc[assign[i] * 7];
@@ -952,7 +952,7 @@ static void phase_surface(SSSFitter* f) {
             if (glm_vec3_dot(f->tn[t], f->snrm[ids[j]]) > 0.25f) row[filled++] = ids[j];
         if (filled == 0) row[0] = ids[0];
     }
-    grid_free(&grid);
+    FreeGrid(&grid);
     EZ_FREE(acc);
     EZ_FREE(assign);
     EZ_FREE(sp);
@@ -1311,7 +1311,7 @@ static void phase_cloud(SSSFitter* f, double budget, SSSClockFn clock) {
             grid_knn(&grid, f->interior[i], 1, &id, &d2);
             assign[i] = id;
         }
-        grid_free(&grid);
+        FreeGrid(&grid);
         memset(acc, 0, (size_t)ng * 4 * sizeof(double));
         for (uint32_t i = 0; i < n; i++) {
             double* a = &acc[assign[i] * 4];
@@ -1365,7 +1365,7 @@ static void phase_cloud(SSSFitter* f, double budget, SSSClockFn clock) {
         }
         make_whitening(g);
     }
-    grid_free(&cgrid);
+    FreeGrid(&cgrid);
     EZ_FREE(cov);
     EZ_FREE(acc);
     EZ_FREE(assign);
