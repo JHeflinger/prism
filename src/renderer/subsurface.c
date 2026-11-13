@@ -129,8 +129,8 @@ typedef struct {
     double r2_mean; // fraction of log excess path length variance explained by the cloud
     uint32_t validation_samples;
     uint32_t projection_failures;
-    double walk_dist_q[4], model_dist_q[4]; // exit distance quantiles 25 / 50 / 75 / 90 %, in mean free paths
-    double walk_len_q[4], model_len_q[4]; // path length quantiles, in mean free paths
+    double walk_dist_q[4], model_dist_q[4]; // exit distance Quantiles 25 / 50 / 75 / 90 %, in mean free paths
+    double walk_len_q[4], model_len_q[4]; // path length Quantiles, in mean free paths
     double tp_walk[3]; // a^scatters of the held out walks (what the random walk computes, the ground truth)
     double tp_length[3]; // exp(-(1 - a) L) with the walks' own path lengths L in mfp (the length only formula, exact lengths)
     double tp_model[3]; // exp(-(1 - a) L) with the cloud's sampled path lengths (what the cloud path computes)
@@ -230,8 +230,8 @@ typedef struct SSSFitter {
     uint32_t nv, nt;
     vec3* tn;        // outward unit normal per triangle
     uint8_t* flip;   // the outward normal is -cross(b - a, c - a)
-    double* cdf;
-    double area;
+    double* cdf; // the area of trianlges 0 to i combined
+    double area; // total surface area
     float sigma, g, mfp, diag, eps;
     // surface gaussians
     uint32_t ns;
@@ -312,6 +312,60 @@ typedef struct {
     uint32_t* items;
 } Grid;
 
+typedef struct {
+    float m1;
+    float s1;
+    float m2;
+    float s2;
+    float w1;
+} LengthModel;
+
+typedef struct {
+    uint32_t mesh;
+    BOOL enabled;
+    uint32_t channels; // 1 or 3
+    uint32_t* blob[3];
+    uint32_t words[3];
+    float sigma[3]; // world space density each blob was trained for
+    uint32_t tstart; // triangle range the cloud was trained on (re-synced when meshes move)
+    uint32_t tcount;
+    MaterialID material;
+    float g;
+    float scale; // object scale it was trained at
+} Cloud;
+
+typedef struct {
+    SubsurfaceTrainPhase phase;
+    SSSFitter* fitter;
+    size_t mesh;
+    uint32_t tstart;
+    uint32_t tcount;
+    MaterialID material;
+    float g;
+    float scale;
+    uint32_t channels;
+    uint32_t channel; // channel currently being fitted
+    float sigma[3];
+    GSSSConfig config;
+    vec3* pos; // object space mesh, kept for the per channel fits (the fitter borrows it)
+    uint32_t* idx;
+    uint32_t nverts;
+    TGPU gpu; // compute context shared by the per channel fits (the fitter borrows it)
+    TGPUKernel kernel;
+    BOOL gpu_alive;
+    uint32_t* blob[3];
+    uint32_t words[3];
+    char status[192];
+    SSSFitStats stats;
+    BOOL have_stats;
+    double started;
+} CloudTrainJob;
+
+static const double SSS_TP_ALBEDOS[3] = { 0.5, 0.9, 0.99 };
+static Cloud* g_clouds = NULL;
+static size_t g_cloud_count = 0;
+static CloudTrainJob g_job = { 0 };
+static BOOL g_update_gsss = FALSE;
 static float* g_sort_keys = NULL; // centroid keys for the SelectNth
 
 static void SetStatus(SSSFitter* f, const char* fmt, ...) {
@@ -535,8 +589,7 @@ static void FreeGrid(Grid* g) {
     memset(g, 0, sizeof(*g));
 }
 
-// k nearest items to q, sorted by distance. Returns how many were found (<= k, k <= 32).
-static uint32_t grid_knn(const Grid* g, const vec3 q, uint32_t k, uint32_t* out, float* outd2) {
+static uint32_t GridLocale(const Grid* g, const vec3 q, uint32_t k, uint32_t* out, float* outd2) {
     if (g->n == 0 || k == 0) return 0;
     int c[3];
     for (int a = 0; a < 3; a++) c[a] = CLAMP((int)floorf((q[a] - g->origin[a]) / g->h), 0, g->dims[a] - 1);
@@ -565,16 +618,11 @@ static uint32_t grid_knn(const Grid* g, const vec3 q, uint32_t k, uint32_t* out,
                 }
             }
         }
-        // everything not visited yet is at least r * h away
         float reach = (float)r * g->h;
         if (found == k && outd2[k - 1] <= reach * reach) break;
     }
     return found;
 }
-
-// ================================================================================================================
-// fitter lifetime
-// ================================================================================================================
 
 static void SSSFitDestroy(SSSFitter* f) {
     if (!f) return;
@@ -628,8 +676,13 @@ static SSSFitter* SSSFitCreate(const SSSFitInput* in, const GSSSConfig* cfg) {
     return f;
 }
 
-static const char* SSSFitStatus(const SSSFitter* f) { return f ? f->status : "No fitter"; }
-static const SSSFitStats* SSSFitGetStats(const SSSFitter* f) { return f ? &f->stats : NULL; }
+static const char* SSSFitStatus(const SSSFitter* f) {
+    return f ? f->status : "No fitter";
+}
+
+static const SSSFitStats* SSSFitGetStats(const SSSFitter* f) {
+    return f ? &f->stats : NULL;
+}
 
 static const uint32_t* SSSFitBlob(const SSSFitter* f, uint32_t* words) {
     if (!f || f->phase != SSSFIT_DONE) { if (words) *words = 0; return NULL; }
@@ -654,7 +707,7 @@ static float SSSFitProgress(const SSSFitter* f) {
     }
 }
 
-static void tri_point(const SSSFitter* f, uint32_t t, float r1, float r2, vec3 out) {
+static void BarycentricPoint(const SSSFitter* f, uint32_t t, float r1, float r2, vec3 out) {
     vec3 a, b, c;
     TriangleCorners(f, t, a, b, c);
     float s = sqrtf(r1);
@@ -663,7 +716,7 @@ static void tri_point(const SSSFitter* f, uint32_t t, float r1, float r2, vec3 o
     glm_vec3_muladds(c, s * r2, out);
 }
 
-static uint32_t pick_triangle(const SSSFitter* f, float r) {
+static uint32_t RandomWeightedTriangle(const SSSFitter* f, float r) { // takes into account area!
     double target = (double)r * f->area;
     uint32_t lo = 0, hi = f->nt - 1;
     while (lo < hi) {
@@ -673,20 +726,120 @@ static uint32_t pick_triangle(const SSSFitter* f, float r) {
     return lo;
 }
 
-static void pack_blob(SSSFitter* f); // forward
+static void PackBlob(SSSFitter* f) {
+    uint32_t table = SSSG_HEADER_WORDS;
+    uint32_t surf = table + f->nt * SSSG_TABLE_STRIDE;
+    uint32_t lobe = surf + f->ns * SSSG_SURF_STRIDE;
+    uint32_t gauss = lobe + f->nlobes * SSSG_LOBE_STRIDE;
+    uint32_t node = gauss + f->ng * SSSG_GAUSS_STRIDE;
+    uint32_t total = node + f->ngnodes * SSSG_NODE_STRIDE;
+    // before the internal cloud exists (walk phase) there are no gaussians or nodes to pack
+    if (!f->gs) {
+        node = gauss;
+        total = gauss;
+    }
+    if (!f->blob || f->blob_words != total) {
+        EZ_FREE(f->blob);
+        f->blob = EZ_MINALLOC(total, sizeof(uint32_t));
+        f->blob_words = total;
+    }
+    uint32_t* b = f->blob;
+    memset(b, 0, (size_t)total * 4);
+    b[SSSG_H_MAGIC] = SSSG_MAGIC;
+    b[SSSG_H_VERSION] = SSSG_VERSION;
+    b[SSSG_H_TCOUNT] = f->nt;
+    b[SSSG_H_TABLE] = table;
+    b[SSSG_H_SURF] = surf;
+    b[SSSG_H_NSURF] = f->ns;
+    b[SSSG_H_LOBE] = lobe;
+    b[SSSG_H_NLOBE] = f->nlobes;
+    b[SSSG_H_GAUSS] = gauss;
+    b[SSSG_H_NGAUSS] = f->gs ? f->ng : 0;
+    b[SSSG_H_NODE] = node;
+    b[SSSG_H_NNODE] = f->gs ? f->ngnodes : 0;
+    b[SSSG_H_SIGMA] = F2U(f->sigma);
+    b[SSSG_H_G] = F2U(f->g);
+    b[SSSG_H_MFP] = F2U(f->mfp);
+    b[SSSG_H_EPS] = F2U(SSS_EPS_FRACTION * f->mfp);
+    for (int k = 0; k < SSS_Q; k++) b[SSSG_H_BG + k] = F2U(f->bg[k]);
+    b[SSSG_H_BGW] = F2U(SSS_BG_WEIGHT);
+    b[SSSG_H_DMIN] = F2U(SSS_DMIN_FRACTION * f->mfp);
+    b[SSSG_H_TSTART] = SSSG_NONE;
+    b[SSSG_H_MATERIAL] = SSSG_NONE;
+    b[SSSG_H_SCALE] = F2U(1.0f);
+    for (uint32_t t = 0; t < f->nt; t++) {
+        uint32_t* r = b + table + t * SSSG_TABLE_STRIDE;
+        r[0] = f->table[t * 3];
+        r[1] = f->table[t * 3 + 1];
+        r[2] = f->table[t * 3 + 2];
+        r[3] = f->flip[t] ? SSSG_TRI_FLIP : 0u;
+    }
+    for (uint32_t c = 0; c < f->ns; c++) {
+        uint32_t* r = b + surf + c * SSSG_SURF_STRIDE;
+        for (int k = 0; k < 3; k++) {
+            r[k] = F2U(f->sc[c][k]);
+            r[4 + k] = F2U(f->snrm[c][k]);
+            r[8 + k] = F2U(f->daxis ? f->daxis[c][k] : f->snrm[c][k]);
+        }
+        r[3] = F2U(f->st[c]);
+        r[7] = F2U(f->sn[c]);
+        r[11] = F2U(f->dexp ? f->dexp[c] : 1.0f);
+        r[12] = f->lfirst ? f->lfirst[c] : 0;
+        r[13] = f->lcount ? f->lcount[c] : 0;
+        r[14] = f->nin ? f->nin[c] : 0;
+        r[15] = f->nout ? f->nout[c] : 0;
+        // cumulative lobe weights within this gaussian
+        if (f->lcount) {
+            float cum = 0;
+            for (uint32_t j = 0; j < f->lcount[c]; j++) {
+                const Lobe* l = &f->lobes[f->lfirst[c] + j];
+                uint32_t* lr = b + lobe + (f->lfirst[c] + j) * SSSG_LOBE_STRIDE;
+                cum += l->weight;
+                for (int k = 0; k < 3; k++) {
+                    lr[k] = F2U(l->mean[k]);
+                    lr[13 + k] = F2U(l->axis[k]);
+                }
+                lr[3] = F2U(j + 1 == f->lcount[c] ? 1.0f : cum);
+                for (int col = 0; col < 3; col++)
+                    for (int row = 0; row < 3; row++)
+                        lr[4 + col * 3 + row] = F2U(l->L[col][row]);
+            }
+        }
+    }
+    if (!f->gs) return;
+    for (uint32_t c = 0; c < f->ng; c++) {
+        uint32_t* r = b + gauss + c * SSSG_GAUSS_STRIDE;
+        const Gauss* g = &f->gs[c];
+        for (int k = 0; k < 3; k++) r[k] = F2U(g->mu[k]);
+        for (int col = 0; col < 3; col++)
+            for (int row = 0; row < 3; row++)
+                r[4 + col * 3 + row] = F2U(g->W[col][row]);
+        for (int k = 0; k < SSS_Q; k++) r[13 + k] = F2U(g->q[k]);
+    }
+    for (uint32_t n = 0; n < f->ngnodes; n++) {
+        uint32_t* r = b + node + n * SSSG_NODE_STRIDE;
+        const BuildNode* nd = &f->gnodes[n];
+        for (int k = 0; k < 3; k++) {
+            r[k] = F2U(nd->bmin[k]);
+            r[4 + k] = F2U(nd->bmax[k]);
+        }
+        r[3] = nd->left;
+        r[7] = nd->count ? (SSSG_LEAF | nd->count) : nd->right;
+    }
+}
 
-// ================================================================================================================
-// phase: setup (area distribution, the object's GPU copy)
-// ================================================================================================================
-
-static void phase_setup(SSSFitter* f) {
-    vec3 bmin = { FLT_MAX, FLT_MAX, FLT_MAX }, bmax = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+static void SetupPhase(SSSFitter* f) {
+    vec3 bmin = { FLT_MAX, FLT_MAX, FLT_MAX };
+    vec3 bmax = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
     for (uint32_t i = 0; i < f->nv; i++) {
         glm_vec3_minv(bmin, (float*)f->pos[i], bmin);
         glm_vec3_maxv(bmax, (float*)f->pos[i], bmax);
     }
     f->diag = glm_vec3_distance(bmin, bmax);
-    if (!(f->diag > 0.0f)) { FailFitting(f, "mesh has no extent"); return; }
+    if (!(f->diag > 0.0f)) {
+        FailFitting(f, "mesh has no extent");
+        return;
+    }
     f->eps = 1e-5f * f->diag;
     f->cdf = EZ_MINALLOC(f->nt, sizeof(double));
     double total = 0.0;
@@ -697,8 +850,10 @@ static void phase_setup(SSSFitter* f) {
         f->cdf[t] = total;
     }
     f->area = total;
-    if (!(total > 0.0)) { FailFitting(f, "mesh has no surface area"); return; }
-    // the object as a scene of its own (object space) for trace() / trace_max() in the kernel; vertexIn is vec4
+    if (!(total > 0.0)) {
+        FailFitting(f, "mesh has no surface area");
+        return;
+    }
     float (*verts)[4] = EZ_MINALLOC(f->nv, sizeof(float[4]));
     for (uint32_t i = 0; i < f->nv; i++) glm_vec3_copy((float*)f->pos[i], verts[i]);
     Triangle* tris = EZ_MINALLOC(f->nt, sizeof(Triangle));
@@ -730,11 +885,7 @@ static void phase_setup(SSSFitter* f) {
     SetStatus(f, "Orienting the surface");
 }
 
-// ================================================================================================================
-// phase: outward normals (GPU ray parity, see orient() in gsss.comp)
-// ================================================================================================================
-
-static void phase_orient(SSSFitter* f, double budget, ClockFunction clock) {
+static void OrientPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
     while (f->cursor < f->nt) {
         uint32_t n = MIN(f->batch, f->nt - f->cursor);
@@ -773,20 +924,17 @@ static void phase_orient(SSSFitter* f, double budget, ClockFunction clock) {
     SetStatus(f, "Clustering surface gaussians");
 }
 
-// ================================================================================================================
-// phase: surface gaussians
-// ================================================================================================================
-
-static void phase_surface(SSSFitter* f) {
+static void SurfacePhase(SSSFitter* f) {
     uint32_t ns = f->cfg.surface_gaussians;
     uint32_t m = ns * SSS_SURFACE_SAMPLES_PER;
     if (m < 20000) m = 20000;
     vec3* sp = EZ_MINALLOC(m, sizeof(vec3));
     vec3* snr = EZ_MINALLOC(m, sizeof(vec3));
     for (uint32_t i = 0; i < m; i++) {
-        uint32_t t = pick_triangle(f, RandomFloat(&f->rng));
-        float r1 = RandomFloat(&f->rng), r2 = RandomFloat(&f->rng);
-        tri_point(f, t, r1, r2, sp[i]);
+        uint32_t t = RandomWeightedTriangle(f, RandomFloat(&f->rng));
+        float r1 = RandomFloat(&f->rng);
+        float r2 = RandomFloat(&f->rng);
+        BarycentricPoint(f, t, r1, r2, sp[i]);
         glm_vec3_copy(f->tn[t], snr[i]);
     }
     if (ns > m) ns = m;
@@ -807,7 +955,7 @@ static void phase_surface(SSSFitter* f) {
         for (uint32_t i = 0; i < m; i++) {
             uint32_t ids[8] = { 0 };
             float d2[8];
-            uint32_t k = grid_knn(&grid, sp[i], 8, ids, d2);
+            uint32_t k = GridLocale(&grid, sp[i], 8, ids, d2);
             uint32_t best = ids[0];
             float bestv = FLT_MAX;
             for (uint32_t j = 0; j < k; j++) {
@@ -867,7 +1015,7 @@ static void phase_surface(SSSFitter* f) {
         glm_vec3_scale(cen, 1.0f / 3.0f, cen);
         uint32_t ids[16];
         float d2[16];
-        uint32_t k = grid_knn(&grid, cen, 16, ids, d2);
+        uint32_t k = GridLocale(&grid, cen, 16, ids, d2);
         uint32_t* row = &f->table[t * 3];
         row[0] = row[1] = row[2] = SSSG_NONE;
         uint32_t filled = 0;
@@ -881,7 +1029,7 @@ static void phase_surface(SSSFitter* f) {
     EZ_FREE(sp);
     EZ_FREE(snr);
     // the walks need the triangle table (flip flags) and the surface gaussians on the GPU
-    pack_blob(f);
+    PackBlob(f);
     if (!UploadBuffer(f, SSS_BIND_BLOB, f->blob, (size_t)f->blob_words * sizeof(uint32_t))) return;
     f->target = f->cfg.walks;
     f->rec = EZ_MINALLOC(f->target, sizeof(SSSWalkRecord));
@@ -891,12 +1039,7 @@ static void phase_surface(SSSFitter* f) {
     SetStatus(f, "Tracing reference walks 0/%u", f->target);
 }
 
-// ================================================================================================================
-// phase: reference random walks (GPU, walk() in gsss.comp)
-// ================================================================================================================
-
-// reservoir of scattering locations for seeding the internal cloud
-static void add_interior(SSSFitter* f, const vec3 p) {
+static void AddInteriorPoint(SSSFitter* f, const vec3 p) {
     f->interior_seen++;
     if (f->ninterior < SSS_INTERIOR_CAP) {
         glm_vec3_copy((float*)p, f->interior[f->ninterior++]);
@@ -906,7 +1049,7 @@ static void add_interior(SSSFitter* f, const vec3 p) {
     if (r < SSS_INTERIOR_CAP) glm_vec3_copy((float*)p, f->interior[r]);
 }
 
-static void phase_walks(SSSFitter* f, double budget, ClockFunction clock) {
+static void WalksPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
     while (f->nrec < f->target) {
         uint32_t want = f->target - f->nrec;
@@ -932,7 +1075,7 @@ static void phase_walks(SSSFitter* f, double budget, ClockFunction clock) {
             if (f->nrec >= f->target) continue;
             f->events_sum += (double)r->info[0] - 1.0;
             f->length_sum += (double)f->sigma * r->exit[3];
-            if (r->interior[3] > 0.0f) add_interior(f, r->interior);
+            if (r->interior[3] > 0.0f) AddInteriorPoint(f, r->interior);
             f->rec[f->nrec++] = *r;
         }
         EZ_FREE(out);
@@ -951,11 +1094,7 @@ static void phase_walks(SSSFitter* f, double budget, ClockFunction clock) {
     SetStatus(f, "Fitting exit lobes");
 }
 
-// ================================================================================================================
-// phase: exit lobes and exit directions per surface gaussian
-// ================================================================================================================
-
-static void default_lobe(const vec3 n, float mfp, Lobe* l) {
+static void DefaultLobe(const vec3 n, float mfp, Lobe* l) {
     memset(l, 0, sizeof(*l));
     double c[3][3];
     for (int i = 0; i < 3; i++)
@@ -966,9 +1105,11 @@ static void default_lobe(const vec3 n, float mfp, Lobe* l) {
     l->weight = 1.0f;
 }
 
-// EM for a K component 3D gaussian mixture over exit offsets (exit normals give the projection axes).
-static uint32_t fit_gmm(SSSFitter* f, const vec3* pts, const vec3* nrm, uint32_t n, uint32_t K, const vec3 fallback_n, Lobe* out) {
-    if (n < 4) { default_lobe(fallback_n, f->mfp, &out[0]); return 1; }
+static uint32_t FitLobes(SSSFitter* f, const vec3* pts, const vec3* nrm, uint32_t n, uint32_t K, const vec3 fallback_n, Lobe* out) { // EM algorithm
+    if (n < 4) {
+        DefaultLobe(fallback_n, f->mfp, &out[0]);
+        return 1;
+    }
     if (K > n / 24) K = n / 24;
     if (K < 1) K = 1;
     double reg = (0.02 * f->mfp) * (0.02 * f->mfp) + 1e-14 * (double)f->diag * f->diag;
@@ -1069,14 +1210,14 @@ static uint32_t fit_gmm(SSSFitter* f, const vec3* pts, const vec3* nrm, uint32_t
         used++;
     }
     EZ_FREE(resp);
-    if (used == 0) { default_lobe(fallback_n, f->mfp, &out[0]); return 1; }
+    if (used == 0) { DefaultLobe(fallback_n, f->mfp, &out[0]); return 1; }
     float total = 0;
     for (uint32_t c = 0; c < used; c++) total += out[c].weight;
     for (uint32_t c = 0; c < used; c++) out[c].weight /= total;
     return used;
 }
 
-static void phase_lobes(SSSFitter* f, double budget, ClockFunction clock) {
+static void LobesPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double tstart = clock();
     uint32_t ns = f->ns, ntrain = f->holdout;
     if (!f->lbucket_start) {
@@ -1113,7 +1254,11 @@ static void phase_lobes(SSSFitter* f, double budget, ClockFunction clock) {
         uint32_t c = f->lcursor;
         if ((c & 7u) == 0u && c > 0) {
             SetStatus(f, "Fitting exit lobes %u/%u", c, ns);
-            if (clock() - tstart >= budget) { EZ_FREE(pts); EZ_FREE(nrm); return; }
+            if (clock() - tstart >= budget) {
+                EZ_FREE(pts);
+                EZ_FREE(nrm);
+                return;
+            }
         }
         uint32_t cnt = bstart[c + 1] - bstart[c];
         uint32_t take = MIN(cnt, SSS_EM_MAX_POINTS);
@@ -1124,7 +1269,7 @@ static void phase_lobes(SSSFitter* f, double budget, ClockFunction clock) {
             glm_vec3_copy(f->tn[w->tris[1]], nrm[j]);
         }
         f->lfirst[c] = f->nlobes;
-        f->lcount[c] = fit_gmm(f, pts, nrm, take, f->cfg.lobes, f->snrm[c], &f->lobes[f->nlobes]);
+        f->lcount[c] = FitLobes(f, pts, nrm, take, f->cfg.lobes, f->snrm[c], &f->lobes[f->nlobes]);
         f->nlobes += f->lcount[c];
     }
     EZ_FREE(pts);
@@ -1148,7 +1293,10 @@ static void phase_lobes(SSSFitter* f, double budget, ClockFunction clock) {
         csum[w->tris[3]] += glm_vec3_dot((float*)w->dir, f->daxis[w->tris[3]]);
     }
     for (uint32_t c = 0; c < ns; c++) {
-        if (f->nout[c] < 8) { f->dexp[c] = 1.0f; continue; }
+        if (f->nout[c] < 8) {
+            f->dexp[c] = 1.0f;
+            continue;
+        }
         double m = csum[c] / f->nout[c];
         // E[cos] of a normalised cos^e lobe is (e + 1) / (e + 2)
         double e = m >= 0.995 ? 200.0 : (2.0 * m - 1.0) / (1.0 - m);
@@ -1160,23 +1308,7 @@ static void phase_lobes(SSSFitter* f, double budget, ClockFunction clock) {
     SetStatus(f, "Building internal cloud");
 }
 
-// ================================================================================================================
-// path length field
-// ================================================================================================================
-
-// Every internal gaussian (and the background) carries SSS_Q coefficients, blended along a chord with the gaussians'
-// line integrals (sss_cloud_chord in shared.import):
-//   q0 + q1 u, q2   : mean / log std of the first normal component of log(excess + eps)
-//   q3 + q4 u, q5   : mean / log std of the second component
-//   q6              : logit of the first component's weight
-// with u = log(1 + chord / mfp).
-typedef struct {
-    float m1, s1, m2, s2, w1;
-} LengthModel;
-
-// The one formula the CPU still shares with the shaders (the end of sss_length_model): the optimiser below is defined
-// over these coefficients, so it needs it to evaluate the likelihood. Keep the two in step.
-static void model_from_sums(float C, const float* Q, float u, LengthModel* lm) {
+static void ModelFromSums(float C, const float* Q, float u, LengthModel* lm) { // DO NOT EDIT UNLESS ALSO EDITING SHADER LOGIC
     float inv = 1.0f / C;
     lm->m1 = (Q[0] + u * Q[1]) * inv;
     lm->s1 = expf(CLAMP(Q[2] * inv, -6.0f, 4.0f));
@@ -1185,18 +1317,14 @@ static void model_from_sums(float C, const float* Q, float u, LengthModel* lm) {
     lm->w1 = 1.0f / (1.0f + expf(-CLAMP(Q[6] * inv, -20.0f, 20.0f)));
 }
 
-// ================================================================================================================
-// phase: internal cloud construction
-// ================================================================================================================
-
-static void make_whitening(Gauss* g) {
+static void PrecomputeWhitening(Gauss* g) {
     // W = S^-1 R^T: W[col][row] = R^T[col][row] / s[row] = R[row][col] / s[row]
     for (int col = 0; col < 3; col++)
         for (int row = 0; row < 3; row++)
             g->W[col][row] = g->R[row][col] / g->s[row];
 }
 
-static void phase_cloud(SSSFitter* f, double budget, ClockFunction clock) {
+static void CloudPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
     uint32_t n = f->ninterior;
     if (!f->cl_centres) {
@@ -1231,7 +1359,7 @@ static void phase_cloud(SSSFitter* f, double budget, ClockFunction clock) {
         for (uint32_t i = 0; i < n; i++) {
             uint32_t id = 0;
             float d2;
-            grid_knn(&grid, f->interior[i], 1, &id, &d2);
+            GridLocale(&grid, f->interior[i], 1, &id, &d2);
             assign[i] = id;
         }
         FreeGrid(&grid);
@@ -1260,7 +1388,9 @@ static void phase_cloud(SSSFitter* f, double budget, ClockFunction clock) {
         uint32_t c = assign[i];
         vec3 d;
         glm_vec3_sub(f->interior[i], centres[c], d);
-        for (int a = 0; a < 3; a++) for (int b = 0; b < 3; b++) cov[c * 9 + a * 3 + b] += d[a] * d[b];
+        for (int a = 0; a < 3; a++)
+            for (int b = 0; b < 3; b++)
+                cov[c * 9 + a * 3 + b] += d[a] * d[b];
         acc[c * 4 + 3] += 1.0;
     }
     Grid cgrid;
@@ -1270,7 +1400,7 @@ static void phase_cloud(SSSFitter* f, double budget, ClockFunction clock) {
         glm_vec3_copy(centres[c], g->mu);
         uint32_t ids[2];
         float d2[2];
-        uint32_t k = grid_knn(&cgrid, g->mu, 2, ids, d2);
+        uint32_t k = GridLocale(&cgrid, g->mu, 2, ids, d2);
         float nn = k > 1 ? sqrtf(d2[1]) : spacing;
         float iso = fmaxf(0.75f * nn, 0.05f * f->mfp);
         double cnt = acc[c * 4 + 3];
@@ -1279,14 +1409,18 @@ static void phase_cloud(SSSFitter* f, double budget, ClockFunction clock) {
             glm_vec3_fill(g->s, iso);
         } else {
             double a[3][3], ev[3], V[3][3];
-            for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) a[i][j] = cov[c * 9 + i * 3 + j] / cnt;
+            for (int i = 0; i < 3; i++)
+                for (int j = 0; j < 3; j++)
+                    a[i][j] = cov[c * 9 + i * 3 + j] / cnt;
             Jacobi3(a, ev, V);
             for (int i = 0; i < 3; i++) g->s[i] = 1.4f * (float)sqrt(fmax(ev[i], 0.0));
             float smin = fmaxf(0.3f * glm_vec3_max(g->s), 0.05f * f->mfp);
             for (int i = 0; i < 3; i++) g->s[i] = fmaxf(g->s[i], smin);
-            for (int col = 0; col < 3; col++) for (int row = 0; row < 3; row++) g->R[col][row] = (float)V[row][col];
+            for (int col = 0; col < 3; col++)
+                for (int row = 0; row < 3; row++)
+                    g->R[col][row] = (float)V[row][col];
         }
-        make_whitening(g);
+        PrecomputeWhitening(g);
     }
     FreeGrid(&cgrid);
     EZ_FREE(cov);
@@ -1351,7 +1485,7 @@ static void phase_cloud(SSSFitter* f, double budget, ClockFunction clock) {
     f->fidx = EZ_MINALLOC(f->entrycap, sizeof(uint32_t));
     f->fval = EZ_MINALLOC(f->entrycap, sizeof(float));
     // the chord traversal reads the packed nodes / gaussians
-    pack_blob(f);
+    PackBlob(f);
     if (!UploadBuffer(f, SSS_BIND_BLOB, f->blob, (size_t)f->blob_words * sizeof(uint32_t))) return;
     f->cursor = 0;
     f->batch = SSS_BATCH_FIRST;
@@ -1359,11 +1493,7 @@ static void phase_cloud(SSSFitter* f, double budget, ClockFunction clock) {
     SetStatus(f, "Integrating chords through the internal cloud");
 }
 
-// ================================================================================================================
-// phase: chord features (GPU, sss_cloud_chord through chords() in gsss.comp)
-// ================================================================================================================
-
-static void phase_chords(SSSFitter* f, double budget, ClockFunction clock) {
+static void ChordPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
     while (f->cursor < f->nfeat) {
         uint32_t n = MIN(f->batch, f->nfeat - f->cursor);
@@ -1417,11 +1547,7 @@ static void phase_chords(SSSFitter* f, double budget, ClockFunction clock) {
     SetStatus(f, "Optimising path length field");
 }
 
-// ================================================================================================================
-// phase: optimise the path length field (full batch Adam on the log normal negative log likelihood)
-// ================================================================================================================
-
-static double evaluate_nll(SSSFitter* f, float* grad, double* r2) {
+static double Evaluate(SSSFitter* f, float* grad, double* r2) {
     uint32_t ng = f->ng;
     uint32_t P = (ng + 1) * SSS_Q;
     if (grad) memset(grad, 0, (size_t)P * sizeof(float));
@@ -1440,7 +1566,7 @@ static double evaluate_nll(SSSFitter* f, float* grad, double* r2) {
         }
         float u = f->fu[i], y = f->fy[i];
         LengthModel lm;
-        model_from_sums(C, Q, u, &lm);
+        ModelFromSums(C, Q, u, &lm);
         float z1 = (y - lm.m1) / lm.s1, z2 = (y - lm.m2) / lm.s2;
         // log densities of both components, combined with log-sum-exp
         float l1 = logf(fmaxf(lm.w1, 1e-30f)) - logf(lm.s1) - 0.5f * z1 * z1;
@@ -1455,7 +1581,7 @@ static double evaluate_nll(SSSFitter* f, float* grad, double* r2) {
         float r1 = expf(l1 - lse), r2 = 1.0f - r1; // responsibilities
         float invC = 1.0f / C;
         float ls1 = Q[2] * invC, ls2 = Q[5] * invC, lg = Q[6] * invC;
-        // derivatives of the nll with respect to the blended quantities
+        // derivatives of the negative log liklihoood with respect to the blended quantities
         float dm1 = -r1 * z1 / lm.s1, dm2 = -r2 * z2 / lm.s2;
         float dls1 = (ls1 > -6.0f && ls1 < 4.0f) ? r1 * (1.0f - z1 * z1) : 0.0f;
         float dls2 = (ls2 > -6.0f && ls2 < 4.0f) ? r2 * (1.0f - z2 * z2) : 0.0f;
@@ -1476,12 +1602,15 @@ static double evaluate_nll(SSSFitter* f, float* grad, double* r2) {
     return nll / n;
 }
 
-static void phase_optimise(SSSFitter* f, double budget, ClockFunction clock) {
+static void OptimisePhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
-    if (f->epoch == 0) f->stats.nll_initial = evaluate_nll(f, NULL, NULL);
-    const float lr = 0.03f, b1 = 0.9f, b2 = 0.999f, reg = 2e-4f;
+    if (f->epoch == 0) f->stats.nll_initial = Evaluate(f, NULL, NULL);
+    const float lr = 0.03f;
+    const float b1 = 0.9f;
+    const float b2 = 0.999f;
+    const float reg = 2e-4f;
     while (f->epoch < f->cfg.epochs) {
-        evaluate_nll(f, f->grad, NULL);
+        Evaluate(f, f->grad, NULL);
         f->epoch++;
         float bc1 = 1.0f - powf(b1, (float)f->epoch), bc2 = 1.0f - powf(b2, (float)f->epoch);
         for (uint32_t p = 0; p < (f->ng + 1) * SSS_Q; p++) {
@@ -1497,8 +1626,8 @@ static void phase_optimise(SSSFitter* f, double budget, ClockFunction clock) {
         if (f->epoch % 10 == 0) SetStatus(f, "Optimising path length field %u/%u", f->epoch, f->cfg.epochs);
         if (clock() - start >= budget) return;
     }
-    f->stats.nll_final = evaluate_nll(f, NULL, &f->stats.r2_mean);
-    pack_blob(f);
+    f->stats.nll_final = Evaluate(f, NULL, &f->stats.r2_mean);
+    PackBlob(f);
     f->val_count = MIN(f->cfg.validation, f->nrec - f->holdout);
     f->cursor = 0;
     if (f->val_count == 0) {
@@ -1514,96 +1643,6 @@ static void phase_optimise(SSSFitter* f, double budget, ClockFunction clock) {
     f->batch = SSS_BATCH_FIRST;
     f->phase = SSSFIT_VALIDATE;
     SetStatus(f, "Validating against held out walks");
-}
-
-// ================================================================================================================
-// packing
-// ================================================================================================================
-
-static void pack_blob(SSSFitter* f) {
-    uint32_t table = SSSG_HEADER_WORDS;
-    uint32_t surf = table + f->nt * SSSG_TABLE_STRIDE;
-    uint32_t lobe = surf + f->ns * SSSG_SURF_STRIDE;
-    uint32_t gauss = lobe + f->nlobes * SSSG_LOBE_STRIDE;
-    uint32_t node = gauss + f->ng * SSSG_GAUSS_STRIDE;
-    uint32_t total = node + f->ngnodes * SSSG_NODE_STRIDE;
-    // before the internal cloud exists (walk phase) there are no gaussians or nodes to pack
-    if (!f->gs) {
-        node = gauss;
-        total = gauss;
-    }
-    if (!f->blob || f->blob_words != total) {
-        EZ_FREE(f->blob);
-        f->blob = EZ_MINALLOC(total, sizeof(uint32_t));
-        f->blob_words = total;
-    }
-    uint32_t* b = f->blob;
-    memset(b, 0, (size_t)total * 4);
-    b[SSSG_H_MAGIC] = SSSG_MAGIC;
-    b[SSSG_H_VERSION] = SSSG_VERSION;
-    b[SSSG_H_TCOUNT] = f->nt;
-    b[SSSG_H_TABLE] = table;
-    b[SSSG_H_SURF] = surf; b[SSSG_H_NSURF] = f->ns;
-    b[SSSG_H_LOBE] = lobe; b[SSSG_H_NLOBE] = f->nlobes;
-    b[SSSG_H_GAUSS] = gauss; b[SSSG_H_NGAUSS] = f->gs ? f->ng : 0;
-    b[SSSG_H_NODE] = node; b[SSSG_H_NNODE] = f->gs ? f->ngnodes : 0;
-    b[SSSG_H_SIGMA] = F2U(f->sigma);
-    b[SSSG_H_G] = F2U(f->g);
-    b[SSSG_H_MFP] = F2U(f->mfp);
-    b[SSSG_H_EPS] = F2U(SSS_EPS_FRACTION * f->mfp);
-    for (int k = 0; k < SSS_Q; k++) b[SSSG_H_BG + k] = F2U(f->bg[k]);
-    b[SSSG_H_BGW] = F2U(SSS_BG_WEIGHT);
-    b[SSSG_H_DMIN] = F2U(SSS_DMIN_FRACTION * f->mfp);
-    b[SSSG_H_TSTART] = SSSG_NONE;
-    b[SSSG_H_MATERIAL] = SSSG_NONE;
-    b[SSSG_H_SCALE] = F2U(1.0f);
-    for (uint32_t t = 0; t < f->nt; t++) {
-        uint32_t* r = b + table + t * SSSG_TABLE_STRIDE;
-        r[0] = f->table[t * 3]; r[1] = f->table[t * 3 + 1]; r[2] = f->table[t * 3 + 2];
-        r[3] = f->flip[t] ? SSSG_TRI_FLIP : 0u;
-    }
-    for (uint32_t c = 0; c < f->ns; c++) {
-        uint32_t* r = b + surf + c * SSSG_SURF_STRIDE;
-        for (int k = 0; k < 3; k++) {
-            r[k] = F2U(f->sc[c][k]);
-            r[4 + k] = F2U(f->snrm[c][k]);
-            r[8 + k] = F2U(f->daxis ? f->daxis[c][k] : f->snrm[c][k]);
-        }
-        r[3] = F2U(f->st[c]);
-        r[7] = F2U(f->sn[c]);
-        r[11] = F2U(f->dexp ? f->dexp[c] : 1.0f);
-        r[12] = f->lfirst ? f->lfirst[c] : 0;
-        r[13] = f->lcount ? f->lcount[c] : 0;
-        r[14] = f->nin ? f->nin[c] : 0;
-        r[15] = f->nout ? f->nout[c] : 0;
-        // cumulative lobe weights within this gaussian
-        if (f->lcount) {
-            float cum = 0;
-            for (uint32_t j = 0; j < f->lcount[c]; j++) {
-                const Lobe* l = &f->lobes[f->lfirst[c] + j];
-                uint32_t* lr = b + lobe + (f->lfirst[c] + j) * SSSG_LOBE_STRIDE;
-                cum += l->weight;
-                for (int k = 0; k < 3; k++) { lr[k] = F2U(l->mean[k]); lr[13 + k] = F2U(l->axis[k]); }
-                lr[3] = F2U(j + 1 == f->lcount[c] ? 1.0f : cum);
-                for (int col = 0; col < 3; col++) for (int row = 0; row < 3; row++) lr[4 + col * 3 + row] = F2U(l->L[col][row]);
-            }
-        }
-    }
-    if (!f->gs) return;
-    for (uint32_t c = 0; c < f->ng; c++) {
-        uint32_t* r = b + gauss + c * SSSG_GAUSS_STRIDE;
-        const Gauss* g = &f->gs[c];
-        for (int k = 0; k < 3; k++) r[k] = F2U(g->mu[k]);
-        for (int col = 0; col < 3; col++) for (int row = 0; row < 3; row++) r[4 + col * 3 + row] = F2U(g->W[col][row]);
-        for (int k = 0; k < SSS_Q; k++) r[13 + k] = F2U(g->q[k]);
-    }
-    for (uint32_t n = 0; n < f->ngnodes; n++) {
-        uint32_t* r = b + node + n * SSSG_NODE_STRIDE;
-        const BuildNode* nd = &f->gnodes[n];
-        for (int k = 0; k < 3; k++) { r[k] = F2U(nd->bmin[k]); r[4 + k] = F2U(nd->bmax[k]); }
-        r[3] = nd->left;
-        r[7] = nd->count ? (SSSG_LEAF | nd->count) : nd->right;
-    }
 }
 
 static int SSSBlobGaussian(const uint32_t* blob, uint32_t i, vec3 mu, mat3 axes, vec3 scales, float* log_excess) {
@@ -1631,7 +1670,7 @@ static int SSSBlobGaussian(const uint32_t* blob, uint32_t i, vec3 mu, mat3 axes,
     float q[SSS_Q];
     for (int k = 0; k < SSS_Q; k++) q[k] = U2F(g[13 + k]);
     LengthModel lm;
-    model_from_sums(1.0f, q, logf(2.0f), &lm);
+    ModelFromSums(1.0f, q, logf(2.0f), &lm);
     *log_excess = lm.w1 * lm.m1 + (1.0f - lm.w1) * lm.m2;
     return 1;
 }
@@ -1653,24 +1692,19 @@ static uint32_t SSSBlobWords(const uint32_t* b, uint32_t available) {
     return (uint32_t)total;
 }
 
-// ================================================================================================================
-// phase: validation against held out walks (GPU, sss_cloud_sample through validate() in gsss.comp)
-// ================================================================================================================
-
-static int cmpf(const void* a, const void* b) {
-    float x = *(const float*)a, y = *(const float*)b;
+static int CompareFloat(const void* a, const void* b) {
+    float x = *(const float*)a;
+    float y = *(const float*)b;
     return x < y ? -1 : (x > y ? 1 : 0);
 }
 
-static void quantiles(float* v, uint32_t n, double* q) {
-    qsort(v, n, sizeof(float), cmpf);
+static void Quantiles(float* v, uint32_t n, double* q) {
+    qsort(v, n, sizeof(float), CompareFloat);
     const double ps[4] = { 0.25, 0.5, 0.75, 0.9 };
     for (int i = 0; i < 4; i++) q[i] = n ? v[(uint32_t)(ps[i] * (n - 1))] : 0.0;
 }
 
-static const double SSS_TP_ALBEDOS[3] = { 0.5, 0.9, 0.99 };
-
-static void phase_validate(SSSFitter* f, double budget, ClockFunction clock) {
+static void PhaseValidate(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
     while (f->cursor < f->val_count) {
         uint32_t n = MIN(f->batch, f->val_count - f->cursor);
@@ -1709,20 +1743,20 @@ static void phase_validate(SSSFitter* f, double budget, ClockFunction clock) {
     }
     uint32_t n = f->val_count;
     f->stats.validation_samples = n;
-    for (int k = 0; k < 3; k++) { f->stats.tp_walk[k] /= n; f->stats.tp_length[k] /= n; f->stats.tp_model[k] /= n; }
+    for (int k = 0; k < 3; k++) {
+        f->stats.tp_walk[k] /= n;
+        f->stats.tp_length[k] /= n;
+        f->stats.tp_model[k] /= n;
+    }
     f->stats.walk_cos = f->val_cos_walk / n;
     f->stats.model_cos = f->val_cos_model / n;
-    quantiles(f->val_walk_d, n, f->stats.walk_dist_q);
-    quantiles(f->val_model_d, n, f->stats.model_dist_q);
-    quantiles(f->val_walk_l, n, f->stats.walk_len_q);
-    quantiles(f->val_model_l, n, f->stats.model_len_q);
+    Quantiles(f->val_walk_d, n, f->stats.walk_dist_q);
+    Quantiles(f->val_model_d, n, f->stats.model_dist_q);
+    Quantiles(f->val_walk_l, n, f->stats.walk_len_q);
+    Quantiles(f->val_model_l, n, f->stats.model_len_q);
     f->phase = SSSFIT_DONE;
     SetStatus(f, "Done");
 }
-
-// ================================================================================================================
-// driver
-// ================================================================================================================
 
 static SSSFitPhase SSSFitStep(SSSFitter* f, double budget, ClockFunction clock) {
     if (!f) return SSSFIT_FAILED;
@@ -1731,70 +1765,20 @@ static SSSFitPhase SSSFitStep(SSSFitter* f, double budget, ClockFunction clock) 
         double left = budget - (clock() - start);
         if (left <= 0.0) break;
         switch (f->phase) {
-            case SSSFIT_SETUP: phase_setup(f); break;
-            case SSSFIT_ORIENT: phase_orient(f, left, clock); break;
-            case SSSFIT_SURFACE: phase_surface(f); break;
-            case SSSFIT_WALKS: phase_walks(f, left, clock); break;
-            case SSSFIT_LOBES: phase_lobes(f, left, clock); break;
-            case SSSFIT_CLOUD: phase_cloud(f, left, clock); break;
-            case SSSFIT_CHORDS: phase_chords(f, left, clock); break;
-            case SSSFIT_OPTIMISE: phase_optimise(f, left, clock); break;
-            case SSSFIT_VALIDATE: phase_validate(f, left, clock); break;
+            case SSSFIT_SETUP: SetupPhase(f); break;
+            case SSSFIT_ORIENT: OrientPhase(f, left, clock); break;
+            case SSSFIT_SURFACE: SurfacePhase(f); break;
+            case SSSFIT_WALKS: WalksPhase(f, left, clock); break;
+            case SSSFIT_LOBES: LobesPhase(f, left, clock); break;
+            case SSSFIT_CLOUD: CloudPhase(f, left, clock); break;
+            case SSSFIT_CHORDS: ChordPhase(f, left, clock); break;
+            case SSSFIT_OPTIMISE: OptimisePhase(f, left, clock); break;
+            case SSSFIT_VALIDATE: PhaseValidate(f, left, clock); break;
             default: break;
         }
     }
     return f->phase;
 }
-
-// ================================================================================================================
-// renderer side: linked clouds, the training job, the SubsurfaceSSBOIn buffer and session persistence
-// ================================================================================================================
-
-typedef struct {
-    uint32_t mesh;
-    BOOL enabled;
-    uint32_t channels; // 1 or 3
-    uint32_t* blob[3];
-    uint32_t words[3];
-    float sigma[3]; // world space density each blob was trained for
-    uint32_t tstart; // triangle range the cloud was trained on (re-synced when meshes move)
-    uint32_t tcount;
-    MaterialID material;
-    float g;
-    float scale; // object scale it was trained at
-} Cloud;
-
-typedef struct {
-    SubsurfaceTrainPhase phase;
-    SSSFitter* fitter;
-    size_t mesh;
-    uint32_t tstart;
-    uint32_t tcount;
-    MaterialID material;
-    float g;
-    float scale;
-    uint32_t channels;
-    uint32_t channel; // channel currently being fitted
-    float sigma[3];
-    GSSSConfig config;
-    vec3* pos; // object space mesh, kept for the per channel fits (the fitter borrows it)
-    uint32_t* idx;
-    uint32_t nverts;
-    TGPU gpu; // compute context shared by the per channel fits (the fitter borrows it)
-    TGPUKernel kernel;
-    BOOL gpu_alive;
-    uint32_t* blob[3];
-    uint32_t words[3];
-    char status[192];
-    SSSFitStats stats;
-    BOOL have_stats;
-    double started;
-} CloudTrainJob;
-
-static Cloud* g_clouds = NULL;
-static size_t g_cloud_count = 0;
-static CloudTrainJob g_job = { 0 };
-static BOOL g_update_gsss = FALSE;
 
 static BOOL MeshTriangles(const MeshDescriptor* md, uint32_t* start, uint32_t* count) {
     if (md->tend < md->tstart || md->tend == (TriangleID)-1) return FALSE;
@@ -1803,8 +1787,7 @@ static BOOL MeshTriangles(const MeshDescriptor* md, uint32_t* start, uint32_t* c
     return TRUE;
 }
 
-// cube root of |det| of the linear part: converts object space lengths to world space (same as SSSObject.scale)
-static float TransformScale(const MeshDescriptor* md) {
+static float TransformScale(const MeshDescriptor* md) { // cube root of |det| of the linear part: converts object space lengths to world space (same as SSSObject.scale)
     mat4 m;
     mat3 m3;
     memcpy(m, md->transform, sizeof(mat4));
