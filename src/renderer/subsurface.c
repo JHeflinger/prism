@@ -14,8 +14,13 @@
 #define SSS_BUFFER_HEADER 4u // words: object count, 3 reserved
 #define SSS_ENTRY_WORDS 8u // per object: blob base per channel (3), mesh index, flags, triangle start, channels, 0
 #define SSS_SPECTRAL_SPREAD 0.05f // relative spread of sigma_t across rgb above which one cloud per channel is trained
+#define SSS_KERNEL_PATH "shaders/gsss.comp.spv"
+#define SSS_GROUP 256u
+#define SSS_BATCH_FIRST 4096u // items in the first submission of a phase; later ones adapt to SSS_SUBMIT_SECONDS
+#define SSS_BATCH_MAX 262144u
+#define SSS_SUBMIT_SECONDS 0.014
 
-// cloud blob (see the layout below)
+// cloud blob
 #define SSSG_MAGIC 0x47535353u // literally the string "SSSG"
 #define SSSG_VERSION 1u
 #define SSSG_HEADER_WORDS 32u
@@ -37,22 +42,15 @@
 #define SSS_DMIN_FRACTION 0.01f // chords shorter than this (in mean free paths) are evaluated as a point
 #define SSS_Q 7
 
-// GPU side of the fit (shaders/gsss.comp, one pipeline, mode in the push constants)
-#define SSS_KERNEL_PATH "shaders/gsss.comp.spv"
-#define SSS_GROUP 256u
-#define SSS_BATCH_FIRST 4096u // items in the first submission of a phase; later ones adapt to SSS_SUBMIT_SECONDS
-#define SSS_BATCH_MAX 262144u
-#define SSS_SUBMIT_SECONDS 0.014
-
-enum {
+typedef enum {
     SSS_MODE_ORIENT = 0,
     SSS_MODE_WALKS = 1,
     SSS_MODE_CHORD_COUNT = 2,
     SSS_MODE_CHORD_WRITE = 3,
     SSS_MODE_VALIDATE = 4
-};
+} SSSMode;
 
-enum { // descriptor bindings of gsss.comp
+typedef enum { // descriptor bindings of gsss.comp
     SSS_BIND_TRIANGLES = 0,
     SSS_BIND_VERTICES,
     SSS_BIND_NODES,
@@ -65,7 +63,7 @@ enum { // descriptor bindings of gsss.comp
     SSS_BIND_CHORD_ENTRIES,
     SSS_BIND_VALIDATION,
     SSS_BIND_COUNT
-};
+} SSSDescriptorBinding;
 
 typedef enum {
     SSSG_H_MAGIC = 0,
@@ -91,7 +89,7 @@ typedef enum {
     SSSG_H_MATERIAL,
     SSSG_H_SCALE,
     SSSG_H_WORDS // 28, must stay <= SSSG_HEADER_WORDS (28..31 are zero / unused)
-} CloudHeaderMarks;
+} CloudHeaderMark;
 
 typedef struct {
     const vec3* positions; // per vertex, object space
@@ -99,7 +97,7 @@ typedef struct {
     uint32_t vertex_count;
     uint32_t triangle_count;
     float sigma; // free flight density in object space units (world sigma * object scale)
-    float g; // Henyey-Greenstein anisotropy
+    float anisotropy; // Henyey-Greenstein anisotropy
     TGPU* gpu;
     const TGPUKernel* kernel;
 } SSSFitInput;
@@ -118,14 +116,29 @@ typedef enum {
     SSSFIT_FAILED
 } SSSFitPhase;
 
+typedef enum {
+    CRACK_ESCAPE = 0,
+    SURFACE_REACH,
+    STEP_LIMIT
+} LostWalkReason;
+
 typedef struct {
-    uint32_t walks_kept;
-    uint32_t walks_lost;
-    uint32_t walks_lost_why[3]; // of those: escaped through a crack, reached the surface from outside, hit step limit
+    uint32_t kept;
+    uint32_t lost;
+    uint32_t lostwhy[3];
+} WalkStats;
+
+typedef struct {
+
+} ModelStats;
+
+typedef struct {
+    WalkStats walks;
+    ModelStats model;
     double mean_steps;
     double events_per_length; // sum (scatters) / sum (sigma * L), ~1 when scattering behaves like a poisson process
-    double nll_initial;
-    double nll_final;
+    double nll_initial; // negative log likelihood is basically a score of how well the model explains the behavior, less is better!
+    double nll_final; // log bc easier/stable to differentiate due to log(ab) = log(a) + log(b), negative bc log maximizes, we want to minimize
     double r2_mean; // fraction of log excess path length variance explained by the cloud
     uint32_t validation_samples;
     uint32_t projection_failures;
@@ -140,15 +153,15 @@ typedef struct {
 typedef struct {
     float entry[4]; // xyz entry point
     float exit[4]; // xyz exit point (on the surface), w path length
-    float dir[4]; // xyz exit direction
+    float direction[4]; // xyz exit direction
     float interior[4]; // xyz one of the walk's scattering locations, w 1 when the walk scattered at all
-    uint32_t tris[4]; // entry triangle, exit triangle, entry surface gaussian, exit surface gaussian
+    uint32_t triangles[4]; // entry triangle, exit triangle, entry surface gaussian, exit surface gaussian
     uint32_t info[4]; // free flights (scattering events + 1), 1 when the walk left through the outside, otherwise why it was lost (1 escaped through a crack, 2 reached the surface from outside, 3 step limit)
 } SSSWalkRecord;
 
 typedef struct {
     float exit[4]; // xyz exit point, w 1 when the exit point projection succeeded
-    float dir[4]; // xyz exit direction, w path length
+    float direction[4]; // xyz exit direction, w path length
     float normal[4]; // xyz outward normal at the exit, w chord length
 } SSSValidationSample;
 
@@ -171,7 +184,10 @@ typedef struct {
     float min[3];
     float pad0;
     float max[3];
-    uint32_t left, right, parent, counter;
+    uint32_t left;
+    uint32_t right;
+    uint32_t parent;
+    uint32_t counter;
     uint32_t pad1;
 } SSSGPUNode;
 
@@ -659,7 +675,7 @@ static SSSFitter* SSSFitCreate(const SSSFitInput* in, const GSSSConfig* cfg) {
     f->pos = in->positions;
     f->idx = in->indices;
     f->sigma = in->sigma;
-    f->g = CLAMP(in->g, -0.99f, 0.99f);
+    f->g = CLAMP(in->anisotropy, -0.99f, 0.99f);
     f->mfp = 1.0f / in->sigma;
     f->gpu = in->gpu;
     f->kernel = in->kernel;
@@ -1068,8 +1084,8 @@ static void WalksPhase(SSSFitter* f, double budget, ClockFunction clock) {
             f->attempts++;
             f->steps_sum += r->info[0];
             if (!r->info[1]) {
-                f->stats.walks_lost++;
-                if (r->info[2] >= 1 && r->info[2] <= 3) f->stats.walks_lost_why[r->info[2] - 1]++;
+                f->stats.walks.lost++;
+                if (r->info[2] >= 1 && r->info[2] <= 3) f->stats.walks.lostwhy[r->info[2] - 1]++;
                 continue;
             }
             if (f->nrec >= f->target) continue;
@@ -1079,14 +1095,14 @@ static void WalksPhase(SSSFitter* f, double budget, ClockFunction clock) {
             f->rec[f->nrec++] = *r;
         }
         EZ_FREE(out);
-        if (f->attempts > 64 && f->stats.walks_lost > f->attempts / 2) {
+        if (f->attempts > 64 && f->stats.walks.lost > f->attempts / 2) {
             FailFitting(f, "more than half of the walks escaped, the mesh is probably not closed");
             return;
         }
         SetStatus(f, "Tracing reference walks %u/%u", f->nrec, f->target);
         if (clock() - start >= budget) return;
     }
-    f->stats.walks_kept = f->nrec;
+    f->stats.walks.kept = f->nrec;
     f->stats.mean_steps = f->steps_sum / (double)(f->attempts ? f->attempts : 1);
     f->stats.events_per_length = f->events_sum / fmax(f->length_sum, 1e-9);
     f->holdout = f->nrec - f->nrec / 10;
@@ -1225,8 +1241,8 @@ static void LobesPhase(SSSFitter* f, double budget, ClockFunction clock) {
         f->nin = EZ_MINALLOC(ns, sizeof(uint32_t));
         f->nout = EZ_MINALLOC(ns, sizeof(uint32_t));
         for (uint32_t i = 0; i < ntrain; i++) {
-            f->nin[f->rec[i].tris[2]]++;
-            f->nout[f->rec[i].tris[3]]++;
+            f->nin[f->rec[i].triangles[2]]++;
+            f->nout[f->rec[i].triangles[3]]++;
         }
         // bucket training records by entry gaussian
         uint32_t* bstart = EZ_MINALLOC(ns + 1, sizeof(uint32_t));
@@ -1234,7 +1250,7 @@ static void LobesPhase(SSSFitter* f, double budget, ClockFunction clock) {
         uint32_t* items = EZ_MINALLOC(ntrain, sizeof(uint32_t));
         uint32_t* cur = EZ_MINALLOC(ns, sizeof(uint32_t));
         for (uint32_t i = 0; i < ntrain; i++) {
-            uint32_t c = f->rec[i].tris[2];
+            uint32_t c = f->rec[i].triangles[2];
             items[bstart[c] + cur[c]++] = i;
         }
         EZ_FREE(cur);
@@ -1266,7 +1282,7 @@ static void LobesPhase(SSSFitter* f, double budget, ClockFunction clock) {
             uint32_t pickj = take == cnt ? j : (uint32_t)(((uint64_t)j * cnt) / take); // even subsample
             const SSSWalkRecord* w = &f->rec[items[bstart[c] + pickj]];
             glm_vec3_sub((float*)w->exit, (float*)w->entry, pts[j]);
-            glm_vec3_copy(f->tn[w->tris[1]], nrm[j]);
+            glm_vec3_copy(f->tn[w->triangles[1]], nrm[j]);
         }
         f->lfirst[c] = f->nlobes;
         f->lcount[c] = FitLobes(f, pts, nrm, take, f->cfg.lobes, f->snrm[c], &f->lobes[f->nlobes]);
@@ -1280,7 +1296,7 @@ static void LobesPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double* dsum = EZ_MINALLOC((size_t)ns * 3, sizeof(double));
     for (uint32_t i = 0; i < ntrain; i++) {
         const SSSWalkRecord* w = &f->rec[i];
-        for (int k = 0; k < 3; k++) dsum[w->tris[3] * 3 + k] += w->dir[k];
+        for (int k = 0; k < 3; k++) dsum[w->triangles[3] * 3 + k] += w->direction[k];
     }
     double* csum = EZ_MINALLOC(ns, sizeof(double));
     for (uint32_t c = 0; c < ns; c++) {
@@ -1290,7 +1306,7 @@ static void LobesPhase(SSSFitter* f, double budget, ClockFunction clock) {
     }
     for (uint32_t i = 0; i < ntrain; i++) {
         const SSSWalkRecord* w = &f->rec[i];
-        csum[w->tris[3]] += glm_vec3_dot((float*)w->dir, f->daxis[w->tris[3]]);
+        csum[w->triangles[3]] += glm_vec3_dot((float*)w->direction, f->daxis[w->triangles[3]]);
     }
     for (uint32_t c = 0; c < ns; c++) {
         if (f->nout[c] < 8) {
@@ -1723,7 +1739,7 @@ static void PhaseValidate(SSSFitter* f, double budget, ClockFunction clock) {
             f->val_walk_d[i] = glm_vec3_distance((float*)w->exit, (float*)w->entry) / f->mfp;
             f->val_walk_l[i] = w->exit[3] / f->mfp;
             f->val_model_d[i] = s->normal[3] / f->mfp;
-            f->val_model_l[i] = s->dir[3] / f->mfp;
+            f->val_model_l[i] = s->direction[3] / f->mfp;
             if (s->exit[3] < 0.5f) f->stats.projection_failures++;
             // throughput at a few albedos: the walk's exact weight (albedo per scattering event; info[0] counts the
             // free flights including the final one that leaves) vs exp(-(1 - a) L) with the walk's and the cloud's lengths
@@ -1733,8 +1749,8 @@ static void PhaseValidate(SSSFitter* f, double budget, ClockFunction clock) {
                 f->stats.tp_length[a] += exp(-(1.0 - al) * f->val_walk_l[i]);
                 f->stats.tp_model[a] += exp(-(1.0 - al) * f->val_model_l[i]);
             }
-            f->val_cos_walk += glm_vec3_dot((float*)w->dir, f->tn[w->tris[1]]);
-            f->val_cos_model += glm_vec3_dot((float*)s->dir, (float*)s->normal);
+            f->val_cos_walk += glm_vec3_dot((float*)w->direction, f->tn[w->triangles[1]]);
+            f->val_cos_model += glm_vec3_dot((float*)s->direction, (float*)s->normal);
         }
         EZ_FREE(vs);
         f->cursor += n;
@@ -1901,7 +1917,7 @@ static void StoreCloud(Cloud c) {
 }
 
 static void LogStats(const SSSFitStats* s) {
-    logtrace("Subsurface splats: %u reference walks (%u lost: %u through cracks, %u from outside, %u at the step limit), %.1f scattering events per walk on average", s->walks_kept, s->walks_lost, s->walks_lost_why[0], s->walks_lost_why[1], s->walks_lost_why[2], s->mean_steps);
+    logtrace("Subsurface splats: %u reference walks (%u lost: %u through cracks, %u from outside, %u at the step limit), %.1f scattering events per walk on average", s->walks.kept, s->walks.lost, s->walks.lostwhy[CRACK_ESCAPE], s->walks.lostwhy[SURFACE_REACH], s->walks.lostwhy[STEP_LIMIT], s->mean_steps);
     logtrace("    path length field: log likelihood %.4f -> %.4f, explains %.3f percent of the log excess length variance", -s->nll_initial, -s->nll_final, 100.0 * s->r2_mean);
     if (s->validation_samples == 0) return;
     logtrace("    validation on %u held out walks (walk / model):", s->validation_samples);

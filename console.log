@@ -1,0 +1,58 @@
+Executing "scripts/shaders.sh"...
+Extracted 64 exports
+Injected 224 imports
+[32mFinished[0m expanding in 0:0:0.004
+Compiling shaders...
+[1A[0KShaders are currently [32mup to date[0m
+
+Environment configuration:
+	GPU: Intel(R) Graphics (RPL-U)
+	Operating System: LINUX
+
+[TRACE] Successfully loaded ui config
+[32m[INFO][0m  Restored 1 subsurface cloud
+[32m[INFO][0m  Successfully loaded prism session from "session.prism"
+[32m[INFO][0m  Renderer resolution set to 400x225
+[32m[INFO][0m  Training subsurface splats for "dragon.fbx": 37986 triangles, coloured scattering -> one cloud per channel, sigma_t 25.250 / 48.000 / 66.000, g 0.20
+[32m[INFO][0m  Subsurface splat training runs its walks on Intel(R) Graphics (RPL-U)
+[TRACE] Subsurface splats, red channel:
+[TRACE] Subsurface splats: 300000 reference walks (940 lost: 68 through cracks, 872 from outside, 0 at the step limit), 6.3 scattering events per walk on average
+[TRACE]     path length field: log likelihood -1.6332 -> -1.5317, explains 45.594 percent of the log excess length variance
+[TRACE]     validation on 20000 held out walks (walk / model):
+[TRACE]         exit distance median 1.61 / 1.59 mfp, 90% 4.92 / 4.98 mfp
+[TRACE]         path length median 2.57 / 2.47 mfp, 90% 11.40 / 10.61 mfp
+[TRACE]         throughput walk / length only / cloud: a=0.5 0.2953 / 0.3474 / 0.3412, a=0.9 0.7004 / 0.7046 / 0.7107, a=0.99 0.9526 / 0.9526 / 0.9530
+[TRACE]         brightness vs walk (length only / cloud): a=0.5 1.176x / 1.156x, a=0.9 1.006x / 1.015x, a=0.99 1.000x / 1.000x
+[TRACE]         mean exit cosine 0.643 / 0.569, projection failures 81 (0.4%)
+[TRACE] Subsurface splats, green channel:
+[TRACE] Subsurface splats: 300000 reference walks (958 lost: 91 through cracks, 867 from outside, 0 at the step limit), 10.9 scattering events per walk on average
+[TRACE]     path length field: log likelihood -1.6411 -> -1.5744, explains 54.755 percent of the log excess length variance
+[TRACE]     validation on 20000 held out walks (walk / model):
+[TRACE]         exit distance median 1.95 / 1.88 mfp, 90% 6.71 / 6.87 mfp
+[TRACE]         path length median 3.80 / 3.49 mfp, 90% 21.9 / 21.45 mfp
+[TRACE]         throughput walk / length only / cloud: a=0.5 0.2149 / 0.2846 / 0.2757, a=0.9 0.6075 / 0.6156 / 0.6199, a=0.99 0.9225 / 0.9225 / 0.9203
+[TRACE]         brightness vs walk (length only / cloud): a=0.5 1.324x / 1.283x, a=0.9 1.013x / 1.021x, a=0.99 1.000x / 0.998x
+[TRACE]         mean exit cosine 0.647 / 0.574, projection failures 129 (0.6%)
+[TRACE] Subsurface splats, blue channel:
+[TRACE] Subsurface splats: 300000 reference walks (899 lost: 98 through cracks, 801 from outside, 0 at the step limit), 14.5 scattering events per walk on average
+[TRACE]     path length field: log likelihood -1.6338 -> -1.5720, explains 59.272 percent of the log excess length variance
+[TRACE]     validation on 20000 held out walks (walk / model):
+[TRACE]         exit distance median 1.97 / 1.92 mfp, 90% 7.74 / 7.70 mfp
+[TRACE]         path length median 4.20 / 3.95 mfp, 90% 28.27 / 27.30 mfp
+[TRACE]         throughput walk / length only / cloud: a=0.5 0.1946 / 0.2700 / 0.2590, a=0.9 0.5723 / 0.5822 / 0.5884, a=0.99 0.9039 / 0.9039 / 0.9056
+[TRACE]         brightness vs walk (length only / cloud): a=0.5 1.388x / 1.331x, a=0.9 1.017x / 1.028x, a=0.99 1.000x / 1.002x
+[TRACE]         mean exit cosine 0.649 / 0.573, projection failures 137 (0.7%)
+[32m[INFO][0m  Done in 144s: 2554.9 KB cloud (per channel) linked to "dragon.fbx"
+[32m[INFO][0m  Saved session to "session.prism"
+[32m[INFO][0m  See you, Space Cowboy
+[32mFinished[0m executing "scripts/shaders.sh" in 0:0:0.062
+Integrating modules...
+[32mFinished[0m integrating modules in 0:0:0.001
+Auditing project...
+Finished audit in 0:0:0.027 - detected [32m0[0m vulnerabilities
+Calculating dependency tree...
+[1A[0KHeaders are currently [32mup to date[0m
+Compiling sources...
+[1A[0KSources are currently [32mup to date[0m
+Current build is [32mup to date[0m, no need to build executable
+[32mFinished[0m total build in 0:0:0.092
