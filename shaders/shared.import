@@ -605,18 +605,15 @@ export LightGlyphSuite {
 }
 
 export CameraGlyphSuite {
-    // Viewport glyphs for the non-primary scene cameras: a small body box sitting behind the lens, a translucent view
-    // frustum with solid edges, and an "up" tick above the far plane. Sizes are in screen pixels so glyphs stay readable
-    // at any zoom. Requires RayDef, ubo (UniformBufferObjectDef) and o_ubo (OverlayUniformBufferObjectDef).
-    const float CAMERA_GLYPH_BODY_W = 7.0;      // body hext extents (px)
+    const float CAMERA_GLYPH_BODY_W = 7.0; // body hext extents (px)
     const float CAMERA_GLYPH_BODY_H = 5.0;
     const float CAMERA_GLYPH_BODY_D = 8.0;
     const float CAMERA_GLYPH_FRUSTUM_PX = 42.0; // frustum depth / max far hext width (px)
-    const float CAMERA_GLYPH_EDGE_PX = 1.25;    // hext thickness of frustum edge lines (px)
+    const float CAMERA_GLYPH_EDGE_PX = 1.25; // hext thickness of frustum edge lines (px)
     const float CAMERA_GLYPH_ORTHO_HALF = 0.45; // ortho frustum hext height as a fraction of its depth
     const uint CAMERA_GLYPH_NONE = 0u;
-    const uint CAMERA_GLYPH_SOLID = 1u;         // body, up tick, frustum edges
-    const uint CAMERA_GLYPH_FACE = 2u;          // translucent frustum sides
+    const uint CAMERA_GLYPH_SOLID = 1u; // body, up tick, frustum edges
+    const uint CAMERA_GLYPH_FACE = 2u; // translucent frustum sides
 
     struct CameraGlyph {
         vec3 position;
@@ -653,9 +650,7 @@ export CameraGlyphSuite {
         return depth / d;
     }
 
-    // oriented box slab test; edge is set when the hit lies within an edge band on two axes
-    bool cg_box(Ray ray, vec3 center, vec3 ax, vec3 ay, vec3 az, vec3 hext, float band, float tmax,
-                out float t, out vec3 n, out bool edge) {
+    bool cg_box(Ray ray, vec3 center, vec3 ax, vec3 ay, vec3 az, vec3 hext, float band, float tmax, out float t, out vec3 n, out bool edge) {
         t = FLTMAX; n = vec3(0); edge = false;
         vec3 rel = ray.position - center;
         vec3 o = vec3(dot(rel, ax), dot(rel, ay), dot(rel, az));
@@ -682,7 +677,6 @@ export CameraGlyphSuite {
         return true;
     }
 
-    // two sided ray / triangle, returns the hit distance or -1
     float cg_triangle(Ray ray, vec3 a, vec3 b, vec3 c) {
         vec3 e1 = b - a;
         vec3 e2 = c - a;
@@ -707,9 +701,7 @@ export CameraGlyphSuite {
         return length(p - a - ab * h);
     }
 
-    // quad (n0, n1, f1, f0); n0 == n1 for a perspective frustum side. Classifies the hit as edge or face.
-    void cg_frustum_side(Ray ray, uint id, vec3 n0, vec3 n1, vec3 f0, vec3 f1, float edgew,
-                         inout float ts, inout uint ids, inout vec3 ns, inout float tf, inout uint idf) {
+    void cg_frustum_side(Ray ray, uint id, vec3 n0, vec3 n1, vec3 f0, vec3 f1, float edgew, inout float ts, inout uint ids, inout vec3 ns, inout float tf, inout uint idf) {
         float t = cg_triangle(ray, n0, f0, f1);
         if (distance(n0, n1) > EPS) {
             float t2 = cg_triangle(ray, n0, f1, n1);
@@ -727,8 +719,6 @@ export CameraGlyphSuite {
         }
     }
 
-    // Traces every non-primary camera glyph. Returns the camera id to report for this pixel (solid parts win over
-    // translucent frustum faces), the nearest solid hit (ts, ns) and the nearest frustum face hit (tf).
     uint trace_camera_glyphs(Ray ray, out float ts, out vec3 ns, out bool sedge, out float tf, out uint idf) {
         ts = FLTMAX; tf = FLTMAX;
         ns = vec3(0, 0, 1);
@@ -885,9 +875,6 @@ export TriangleIntersectSuite {
         return tnear <= min(min(thi.x, thi.y), min(thi.z, tfar));
     }
 
-    // Closest triangle hit with distance in (EPS, tmax). Children are visited near to far and every node that starts
-    // beyond the closest hit found so far is skipped, so a query costs roughly what its nearest surface costs instead
-    // of every node the infinite ray passes through.
     Hit trace_max(Ray ray, float tmax, inout uint hit_id) {
         Hit hit;
         hit.distance = -1.0;
@@ -965,13 +952,9 @@ export SplatConstants {
 }
 
 export TrainerSuite {
-    // Shared definitions for the Gaussian splat trainer compute shaders.
-    // Every kernel uses the same descriptor set layout (see tgpu.h) and a 128 byte push constant block.
-    // A kernel only declares the buffers it touches.
-
-    #define PSTRIDE 16          // floats per gaussian in params / grads / adam buffers
-    #define GSTRIDE 16          // floats per gaussian in the projected geometry buffer
-    #define RSTRIDE 12          // floats per gaussian in the raster gradient scratch buffer
+    #define PSTRIDE 16 // floats per gaussian in params / grads / adam buffers
+    #define GSTRIDE 16 // floats per gaussian in the projected geometry buffer
+    #define RSTRIDE 12 // floats per gaussian in the raster gradient scratch buffer
     #define SH_C0 0.28209479177387814
     #define TILE 16
     #define BLOCK 256
@@ -991,13 +974,13 @@ export TrainerSuite {
     #define P_COLOR 11
 
     // projected geometry layout (per gaussian, GSTRIDE floats)
-    #define G_MEAN 0            // xy, pixel space
-    #define G_CONIC 2           // xyz = (A, B, C)
-    #define G_OPAC 5            // sigmoid(opacity)
-    #define G_COLOR 6           // rgb
+    #define G_MEAN 0 // xy, pixel space
+    #define G_CONIC 2 // xyz = (A, B, C)
+    #define G_OPAC 5 // sigmoid(opacity)
+    #define G_COLOR 6 // rgb
     #define G_DEPTH 9
     #define G_RADIUS 10
-    #define G_RECT 12           // uvec4 tile rect (minx, miny, maxx, maxy) stored as uint bits
+    #define G_RECT 12 // uvec4 tile rect (minx, miny, maxx, maxy) stored as uint bits
 
     // binding slots
     #define B_PARAMS 0
@@ -1028,27 +1011,26 @@ export TrainerSuite {
     #define BUF(slot, name, type, qual) layout(std430, set = 0, binding = slot) qual buffer Buf_##name { type name[]; }
 
     // meta buffer slots
-    #define META_TOTAL 0        // raw (unclamped) tile/gaussian pair count
-    #define META_PAIRS 1        // clamped pair count actually stored
-    #define META_INDIRECT 8     // 3 uints, dispatch args for pair sized kernels
+    #define META_TOTAL 0 // raw (unclamped) tile/gaussian pair count
+    #define META_PAIRS 1 // clamped pair count actually stored
+    #define META_INDIRECT 8 // 3 uints, dispatch args for pair sized kernels
 
     // push constants shared by the render pipeline kernels
     layout(push_constant) uniform PC {
-        vec4 eye_d;         // eye.xyz, focal length in pixels
-        vec4 right_cx;      // camera right axis, principal point x
-        vec4 down_cy;       // camera down axis, principal point y
-        vec4 fwd_near;      // camera forward axis, near plane
-        uvec4 dims;         // width, height, tiles x, tiles y
-        uvec4 cnt;          // gaussian count, pair capacity, view index, sort shift | (direction << 16)
-        vec4 bgl;           // background rgb, lambda ssim
-        vec4 dr;            // depth min, depth scale (65535 / range), unused, unused
+        vec4 eye_d; // eye.xyz, focal length in pixels
+        vec4 right_cx; // camera right axis, principal point x
+        vec4 down_cy; // camera down axis, principal point y
+        vec4 fwd_near; // camera forward axis, near plane
+        uvec4 dims; // width, height, tiles x, tiles y
+        uvec4 cnt; // gaussian count, pair capacity, view index, sort shift | (direction << 16)
+        vec4 bgl; // background rgb, lambda ssim
+        vec4 dr; // depth min, depth scale (65535 / range), unused, unused
     } pc;
 
     // quaternion (w, x, y, z), will be normalized
     mat3 quat_to_rot(vec4 q) {
         float n = inversesqrt(max(dot(q, q), 1e-24));
         float w = q.x * n, x = q.y * n, y = q.z * n, z = q.w * n;
-        // GLSL matrices are column major: R[col][row]
         return mat3(
             1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y + w * z), 2.0 * (x * z - w * y),
             2.0 * (x * y - w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z + w * x),
@@ -1083,15 +1065,15 @@ export TrainerSuite {
     // two always agree. Requires train_common.glsl.
 
     struct Proj {
-        vec3 t;             // camera space position (x right, y down, z forward)
-        vec3 s;             // exp(logscale)
-        mat3 R;             // rotation, R[col][row]
-        mat3 M;             // R * diag(s)
-        mat3 Sigma;         // M * M^T
-        vec3 T0, T1;        // rows of J * W expressed in world space
-        float a, b, c;      // 2D covariance (with low pass filter)
+        vec3 t; // camera space position (x right, y down, z forward)
+        vec3 s; // exp(logscale)
+        mat3 R; // rotation, R[col][row]
+        mat3 M; // R * diag(s)
+        mat3 Sigma; // M * M^T
+        vec3 T0, T1; // rows of J * W expressed in world space
+        float a, b, c; // 2D covariance (with low pass filter)
         float det;
-        float clx, cly;     // clamped t.x / t.z, t.y / t.z
+        float clx, cly; // clamped t.x / t.z, t.y / t.z
         bool clampx, clampy;
         vec2 mean2d;
     };
@@ -1156,8 +1138,6 @@ export RandomSuite {
 }
 
 export SamplingSuite {
-    // needs: Definitions, RandomSuite
-
     vec3 onb(vec3 normal, vec3 local) {
         vec3 w = normal;
         vec3 a = (abs(w.x) > 0.9) ? vec3(0, 1, 0) : vec3(1, 0, 0);
@@ -1243,14 +1223,6 @@ export SamplingSuite {
 }
 
 export SubsurfaceSuite {
-    // Subsurface scattering shared by the path tracer (path.comp) and the subsurface cloud trainer (sss_train.comp):
-    // the random walk's free flight, the trained cloud sampler and the traversal of a cloud's internal gaussians. The
-    // trainer runs exactly this code against the object alone (object space, identity SSSObject), so whatever changes
-    // here changes the reference walks, the training features and the validation report together.
-    //
-    // needs: Definitions, SplatConstants, RayDef, HitDef, TriangleDef, EpsilonOffset, TriangleIntersectSuite
-    //        (trace / trace_max over triangleIn, vertexIn, nodeIn), RandomSuite, SamplingSuite, and the cloud buffer sssIn.
-    //
     // Blob layout (uint words, floats as raw bits; offsets relative to the blob's base). Header words:
     //   2 triangle count, 3 table, 4 surface gaussians, 5 count, 6 lobes, 7 count, 8 internal gaussians, 9 count,
     //   10 nodes, 11 count, 12 sigma, 13 g, 14 mean free path, 15 excess length floor, 16..22 background path length
@@ -1289,14 +1261,14 @@ export SubsurfaceSuite {
 
     struct SSSObject {
         uint base;
-        uvec3 bases;  // per channel blobs (all equal for a single cloud)
+        uvec3 bases; // per channel blobs (all equal for a single cloud)
         uint channels;
         uint tstart;
         uint tcount;
-        mat4 M;       // object -> world
+        mat4 M; // object -> world
         mat4 Minv;
         mat3 M3;
-        float scale;  // cube root of |det M3|, converts object space lengths to world space
+        float scale; // cube root of |det M3|, converts object space lengths to world space
         float handed; // sign of det M3: mirrored transforms flip triangle winding
     };
 
@@ -1320,27 +1292,15 @@ export SubsurfaceSuite {
     vec3 sss_v3(uint i) { return vec3(sss_f(i), sss_f(i + 1u), sss_f(i + 2u)); }
     mat3 sss_m3(uint i) { return mat3(sss_v3(i), sss_v3(i + 3u), sss_v3(i + 6u)); } // column major
 
-    // ---- random walk ------------------------------------------------------------------------------------------------
-
-    // First direction of a walk entering at `position`: Henyey-Greenstein around the incident direction; a sample that
-    // points back out (towards `outside`, the normal on the side the light came from) is mirrored into the medium.
-    // The origin is pushed into the medium along the normal, not along the direction: for a grazing direction an offset
-    // along it is smaller than the rounding error of the entry point itself, and the first flight would then hit the
-    // entry triangle from outside (about 5% of walks on a smooth sphere).
-    Ray sss_walk_enter(vec3 position, vec3 outside, vec3 incident, float g) {
+    Ray sss_walk_enter(vec3 position, vec3 outside, vec3 incident, float anisotropy) {
         Ray ray;
-        ray.direction = sample_henyey_greenstein(incident, g);
+        ray.direction = sample_henyey_greenstein(incident, anisotropy);
         if (dot(ray.direction, outside) > 0.0) ray.direction = reflect(ray.direction, outside);
         ray.position = epsilon_offset(position, -outside);
         return ray;
     }
 
-    // One free flight with density sigma (d ~ sigma exp(-sigma d)) towards the boundary along `ray`.
-    //   SSS_FLIGHT_SCATTERED: ray moved to the scattering point, its direction resampled from the phase function
-    //   SSS_FLIGHT_EXITED:    the flight reached the boundary first; ray.position is the exit point, `boundary` the hit
-    //   SSS_FLIGHT_ESCAPED:   no boundary along the ray (a crack, or the walk started outside)
-    // `segment` is the distance travelled. Weighting (absorption, colour) is up to the caller.
-    int sss_walk_flight(inout Ray ray, float sigma, float g, inout uint boundary_id, out float segment, out Hit boundary) {
+    int sss_walk_flight(inout Ray ray, float sigma, float anisotropy, inout uint boundary_id, out float segment, out Hit boundary) {
         segment = 0.0;
         boundary = trace(ray, boundary_id);
         if (boundary.distance <= 0.0) return SSS_FLIGHT_ESCAPED;
@@ -1352,15 +1312,12 @@ export SubsurfaceSuite {
             return SSS_FLIGHT_EXITED;
         }
         segment = free_distance;
-        // phase function around the travel direction (g > 0 = forward scattering)
+        // phase function around the travel direction (anisotropy > 0 = forward scattering)
         ray.position += ray.direction * free_distance;
-        ray.direction = sample_henyey_greenstein(ray.direction, g);
+        ray.direction = sample_henyey_greenstein(ray.direction, anisotropy);
         return SSS_FLIGHT_SCATTERED;
     }
 
-    // ---- trained cloud ----------------------------------------------------------------------------------------------
-
-    // outward world space normal of a triangle of the object
     vec3 sss_tri_normal(SSSObject o, uint tid) {
         Triangle tri = triangleIn[tid];
         vec3 n = normalize(cross(vertexIn[tri.b].xyz - vertexIn[tri.a].xyz, vertexIn[tri.c].xyz - vertexIn[tri.a].xyz));
@@ -1377,7 +1334,6 @@ export SubsurfaceSuite {
         return exp(-0.5 * (dt2 / (st * st) + dn * dn / (sn * sn)));
     }
 
-    // stochastic O(1) lookup of the surface gaussian under object space point p on local triangle lt
     uint sss_pick_surface(uint base, uint lt, vec3 p, float r) {
         uint row = base + sssIn[base + SSSG_H_TABLE] + lt * SSSG_TABLE_STRIDE;
         uint surf = base + sssIn[base + SSSG_H_SURF];
@@ -1400,12 +1356,6 @@ export SubsurfaceSuite {
         return sssIn[row];
     }
 
-    // Short rays of the cloud path (exit point projection, exit shadow rays) use the distance limited query.
-    Hit trace_bounded(Ray ray, float tmax, inout uint hit_id) {
-        return trace_max(ray, tmax, hit_id);
-    }
-
-    // closest hit along a world space ray that belongs to the object, looking through up to SSS_FOREIGN_SKIPS other surfaces
     bool sss_trace_own(SSSObject o, vec3 origin, vec3 dir, float tmax, out float t, out uint tri) {
         t = 0.0;
         tri = 0u;
@@ -1413,7 +1363,7 @@ export SubsurfaceSuite {
         Ray r = Ray(origin, dir);
         for (int i = 0; i <= SSS_FOREIGN_SKIPS; i++) {
             uint hid = uint(-1);
-            Hit h = trace_bounded(r, tmax - travelled, hid);
+            Hit h = trace_max(r, tmax - travelled, hid);
             if (h.distance <= 0.0) return false;
             travelled += h.distance;
             if (hid >= o.tstart && hid < o.tstart + o.tcount) {
@@ -1448,10 +1398,6 @@ export SubsurfaceSuite {
         return exp(-0.5 * q);
     }
 
-    // Ray traces the internal cloud along the chord p0 -> p1 (object space). C is the summed line integral of the
-    // gaussians the chord passes, Q the line integral weighted sums of their 7 path length coefficients. Returns the
-    // chord length the background term is weighted with (chords shorter than the blob's point length are evaluated as
-    // a point).
     float sss_cloud_chord(uint base, vec3 p0, vec3 p1, out float C, out float Q[7]) {
         uint gs = base + sssIn[base + SSSG_H_GAUSS];
         uint nodes = base + sssIn[base + SSSG_H_NODE];
@@ -1487,9 +1433,9 @@ export SubsurfaceSuite {
                     uint g = gs + i * SSSG_GAUSS_STRIDE;
                     float c = point ? dmin * sss_gauss_point(g, p0) : sss_gauss_chord(g, p0, p1, D);
                     if (!(c > 0.0)) continue;
-#ifdef SSS_CHORD_VISIT
-                    SSS_CHORD_VISIT(i, c);
-#endif
+                    #ifdef SSS_CHORD_VISIT
+                        SSS_CHORD_VISIT(i, c);
+                    #endif
                     C += c;
                     for (int k = 0; k < 7; k++) Q[k] += c * sss_f(g + 13u + uint(k));
                 }
@@ -1501,10 +1447,6 @@ export SubsurfaceSuite {
         return len;
     }
 
-    // Distribution of log(excess length + eps) along the chord p0 -> p1: two normal components (m1, s1, m2, s2) and the
-    // weight of the first. Path length field per gaussian (and the background), blended with the line integrals:
-    //   q0 + q1 u, q2 : mean / log std of the first component      q3 + q4 u, q5 : the second      q6 : logit of w1
-    // with u = log(1 + chord / mfp).
     void sss_length_model(uint base, vec3 p0, vec3 p1, out vec4 comps, out float w1) {
         float C;
         float Q[7];
@@ -1521,32 +1463,30 @@ export SubsurfaceSuite {
         w1 = 1.0 / (1.0 + exp(-clamp(Q[6] * invC, -20.0, 20.0)));
     }
 
-    // density (solid angle) of the exit direction: cosine power lobe around `axis`, folded onto the outward hemisphere
     float sss_dir_pdf(vec3 w, vec3 n, vec3 axis, float e) {
         float wn = dot(w, n);
         if (wn <= 0.0) return 0.0;
         vec3 wr = w - 2.0 * wn * n;
         float norm = (e + 1.0) / (2.0 * PI);
-        float c0 = dot(axis, w), c1 = dot(axis, wr);
+        float c0 = dot(axis, w);
+        float c1 = dot(axis, wr);
         e = max(e, 1e-3); // pow(0, 0) is undefined in GLSL
         return norm * ((c0 > 0.0 ? pow(c0, e) : 0.0) + (c1 > 0.0 ? pow(c1, e) : 0.0));
     }
 
     struct SSSCloudSample {
-        vec3 position;   // exit point, world space
-        vec3 local;      // exit point, object space
-        uint triangle;   // exit triangle
-        vec3 normal;     // outward normal at the exit, world space
-        vec3 direction;  // exit direction, world space
-        vec3 axis;       // exit direction lobe: axis (world space) and cosine power
+        vec3 position; // exit point, world space
+        vec3 local; // exit point, object space
+        uint triangle; // exit triangle
+        vec3 normal; // outward normal at the exit, world space
+        vec3 direction; // exit direction, world space
+        vec3 axis; // exit direction lobe: axis (world space) and cosine power
         float exponent;
-        float chord;     // entry -> exit distance, object space
+        float chord; // entry -> exit distance, object space
         float path_length; // sampled path length, object space
-        bool projected;  // false when the exit projection failed and the path leaves where it entered
+        bool projected; // false when the exit projection failed and the path leaves where it entered
     };
 
-    // The cloud's replacement for a random walk: entry point (world space) on triangle tid -> exit point, path length
-    // and exit direction, from the blob at `base`.
     SSSCloudSample sss_cloud_sample(SSSObject o, uint base, vec3 entry, uint tid) {
         SSSCloudSample s;
         float mfp = sss_f(base + SSSG_H_MFP);

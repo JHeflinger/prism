@@ -2490,3 +2490,15 @@ BOOL SubsurfaceNeedsUpdate() {
 void ResolveSubsurfaceUpdate() {
     g_update_gsss = FALSE;
 }
+
+// ---- packed cloud format (uint32 words, floats stored as raw bits) ----------------------------------------------------
+// One object is a self contained blob; every offset inside it is relative to the start of the blob. The shaders read it
+// through SubsurfaceSuite (shaders/shared.import), which documents the same layout.
+//
+// surface gaussian words: 0-2 centre, 3 tangential sigma, 4-6 outward normal, 7 normal sigma,
+//                         8-10 exit direction axis, 11 exit direction exponent, 12 first lobe, 13 lobe count,
+//                         14 training samples (entries), 15 training samples (exits)
+// lobe words:             0-2 mean offset from the entry point, 3 cumulative weight within its surface gaussian,
+//                         4-12 lower cholesky factor of the covariance (column major), 13-15 projection axis
+// internal gaussian words: 0-2 mean, 3 unused, 4-12 whitening matrix W = S^-1 R^T (column major),
+//                         13-19 path length field coefficients (see sss_length_model in shared.import)

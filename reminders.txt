@@ -1,6 +1,2 @@
-rename vars in structs in subsurface.c to be more coherent
-clean up shared.import
-clean up gsss.comp
-clean up path.comp
 fix gsss ui and percentages and improve visual status progression
 fix gs training ui
