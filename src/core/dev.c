@@ -211,9 +211,9 @@ static void SetBoxCamera() {
 }
 
 static void StartTestSuite() {
-    g_mstage = JADE_STAGE;
-    g_estage = EMISSION_STAGE;
-    g_qstage = QUALITY_STAGE;
+    g_mstage = 0;
+    g_estage = 0;
+    g_qstage = 0;
     g_testing = TRUE;
     ClearScene(FALSE);
     SubmitNamedLight((SceneLight){{0,1,1},{5,5,5},{0,0,0},0,0}, "Rabbit Point Light");

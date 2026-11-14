@@ -126,28 +126,34 @@ typedef struct {
     uint32_t kept;
     uint32_t lost;
     uint32_t lostwhy[3];
+    double distance_quantiles[4]; // exit distance Quantiles 25 / 50 / 75 / 90 %, in mean free paths
+    double length_quantiles[4]; // path length Quantiles, in mean free paths
+    double cosine; // mean cosine between exit direction and outward normal
 } WalkStats;
 
 typedef struct {
-
+    double distance_quantiles[4]; // exit distance Quantiles 25 / 50 / 75 / 90 %, in mean free paths
+    double length_quantiles[4]; // path length Quantiles, in mean free paths
+    double cosine; // mean cosine between exit direction and outward normal
 } ModelStats;
+
+typedef struct {
+    double walk[3]; // a^scatters of the held out walks (what the random walk computes, the ground truth)
+    double length[3]; // exp(-(1 - a) L) with the walks' own path lengths L in mfp (the length only formula, exact lengths)
+    double model[3]; // exp(-(1 - a) L) with the cloud's sampled path lengths (what the cloud path computes)
+} ThroughputStats; // TLDR - walk vs length is inaccuracy that is faulty with our base logic, model vs length is inaccuracy in training
 
 typedef struct {
     WalkStats walks;
     ModelStats model;
-    double mean_steps;
-    double events_per_length; // sum (scatters) / sum (sigma * L), ~1 when scattering behaves like a poisson process
+    ThroughputStats throughput;
+    double mean_steps; // basically average # of scattering events minus 1
+    double events_per_length; // sum (scatters) / sum (sigma * L), ~1 when scattering behaves like a poisson process (SHOULD BE BASICALLY 1, IF NOT, SOMETHING IS WRONG)
     double nll_initial; // negative log likelihood is basically a score of how well the model explains the behavior, less is better!
     double nll_final; // log bc easier/stable to differentiate due to log(ab) = log(a) + log(b), negative bc log maximizes, we want to minimize
-    double r2_mean; // fraction of log excess path length variance explained by the cloud
+    double r2_mean; // fraction of log excess path length variance explained by the cloud (closer to 1 is better, but close to 0 isn't exactly bad! negative is bad!)
     uint32_t validation_samples;
     uint32_t projection_failures;
-    double walk_dist_q[4], model_dist_q[4]; // exit distance Quantiles 25 / 50 / 75 / 90 %, in mean free paths
-    double walk_len_q[4], model_len_q[4]; // path length Quantiles, in mean free paths
-    double tp_walk[3]; // a^scatters of the held out walks (what the random walk computes, the ground truth)
-    double tp_length[3]; // exp(-(1 - a) L) with the walks' own path lengths L in mfp (the length only formula, exact lengths)
-    double tp_model[3]; // exp(-(1 - a) L) with the cloud's sampled path lengths (what the cloud path computes)
-    double walk_cos, model_cos; // mean cosine between exit direction and outward normal
 } SSSFitStats;
 
 typedef struct {
@@ -175,7 +181,7 @@ typedef struct {
     uint32_t max_steps;
     uint32_t pad0;
     float sigma;
-    float g;
+    float anisotropy;
     float eps;
     float pad1;
 } SSSTrainPC;
@@ -207,7 +213,7 @@ typedef struct {
 } Lobe;
 
 typedef struct {
-    vec3 mu;
+    vec3 mu; // the center
     mat3 R; // columns = principal axes
     vec3 s; // standard deviations along them
     mat3 W; // whitening matrix S^-1 R^T
@@ -215,18 +221,134 @@ typedef struct {
 } Gauss;
 
 typedef struct {
-    vec3 bmin, bmax;
+    vec3 bmin;
+    vec3 bmax;
     uint32_t left; // first item for leaves, left child otherwise
     uint32_t count; // items in a leaf, 0 for interior nodes
     uint32_t right;
 } BuildNode;
 
 typedef struct {
-    float m;
-    float v;
+    float m; // momentum (smooth avg of gradient)
+    float v; // smooth avg of gradient squared
 } AdamSlot;
 
 typedef double (*ClockFunction)(void);
+
+typedef struct {
+    TGPU* gpu;
+    const TGPUKernel* kernel;
+    TGPUBuffer buffers[SSS_BIND_COUNT];
+    uint32_t batch; // items per submission, adapted to SSS_SUBMIT_SECONDS
+    uint32_t cursor; // progress of the current GPU phase
+} FitterGPU;
+
+typedef struct {
+    const vec3* positions;
+    const uint32_t* indices;
+    uint32_t vertex_count;
+    uint32_t triangle_count;
+    vec3* normals;
+    uint8_t* flips;
+    double* cdf; // (cumulative distribution function) area of trianlges from 0 to i combined
+    double area; // entire surface area
+    float sigma;
+    float anisotropy;
+    float mfp; // mean free path (1/sigma), the units we do things in basically
+    float diagonal; // bounding box diagonal, basically the extents
+    float epsilon; // mesh-specific epsilon, based on diagonal
+} FitterMesh;
+
+typedef struct {
+    uint32_t count;
+    vec3* centers;
+    vec3* normals;
+    float* tangent_spreads; // tangential sigma
+    float* normal_spreads; // normal sigma
+    uint32_t* table; // 3 candidates per triangle!
+    vec3* exit_axies; // exit direction lobe axis
+    float* exit_exponents; // exit direction lobe exponents
+    uint32_t* first_lobes; // first lobe index for each gaussian
+    uint32_t* lobe_counts; // how many lobes per gaussian
+    uint32_t* walks_entered; // how many walks entered each surface gaussian
+    uint32_t* walks_exited; // how many walks exited each surface gaussian
+    Lobe* lobes;
+    uint32_t lobe_count;
+    uint32_t lobe_capacity;
+    uint32_t* bucket_starts; // training buckets - start index
+    uint32_t* bucket_sizes; // training buckets - each bucket size
+    uint32_t cursor; // current gaussian being worked on
+} FitterSurface;
+
+typedef struct {
+    vec3* centers;
+    uint32_t* assignments;
+    double* sums;
+    float spacing;
+    uint32_t iteration;
+} EtherealCloud;
+
+typedef struct {
+    Gauss* gaussians;
+    uint32_t count;
+    BuildNode* nodes;
+    uint32_t node_count;
+    float background[SSS_Q];
+} TangibleCloud;
+
+typedef struct {
+    EtherealCloud ethereal;
+    TangibleCloud tangible;
+} FitterCloud;
+
+typedef struct {
+    vec3* points;
+    uint32_t count;
+    uint32_t seen;
+} ScatterRecord;
+
+typedef struct {
+    SSSWalkRecord* records;
+    uint32_t records_count;
+    uint32_t target;
+    uint32_t attempts;
+    uint32_t holdout; // records [holdout, nrec) are held out for validation
+    double steps; // sums used for calculating mean steps and events per length
+    double events;
+    double length;
+    ScatterRecord interior;
+} FitterWalks;
+
+typedef struct {
+    uint32_t walkcount;
+    uint32_t* starts;
+    uint32_t* indices;
+    float* integrals;
+    float* background_weights;
+    float* excess_length;
+    float* log_length;
+    uint32_t entries_used;
+    uint32_t entry_capacity;
+    float initial_fit[SSS_Q];
+    AdamSlot* adam;
+    float* gradient;
+    uint32_t epoch;
+} FitterOptimization;
+
+typedef struct {
+    uint32_t count;
+    float* model_exit_distance;
+    float* model_path_length;
+    float* walk_exit_distance;
+    float* walk_path_length;
+    double model_cosine;
+    double walk_cosine;
+} FitterValidation;
+
+typedef struct {
+    uint32_t* blob;
+    uint32_t words;
+} FitterResult;
 
 typedef struct SSSFitter {
     GSSSConfig cfg;
@@ -234,82 +356,14 @@ typedef struct SSSFitter {
     char status[192];
     SSSFitStats stats;
     LittleRNG rng;
-    // gpu (borrowed context, owned buffers)
-    TGPU* gpu;
-    const TGPUKernel* kernel;
-    TGPUBuffer buf[SSS_BIND_COUNT];
-    uint32_t batch;  // items per submission, adapted to SSS_SUBMIT_SECONDS
-    uint32_t cursor; // progress of the current GPU phase
-    // mesh (borrowed)
-    const vec3* pos;
-    const uint32_t* idx;
-    uint32_t nv, nt;
-    vec3* tn;        // outward unit normal per triangle
-    uint8_t* flip;   // the outward normal is -cross(b - a, c - a)
-    double* cdf; // the area of trianlges 0 to i combined
-    double area; // total surface area
-    float sigma, g, mfp, diag, eps;
-    // surface gaussians
-    uint32_t ns;
-    vec3* sc;        // centre
-    vec3* snrm;      // normal
-    float* st;       // tangential sigma
-    float* sn;       // normal sigma
-    uint32_t* table; // 3 candidates per triangle
-    vec3* daxis;     // exit direction lobe axis
-    float* dexp;     // and exponent
-    uint32_t* lfirst;
-    uint32_t* lcount;
-    uint32_t* lbucket_start; // training records bucketed by entry gaussian (lobe phase)
-    uint32_t* lbucket_items;
-    uint32_t lcursor;
-    uint32_t* nin;
-    uint32_t* nout;
-    Lobe* lobes;
-    uint32_t nlobes, lobecap;
-    // internal cloud k-means state (cloud phase)
-    vec3* cl_centres;
-    uint32_t* cl_assign;
-    double* cl_acc;
-    float cl_spacing;
-    uint32_t cl_iter;
-    // walks
-    SSSWalkRecord* rec;
-    uint32_t nrec, target, attempts;
-    uint32_t holdout;    // records [holdout, nrec) are held out for validation
-    double steps_sum, events_sum, length_sum;
-    vec3* interior;
-    uint32_t ninterior;
-    uint64_t interior_seen;
-    // internal cloud
-    uint32_t ng;
-    Gauss* gs;
-    BuildNode* gnodes;
-    uint32_t ngnodes;
-    float bg[SSS_Q];
-    // chord features (training records only)
-    uint32_t nfeat;
-    uint32_t* fstart;
-    uint32_t* fidx;
-    float* fval;
-    float* fbg;
-    float* fy;
-    float* fu;
-    uint32_t nentries, entrycap;
-    float init_q[SSS_Q];
-    AdamSlot* adam;
-    float* grad;
-    uint32_t epoch;
-    // validation
-    uint32_t val_count;
-    float* val_model_d;
-    float* val_model_l;
-    float* val_walk_d;
-    float* val_walk_l;
-    double val_cos_model, val_cos_walk;
-    // result
-    uint32_t* blob;
-    uint32_t blob_words;
+    FitterGPU fgpu;
+    FitterMesh mesh;
+    FitterSurface surface;
+    FitterCloud cloud;
+    FitterWalks walks;
+    FitterOptimization optimizer;
+    FitterValidation validater;
+    FitterResult result;
 } SSSFitter;
 
 typedef struct {
@@ -319,12 +373,12 @@ typedef struct {
 } BuildTask;
 
 typedef struct {
-    const vec3* pts;
-    uint32_t n;
+    const vec3* points;
+    uint32_t count;
     vec3 origin;
-    float h;
-    int dims[3];
-    uint32_t* start; // cell -> first item (prefix sums), size cells + 1
+    float length;
+    int dimensions[3];
+    uint32_t* starts; // cell -> first item (prefix sums), size cells + 1
     uint32_t* items;
 } Grid;
 
@@ -334,7 +388,7 @@ typedef struct {
     float m2;
     float s2;
     float w1;
-} LengthModel;
+} LengthModel; // 2 normal distributions basically (mean + std dev for each, and weight w for one)
 
 typedef struct {
     uint32_t mesh;
@@ -346,7 +400,7 @@ typedef struct {
     uint32_t tstart; // triangle range the cloud was trained on (re-synced when meshes move)
     uint32_t tcount;
     MaterialID material;
-    float g;
+    float anisotropy;
     float scale; // object scale it was trained at
 } Cloud;
 
@@ -357,15 +411,15 @@ typedef struct {
     uint32_t tstart;
     uint32_t tcount;
     MaterialID material;
-    float g;
+    float anisotropy;
     float scale;
     uint32_t channels;
     uint32_t channel; // channel currently being fitted
     float sigma[3];
     GSSSConfig config;
-    vec3* pos; // object space mesh, kept for the per channel fits (the fitter borrows it)
-    uint32_t* idx;
-    uint32_t nverts;
+    vec3* positions; // object space mesh, kept for the per channel fits (the fitter borrows it)
+    uint32_t* indices;
+    uint32_t vertex_count;
     TGPU gpu; // compute context shared by the per channel fits (the fitter borrows it)
     TGPUKernel kernel;
     BOOL gpu_alive;
@@ -397,21 +451,21 @@ static void FailFitting(SSSFitter* f, const char* why) {
 }
 
 static BOOL RecreateBuffer(SSSFitter* f, uint32_t binding, size_t bytes) {
-    TGPUBuffer* b = &f->buf[binding];
+    TGPUBuffer* b = &f->fgpu.buffers[binding];
     if (bytes < 16) bytes = 16;
     if (b->buffer && b->size >= bytes) return TRUE;
-    tgpu_buffer_destroy(f->gpu, b);
-    if (tgpu_buffer_create(f->gpu, b, bytes)) {
+    tgpu_buffer_destroy(f->fgpu.gpu, b);
+    if (tgpu_buffer_create(f->fgpu.gpu, b, bytes)) {
         FailFitting(f, "out of GPU memory");
         return FALSE;
     }
-    tgpu_bind(f->gpu, binding, b);
+    tgpu_bind(f->fgpu.gpu, binding, b);
     return TRUE;
 }
 
 static BOOL UploadBuffer(SSSFitter* f, uint32_t binding, const void* data, size_t bytes) {
     if (!RecreateBuffer(f, binding, bytes)) return FALSE;
-    if (bytes > 0 && tgpu_upload(f->gpu, &f->buf[binding], 0, data, bytes)) {
+    if (bytes > 0 && tgpu_upload(f->fgpu.gpu, &f->fgpu.buffers[binding], 0, data, bytes)) {
         FailFitting(f, "GPU upload failed");
         return FALSE;
     }
@@ -419,7 +473,7 @@ static BOOL UploadBuffer(SSSFitter* f, uint32_t binding, const void* data, size_
 }
 
 static BOOL DownloadBuffer(SSSFitter* f, uint32_t binding, void* data, size_t bytes) {
-    if (bytes > 0 && tgpu_download(f->gpu, &f->buf[binding], 0, data, bytes)) {
+    if (bytes > 0 && tgpu_download(f->fgpu.gpu, &f->fgpu.buffers[binding], 0, data, bytes)) {
         FailFitting(f, "GPU download failed");
         return FALSE;
     }
@@ -428,13 +482,13 @@ static BOOL DownloadBuffer(SSSFitter* f, uint32_t binding, void* data, size_t by
 
 static BOOL SubmitKernel(SSSFitter* f, uint32_t mode, uint32_t offset, uint32_t count) {
     SSSTrainPC pc = {
-        f->nt, 0u, mode, count,
-        offset, f->cfg.seed ^ F2U(f->sigma), f->cfg.max_steps, 0u,
-        f->sigma, f->g, f->eps, 0.0f
+        f->mesh.triangle_count, 0u, mode, count,
+        offset, f->cfg.seed ^ F2U(f->mesh.sigma), f->cfg.max_steps, 0u,
+        f->mesh.sigma, f->mesh.anisotropy, f->mesh.epsilon, 0.0f
     };
-    tgpu_begin(f->gpu);
-    tgpu_dispatch(f->gpu, f->kernel, (count + SSS_GROUP - 1u) / SSS_GROUP, 1, 1, &pc, sizeof(pc));
-    if (tgpu_submit(f->gpu)) {
+    tgpu_begin(f->fgpu.gpu);
+    tgpu_dispatch(f->fgpu.gpu, f->fgpu.kernel, (count + SSS_GROUP - 1u) / SSS_GROUP, 1, 1, &pc, sizeof(pc));
+    if (tgpu_submit(f->fgpu.gpu)) {
         FailFitting(f, "GPU submission failed");
         return FALSE;
     }
@@ -442,8 +496,8 @@ static BOOL SubmitKernel(SSSFitter* f, uint32_t mode, uint32_t offset, uint32_t 
 }
 
 static void AdaptBatch(SSSFitter* f, double took) {
-    if (took < 0.5 * SSS_SUBMIT_SECONDS && f->batch < SSS_BATCH_MAX) f->batch *= 2u;
-    else if (took > 2.0 * SSS_SUBMIT_SECONDS && f->batch > SSS_GROUP) f->batch /= 2u;
+    if (took < 0.5 * SSS_SUBMIT_SECONDS && f->fgpu.batch < SSS_BATCH_MAX) f->fgpu.batch *= 2u;
+    else if (took > 2.0 * SSS_SUBMIT_SECONDS && f->fgpu.batch > SSS_GROUP) f->fgpu.batch /= 2u;
 }
 
 static void SelectNth(uint32_t* a, int64_t lo, int64_t hi, int64_t nth) {
@@ -515,15 +569,15 @@ static BuildNode* BuildBVH(uint32_t n, const vec3* bmins, const vec3* bmaxs, uin
 }
 
 static void TriangleCorners(const SSSFitter* f, uint32_t t, vec3 a, vec3 b, vec3 c) {
-    glm_vec3_copy((float*)f->pos[f->idx[t * 3]], a);
-    glm_vec3_copy((float*)f->pos[f->idx[t * 3 + 1]], b);
-    glm_vec3_copy((float*)f->pos[f->idx[t * 3 + 2]], c);
+    glm_vec3_copy((float*)f->mesh.positions[f->mesh.indices[t * 3]], a);
+    glm_vec3_copy((float*)f->mesh.positions[f->mesh.indices[t * 3 + 1]], b);
+    glm_vec3_copy((float*)f->mesh.positions[f->mesh.indices[t * 3 + 2]], c);
 }
 
 static SSSGPUNode* IsolatedBVH(const SSSFitter* f, uint32_t* count) {
-    vec3* mins = EZ_MINALLOC(f->nt, sizeof(vec3));
-    vec3* maxs = EZ_MINALLOC(f->nt, sizeof(vec3));
-    for (uint32_t t = 0; t < f->nt; t++) {
+    vec3* mins = EZ_MINALLOC(f->mesh.triangle_count, sizeof(vec3));
+    vec3* maxs = EZ_MINALLOC(f->mesh.triangle_count, sizeof(vec3));
+    for (uint32_t t = 0; t < f->mesh.triangle_count; t++) {
         vec3 a, b, c;
         TriangleCorners(f, t, a, b, c);
         glm_vec3_minv(a, b, mins[t]);
@@ -531,9 +585,9 @@ static SSSGPUNode* IsolatedBVH(const SSSFitter* f, uint32_t* count) {
         glm_vec3_maxv(a, b, maxs[t]);
         glm_vec3_maxv(maxs[t], c, maxs[t]);
     }
-    uint32_t* order = EZ_MINALLOC(f->nt, sizeof(uint32_t));
+    uint32_t* order = EZ_MINALLOC(f->mesh.triangle_count, sizeof(uint32_t));
     uint32_t n = 0;
-    BuildNode* nodes = BuildBVH(f->nt, mins, maxs, 1, order, &n);
+    BuildNode* nodes = BuildBVH(f->mesh.triangle_count, mins, maxs, 1, order, &n);
     SSSGPUNode* out = EZ_MINALLOC(n, sizeof(SSSGPUNode));
     for (uint32_t i = 0; i < n; i++) {
         glm_vec3_copy(nodes[i].bmin, out[i].min);
@@ -558,8 +612,8 @@ static SSSGPUNode* IsolatedBVH(const SSSFitter* f, uint32_t* count) {
 
 static void BuildGrid(Grid* g, const vec3* pts, uint32_t n, float h) {
     memset(g, 0, sizeof(*g));
-    g->pts = pts;
-    g->n = n;
+    g->points = pts;
+    g->count = n;
     vec3 bmin = { FLT_MAX, FLT_MAX, FLT_MAX }, bmax = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
     for (uint32_t i = 0; i < n; i++) {
         glm_vec3_minv(bmin, (float*)pts[i], bmin);
@@ -579,52 +633,52 @@ static void BuildGrid(Grid* g, const vec3* pts, uint32_t n, float h) {
         if (cells <= 4.0 * (double)n + 64.0 && cells <= 16777216.0) break;
         h *= 1.25f;
     }
-    g->h = h;
+    g->length = h;
     glm_vec3_copy(bmin, g->origin);
-    for (int k = 0; k < 3; k++) g->dims[k] = (int)floorf(ext[k] / h) + 1;
-    size_t cells = (size_t)g->dims[0] * g->dims[1] * g->dims[2];
-    g->start = EZ_MINALLOC(cells + 1, sizeof(uint32_t));
+    for (int k = 0; k < 3; k++) g->dimensions[k] = (int)floorf(ext[k] / h) + 1;
+    size_t cells = (size_t)g->dimensions[0] * g->dimensions[1] * g->dimensions[2];
+    g->starts = EZ_MINALLOC(cells + 1, sizeof(uint32_t));
     g->items = EZ_MINALLOC(n, sizeof(uint32_t));
     uint32_t* cellof = EZ_MINALLOC(n, sizeof(uint32_t));
     for (uint32_t i = 0; i < n; i++) {
         int c[3];
-        for (int k = 0; k < 3; k++) c[k] = CLAMP((int)floorf((pts[i][k] - g->origin[k]) / h), 0, g->dims[k] - 1);
-        cellof[i] = (uint32_t)(c[0] + g->dims[0] * (c[1] + g->dims[1] * c[2]));
-        g->start[cellof[i] + 1]++;
+        for (int k = 0; k < 3; k++) c[k] = CLAMP((int)floorf((pts[i][k] - g->origin[k]) / h), 0, g->dimensions[k] - 1);
+        cellof[i] = (uint32_t)(c[0] + g->dimensions[0] * (c[1] + g->dimensions[1] * c[2]));
+        g->starts[cellof[i] + 1]++;
     }
-    for (size_t c = 0; c < cells; c++) g->start[c + 1] += g->start[c];
+    for (size_t c = 0; c < cells; c++) g->starts[c + 1] += g->starts[c];
     uint32_t* cursor = EZ_MINALLOC(cells, sizeof(uint32_t));
-    for (uint32_t i = 0; i < n; i++) g->items[g->start[cellof[i]] + cursor[cellof[i]]++] = i;
+    for (uint32_t i = 0; i < n; i++) g->items[g->starts[cellof[i]] + cursor[cellof[i]]++] = i;
     EZ_FREE(cursor);
     EZ_FREE(cellof);
 }
 
 static void FreeGrid(Grid* g) {
-    EZ_FREE(g->start);
+    EZ_FREE(g->starts);
     EZ_FREE(g->items);
     memset(g, 0, sizeof(*g));
 }
 
 static uint32_t GridLocale(const Grid* g, const vec3 q, uint32_t k, uint32_t* out, float* outd2) {
-    if (g->n == 0 || k == 0) return 0;
+    if (g->count == 0 || k == 0) return 0;
     int c[3];
-    for (int a = 0; a < 3; a++) c[a] = CLAMP((int)floorf((q[a] - g->origin[a]) / g->h), 0, g->dims[a] - 1);
+    for (int a = 0; a < 3; a++) c[a] = CLAMP((int)floorf((q[a] - g->origin[a]) / g->length), 0, g->dimensions[a] - 1);
     uint32_t found = 0;
-    int maxr = g->dims[0];
-    if (g->dims[1] > maxr) maxr = g->dims[1];
-    if (g->dims[2] > maxr) maxr = g->dims[2];
+    int maxr = g->dimensions[0];
+    if (g->dimensions[1] > maxr) maxr = g->dimensions[1];
+    if (g->dimensions[2] > maxr) maxr = g->dimensions[2];
     for (int r = 0; r <= maxr; r++) {
         for (int z = c[2] - r; z <= c[2] + r; z++) {
-            if (z < 0 || z >= g->dims[2]) continue;
+            if (z < 0 || z >= g->dimensions[2]) continue;
             for (int y = c[1] - r; y <= c[1] + r; y++) {
-                if (y < 0 || y >= g->dims[1]) continue;
+                if (y < 0 || y >= g->dimensions[1]) continue;
                 for (int x = c[0] - r; x <= c[0] + r; x++) {
-                    if (x < 0 || x >= g->dims[0]) continue;
+                    if (x < 0 || x >= g->dimensions[0]) continue;
                     if (abs(x - c[0]) != r && abs(y - c[1]) != r && abs(z - c[2]) != r) continue; // shell only
-                    size_t cell = (size_t)x + (size_t)g->dims[0] * ((size_t)y + (size_t)g->dims[1] * (size_t)z);
-                    for (uint32_t i = g->start[cell]; i < g->start[cell + 1]; i++) {
+                    size_t cell = (size_t)x + (size_t)g->dimensions[0] * ((size_t)y + (size_t)g->dimensions[1] * (size_t)z);
+                    for (uint32_t i = g->starts[cell]; i < g->starts[cell + 1]; i++) {
                         uint32_t id = g->items[i];
-                        float d2 = glm_vec3_distance2((float*)g->pts[id], (float*)q);
+                        float d2 = glm_vec3_distance2((float*)g->points[id], (float*)q);
                         if (found == k && d2 >= outd2[k - 1]) continue;
                         uint32_t j = found < k ? found++ : k - 1;
                         while (j > 0 && outd2[j - 1] > d2) { outd2[j] = outd2[j - 1]; out[j] = out[j - 1]; j--; }
@@ -634,7 +688,7 @@ static uint32_t GridLocale(const Grid* g, const vec3 q, uint32_t k, uint32_t* ou
                 }
             }
         }
-        float reach = (float)r * g->h;
+        float reach = (float)r * g->length;
         if (found == k && outd2[k - 1] <= reach * reach) break;
     }
     return found;
@@ -642,19 +696,44 @@ static uint32_t GridLocale(const Grid* g, const vec3 q, uint32_t k, uint32_t* ou
 
 static void SSSFitDestroy(SSSFitter* f) {
     if (!f) return;
-    for (uint32_t b = 0; b < SSS_BIND_COUNT; b++) tgpu_buffer_destroy(f->gpu, &f->buf[b]);
-    EZ_FREE(f->tn); EZ_FREE(f->flip); EZ_FREE(f->cdf);
-    EZ_FREE(f->sc); EZ_FREE(f->snrm); EZ_FREE(f->st); EZ_FREE(f->sn); EZ_FREE(f->table);
-    EZ_FREE(f->daxis); EZ_FREE(f->dexp); EZ_FREE(f->lfirst); EZ_FREE(f->lcount); EZ_FREE(f->nin); EZ_FREE(f->nout);
-    EZ_FREE(f->lobes);
-    EZ_FREE(f->lbucket_start); EZ_FREE(f->lbucket_items);
-    EZ_FREE(f->cl_centres); EZ_FREE(f->cl_assign); EZ_FREE(f->cl_acc);
-    EZ_FREE(f->rec); EZ_FREE(f->interior);
-    EZ_FREE(f->gs); EZ_FREE(f->gnodes);
-    EZ_FREE(f->fstart); EZ_FREE(f->fidx); EZ_FREE(f->fval); EZ_FREE(f->fbg); EZ_FREE(f->fy); EZ_FREE(f->fu);
-    EZ_FREE(f->adam); EZ_FREE(f->grad);
-    EZ_FREE(f->val_model_d); EZ_FREE(f->val_model_l); EZ_FREE(f->val_walk_d); EZ_FREE(f->val_walk_l);
-    EZ_FREE(f->blob);
+    for (uint32_t b = 0; b < SSS_BIND_COUNT; b++) tgpu_buffer_destroy(f->fgpu.gpu, &f->fgpu.buffers[b]);
+    EZ_FREE(f->mesh.normals);
+    EZ_FREE(f->mesh.flips);
+    EZ_FREE(f->mesh.cdf);
+    EZ_FREE(f->surface.centers);
+    EZ_FREE(f->surface.normals);
+    EZ_FREE(f->surface.tangent_spreads);
+    EZ_FREE(f->surface.normal_spreads);
+    EZ_FREE(f->surface.table);
+    EZ_FREE(f->surface.exit_axies);
+    EZ_FREE(f->surface.exit_exponents);
+    EZ_FREE(f->surface.first_lobes);
+    EZ_FREE(f->surface.lobe_counts);
+    EZ_FREE(f->surface.walks_entered);
+    EZ_FREE(f->surface.walks_exited);
+    EZ_FREE(f->surface.lobes);
+    EZ_FREE(f->surface.bucket_starts);
+    EZ_FREE(f->surface.bucket_sizes);
+    EZ_FREE(f->cloud.ethereal.centers);
+    EZ_FREE(f->cloud.ethereal.assignments);
+    EZ_FREE(f->cloud.ethereal.sums);
+    EZ_FREE(f->walks.records);
+    EZ_FREE(f->walks.interior.points);
+    EZ_FREE(f->cloud.tangible.gaussians);
+    EZ_FREE(f->cloud.tangible.nodes);
+    EZ_FREE(f->optimizer.starts);
+    EZ_FREE(f->optimizer.indices);
+    EZ_FREE(f->optimizer.integrals);
+    EZ_FREE(f->optimizer.background_weights);
+    EZ_FREE(f->optimizer.excess_length);
+    EZ_FREE(f->optimizer.log_length);
+    EZ_FREE(f->optimizer.adam);
+    EZ_FREE(f->optimizer.gradient);
+    EZ_FREE(f->validater.model_exit_distance);
+    EZ_FREE(f->validater.model_path_length);
+    EZ_FREE(f->validater.walk_exit_distance);
+    EZ_FREE(f->validater.walk_path_length);
+    EZ_FREE(f->result.blob);
     EZ_FREE(f);
 }
 
@@ -670,17 +749,17 @@ static SSSFitter* SSSFitCreate(const SSSFitInput* in, const GSSSConfig* cfg) {
     if (f->cfg.lobes < 1) f->cfg.lobes = 1;
     if (f->cfg.lobes > 8) f->cfg.lobes = 8;
     if (f->cfg.max_steps < 64) f->cfg.max_steps = 64;
-    f->nv = in->vertex_count;
-    f->nt = in->triangle_count;
-    f->pos = in->positions;
-    f->idx = in->indices;
-    f->sigma = in->sigma;
-    f->g = CLAMP(in->anisotropy, -0.99f, 0.99f);
-    f->mfp = 1.0f / in->sigma;
-    f->gpu = in->gpu;
-    f->kernel = in->kernel;
+    f->mesh.vertex_count = in->vertex_count;
+    f->mesh.triangle_count = in->triangle_count;
+    f->mesh.positions = in->positions;
+    f->mesh.indices = in->indices;
+    f->mesh.sigma = in->sigma;
+    f->mesh.anisotropy = CLAMP(in->anisotropy, -0.99f, 0.99f);
+    f->mesh.mfp = 1.0f / in->sigma;
+    f->fgpu.gpu = in->gpu;
+    f->fgpu.kernel = in->kernel;
     f->rng.seed = 0x853c49e6748fea9bull ^ ((uint64_t)f->cfg.seed * 0x9E3779B97F4A7C15ull);
-    f->batch = SSS_BATCH_FIRST;
+    f->fgpu.batch = SSS_BATCH_FIRST;
     for (uint32_t b = 0; b < SSS_BIND_COUNT; b++) {
         if (!RecreateBuffer(f, b, 16)) {
             SSSFitDestroy(f);
@@ -702,22 +781,22 @@ static const SSSFitStats* SSSFitGetStats(const SSSFitter* f) {
 
 static const uint32_t* SSSFitBlob(const SSSFitter* f, uint32_t* words) {
     if (!f || f->phase != SSSFIT_DONE) { if (words) *words = 0; return NULL; }
-    if (words) *words = f->blob_words;
-    return f->blob;
+    if (words) *words = f->result.words;
+    return f->result.blob;
 }
 
 static float SSSFitProgress(const SSSFitter* f) {
     if (!f) return 0.0f;
     switch (f->phase) {
         case SSSFIT_SETUP: return 0.0f;
-        case SSSFIT_ORIENT: return 0.01f + 0.02f * (float)f->cursor / (float)(f->nt ? f->nt : 1);
+        case SSSFIT_ORIENT: return 0.01f + 0.02f * (float)f->fgpu.cursor / (float)(f->mesh.triangle_count ? f->mesh.triangle_count : 1);
         case SSSFIT_SURFACE: return 0.03f;
-        case SSSFIT_WALKS: return 0.05f + 0.50f * (float)f->nrec / (float)(f->target ? f->target : 1);
-        case SSSFIT_LOBES: return 0.55f + 0.05f * (float)f->lcursor / (float)(f->ns ? f->ns : 1);
-        case SSSFIT_CLOUD: return 0.60f + 0.05f * (float)f->cl_iter / 10.0f;
-        case SSSFIT_CHORDS: return 0.65f + 0.10f * (float)f->cursor / (float)(f->nfeat ? f->nfeat : 1);
-        case SSSFIT_OPTIMISE: return 0.75f + 0.20f * (float)f->epoch / (float)(f->cfg.epochs ? f->cfg.epochs : 1);
-        case SSSFIT_VALIDATE: return 0.95f + 0.05f * (float)f->cursor / (float)(f->val_count ? f->val_count : 1);
+        case SSSFIT_WALKS: return 0.05f + 0.50f * (float)f->walks.records_count / (float)(f->walks.target ? f->walks.target : 1);
+        case SSSFIT_LOBES: return 0.55f + 0.05f * (float)f->surface.cursor / (float)(f->surface.count ? f->surface.count : 1);
+        case SSSFIT_CLOUD: return 0.60f + 0.05f * (float)f->cloud.ethereal.iteration / 10.0f;
+        case SSSFIT_CHORDS: return 0.65f + 0.10f * (float)f->fgpu.cursor / (float)(f->optimizer.walkcount ? f->optimizer.walkcount : 1);
+        case SSSFIT_OPTIMISE: return 0.75f + 0.20f * (float)f->optimizer.epoch / (float)(f->cfg.epochs ? f->cfg.epochs : 1);
+        case SSSFIT_VALIDATE: return 0.95f + 0.05f * (float)f->fgpu.cursor / (float)(f->validater.count ? f->validater.count : 1);
         case SSSFIT_DONE: return 1.0f;
         default: return 0.0f;
     }
@@ -733,108 +812,108 @@ static void BarycentricPoint(const SSSFitter* f, uint32_t t, float r1, float r2,
 }
 
 static uint32_t RandomWeightedTriangle(const SSSFitter* f, float r) { // takes into account area!
-    double target = (double)r * f->area;
-    uint32_t lo = 0, hi = f->nt - 1;
+    double target = (double)r * f->mesh.area;
+    uint32_t lo = 0, hi = f->mesh.triangle_count - 1;
     while (lo < hi) {
         uint32_t mid = (lo + hi) / 2;
-        if (f->cdf[mid] < target) lo = mid + 1; else hi = mid;
+        if (f->mesh.cdf[mid] < target) lo = mid + 1; else hi = mid;
     }
     return lo;
 }
 
 static void PackBlob(SSSFitter* f) {
     uint32_t table = SSSG_HEADER_WORDS;
-    uint32_t surf = table + f->nt * SSSG_TABLE_STRIDE;
-    uint32_t lobe = surf + f->ns * SSSG_SURF_STRIDE;
-    uint32_t gauss = lobe + f->nlobes * SSSG_LOBE_STRIDE;
-    uint32_t node = gauss + f->ng * SSSG_GAUSS_STRIDE;
-    uint32_t total = node + f->ngnodes * SSSG_NODE_STRIDE;
+    uint32_t surf = table + f->mesh.triangle_count * SSSG_TABLE_STRIDE;
+    uint32_t lobe = surf + f->surface.count * SSSG_SURF_STRIDE;
+    uint32_t gauss = lobe + f->surface.lobe_count * SSSG_LOBE_STRIDE;
+    uint32_t node = gauss + f->cloud.tangible.count * SSSG_GAUSS_STRIDE;
+    uint32_t total = node + f->cloud.tangible.node_count * SSSG_NODE_STRIDE;
     // before the internal cloud exists (walk phase) there are no gaussians or nodes to pack
-    if (!f->gs) {
+    if (!f->cloud.tangible.gaussians) {
         node = gauss;
         total = gauss;
     }
-    if (!f->blob || f->blob_words != total) {
-        EZ_FREE(f->blob);
-        f->blob = EZ_MINALLOC(total, sizeof(uint32_t));
-        f->blob_words = total;
+    if (!f->result.blob || f->result.words != total) {
+        EZ_FREE(f->result.blob);
+        f->result.blob = EZ_MINALLOC(total, sizeof(uint32_t));
+        f->result.words = total;
     }
-    uint32_t* b = f->blob;
+    uint32_t* b = f->result.blob;
     memset(b, 0, (size_t)total * 4);
     b[SSSG_H_MAGIC] = SSSG_MAGIC;
     b[SSSG_H_VERSION] = SSSG_VERSION;
-    b[SSSG_H_TCOUNT] = f->nt;
+    b[SSSG_H_TCOUNT] = f->mesh.triangle_count;
     b[SSSG_H_TABLE] = table;
     b[SSSG_H_SURF] = surf;
-    b[SSSG_H_NSURF] = f->ns;
+    b[SSSG_H_NSURF] = f->surface.count;
     b[SSSG_H_LOBE] = lobe;
-    b[SSSG_H_NLOBE] = f->nlobes;
+    b[SSSG_H_NLOBE] = f->surface.lobe_count;
     b[SSSG_H_GAUSS] = gauss;
-    b[SSSG_H_NGAUSS] = f->gs ? f->ng : 0;
+    b[SSSG_H_NGAUSS] = f->cloud.tangible.gaussians ? f->cloud.tangible.count : 0;
     b[SSSG_H_NODE] = node;
-    b[SSSG_H_NNODE] = f->gs ? f->ngnodes : 0;
-    b[SSSG_H_SIGMA] = F2U(f->sigma);
-    b[SSSG_H_G] = F2U(f->g);
-    b[SSSG_H_MFP] = F2U(f->mfp);
-    b[SSSG_H_EPS] = F2U(SSS_EPS_FRACTION * f->mfp);
-    for (int k = 0; k < SSS_Q; k++) b[SSSG_H_BG + k] = F2U(f->bg[k]);
+    b[SSSG_H_NNODE] = f->cloud.tangible.gaussians ? f->cloud.tangible.node_count : 0;
+    b[SSSG_H_SIGMA] = F2U(f->mesh.sigma);
+    b[SSSG_H_G] = F2U(f->mesh.anisotropy);
+    b[SSSG_H_MFP] = F2U(f->mesh.mfp);
+    b[SSSG_H_EPS] = F2U(SSS_EPS_FRACTION * f->mesh.mfp);
+    for (int k = 0; k < SSS_Q; k++) b[SSSG_H_BG + k] = F2U(f->cloud.tangible.background[k]);
     b[SSSG_H_BGW] = F2U(SSS_BG_WEIGHT);
-    b[SSSG_H_DMIN] = F2U(SSS_DMIN_FRACTION * f->mfp);
+    b[SSSG_H_DMIN] = F2U(SSS_DMIN_FRACTION * f->mesh.mfp);
     b[SSSG_H_TSTART] = SSSG_NONE;
     b[SSSG_H_MATERIAL] = SSSG_NONE;
     b[SSSG_H_SCALE] = F2U(1.0f);
-    for (uint32_t t = 0; t < f->nt; t++) {
+    for (uint32_t t = 0; t < f->mesh.triangle_count; t++) {
         uint32_t* r = b + table + t * SSSG_TABLE_STRIDE;
-        r[0] = f->table[t * 3];
-        r[1] = f->table[t * 3 + 1];
-        r[2] = f->table[t * 3 + 2];
-        r[3] = f->flip[t] ? SSSG_TRI_FLIP : 0u;
+        r[0] = f->surface.table[t * 3];
+        r[1] = f->surface.table[t * 3 + 1];
+        r[2] = f->surface.table[t * 3 + 2];
+        r[3] = f->mesh.flips[t] ? SSSG_TRI_FLIP : 0u;
     }
-    for (uint32_t c = 0; c < f->ns; c++) {
+    for (uint32_t c = 0; c < f->surface.count; c++) {
         uint32_t* r = b + surf + c * SSSG_SURF_STRIDE;
         for (int k = 0; k < 3; k++) {
-            r[k] = F2U(f->sc[c][k]);
-            r[4 + k] = F2U(f->snrm[c][k]);
-            r[8 + k] = F2U(f->daxis ? f->daxis[c][k] : f->snrm[c][k]);
+            r[k] = F2U(f->surface.centers[c][k]);
+            r[4 + k] = F2U(f->surface.normals[c][k]);
+            r[8 + k] = F2U(f->surface.exit_axies ? f->surface.exit_axies[c][k] : f->surface.normals[c][k]);
         }
-        r[3] = F2U(f->st[c]);
-        r[7] = F2U(f->sn[c]);
-        r[11] = F2U(f->dexp ? f->dexp[c] : 1.0f);
-        r[12] = f->lfirst ? f->lfirst[c] : 0;
-        r[13] = f->lcount ? f->lcount[c] : 0;
-        r[14] = f->nin ? f->nin[c] : 0;
-        r[15] = f->nout ? f->nout[c] : 0;
+        r[3] = F2U(f->surface.tangent_spreads[c]);
+        r[7] = F2U(f->surface.normal_spreads[c]);
+        r[11] = F2U(f->surface.exit_exponents ? f->surface.exit_exponents[c] : 1.0f);
+        r[12] = f->surface.first_lobes ? f->surface.first_lobes[c] : 0;
+        r[13] = f->surface.lobe_counts ? f->surface.lobe_counts[c] : 0;
+        r[14] = f->surface.walks_entered ? f->surface.walks_entered[c] : 0;
+        r[15] = f->surface.walks_exited ? f->surface.walks_exited[c] : 0;
         // cumulative lobe weights within this gaussian
-        if (f->lcount) {
+        if (f->surface.lobe_counts) {
             float cum = 0;
-            for (uint32_t j = 0; j < f->lcount[c]; j++) {
-                const Lobe* l = &f->lobes[f->lfirst[c] + j];
-                uint32_t* lr = b + lobe + (f->lfirst[c] + j) * SSSG_LOBE_STRIDE;
+            for (uint32_t j = 0; j < f->surface.lobe_counts[c]; j++) {
+                const Lobe* l = &f->surface.lobes[f->surface.first_lobes[c] + j];
+                uint32_t* lr = b + lobe + (f->surface.first_lobes[c] + j) * SSSG_LOBE_STRIDE;
                 cum += l->weight;
                 for (int k = 0; k < 3; k++) {
                     lr[k] = F2U(l->mean[k]);
                     lr[13 + k] = F2U(l->axis[k]);
                 }
-                lr[3] = F2U(j + 1 == f->lcount[c] ? 1.0f : cum);
+                lr[3] = F2U(j + 1 == f->surface.lobe_counts[c] ? 1.0f : cum);
                 for (int col = 0; col < 3; col++)
                     for (int row = 0; row < 3; row++)
                         lr[4 + col * 3 + row] = F2U(l->L[col][row]);
             }
         }
     }
-    if (!f->gs) return;
-    for (uint32_t c = 0; c < f->ng; c++) {
+    if (!f->cloud.tangible.gaussians) return;
+    for (uint32_t c = 0; c < f->cloud.tangible.count; c++) {
         uint32_t* r = b + gauss + c * SSSG_GAUSS_STRIDE;
-        const Gauss* g = &f->gs[c];
+        const Gauss* g = &f->cloud.tangible.gaussians[c];
         for (int k = 0; k < 3; k++) r[k] = F2U(g->mu[k]);
         for (int col = 0; col < 3; col++)
             for (int row = 0; row < 3; row++)
                 r[4 + col * 3 + row] = F2U(g->W[col][row]);
         for (int k = 0; k < SSS_Q; k++) r[13 + k] = F2U(g->q[k]);
     }
-    for (uint32_t n = 0; n < f->ngnodes; n++) {
+    for (uint32_t n = 0; n < f->cloud.tangible.node_count; n++) {
         uint32_t* r = b + node + n * SSSG_NODE_STRIDE;
-        const BuildNode* nd = &f->gnodes[n];
+        const BuildNode* nd = &f->cloud.tangible.nodes[n];
         for (int k = 0; k < 3; k++) {
             r[k] = F2U(nd->bmin[k]);
             r[4 + k] = F2U(nd->bmax[k]);
@@ -847,92 +926,92 @@ static void PackBlob(SSSFitter* f) {
 static void SetupPhase(SSSFitter* f) {
     vec3 bmin = { FLT_MAX, FLT_MAX, FLT_MAX };
     vec3 bmax = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-    for (uint32_t i = 0; i < f->nv; i++) {
-        glm_vec3_minv(bmin, (float*)f->pos[i], bmin);
-        glm_vec3_maxv(bmax, (float*)f->pos[i], bmax);
+    for (uint32_t i = 0; i < f->mesh.vertex_count; i++) {
+        glm_vec3_minv(bmin, (float*)f->mesh.positions[i], bmin);
+        glm_vec3_maxv(bmax, (float*)f->mesh.positions[i], bmax);
     }
-    f->diag = glm_vec3_distance(bmin, bmax);
-    if (!(f->diag > 0.0f)) {
+    f->mesh.diagonal = glm_vec3_distance(bmin, bmax);
+    if (!(f->mesh.diagonal > 0.0f)) {
         FailFitting(f, "mesh has no extent");
         return;
     }
-    f->eps = 1e-5f * f->diag;
-    f->cdf = EZ_MINALLOC(f->nt, sizeof(double));
+    f->mesh.epsilon = 1e-5f * f->mesh.diagonal;
+    f->mesh.cdf = EZ_MINALLOC(f->mesh.triangle_count, sizeof(double));
     double total = 0.0;
-    for (uint32_t t = 0; t < f->nt; t++) {
+    for (uint32_t t = 0; t < f->mesh.triangle_count; t++) {
         vec3 a, b, c;
         TriangleCorners(f, t, a, b, c);
         total += TriangleArea(a, b, c);
-        f->cdf[t] = total;
+        f->mesh.cdf[t] = total;
     }
-    f->area = total;
+    f->mesh.area = total;
     if (!(total > 0.0)) {
         FailFitting(f, "mesh has no surface area");
         return;
     }
-    float (*verts)[4] = EZ_MINALLOC(f->nv, sizeof(float[4]));
-    for (uint32_t i = 0; i < f->nv; i++) glm_vec3_copy((float*)f->pos[i], verts[i]);
-    Triangle* tris = EZ_MINALLOC(f->nt, sizeof(Triangle));
-    float* cdf = EZ_MINALLOC(f->nt, sizeof(float));
-    for (uint32_t t = 0; t < f->nt; t++) {
-        tris[t].a = f->idx[t * 3];
-        tris[t].b = f->idx[t * 3 + 1];
-        tris[t].c = f->idx[t * 3 + 2];
+    float (*verts)[4] = EZ_MINALLOC(f->mesh.vertex_count, sizeof(float[4]));
+    for (uint32_t i = 0; i < f->mesh.vertex_count; i++) glm_vec3_copy((float*)f->mesh.positions[i], verts[i]);
+    Triangle* tris = EZ_MINALLOC(f->mesh.triangle_count, sizeof(Triangle));
+    float* cdf = EZ_MINALLOC(f->mesh.triangle_count, sizeof(float));
+    for (uint32_t t = 0; t < f->mesh.triangle_count; t++) {
+        tris[t].a = f->mesh.indices[t * 3];
+        tris[t].b = f->mesh.indices[t * 3 + 1];
+        tris[t].c = f->mesh.indices[t * 3 + 2];
         tris[t].an = tris[t].bn = tris[t].cn = 0xFFFFFFFFu;
         tris[t].material = 0;
-        cdf[t] = (float)(f->cdf[t] / total);
+        cdf[t] = (float)(f->mesh.cdf[t] / total);
     }
-    cdf[f->nt - 1] = 1.0f;
+    cdf[f->mesh.triangle_count - 1] = 1.0f;
     uint32_t nnodes = 0;
     SSSGPUNode* nodes = IsolatedBVH(f, &nnodes);
-    BOOL ok = UploadBuffer(f, SSS_BIND_TRIANGLES, tris, (size_t)f->nt * sizeof(Triangle)) &&
-              UploadBuffer(f, SSS_BIND_VERTICES, verts, (size_t)f->nv * sizeof(float[4])) &&
+    BOOL ok = UploadBuffer(f, SSS_BIND_TRIANGLES, tris, (size_t)f->mesh.triangle_count * sizeof(Triangle)) &&
+              UploadBuffer(f, SSS_BIND_VERTICES, verts, (size_t)f->mesh.vertex_count * sizeof(float[4])) &&
               UploadBuffer(f, SSS_BIND_NODES, nodes, (size_t)nnodes * sizeof(SSSGPUNode)) &&
-              UploadBuffer(f, SSS_BIND_CDF, cdf, (size_t)f->nt * sizeof(float)) &&
-              RecreateBuffer(f, SSS_BIND_FLIPS, (size_t)f->nt * sizeof(uint32_t));
+              UploadBuffer(f, SSS_BIND_CDF, cdf, (size_t)f->mesh.triangle_count * sizeof(float)) &&
+              RecreateBuffer(f, SSS_BIND_FLIPS, (size_t)f->mesh.triangle_count * sizeof(uint32_t));
     EZ_FREE(verts);
     EZ_FREE(tris);
     EZ_FREE(cdf);
     EZ_FREE(nodes);
     if (!ok) return;
-    f->cursor = 0;
-    f->batch = SSS_BATCH_FIRST;
+    f->fgpu.cursor = 0;
+    f->fgpu.batch = SSS_BATCH_FIRST;
     f->phase = SSSFIT_ORIENT;
     SetStatus(f, "Orienting the surface");
 }
 
 static void OrientPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
-    while (f->cursor < f->nt) {
-        uint32_t n = MIN(f->batch, f->nt - f->cursor);
+    while (f->fgpu.cursor < f->mesh.triangle_count) {
+        uint32_t n = MIN(f->fgpu.batch, f->mesh.triangle_count - f->fgpu.cursor);
         double t0 = clock();
-        if (!SubmitKernel(f, SSS_MODE_ORIENT, f->cursor, n)) return;
+        if (!SubmitKernel(f, SSS_MODE_ORIENT, f->fgpu.cursor, n)) return;
         AdaptBatch(f, clock() - t0);
-        f->cursor += n;
-        SetStatus(f, "Orienting the surface %u/%u", f->cursor, f->nt);
+        f->fgpu.cursor += n;
+        SetStatus(f, "Orienting the surface %u/%u", f->fgpu.cursor, f->mesh.triangle_count);
         if (clock() - start >= budget) return;
     }
-    uint32_t* flips = EZ_MINALLOC(f->nt, sizeof(uint32_t));
-    if (!DownloadBuffer(f, SSS_BIND_FLIPS, flips, (size_t)f->nt * sizeof(uint32_t))) {
+    uint32_t* flips = EZ_MINALLOC(f->mesh.triangle_count, sizeof(uint32_t));
+    if (!DownloadBuffer(f, SSS_BIND_FLIPS, flips, (size_t)f->mesh.triangle_count * sizeof(uint32_t))) {
         EZ_FREE(flips);
         return;
     }
-    f->tn = EZ_MINALLOC(f->nt, sizeof(vec3));
-    f->flip = EZ_MINALLOC(f->nt, 1);
-    for (uint32_t t = 0; t < f->nt; t++) {
+    f->mesh.normals = EZ_MINALLOC(f->mesh.triangle_count, sizeof(vec3));
+    f->mesh.flips = EZ_MINALLOC(f->mesh.triangle_count, 1);
+    for (uint32_t t = 0; t < f->mesh.triangle_count; t++) {
         vec3 a, b, c, e1, e2;
         TriangleCorners(f, t, a, b, c);
         glm_vec3_sub(b, a, e1);
         glm_vec3_sub(c, a, e2);
-        glm_vec3_cross(e1, e2, f->tn[t]); // winding normal, flipped below where the parity test says it points inwards
-        if (!(glm_vec3_norm(f->tn[t]) > 0.0f)) {
-            glm_vec3_copy(GLM_ZUP, f->tn[t]);
+        glm_vec3_cross(e1, e2, f->mesh.normals[t]); // winding normal, flipped below where the parity test says it points inwards
+        if (!(glm_vec3_norm(f->mesh.normals[t]) > 0.0f)) {
+            glm_vec3_copy(GLM_ZUP, f->mesh.normals[t]);
             continue;
         }
-        glm_vec3_normalize(f->tn[t]);
+        glm_vec3_normalize(f->mesh.normals[t]);
         if (flips[t]) {
-            f->flip[t] = 1;
-            glm_vec3_negate(f->tn[t]);
+            f->mesh.flips[t] = 1;
+            glm_vec3_negate(f->mesh.normals[t]);
         }
     }
     EZ_FREE(flips);
@@ -951,23 +1030,23 @@ static void SurfacePhase(SSSFitter* f) {
         float r1 = RandomFloat(&f->rng);
         float r2 = RandomFloat(&f->rng);
         BarycentricPoint(f, t, r1, r2, sp[i]);
-        glm_vec3_copy(f->tn[t], snr[i]);
+        glm_vec3_copy(f->mesh.normals[t], snr[i]);
     }
     if (ns > m) ns = m;
-    f->ns = ns;
-    f->sc = EZ_MINALLOC(ns, sizeof(vec3));
-    f->snrm = EZ_MINALLOC(ns, sizeof(vec3));
-    f->st = EZ_MINALLOC(ns, sizeof(float));
-    f->sn = EZ_MINALLOC(ns, sizeof(float));
+    f->surface.count = ns;
+    f->surface.centers = EZ_MINALLOC(ns, sizeof(vec3));
+    f->surface.normals = EZ_MINALLOC(ns, sizeof(vec3));
+    f->surface.tangent_spreads = EZ_MINALLOC(ns, sizeof(float));
+    f->surface.normal_spreads = EZ_MINALLOC(ns, sizeof(float));
     // samples are already random: the first ns seed the clusters
-    memcpy(f->sc, sp, (size_t)ns * sizeof(vec3));
-    memcpy(f->snrm, snr, (size_t)ns * sizeof(vec3));
-    float spacing = (float)sqrt(f->area / (double)ns);
+    memcpy(f->surface.centers, sp, (size_t)ns * sizeof(vec3));
+    memcpy(f->surface.normals, snr, (size_t)ns * sizeof(vec3));
+    float spacing = (float)sqrt(f->mesh.area / (double)ns);
     uint32_t* assign = EZ_MINALLOC(m, sizeof(uint32_t));
     double* acc = EZ_MINALLOC((size_t)ns * 7, sizeof(double));
     for (int iter = 0; iter < 12; iter++) {
         Grid grid;
-        BuildGrid(&grid, f->sc, ns, spacing);
+        BuildGrid(&grid, f->surface.centers, ns, spacing);
         for (uint32_t i = 0; i < m; i++) {
             uint32_t ids[8] = { 0 };
             float d2[8];
@@ -975,7 +1054,7 @@ static void SurfacePhase(SSSFitter* f) {
             uint32_t best = ids[0];
             float bestv = FLT_MAX;
             for (uint32_t j = 0; j < k; j++) {
-                float pen = glm_vec3_dot(snr[i], f->snrm[ids[j]]) > 0.3f ? 1.0f : 16.0f;
+                float pen = glm_vec3_dot(snr[i], f->surface.normals[ids[j]]) > 0.3f ? 1.0f : 16.0f;
                 if (d2[j] * pen < bestv) { bestv = d2[j] * pen; best = ids[j]; }
             }
             assign[i] = best;
@@ -991,13 +1070,13 @@ static void SurfacePhase(SSSFitter* f) {
             double* a = &acc[c * 7];
             if (a[6] < 0.5) {
                 uint32_t r = RandomU32(&f->rng) % m; // empty cluster: reseed on a random sample
-                glm_vec3_copy(sp[r], f->sc[c]);
-                glm_vec3_copy(snr[r], f->snrm[c]);
+                glm_vec3_copy(sp[r], f->surface.centers[c]);
+                glm_vec3_copy(snr[r], f->surface.normals[c]);
                 continue;
             }
-            for (int k = 0; k < 3; k++) { f->sc[c][k] = (float)(a[k] / a[6]); f->snrm[c][k] = (float)a[3 + k]; }
-            glm_vec3_normalize(f->snrm[c]);
-            if (glm_vec3_norm(f->snrm[c]) < 0.5f) glm_vec3_copy(snr[c], f->snrm[c]);
+            for (int k = 0; k < 3; k++) { f->surface.centers[c][k] = (float)(a[k] / a[6]); f->surface.normals[c][k] = (float)a[3 + k]; }
+            glm_vec3_normalize(f->surface.normals[c]);
+            if (glm_vec3_norm(f->surface.normals[c]) < 0.5f) glm_vec3_copy(snr[c], f->surface.normals[c]);
         }
     }
     // footprint of each cluster
@@ -1005,8 +1084,8 @@ static void SurfacePhase(SSSFitter* f) {
     for (uint32_t i = 0; i < m; i++) {
         uint32_t c = assign[i];
         vec3 d;
-        glm_vec3_sub(sp[i], f->sc[c], d);
-        float dn = glm_vec3_dot(d, f->snrm[c]);
+        glm_vec3_sub(sp[i], f->surface.centers[c], d);
+        float dn = glm_vec3_dot(d, f->surface.normals[c]);
         acc[c * 7 + 0] += fmax(glm_vec3_norm2(d) - dn * dn, 0.0);
         acc[c * 7 + 1] += dn * dn;
         acc[c * 7 + 6] += 1.0;
@@ -1016,14 +1095,14 @@ static void SurfacePhase(SSSFitter* f) {
         float st = (float)sqrt(acc[c * 7 + 0] / n * 0.5);
         float sn = (float)sqrt(acc[c * 7 + 1] / n);
         st = CLAMP(st, 0.4f * spacing, 2.0f * spacing);
-        f->st[c] = st;
-        f->sn[c] = fmaxf(sn, 0.25f * st);
+        f->surface.tangent_spreads[c] = st;
+        f->surface.normal_spreads[c] = fmaxf(sn, 0.25f * st);
     }
     // per triangle candidate table: nearest clusters on the same side of the surface
-    f->table = EZ_MINALLOC((size_t)f->nt * 3, sizeof(uint32_t));
+    f->surface.table = EZ_MINALLOC((size_t)f->mesh.triangle_count * 3, sizeof(uint32_t));
     Grid grid;
-    BuildGrid(&grid, f->sc, ns, spacing);
-    for (uint32_t t = 0; t < f->nt; t++) {
+    BuildGrid(&grid, f->surface.centers, ns, spacing);
+    for (uint32_t t = 0; t < f->mesh.triangle_count; t++) {
         vec3 a, b, c, cen;
         TriangleCorners(f, t, a, b, c);
         glm_vec3_add(a, b, cen);
@@ -1032,11 +1111,11 @@ static void SurfacePhase(SSSFitter* f) {
         uint32_t ids[16];
         float d2[16];
         uint32_t k = GridLocale(&grid, cen, 16, ids, d2);
-        uint32_t* row = &f->table[t * 3];
+        uint32_t* row = &f->surface.table[t * 3];
         row[0] = row[1] = row[2] = SSSG_NONE;
         uint32_t filled = 0;
         for (uint32_t j = 0; j < k && filled < 3; j++)
-            if (glm_vec3_dot(f->tn[t], f->snrm[ids[j]]) > 0.25f) row[filled++] = ids[j];
+            if (glm_vec3_dot(f->mesh.normals[t], f->surface.normals[ids[j]]) > 0.25f) row[filled++] = ids[j];
         if (filled == 0) row[0] = ids[0];
     }
     FreeGrid(&grid);
@@ -1046,33 +1125,33 @@ static void SurfacePhase(SSSFitter* f) {
     EZ_FREE(snr);
     // the walks need the triangle table (flip flags) and the surface gaussians on the GPU
     PackBlob(f);
-    if (!UploadBuffer(f, SSS_BIND_BLOB, f->blob, (size_t)f->blob_words * sizeof(uint32_t))) return;
-    f->target = f->cfg.walks;
-    f->rec = EZ_MINALLOC(f->target, sizeof(SSSWalkRecord));
-    f->interior = EZ_MINALLOC(SSS_INTERIOR_CAP, sizeof(vec3));
-    f->batch = SSS_BATCH_FIRST;
+    if (!UploadBuffer(f, SSS_BIND_BLOB, f->result.blob, (size_t)f->result.words * sizeof(uint32_t))) return;
+    f->walks.target = f->cfg.walks;
+    f->walks.records = EZ_MINALLOC(f->walks.target, sizeof(SSSWalkRecord));
+    f->walks.interior.points = EZ_MINALLOC(SSS_INTERIOR_CAP, sizeof(vec3));
+    f->fgpu.batch = SSS_BATCH_FIRST;
     f->phase = SSSFIT_WALKS;
-    SetStatus(f, "Tracing reference walks 0/%u", f->target);
+    SetStatus(f, "Tracing reference walks 0/%u", f->walks.target);
 }
 
 static void AddInteriorPoint(SSSFitter* f, const vec3 p) {
-    f->interior_seen++;
-    if (f->ninterior < SSS_INTERIOR_CAP) {
-        glm_vec3_copy((float*)p, f->interior[f->ninterior++]);
+    f->walks.interior.seen++;
+    if (f->walks.interior.count < SSS_INTERIOR_CAP) {
+        glm_vec3_copy((float*)p, f->walks.interior.points[f->walks.interior.count++]);
         return;
     }
-    uint64_t r = ((uint64_t)RandomU32(&f->rng) << 32 | RandomU32(&f->rng)) % f->interior_seen;
-    if (r < SSS_INTERIOR_CAP) glm_vec3_copy((float*)p, f->interior[r]);
+    uint64_t r = ((uint64_t)RandomU32(&f->rng) << 32 | RandomU32(&f->rng)) % f->walks.interior.seen;
+    if (r < SSS_INTERIOR_CAP) glm_vec3_copy((float*)p, f->walks.interior.points[r]);
 }
 
 static void WalksPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
-    while (f->nrec < f->target) {
-        uint32_t want = f->target - f->nrec;
-        uint32_t n = MIN(f->batch, want + want / 16 + 64); // a few spare attempts for walks that leak
+    while (f->walks.records_count < f->walks.target) {
+        uint32_t want = f->walks.target - f->walks.records_count;
+        uint32_t n = MIN(f->fgpu.batch, want + want / 16 + 64); // a few spare attempts for walks that leak
         if (!RecreateBuffer(f, SSS_BIND_RECORDS, (size_t)n * sizeof(SSSWalkRecord))) return;
         double t0 = clock();
-        if (!SubmitKernel(f, SSS_MODE_WALKS, f->attempts, n)) return;
+        if (!SubmitKernel(f, SSS_MODE_WALKS, f->walks.attempts, n)) return;
         SSSWalkRecord* out = EZ_MINALLOC(n, sizeof(SSSWalkRecord));
         if (!DownloadBuffer(f, SSS_BIND_RECORDS, out, (size_t)n * sizeof(SSSWalkRecord))) {
             EZ_FREE(out);
@@ -1081,31 +1160,31 @@ static void WalksPhase(SSSFitter* f, double budget, ClockFunction clock) {
         AdaptBatch(f, clock() - t0);
         for (uint32_t i = 0; i < n; i++) {
             const SSSWalkRecord* r = &out[i];
-            f->attempts++;
-            f->steps_sum += r->info[0];
+            f->walks.attempts++;
+            f->walks.steps += r->info[0];
             if (!r->info[1]) {
                 f->stats.walks.lost++;
                 if (r->info[2] >= 1 && r->info[2] <= 3) f->stats.walks.lostwhy[r->info[2] - 1]++;
                 continue;
             }
-            if (f->nrec >= f->target) continue;
-            f->events_sum += (double)r->info[0] - 1.0;
-            f->length_sum += (double)f->sigma * r->exit[3];
+            if (f->walks.records_count >= f->walks.target) continue;
+            f->walks.events += (double)r->info[0] - 1.0;
+            f->walks.length += (double)f->mesh.sigma * r->exit[3];
             if (r->interior[3] > 0.0f) AddInteriorPoint(f, r->interior);
-            f->rec[f->nrec++] = *r;
+            f->walks.records[f->walks.records_count++] = *r;
         }
         EZ_FREE(out);
-        if (f->attempts > 64 && f->stats.walks.lost > f->attempts / 2) {
+        if (f->walks.attempts > 64 && f->stats.walks.lost > f->walks.attempts / 2) {
             FailFitting(f, "more than half of the walks escaped, the mesh is probably not closed");
             return;
         }
-        SetStatus(f, "Tracing reference walks %u/%u", f->nrec, f->target);
+        SetStatus(f, "Tracing reference walks %u/%u", f->walks.records_count, f->walks.target);
         if (clock() - start >= budget) return;
     }
-    f->stats.walks.kept = f->nrec;
-    f->stats.mean_steps = f->steps_sum / (double)(f->attempts ? f->attempts : 1);
-    f->stats.events_per_length = f->events_sum / fmax(f->length_sum, 1e-9);
-    f->holdout = f->nrec - f->nrec / 10;
+    f->stats.walks.kept = f->walks.records_count;
+    f->stats.mean_steps = f->walks.steps / (double)(f->walks.attempts ? f->walks.attempts : 1);
+    f->stats.events_per_length = f->walks.events / fmax(f->walks.length, 1e-9);
+    f->walks.holdout = f->walks.records_count - f->walks.records_count / 10;
     f->phase = SSSFIT_LOBES;
     SetStatus(f, "Fitting exit lobes");
 }
@@ -1123,12 +1202,12 @@ static void DefaultLobe(const vec3 n, float mfp, Lobe* l) {
 
 static uint32_t FitLobes(SSSFitter* f, const vec3* pts, const vec3* nrm, uint32_t n, uint32_t K, const vec3 fallback_n, Lobe* out) { // EM algorithm
     if (n < 4) {
-        DefaultLobe(fallback_n, f->mfp, &out[0]);
+        DefaultLobe(fallback_n, f->mesh.mfp, &out[0]);
         return 1;
     }
     if (K > n / 24) K = n / 24;
     if (K < 1) K = 1;
-    double reg = (0.02 * f->mfp) * (0.02 * f->mfp) + 1e-14 * (double)f->diag * f->diag;
+    double reg = (0.02 * f->mesh.mfp) * (0.02 * f->mesh.mfp) + 1e-14 * (double)f->mesh.diagonal * f->mesh.diagonal;
     double mu[8][3], cov[8][3][3], pi[8];
     // k-means++ seeding of the means
     uint32_t first = RandomU32(&f->rng) % n;
@@ -1226,7 +1305,7 @@ static uint32_t FitLobes(SSSFitter* f, const vec3* pts, const vec3* nrm, uint32_
         used++;
     }
     EZ_FREE(resp);
-    if (used == 0) { DefaultLobe(fallback_n, f->mfp, &out[0]); return 1; }
+    if (used == 0) { DefaultLobe(fallback_n, f->mesh.mfp, &out[0]); return 1; }
     float total = 0;
     for (uint32_t c = 0; c < used; c++) total += out[c].weight;
     for (uint32_t c = 0; c < used; c++) out[c].weight /= total;
@@ -1235,39 +1314,39 @@ static uint32_t FitLobes(SSSFitter* f, const vec3* pts, const vec3* nrm, uint32_
 
 static void LobesPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double tstart = clock();
-    uint32_t ns = f->ns, ntrain = f->holdout;
-    if (!f->lbucket_start) {
+    uint32_t ns = f->surface.count, ntrain = f->walks.holdout;
+    if (!f->surface.bucket_starts) {
         // surface gaussians under each walk's entry and exit were picked on the GPU (sss_pick_surface)
-        f->nin = EZ_MINALLOC(ns, sizeof(uint32_t));
-        f->nout = EZ_MINALLOC(ns, sizeof(uint32_t));
+        f->surface.walks_entered = EZ_MINALLOC(ns, sizeof(uint32_t));
+        f->surface.walks_exited = EZ_MINALLOC(ns, sizeof(uint32_t));
         for (uint32_t i = 0; i < ntrain; i++) {
-            f->nin[f->rec[i].triangles[2]]++;
-            f->nout[f->rec[i].triangles[3]]++;
+            f->surface.walks_entered[f->walks.records[i].triangles[2]]++;
+            f->surface.walks_exited[f->walks.records[i].triangles[3]]++;
         }
         // bucket training records by entry gaussian
         uint32_t* bstart = EZ_MINALLOC(ns + 1, sizeof(uint32_t));
-        for (uint32_t c = 0; c < ns; c++) bstart[c + 1] = bstart[c] + f->nin[c];
+        for (uint32_t c = 0; c < ns; c++) bstart[c + 1] = bstart[c] + f->surface.walks_entered[c];
         uint32_t* items = EZ_MINALLOC(ntrain, sizeof(uint32_t));
         uint32_t* cur = EZ_MINALLOC(ns, sizeof(uint32_t));
         for (uint32_t i = 0; i < ntrain; i++) {
-            uint32_t c = f->rec[i].triangles[2];
+            uint32_t c = f->walks.records[i].triangles[2];
             items[bstart[c] + cur[c]++] = i;
         }
         EZ_FREE(cur);
-        f->lfirst = EZ_MINALLOC(ns, sizeof(uint32_t));
-        f->lcount = EZ_MINALLOC(ns, sizeof(uint32_t));
-        f->lobecap = ns * f->cfg.lobes;
-        f->lobes = EZ_MINALLOC(f->lobecap, sizeof(Lobe));
-        f->lbucket_start = bstart;
-        f->lbucket_items = items;
-        f->lcursor = 0;
+        f->surface.first_lobes = EZ_MINALLOC(ns, sizeof(uint32_t));
+        f->surface.lobe_counts = EZ_MINALLOC(ns, sizeof(uint32_t));
+        f->surface.lobe_capacity = ns * f->cfg.lobes;
+        f->surface.lobes = EZ_MINALLOC(f->surface.lobe_capacity, sizeof(Lobe));
+        f->surface.bucket_starts = bstart;
+        f->surface.bucket_sizes = items;
+        f->surface.cursor = 0;
     }
-    uint32_t* bstart = f->lbucket_start;
-    uint32_t* items = f->lbucket_items;
+    uint32_t* bstart = f->surface.bucket_starts;
+    uint32_t* items = f->surface.bucket_sizes;
     vec3* pts = EZ_MINALLOC(SSS_EM_MAX_POINTS, sizeof(vec3));
     vec3* nrm = EZ_MINALLOC(SSS_EM_MAX_POINTS, sizeof(vec3));
-    for (; f->lcursor < ns; f->lcursor++) {
-        uint32_t c = f->lcursor;
+    for (; f->surface.cursor < ns; f->surface.cursor++) {
+        uint32_t c = f->surface.cursor;
         if ((c & 7u) == 0u && c > 0) {
             SetStatus(f, "Fitting exit lobes %u/%u", c, ns);
             if (clock() - tstart >= budget) {
@@ -1280,43 +1359,43 @@ static void LobesPhase(SSSFitter* f, double budget, ClockFunction clock) {
         uint32_t take = MIN(cnt, SSS_EM_MAX_POINTS);
         for (uint32_t j = 0; j < take; j++) {
             uint32_t pickj = take == cnt ? j : (uint32_t)(((uint64_t)j * cnt) / take); // even subsample
-            const SSSWalkRecord* w = &f->rec[items[bstart[c] + pickj]];
+            const SSSWalkRecord* w = &f->walks.records[items[bstart[c] + pickj]];
             glm_vec3_sub((float*)w->exit, (float*)w->entry, pts[j]);
-            glm_vec3_copy(f->tn[w->triangles[1]], nrm[j]);
+            glm_vec3_copy(f->mesh.normals[w->triangles[1]], nrm[j]);
         }
-        f->lfirst[c] = f->nlobes;
-        f->lcount[c] = FitLobes(f, pts, nrm, take, f->cfg.lobes, f->snrm[c], &f->lobes[f->nlobes]);
-        f->nlobes += f->lcount[c];
+        f->surface.first_lobes[c] = f->surface.lobe_count;
+        f->surface.lobe_counts[c] = FitLobes(f, pts, nrm, take, f->cfg.lobes, f->surface.normals[c], &f->surface.lobes[f->surface.lobe_count]);
+        f->surface.lobe_count += f->surface.lobe_counts[c];
     }
     EZ_FREE(pts);
     EZ_FREE(nrm);
     // exit directions: cosine power lobe per gaussian, fitted from the walks that left under it
-    f->daxis = EZ_MINALLOC(ns, sizeof(vec3));
-    f->dexp = EZ_MINALLOC(ns, sizeof(float));
+    f->surface.exit_axies = EZ_MINALLOC(ns, sizeof(vec3));
+    f->surface.exit_exponents = EZ_MINALLOC(ns, sizeof(float));
     double* dsum = EZ_MINALLOC((size_t)ns * 3, sizeof(double));
     for (uint32_t i = 0; i < ntrain; i++) {
-        const SSSWalkRecord* w = &f->rec[i];
+        const SSSWalkRecord* w = &f->walks.records[i];
         for (int k = 0; k < 3; k++) dsum[w->triangles[3] * 3 + k] += w->direction[k];
     }
     double* csum = EZ_MINALLOC(ns, sizeof(double));
     for (uint32_t c = 0; c < ns; c++) {
         vec3 a = { (float)dsum[c * 3], (float)dsum[c * 3 + 1], (float)dsum[c * 3 + 2] };
-        if (f->nout[c] < 8 || glm_vec3_norm(a) < 1e-6f) glm_vec3_copy(f->snrm[c], a);
-        glm_vec3_normalize_to(a, f->daxis[c]);
+        if (f->surface.walks_exited[c] < 8 || glm_vec3_norm(a) < 1e-6f) glm_vec3_copy(f->surface.normals[c], a);
+        glm_vec3_normalize_to(a, f->surface.exit_axies[c]);
     }
     for (uint32_t i = 0; i < ntrain; i++) {
-        const SSSWalkRecord* w = &f->rec[i];
-        csum[w->triangles[3]] += glm_vec3_dot((float*)w->direction, f->daxis[w->triangles[3]]);
+        const SSSWalkRecord* w = &f->walks.records[i];
+        csum[w->triangles[3]] += glm_vec3_dot((float*)w->direction, f->surface.exit_axies[w->triangles[3]]);
     }
     for (uint32_t c = 0; c < ns; c++) {
-        if (f->nout[c] < 8) {
-            f->dexp[c] = 1.0f;
+        if (f->surface.walks_exited[c] < 8) {
+            f->surface.exit_exponents[c] = 1.0f;
             continue;
         }
-        double m = csum[c] / f->nout[c];
+        double m = csum[c] / f->surface.walks_exited[c];
         // E[cos] of a normalised cos^e lobe is (e + 1) / (e + 2)
         double e = m >= 0.995 ? 200.0 : (2.0 * m - 1.0) / (1.0 - m);
-        f->dexp[c] = (float)fmin(fmax(e, 0.0), 200.0);
+        f->surface.exit_exponents[c] = (float)fmin(fmax(e, 0.0), 200.0);
     }
     EZ_FREE(dsum);
     EZ_FREE(csum);
@@ -1342,68 +1421,68 @@ static void PrecomputeWhitening(Gauss* g) {
 
 static void CloudPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
-    uint32_t n = f->ninterior;
-    if (!f->cl_centres) {
+    uint32_t n = f->walks.interior.count;
+    if (!f->cloud.ethereal.centers) {
         uint32_t ngw = f->cfg.internal_gaussians;
         if (ngw > n / 4) ngw = n / 4;
         if (ngw < 1) ngw = 1;
-        f->ng = ngw;
-        f->cl_centres = EZ_MINALLOC(ngw, sizeof(vec3));
-        f->cl_assign = EZ_MINALLOC(n, sizeof(uint32_t));
-        f->cl_acc = EZ_MINALLOC((size_t)ngw * 4, sizeof(double));
-        for (uint32_t c = 0; c < ngw; c++) glm_vec3_copy(f->interior[n ? (c * (n / ngw)) % n : 0], f->cl_centres[c]);
+        f->cloud.tangible.count = ngw;
+        f->cloud.ethereal.centers = EZ_MINALLOC(ngw, sizeof(vec3));
+        f->cloud.ethereal.assignments = EZ_MINALLOC(n, sizeof(uint32_t));
+        f->cloud.ethereal.sums = EZ_MINALLOC((size_t)ngw * 4, sizeof(double));
+        for (uint32_t c = 0; c < ngw; c++) glm_vec3_copy(f->walks.interior.points[n ? (c * (n / ngw)) % n : 0], f->cloud.ethereal.centers[c]);
         // spacing estimate from the bounding volume of the seeds
         vec3 vb0 = { FLT_MAX, FLT_MAX, FLT_MAX }, vb1 = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
         for (uint32_t i = 0; i < n; i++) {
-            glm_vec3_minv(vb0, f->interior[i], vb0);
-            glm_vec3_maxv(vb1, f->interior[i], vb1);
+            glm_vec3_minv(vb0, f->walks.interior.points[i], vb0);
+            glm_vec3_maxv(vb1, f->walks.interior.points[i], vb1);
         }
         double vol = 1.0;
-        for (int k = 0; k < 3; k++) vol *= fmax(vb1[k] - vb0[k], 1e-6 * f->diag);
-        f->cl_spacing = (float)cbrt(vol / ngw);
-        f->cl_iter = 0;
+        for (int k = 0; k < 3; k++) vol *= fmax(vb1[k] - vb0[k], 1e-6 * f->mesh.diagonal);
+        f->cloud.ethereal.spacing = (float)cbrt(vol / ngw);
+        f->cloud.ethereal.iteration = 0;
     }
-    uint32_t ng = f->ng;
-    vec3* centres = f->cl_centres;
-    uint32_t* assign = f->cl_assign;
-    double* acc = f->cl_acc;
-    float spacing = f->cl_spacing;
+    uint32_t ng = f->cloud.tangible.count;
+    vec3* centres = f->cloud.ethereal.centers;
+    uint32_t* assign = f->cloud.ethereal.assignments;
+    double* acc = f->cloud.ethereal.sums;
+    float spacing = f->cloud.ethereal.spacing;
     // k-means over the scattering locations, one iteration per time slice
-    while (f->cl_iter < 10 && n > 0) {
+    while (f->cloud.ethereal.iteration < 10 && n > 0) {
         Grid grid;
         BuildGrid(&grid, centres, ng, spacing);
         for (uint32_t i = 0; i < n; i++) {
             uint32_t id = 0;
             float d2;
-            GridLocale(&grid, f->interior[i], 1, &id, &d2);
+            GridLocale(&grid, f->walks.interior.points[i], 1, &id, &d2);
             assign[i] = id;
         }
         FreeGrid(&grid);
         memset(acc, 0, (size_t)ng * 4 * sizeof(double));
         for (uint32_t i = 0; i < n; i++) {
             double* a = &acc[assign[i] * 4];
-            for (int k = 0; k < 3; k++) a[k] += f->interior[i][k];
+            for (int k = 0; k < 3; k++) a[k] += f->walks.interior.points[i][k];
             a[3] += 1.0;
         }
         for (uint32_t c = 0; c < ng; c++) {
-            if (acc[c * 4 + 3] < 0.5) { glm_vec3_copy(f->interior[RandomU32(&f->rng) % n], centres[c]); continue; }
+            if (acc[c * 4 + 3] < 0.5) { glm_vec3_copy(f->walks.interior.points[RandomU32(&f->rng) % n], centres[c]); continue; }
             for (int k = 0; k < 3; k++) centres[c][k] = (float)(acc[c * 4 + k] / acc[c * 4 + 3]);
         }
-        f->cl_iter++;
-        SetStatus(f, "Clustering the internal cloud %u/10", f->cl_iter);
+        f->cloud.ethereal.iteration++;
+        SetStatus(f, "Clustering the internal cloud %u/10", f->cloud.ethereal.iteration);
         if (clock() - start >= budget) return;
     }
-    f->gs = EZ_MINALLOC(ng, sizeof(Gauss));
-    f->cl_centres = NULL;
-    f->cl_assign = NULL;
-    f->cl_acc = NULL;
+    f->cloud.tangible.gaussians = EZ_MINALLOC(ng, sizeof(Gauss));
+    f->cloud.ethereal.centers = NULL;
+    f->cloud.ethereal.assignments = NULL;
+    f->cloud.ethereal.sums = NULL;
     // covariance of every cluster -> oriented gaussian
     double* cov = EZ_MINALLOC((size_t)ng * 9, sizeof(double));
     memset(acc, 0, (size_t)ng * 4 * sizeof(double));
     for (uint32_t i = 0; i < n; i++) {
         uint32_t c = assign[i];
         vec3 d;
-        glm_vec3_sub(f->interior[i], centres[c], d);
+        glm_vec3_sub(f->walks.interior.points[i], centres[c], d);
         for (int a = 0; a < 3; a++)
             for (int b = 0; b < 3; b++)
                 cov[c * 9 + a * 3 + b] += d[a] * d[b];
@@ -1412,13 +1491,13 @@ static void CloudPhase(SSSFitter* f, double budget, ClockFunction clock) {
     Grid cgrid;
     BuildGrid(&cgrid, centres, ng, spacing);
     for (uint32_t c = 0; c < ng; c++) {
-        Gauss* g = &f->gs[c];
+        Gauss* g = &f->cloud.tangible.gaussians[c];
         glm_vec3_copy(centres[c], g->mu);
         uint32_t ids[2];
         float d2[2];
         uint32_t k = GridLocale(&cgrid, g->mu, 2, ids, d2);
         float nn = k > 1 ? sqrtf(d2[1]) : spacing;
-        float iso = fmaxf(0.75f * nn, 0.05f * f->mfp);
+        float iso = fmaxf(0.75f * nn, 0.05f * f->mesh.mfp);
         double cnt = acc[c * 4 + 3];
         if (cnt < 6) {
             glm_mat3_identity(g->R);
@@ -1430,7 +1509,7 @@ static void CloudPhase(SSSFitter* f, double budget, ClockFunction clock) {
                     a[i][j] = cov[c * 9 + i * 3 + j] / cnt;
             Jacobi3(a, ev, V);
             for (int i = 0; i < 3; i++) g->s[i] = 1.4f * (float)sqrt(fmax(ev[i], 0.0));
-            float smin = fmaxf(0.3f * glm_vec3_max(g->s), 0.05f * f->mfp);
+            float smin = fmaxf(0.3f * glm_vec3_max(g->s), 0.05f * f->mesh.mfp);
             for (int i = 0; i < 3; i++) g->s[i] = fmaxf(g->s[i], smin);
             for (int col = 0; col < 3; col++)
                 for (int row = 0; row < 3; row++)
@@ -1447,7 +1526,7 @@ static void CloudPhase(SSSFitter* f, double budget, ClockFunction clock) {
     vec3* mins = EZ_MINALLOC(ng, sizeof(vec3));
     vec3* maxs = EZ_MINALLOC(ng, sizeof(vec3));
     for (uint32_t c = 0; c < ng; c++) {
-        Gauss* g = &f->gs[c];
+        Gauss* g = &f->cloud.tangible.gaussians[c];
         for (int row = 0; row < 3; row++) {
             double v = 0; // Sigma_rr = sum_k (R_rk s_k)^2
             for (int k = 0; k < 3; k++) { double e = g->R[k][row] * g->s[k]; v += e * e; }
@@ -1457,130 +1536,135 @@ static void CloudPhase(SSSFitter* f, double budget, ClockFunction clock) {
         }
     }
     uint32_t* order = EZ_MINALLOC(ng, sizeof(uint32_t));
-    f->gnodes = BuildBVH(ng, mins, maxs, 4, order, &f->ngnodes);
+    f->cloud.tangible.nodes = BuildBVH(ng, mins, maxs, 4, order, &f->cloud.tangible.node_count);
     Gauss* sorted = EZ_MINALLOC(ng, sizeof(Gauss));
-    for (uint32_t i = 0; i < ng; i++) sorted[i] = f->gs[order[i]];
-    EZ_FREE(f->gs);
-    f->gs = sorted;
+    for (uint32_t i = 0; i < ng; i++) sorted[i] = f->cloud.tangible.gaussians[order[i]];
+    EZ_FREE(f->cloud.tangible.gaussians);
+    f->cloud.tangible.gaussians = sorted;
     EZ_FREE(order);
     EZ_FREE(mins);
     EZ_FREE(maxs);
     // starting model: one global regression of the log excess length on log chord length
-    f->nfeat = f->holdout;
-    f->fstart = EZ_MINALLOC((size_t)f->nfeat + 1, sizeof(uint32_t));
-    f->fbg = EZ_MINALLOC(f->nfeat, sizeof(float));
-    f->fy = EZ_MINALLOC(f->nfeat, sizeof(float));
-    f->fu = EZ_MINALLOC(f->nfeat, sizeof(float));
+    f->optimizer.walkcount = f->walks.holdout;
+    f->optimizer.starts = EZ_MINALLOC((size_t)f->optimizer.walkcount + 1, sizeof(uint32_t));
+    f->optimizer.background_weights = EZ_MINALLOC(f->optimizer.walkcount, sizeof(float));
+    f->optimizer.excess_length = EZ_MINALLOC(f->optimizer.walkcount, sizeof(float));
+    f->optimizer.log_length = EZ_MINALLOC(f->optimizer.walkcount, sizeof(float));
     double sx = 0, sy = 0, sxx = 0, sxy = 0;
-    float epsl = SSS_EPS_FRACTION * f->mfp;
-    for (uint32_t i = 0; i < f->nfeat; i++) {
-        const SSSWalkRecord* w = &f->rec[i];
+    float epsl = SSS_EPS_FRACTION * f->mesh.mfp;
+    for (uint32_t i = 0; i < f->optimizer.walkcount; i++) {
+        const SSSWalkRecord* w = &f->walks.records[i];
         float D = glm_vec3_distance((float*)w->exit, (float*)w->entry);
-        f->fy[i] = logf(fmaxf(w->exit[3] - D, 0.0f) + epsl);
-        f->fu[i] = logf(1.0f + D / f->mfp);
-        sx += f->fu[i]; sy += f->fy[i]; sxx += f->fu[i] * f->fu[i]; sxy += f->fu[i] * f->fy[i];
+        f->optimizer.excess_length[i] = logf(fmaxf(w->exit[3] - D, 0.0f) + epsl);
+        f->optimizer.log_length[i] = logf(1.0f + D / f->mesh.mfp);
+        sx += f->optimizer.log_length[i]; sy += f->optimizer.excess_length[i]; sxx += f->optimizer.log_length[i] * f->optimizer.log_length[i]; sxy += f->optimizer.log_length[i] * f->optimizer.excess_length[i];
     }
-    double nn = f->nfeat > 0 ? f->nfeat : 1;
+    double nn = f->optimizer.walkcount > 0 ? f->optimizer.walkcount : 1;
     double den = sxx - sx * sx / nn;
     double b1 = den > 1e-12 ? (sxy - sx * sy / nn) / den : 0.0;
     double b0 = (sy - b1 * sx) / nn;
     double ss = 0;
-    for (uint32_t i = 0; i < f->nfeat; i++) { double r = f->fy[i] - (b0 + b1 * f->fu[i]); ss += r * r; }
+    for (uint32_t i = 0; i < f->optimizer.walkcount; i++) { double r = f->optimizer.excess_length[i] - (b0 + b1 * f->optimizer.log_length[i]); ss += r * r; }
     double sd = sqrt(ss / nn);
     // two components straddling the global fit; the optimiser separates short and long walks
-    f->init_q[0] = (float)(b0 - 0.6 * sd);
-    f->init_q[1] = (float)b1;
-    f->init_q[2] = (float)log(fmax(0.7 * sd, 1e-3));
-    f->init_q[3] = (float)(b0 + 0.6 * sd);
-    f->init_q[4] = (float)b1;
-    f->init_q[5] = (float)log(fmax(0.7 * sd, 1e-3));
-    f->init_q[6] = 0.0f;
-    for (uint32_t c = 0; c < ng; c++) memcpy(f->gs[c].q, f->init_q, sizeof(f->init_q));
-    memcpy(f->bg, f->init_q, sizeof(f->init_q));
-    f->entrycap = f->nfeat * 8 + 1024;
-    f->fidx = EZ_MINALLOC(f->entrycap, sizeof(uint32_t));
-    f->fval = EZ_MINALLOC(f->entrycap, sizeof(float));
+    f->optimizer.initial_fit[0] = (float)(b0 - 0.6 * sd);
+    f->optimizer.initial_fit[1] = (float)b1;
+    f->optimizer.initial_fit[2] = (float)log(fmax(0.7 * sd, 1e-3));
+    f->optimizer.initial_fit[3] = (float)(b0 + 0.6 * sd);
+    f->optimizer.initial_fit[4] = (float)b1;
+    f->optimizer.initial_fit[5] = (float)log(fmax(0.7 * sd, 1e-3));
+    f->optimizer.initial_fit[6] = 0.0f;
+    for (uint32_t c = 0; c < ng; c++) memcpy(f->cloud.tangible.gaussians[c].q, f->optimizer.initial_fit, sizeof(f->optimizer.initial_fit));
+    memcpy(f->cloud.tangible.background, f->optimizer.initial_fit, sizeof(f->optimizer.initial_fit));
+    f->optimizer.entry_capacity = f->optimizer.walkcount * 8 + 1024;
+    f->optimizer.indices = EZ_MINALLOC(f->optimizer.entry_capacity, sizeof(uint32_t));
+    f->optimizer.integrals = EZ_MINALLOC(f->optimizer.entry_capacity, sizeof(float));
     // the chord traversal reads the packed nodes / gaussians
     PackBlob(f);
-    if (!UploadBuffer(f, SSS_BIND_BLOB, f->blob, (size_t)f->blob_words * sizeof(uint32_t))) return;
-    f->cursor = 0;
-    f->batch = SSS_BATCH_FIRST;
+    if (!UploadBuffer(f, SSS_BIND_BLOB, f->result.blob, (size_t)f->result.words * sizeof(uint32_t))) return;
+    f->fgpu.cursor = 0;
+    f->fgpu.batch = SSS_BATCH_FIRST;
     f->phase = SSSFIT_CHORDS;
     SetStatus(f, "Integrating chords through the internal cloud");
 }
 
 static void ChordPhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
-    while (f->cursor < f->nfeat) {
-        uint32_t n = MIN(f->batch, f->nfeat - f->cursor);
+    while (f->fgpu.cursor < f->optimizer.walkcount) {
+        uint32_t n = MIN(f->fgpu.batch, f->optimizer.walkcount - f->fgpu.cursor);
         double t0 = clock();
         // pass 1: how many gaussians each chord passes, and the chord length of the background term
-        if (!UploadBuffer(f, SSS_BIND_RECORDS, &f->rec[f->cursor], (size_t)n * sizeof(SSSWalkRecord))) return;
+        if (!UploadBuffer(f, SSS_BIND_RECORDS, &f->walks.records[f->fgpu.cursor], (size_t)n * sizeof(SSSWalkRecord))) return;
         if (!RecreateBuffer(f, SSS_BIND_CHORD_META, (size_t)n * 4 * sizeof(uint32_t))) return;
-        if (!SubmitKernel(f, SSS_MODE_CHORD_COUNT, f->cursor, n)) return;
+        if (!SubmitKernel(f, SSS_MODE_CHORD_COUNT, f->fgpu.cursor, n)) return;
         uint32_t* meta = EZ_MINALLOC((size_t)n * 4, sizeof(uint32_t));
         if (!DownloadBuffer(f, SSS_BIND_CHORD_META, meta, (size_t)n * 4 * sizeof(uint32_t))) { EZ_FREE(meta); return; }
         uint32_t total = 0;
         for (uint32_t i = 0; i < n; i++) {
             meta[i * 4 + 1] = total;
             total += meta[i * 4];
-            f->fbg[f->cursor + i] = SSS_BG_WEIGHT * U2F(meta[i * 4 + 2]);
-            f->fstart[f->cursor + i] = f->nentries + meta[i * 4 + 1];
+            f->optimizer.background_weights[f->fgpu.cursor + i] = SSS_BG_WEIGHT * U2F(meta[i * 4 + 2]);
+            f->optimizer.starts[f->fgpu.cursor + i] = f->optimizer.entries_used + meta[i * 4 + 1];
         }
         // pass 2: the (gaussian, line integral) pairs, at the offsets just computed
         if (total > 0) {
             uint32_t* entries = EZ_MINALLOC((size_t)total * 2, sizeof(uint32_t));
             BOOL ok = UploadBuffer(f, SSS_BIND_CHORD_META, meta, (size_t)n * 4 * sizeof(uint32_t)) &&
                       RecreateBuffer(f, SSS_BIND_CHORD_ENTRIES, (size_t)total * 2 * sizeof(uint32_t)) &&
-                      SubmitKernel(f, SSS_MODE_CHORD_WRITE, f->cursor, n) &&
+                      SubmitKernel(f, SSS_MODE_CHORD_WRITE, f->fgpu.cursor, n) &&
                       DownloadBuffer(f, SSS_BIND_CHORD_ENTRIES, entries, (size_t)total * 2 * sizeof(uint32_t));
-            if (!ok) { EZ_FREE(entries); EZ_FREE(meta); return; }
-            if (f->nentries + total > f->entrycap) {
-                uint32_t newcap = (f->nentries + total) * 2;
-                f->fidx = EZ_REALLOC(f->fidx, newcap, sizeof(uint32_t));
-                f->fval = EZ_REALLOC(f->fval, newcap, sizeof(float));
-                f->entrycap = newcap;
+            if (!ok) {
+                EZ_FREE(entries);
+                EZ_FREE(meta);
+                return;
+            }
+            if (f->optimizer.entries_used + total > f->optimizer.entry_capacity) {
+                uint32_t newcap = (f->optimizer.entries_used + total) * 2;
+                f->optimizer.indices = EZ_REALLOC(f->optimizer.indices, newcap, sizeof(uint32_t));
+                f->optimizer.integrals = EZ_REALLOC(f->optimizer.integrals, newcap, sizeof(float));
+                f->optimizer.entry_capacity = newcap;
             }
             for (uint32_t e = 0; e < total; e++) {
-                f->fidx[f->nentries + e] = entries[e * 2];
-                f->fval[f->nentries + e] = U2F(entries[e * 2 + 1]);
+                f->optimizer.indices[f->optimizer.entries_used + e] = entries[e * 2];
+                f->optimizer.integrals[f->optimizer.entries_used + e] = U2F(entries[e * 2 + 1]);
             }
-            f->nentries += total;
+            f->optimizer.entries_used += total;
             EZ_FREE(entries);
         }
         EZ_FREE(meta);
         AdaptBatch(f, clock() - t0);
-        f->cursor += n;
-        SetStatus(f, "Integrating chords through the internal cloud %u/%u", f->cursor, f->nfeat);
+        f->fgpu.cursor += n;
+        SetStatus(f, "Integrating chords through the internal cloud %u/%u", f->fgpu.cursor, f->optimizer.walkcount);
         if (clock() - start >= budget) return;
     }
-    f->fstart[f->nfeat] = f->nentries;
-    uint32_t P = (f->ng + 1) * SSS_Q;
-    f->adam = EZ_MINALLOC(P, sizeof(AdamSlot));
-    f->grad = EZ_MINALLOC(P, sizeof(float));
-    f->epoch = 0;
+    f->optimizer.starts[f->optimizer.walkcount] = f->optimizer.entries_used;
+    uint32_t P = (f->cloud.tangible.count + 1) * SSS_Q;
+    f->optimizer.adam = EZ_MINALLOC(P, sizeof(AdamSlot));
+    f->optimizer.gradient = EZ_MINALLOC(P, sizeof(float));
+    f->optimizer.epoch = 0;
     f->phase = SSSFIT_OPTIMISE;
     SetStatus(f, "Optimising path length field");
 }
 
 static double Evaluate(SSSFitter* f, float* grad, double* r2) {
-    uint32_t ng = f->ng;
+    uint32_t ng = f->cloud.tangible.count;
     uint32_t P = (ng + 1) * SSS_Q;
     if (grad) memset(grad, 0, (size_t)P * sizeof(float));
     double nll = 0, sres = 0, stot = 0, ymean = 0;
-    for (uint32_t i = 0; i < f->nfeat; i++) ymean += f->fy[i];
-    ymean /= (f->nfeat ? f->nfeat : 1);
+    for (uint32_t i = 0; i < f->optimizer.walkcount; i++) ymean += f->optimizer.excess_length[i];
+    ymean /= (f->optimizer.walkcount ? f->optimizer.walkcount : 1);
     const float LOG_SQRT_2PI = 0.91893853f;
-    for (uint32_t i = 0; i < f->nfeat; i++) {
-        float C = f->fbg[i], Q[SSS_Q];
-        for (int k = 0; k < SSS_Q; k++) Q[k] = f->fbg[i] * f->bg[k];
-        for (uint32_t e = f->fstart[i]; e < f->fstart[i + 1]; e++) {
-            const Gauss* g = &f->gs[f->fidx[e]];
-            float c = f->fval[e];
+    for (uint32_t i = 0; i < f->optimizer.walkcount; i++) {
+        float C = f->optimizer.background_weights[i], Q[SSS_Q];
+        for (int k = 0; k < SSS_Q; k++) Q[k] = f->optimizer.background_weights[i] * f->cloud.tangible.background[k];
+        for (uint32_t e = f->optimizer.starts[i]; e < f->optimizer.starts[i + 1]; e++) {
+            const Gauss* g = &f->cloud.tangible.gaussians[f->optimizer.indices[e]];
+            float c = f->optimizer.integrals[e];
             C += c;
             for (int k = 0; k < SSS_Q; k++) Q[k] += c * g->q[k];
         }
-        float u = f->fu[i], y = f->fy[i];
+        float u = f->optimizer.log_length[i];
+        float y = f->optimizer.excess_length[i];
         LengthModel lm;
         ModelFromSums(C, Q, u, &lm);
         float z1 = (y - lm.m1) / lm.s1, z2 = (y - lm.m2) / lm.s2;
@@ -1603,16 +1687,16 @@ static double Evaluate(SSSFitter* f, float* grad, double* r2) {
         float dls2 = (ls2 > -6.0f && ls2 < 4.0f) ? r2 * (1.0f - z2 * z2) : 0.0f;
         float dlg = (lg > -20.0f && lg < 20.0f) ? lm.w1 - r1 : 0.0f;
         float dq[SSS_Q] = { dm1, dm1 * u, dls1, dm2, dm2 * u, dls2, dlg };
-        for (uint32_t e = f->fstart[i]; e < f->fstart[i + 1]; e++) {
-            float w = f->fval[e] * invC;
-            float* gg = &grad[f->fidx[e] * SSS_Q];
+        for (uint32_t e = f->optimizer.starts[i]; e < f->optimizer.starts[i + 1]; e++) {
+            float w = f->optimizer.integrals[e] * invC;
+            float* gg = &grad[f->optimizer.indices[e] * SSS_Q];
             for (int k = 0; k < SSS_Q; k++) gg[k] += dq[k] * w;
         }
-        float wb = f->fbg[i] * invC;
+        float wb = f->optimizer.background_weights[i] * invC;
         float* gb = &grad[ng * SSS_Q];
         for (int k = 0; k < SSS_Q; k++) gb[k] += dq[k] * wb;
     }
-    double n = f->nfeat ? f->nfeat : 1;
+    double n = f->optimizer.walkcount ? f->optimizer.walkcount : 1;
     if (grad) for (uint32_t p = 0; p < P; p++) grad[p] /= (float)n;
     if (r2) *r2 = stot > 0 ? 1.0 - sres / stot : 0.0;
     return nll / n;
@@ -1620,43 +1704,43 @@ static double Evaluate(SSSFitter* f, float* grad, double* r2) {
 
 static void OptimisePhase(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
-    if (f->epoch == 0) f->stats.nll_initial = Evaluate(f, NULL, NULL);
+    if (f->optimizer.epoch == 0) f->stats.nll_initial = Evaluate(f, NULL, NULL);
     const float lr = 0.03f;
     const float b1 = 0.9f;
     const float b2 = 0.999f;
     const float reg = 2e-4f;
-    while (f->epoch < f->cfg.epochs) {
-        Evaluate(f, f->grad, NULL);
-        f->epoch++;
-        float bc1 = 1.0f - powf(b1, (float)f->epoch), bc2 = 1.0f - powf(b2, (float)f->epoch);
-        for (uint32_t p = 0; p < (f->ng + 1) * SSS_Q; p++) {
+    while (f->optimizer.epoch < f->cfg.epochs) {
+        Evaluate(f, f->optimizer.gradient, NULL);
+        f->optimizer.epoch++;
+        float bc1 = 1.0f - powf(b1, (float)f->optimizer.epoch), bc2 = 1.0f - powf(b2, (float)f->optimizer.epoch);
+        for (uint32_t p = 0; p < (f->cloud.tangible.count + 1) * SSS_Q; p++) {
             uint32_t gi = p / SSS_Q, k = p % SSS_Q;
-            float* param = gi < f->ng ? &f->gs[gi].q[k] : &f->bg[k];
-            float init = f->init_q[k];
-            float gr = f->grad[p] + reg * (*param - init); // weak pull towards the global fit for sparse gaussians
-            AdamSlot* a = &f->adam[p];
+            float* param = gi < f->cloud.tangible.count ? &f->cloud.tangible.gaussians[gi].q[k] : &f->cloud.tangible.background[k];
+            float init = f->optimizer.initial_fit[k];
+            float gr = f->optimizer.gradient[p] + reg * (*param - init); // weak pull towards the global fit for sparse gaussians
+            AdamSlot* a = &f->optimizer.adam[p];
             a->m = b1 * a->m + (1 - b1) * gr;
             a->v = b2 * a->v + (1 - b2) * gr * gr;
             *param -= lr * (a->m / bc1) / (sqrtf(a->v / bc2) + 1e-8f);
         }
-        if (f->epoch % 10 == 0) SetStatus(f, "Optimising path length field %u/%u", f->epoch, f->cfg.epochs);
+        if (f->optimizer.epoch % 10 == 0) SetStatus(f, "Optimising path length field %u/%u", f->optimizer.epoch, f->cfg.epochs);
         if (clock() - start >= budget) return;
     }
     f->stats.nll_final = Evaluate(f, NULL, &f->stats.r2_mean);
     PackBlob(f);
-    f->val_count = MIN(f->cfg.validation, f->nrec - f->holdout);
-    f->cursor = 0;
-    if (f->val_count == 0) {
+    f->validater.count = MIN(f->cfg.validation, f->walks.records_count - f->walks.holdout);
+    f->fgpu.cursor = 0;
+    if (f->validater.count == 0) {
         f->phase = SSSFIT_DONE;
         SetStatus(f, "Done");
         return;
     }
-    if (!UploadBuffer(f, SSS_BIND_BLOB, f->blob, (size_t)f->blob_words * sizeof(uint32_t))) return;
-    f->val_model_d = EZ_MINALLOC(f->val_count, sizeof(float));
-    f->val_model_l = EZ_MINALLOC(f->val_count, sizeof(float));
-    f->val_walk_d = EZ_MINALLOC(f->val_count, sizeof(float));
-    f->val_walk_l = EZ_MINALLOC(f->val_count, sizeof(float));
-    f->batch = SSS_BATCH_FIRST;
+    if (!UploadBuffer(f, SSS_BIND_BLOB, f->result.blob, (size_t)f->result.words * sizeof(uint32_t))) return;
+    f->validater.model_exit_distance = EZ_MINALLOC(f->validater.count, sizeof(float));
+    f->validater.model_path_length = EZ_MINALLOC(f->validater.count, sizeof(float));
+    f->validater.walk_exit_distance = EZ_MINALLOC(f->validater.count, sizeof(float));
+    f->validater.walk_path_length = EZ_MINALLOC(f->validater.count, sizeof(float));
+    f->fgpu.batch = SSS_BATCH_FIRST;
     f->phase = SSSFIT_VALIDATE;
     SetStatus(f, "Validating against held out walks");
 }
@@ -1722,54 +1806,54 @@ static void Quantiles(float* v, uint32_t n, double* q) {
 
 static void PhaseValidate(SSSFitter* f, double budget, ClockFunction clock) {
     double start = clock();
-    while (f->cursor < f->val_count) {
-        uint32_t n = MIN(f->batch, f->val_count - f->cursor);
-        const SSSWalkRecord* held = &f->rec[f->holdout + f->cursor];
+    while (f->fgpu.cursor < f->validater.count) {
+        uint32_t n = MIN(f->fgpu.batch, f->validater.count - f->fgpu.cursor);
+        const SSSWalkRecord* held = &f->walks.records[f->walks.holdout + f->fgpu.cursor];
         double t0 = clock();
         if (!UploadBuffer(f, SSS_BIND_RECORDS, held, (size_t)n * sizeof(SSSWalkRecord))) return;
         if (!RecreateBuffer(f, SSS_BIND_VALIDATION, (size_t)n * sizeof(SSSValidationSample))) return;
-        if (!SubmitKernel(f, SSS_MODE_VALIDATE, f->cursor, n)) return;
+        if (!SubmitKernel(f, SSS_MODE_VALIDATE, f->fgpu.cursor, n)) return;
         SSSValidationSample* vs = EZ_MINALLOC(n, sizeof(SSSValidationSample));
         if (!DownloadBuffer(f, SSS_BIND_VALIDATION, vs, (size_t)n * sizeof(SSSValidationSample))) { EZ_FREE(vs); return; }
         AdaptBatch(f, clock() - t0);
         for (uint32_t k = 0; k < n; k++) {
-            uint32_t i = f->cursor + k;
+            uint32_t i = f->fgpu.cursor + k;
             const SSSWalkRecord* w = &held[k];
             const SSSValidationSample* s = &vs[k];
-            f->val_walk_d[i] = glm_vec3_distance((float*)w->exit, (float*)w->entry) / f->mfp;
-            f->val_walk_l[i] = w->exit[3] / f->mfp;
-            f->val_model_d[i] = s->normal[3] / f->mfp;
-            f->val_model_l[i] = s->direction[3] / f->mfp;
+            f->validater.walk_exit_distance[i] = glm_vec3_distance((float*)w->exit, (float*)w->entry) / f->mesh.mfp;
+            f->validater.walk_path_length[i] = w->exit[3] / f->mesh.mfp;
+            f->validater.model_exit_distance[i] = s->normal[3] / f->mesh.mfp;
+            f->validater.model_path_length[i] = s->direction[3] / f->mesh.mfp;
             if (s->exit[3] < 0.5f) f->stats.projection_failures++;
             // throughput at a few albedos: the walk's exact weight (albedo per scattering event; info[0] counts the
             // free flights including the final one that leaves) vs exp(-(1 - a) L) with the walk's and the cloud's lengths
             for (int a = 0; a < 3; a++) {
                 double al = SSS_TP_ALBEDOS[a];
-                f->stats.tp_walk[a] += pow(al, (double)w->info[0] - 1.0);
-                f->stats.tp_length[a] += exp(-(1.0 - al) * f->val_walk_l[i]);
-                f->stats.tp_model[a] += exp(-(1.0 - al) * f->val_model_l[i]);
+                f->stats.throughput.walk[a] += pow(al, (double)w->info[0] - 1.0);
+                f->stats.throughput.length[a] += exp(-(1.0 - al) * f->validater.walk_path_length[i]);
+                f->stats.throughput.model[a] += exp(-(1.0 - al) * f->validater.model_path_length[i]);
             }
-            f->val_cos_walk += glm_vec3_dot((float*)w->direction, f->tn[w->triangles[1]]);
-            f->val_cos_model += glm_vec3_dot((float*)s->direction, (float*)s->normal);
+            f->validater.walk_cosine += glm_vec3_dot((float*)w->direction, f->mesh.normals[w->triangles[1]]);
+            f->validater.model_cosine += glm_vec3_dot((float*)s->direction, (float*)s->normal);
         }
         EZ_FREE(vs);
-        f->cursor += n;
-        SetStatus(f, "Validating against held out walks %u/%u", f->cursor, f->val_count);
+        f->fgpu.cursor += n;
+        SetStatus(f, "Validating against held out walks %u/%u", f->fgpu.cursor, f->validater.count);
         if (clock() - start >= budget) return;
     }
-    uint32_t n = f->val_count;
+    uint32_t n = f->validater.count;
     f->stats.validation_samples = n;
     for (int k = 0; k < 3; k++) {
-        f->stats.tp_walk[k] /= n;
-        f->stats.tp_length[k] /= n;
-        f->stats.tp_model[k] /= n;
+        f->stats.throughput.walk[k] /= n;
+        f->stats.throughput.length[k] /= n;
+        f->stats.throughput.model[k] /= n;
     }
-    f->stats.walk_cos = f->val_cos_walk / n;
-    f->stats.model_cos = f->val_cos_model / n;
-    Quantiles(f->val_walk_d, n, f->stats.walk_dist_q);
-    Quantiles(f->val_model_d, n, f->stats.model_dist_q);
-    Quantiles(f->val_walk_l, n, f->stats.walk_len_q);
-    Quantiles(f->val_model_l, n, f->stats.model_len_q);
+    f->stats.walks.cosine = f->validater.walk_cosine / n;
+    f->stats.model.cosine = f->validater.model_cosine / n;
+    Quantiles(f->validater.walk_exit_distance, n, f->stats.walks.distance_quantiles);
+    Quantiles(f->validater.model_exit_distance, n, f->stats.model.distance_quantiles);
+    Quantiles(f->validater.walk_path_length, n, f->stats.walks.length_quantiles);
+    Quantiles(f->validater.model_path_length, n, f->stats.model.length_quantiles);
     f->phase = SSSFIT_DONE;
     SetStatus(f, "Done");
 }
@@ -1921,11 +2005,11 @@ static void LogStats(const SSSFitStats* s) {
     logtrace("    path length field: log likelihood %.4f -> %.4f, explains %.3f percent of the log excess length variance", -s->nll_initial, -s->nll_final, 100.0 * s->r2_mean);
     if (s->validation_samples == 0) return;
     logtrace("    validation on %u held out walks (walk / model):", s->validation_samples);
-    logtrace("        exit distance median %.2f / %.2f mfp, 90%% %.2f / %.2f mfp", s->walk_dist_q[1], s->model_dist_q[1], s->walk_dist_q[3], s->model_dist_q[3]);
-    logtrace("        path length median %.2f / %.2f mfp, 90%% %.2f / %.2f mfp", s->walk_len_q[1], s->model_len_q[1], s->walk_len_q[3], s->model_len_q[3]);
-    logtrace("        throughput walk / length only / cloud: a=0.5 %.4f / %.4f / %.4f, a=0.9 %.4f / %.4f / %.4f, a=0.99 %.4f / %.4f / %.4f", s->tp_walk[0], s->tp_length[0], s->tp_model[0], s->tp_walk[1], s->tp_length[1], s->tp_model[1], s->tp_walk[2], s->tp_length[2], s->tp_model[2]);
-    logtrace("        brightness vs walk (length only / cloud): a=0.5 %.3fx / %.3fx, a=0.9 %.3fx / %.3fx, a=0.99 %.3fx / %.3fx", s->tp_length[0] / fmax(s->tp_walk[0], 1e-12), s->tp_model[0] / fmax(s->tp_walk[0], 1e-12), s->tp_length[1] / fmax(s->tp_walk[1], 1e-12), s->tp_model[1] / fmax(s->tp_walk[1], 1e-12), s->tp_length[2] / fmax(s->tp_walk[2], 1e-12), s->tp_model[2] / fmax(s->tp_walk[2], 1e-12));
-    logtrace("        mean exit cosine %.3f / %.3f, projection failures %u (%.1f%%)", s->walk_cos, s->model_cos, s->projection_failures, 100.0 * s->projection_failures / (double)s->validation_samples);
+    logtrace("        exit distance median %.2f / %.2f mfp, 90%% %.2f / %.2f mfp", s->walks.distance_quantiles[1], s->model.distance_quantiles[1], s->walks.distance_quantiles[3], s->model.distance_quantiles[3]);
+    logtrace("        path length median %.2f / %.2f mfp, 90%% %.2f / %.2f mfp", s->walks.length_quantiles[1], s->model.length_quantiles[1], s->walks.length_quantiles[3], s->model.length_quantiles[3]);
+    logtrace("        throughput walk / length only / cloud: a=0.5 %.4f / %.4f / %.4f, a=0.9 %.4f / %.4f / %.4f, a=0.99 %.4f / %.4f / %.4f", s->throughput.walk[0], s->throughput.length[0], s->throughput.model[0], s->throughput.walk[1], s->throughput.length[1], s->throughput.model[1], s->throughput.walk[2], s->throughput.length[2], s->throughput.model[2]);
+    logtrace("        brightness vs walk (length only / cloud): a=0.5 %.3fx / %.3fx, a=0.9 %.3fx / %.3fx, a=0.99 %.3fx / %.3fx", s->throughput.length[0] / fmax(s->throughput.walk[0], 1e-12), s->throughput.model[0] / fmax(s->throughput.walk[0], 1e-12), s->throughput.length[1] / fmax(s->throughput.walk[1], 1e-12), s->throughput.model[1] / fmax(s->throughput.walk[1], 1e-12), s->throughput.length[2] / fmax(s->throughput.walk[2], 1e-12), s->throughput.model[2] / fmax(s->throughput.walk[2], 1e-12));
+    logtrace("        mean exit cosine %.3f / %.3f, projection failures %u (%.1f%%)", s->walks.cosine, s->model.cosine, s->projection_failures, 100.0 * s->projection_failures / (double)s->validation_samples);
 }
 
 static void ReleaseJobData(CloudTrainJob* j) {
@@ -1936,10 +2020,10 @@ static void ReleaseJobData(CloudTrainJob* j) {
         tgpu_destroy(&j->gpu);
         j->gpu_alive = FALSE;
     }
-    EZ_FREE(j->pos);
-    j->pos = NULL;
-    EZ_FREE(j->idx);
-    j->idx = NULL;
+    EZ_FREE(j->positions);
+    j->positions = NULL;
+    EZ_FREE(j->indices);
+    j->indices = NULL;
     for (int k = 0; k < 3; k++) {
         EZ_FREE(j->blob[k]);
         j->blob[k] = NULL;
@@ -1967,7 +2051,7 @@ static void FinishChannel(CloudTrainJob* j) {
         return;
     }
     if (++j->channel < j->channels) {
-        SSSFitInput in = { j->pos, j->idx, j->nverts, j->tcount, j->sigma[j->channel] * j->scale, j->g, &j->gpu, &j->kernel };
+        SSSFitInput in = { j->positions, j->indices, j->vertex_count, j->tcount, j->sigma[j->channel] * j->scale, j->anisotropy, &j->gpu, &j->kernel };
         j->fitter = SSSFitCreate(&in, &j->config);
         if (!j->fitter) {
             snprintf(j->status, sizeof(j->status), "Failed: could not set up the %s channel fit", names[j->channel]);
@@ -1992,7 +2076,7 @@ static void FinishChannel(CloudTrainJob* j) {
     c.tstart = s;
     c.tcount = n;
     c.material = j->material;
-    c.g = j->g;
+    c.anisotropy = j->anisotropy;
     c.scale = j->scale;
     uint32_t total = 0;
     for (uint32_t k = 0; k < j->channels; k++) {
@@ -2061,7 +2145,7 @@ BOOL SubsurfaceTrainStart(size_t mesh, const GSSSConfig* config) {
         return FALSE;
     }
     g_job.channels = MaterialDensities(mat, g_job.sigma);
-    g_job.g = mat->anisotropy;
+    g_job.anisotropy = mat->anisotropy;
     g_job.scale = TransformScale(md);
     size_t nv = geo->vertices.size;
     uint32_t* remap = EZ_ALLOC(nv ? nv : 1, sizeof(uint32_t));
@@ -2083,9 +2167,9 @@ BOOL SubsurfaceTrainStart(size_t mesh, const GSSSConfig* config) {
         }
     }
     EZ_FREE(remap);
-    g_job.pos = pos;
-    g_job.idx = idx;
-    g_job.nverts = used;
+    g_job.positions = pos;
+    g_job.indices = idx;
+    g_job.vertex_count = used;
     g_job.config = config ? *config : SubsurfaceDefaultConfig();
     g_job.channel = 0;
     if (tgpu_create(&g_job.gpu, g_job.config.gpu_index, 0) != 0) {
@@ -2103,7 +2187,7 @@ BOOL SubsurfaceTrainStart(size_t mesh, const GSSSConfig* config) {
         g_job.phase = SUBSURFACE_FAILED;
         return FALSE;
     }
-    SSSFitInput in = { g_job.pos, g_job.idx, g_job.nverts, g_job.tcount, g_job.sigma[0] * g_job.scale, g_job.g, &g_job.gpu, &g_job.kernel };
+    SSSFitInput in = { g_job.positions, g_job.indices, g_job.vertex_count, g_job.tcount, g_job.sigma[0] * g_job.scale, g_job.anisotropy, &g_job.gpu, &g_job.kernel };
     g_job.fitter = SSSFitCreate(&in, &g_job.config);
     if (!g_job.fitter) {
         snprintf(g_job.status, sizeof(g_job.status), "Failed: could not set up the fit");
@@ -2115,8 +2199,8 @@ BOOL SubsurfaceTrainStart(size_t mesh, const GSSSConfig* config) {
     g_job.started = GetTime();
     g_job.phase = SUBSURFACE_TRAINING;
     snprintf(g_job.status, sizeof(g_job.status), "Starting");
-    if (g_job.channels == 3) loginfo("Training subsurface splats for \"%s\": %u triangles, coloured scattering -> one cloud per channel, sigma_t %.3f / %.3f / %.3f, g %.2f", *MeshNameReference(mesh), g_job.tcount, g_job.sigma[0], g_job.sigma[1], g_job.sigma[2], g_job.g);
-    else loginfo("Training subsurface splats for \"%s\": %u triangles, sigma %.3f (mean free path %.4g), g %.2f", *MeshNameReference(mesh), g_job.tcount, g_job.sigma[0], 1.0 / g_job.sigma[0], g_job.g);
+    if (g_job.channels == 3) loginfo("Training subsurface splats for \"%s\": %u triangles, coloured scattering -> one cloud per channel, sigma_t %.3f / %.3f / %.3f, g %.2f", *MeshNameReference(mesh), g_job.tcount, g_job.sigma[0], g_job.sigma[1], g_job.sigma[2], g_job.anisotropy);
+    else loginfo("Training subsurface splats for \"%s\": %u triangles, sigma %.3f (mean free path %.4g), g %.2f", *MeshNameReference(mesh), g_job.tcount, g_job.sigma[0], 1.0 / g_job.sigma[0], g_job.anisotropy);
     loginfo("Subsurface splat training runs its walks on %s", g_job.gpu.gpu_name);
     return TRUE;
 }
@@ -2184,7 +2268,7 @@ BOOL QuerySubsurfaceCloudInfo(size_t mesh, SubsurfaceCloudInfo* info) {
     info->bytes = 0;
     for (uint32_t k = 0; k < c->channels; k++) info->bytes += c->words[k] * 4;
     info->sigma = c->sigma[0];
-    info->anisotropy = c->g;
+    info->anisotropy = c->anisotropy;
     info->scale = c->scale;
     info->material = c->material;
     Geometry* geo = RendererGeometry();
@@ -2213,9 +2297,9 @@ BOOL QuerySubsurfaceCloudInfo(size_t mesh, SubsurfaceCloudInfo* info) {
     } else if (density_changed) {
         info->stale = TRUE;
         snprintf(info->reason, sizeof(info->reason), "scattering density changed (%.3g, trained %.3g), retrain", sigma[0], c->sigma[0]);
-    } else if (fabsf(m->anisotropy - c->g) > 0.01f) {
+    } else if (fabsf(m->anisotropy - c->anisotropy) > 0.01f) {
         info->stale = TRUE;
-        snprintf(info->reason, sizeof(info->reason), "anisotropy changed (%.2f, trained %.2f), retrain", m->anisotropy, c->g);
+        snprintf(info->reason, sizeof(info->reason), "anisotropy changed (%.2f, trained %.2f), retrain", m->anisotropy, c->anisotropy);
     } else if (fabsf(scale - c->scale) > 0.01f * c->scale) {
         info->stale = TRUE;
         snprintf(info->reason, sizeof(info->reason), "object scale changed (%.3g, trained %.3g), retrain", scale, c->scale);
@@ -2334,7 +2418,7 @@ uint32_t* SubsurfaceSerialize(size_t* words) {
         out[w++] = c->tstart;
         out[w++] = c->tcount;
         out[w++] = c->material;
-        memcpy(&out[w++], &c->g, 4);
+        memcpy(&out[w++], &c->anisotropy, 4);
         memcpy(&out[w++], &c->scale, 4);
         out[w++] = c->channels;
         for (uint32_t k = 0; k < c->channels; k++) {
@@ -2362,7 +2446,7 @@ BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words) {
         c.tstart = data[w + 2];
         c.tcount = data[w + 3];
         c.material = data[w + 4];
-        memcpy(&c.g, &data[w + 5], 4);
+        memcpy(&c.anisotropy, &data[w + 5], 4);
         memcpy(&c.scale, &data[w + 6], 4);
         c.channels = data[w + 7];
         w += SSS_RECORD_WORDS;
