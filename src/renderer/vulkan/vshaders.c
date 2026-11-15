@@ -1,7 +1,7 @@
 #include "vshaders.h"
+#include "renderer/subsurface.h"
 #include <easymemory.h>
 #include <easyobjects.h>
-#include <easybasics.h>
 #include <util/logger.h>
 
 static char* last_relevant_word(char* str, int len) {
@@ -480,6 +480,21 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 					&(renderer->geometry.lights.size)
 				}, 0.0f,
 				sizeof(SceneLight)
+			}
+		};
+	} else if (strcmp(name, "SubsurfaceSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.gsss.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.gsss.size)
+				}, 0.0f,
+				sizeof(uint32_t)
 			}
 		};
 	} else if (strcmp(name, "OverlaySSBO") == 0) {

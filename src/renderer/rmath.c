@@ -299,3 +299,80 @@ float Wrap180(float a) {
 float Luminance(vec3 c) {
     return 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
 }
+
+inline float U2F(uint32_t u) {
+    float f;
+    memcpy(&f, &u, sizeof(float));
+    return f;
+}
+
+inline uint32_t F2U(float f) {
+    uint32_t u;
+    memcpy(&u, &f, sizeof(uint32_t));
+    return u;
+}
+
+inline uint32_t RandomU32(LittleRNG* r) {
+    // pcg32
+    uint64_t old = r->seed;
+    r->seed = old * 6364136223846793005ull + 1442695040888963407ull;
+    uint32_t xs = (uint32_t)(((old >> 18u) ^ old) >> 27u);
+    uint32_t rot = (uint32_t)(old >> 59u);
+    return (xs >> rot) | (xs << ((32u - rot) & 31u));
+}
+
+inline float RandomFloat(LittleRNG* r) {
+    return (float)(RandomU32(r) >> 8) * (1.0f / 16777216.0f);
+}
+
+float RandomCallback(void* st) {
+    return RandomFloat((LittleRNG*)st);
+}
+
+void Jacobi3(double a[3][3], double evals[3], double v[3][3]) {
+    for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) v[i][j] = i == j ? 1.0 : 0.0;
+    for (int sweep = 0; sweep < 32; sweep++) {
+        double off = fabs(a[0][1]) + fabs(a[0][2]) + fabs(a[1][2]);
+        if (off < 1e-30) break;
+        for (int p = 0; p < 2; p++) {
+            for (int q = p + 1; q < 3; q++) {
+                if (fabs(a[p][q]) < 1e-300) continue;
+                double theta = (a[q][q] - a[p][p]) / (2.0 * a[p][q]);
+                double t = (theta >= 0 ? 1.0 : -1.0) / (fabs(theta) + sqrt(theta * theta + 1.0));
+                double c = 1.0 / sqrt(t * t + 1.0), s = t * c;
+                for (int k = 0; k < 3; k++) {
+                    double akp = a[k][p], akq = a[k][q];
+                    a[k][p] = c * akp - s * akq;
+                    a[k][q] = s * akp + c * akq;
+                }
+                for (int k = 0; k < 3; k++) {
+                    double apk = a[p][k], aqk = a[q][k];
+                    a[p][k] = c * apk - s * aqk;
+                    a[q][k] = s * apk + c * aqk;
+                }
+                for (int k = 0; k < 3; k++) {
+                    double vkp = v[k][p], vkq = v[k][q];
+                    v[k][p] = c * vkp - s * vkq;
+                    v[k][q] = s * vkp + c * vkq;
+                }
+            }
+        }
+    }
+    for (int i = 0; i < 3; i++) evals[i] = a[i][i];
+}
+
+void Cholesky3(const double c[3][3], mat3 L) {
+    double l00 = sqrt(fmax(c[0][0], 1e-30));
+    double l10 = c[1][0] / l00;
+    double l20 = c[2][0] / l00;
+    double l11 = sqrt(fmax(c[1][1] - l10 * l10, 1e-30));
+    double l21 = (c[2][1] - l20 * l10) / l11;
+    double l22 = sqrt(fmax(c[2][2] - l20 * l20 - l21 * l21, 1e-30));
+    glm_mat3_zero(L);
+    L[0][0] = (float)l00;
+    L[0][1] = (float)l10;
+    L[0][2] = (float)l20;
+    L[1][1] = (float)l11;
+    L[1][2] = (float)l21;
+    L[2][2] = (float)l22;
+}

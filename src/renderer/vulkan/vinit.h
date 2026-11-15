@@ -17,6 +17,8 @@ BOOL VINIT_Poses(VulkanDataBuffer* poses);
 
 BOOL VINIT_Lights(VulkanDataBuffer* lights);
 
+BOOL VINIT_Subsurface(VulkanDataBuffer* gsss);
+
 BOOL VINIT_Queue(VkQueue* queue);
 
 BOOL VINIT_Commands(VulkanCommands* commands);

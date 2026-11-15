@@ -2,11 +2,10 @@
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
+#include "renderer/subsurface.h"
 #include "ui/shared.h"
 #include <ui/extra.h>
 #include <util/logger.h>
-
-#define LEFT_COLUMN_WIDTH 150
 
 static size_t g_edit_item_index = 0;
 static BOOL g_item_selected = FALSE;
@@ -123,6 +122,15 @@ static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float heig
     edited |= disabled != (md->disabled != 0);
     md->disabled = disabled;
     if (edited) UpdateObjectTransform(g_edit_item_index);
+    if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) {
+        SubsurfaceCloudInfo info = { 0 };
+        BOOL linked = QuerySubsurfaceCloudInfo(g_edit_item_index, &info);
+        if (linked) {
+            UIColumnHeader("Subsurface cloud", LEFT_COLUMN_WIDTH);
+            BOOL enabled = info.enabled;
+            if (UICheckbox(&enabled)) SubsurfaceSetCloudEnabled(g_edit_item_index, enabled);
+        }
+    }
 }
 
 static void DrawEditCamera(SceneCamera* cref, char* name, float width, float height) {
@@ -173,13 +181,17 @@ static void DrawEditCamera(SceneCamera* cref, char* name, float width, float hei
     UICheckbox(&(cref->config.scenelightshadows));
     UIColumnHeader("Spectral Coloring", LEFT_COLUMN_WIDTH);
     UICheckbox(&(cref->config.spectral));
+    UIColumnHeader("Subsurface Splats", LEFT_COLUMN_WIDTH);
+    if (UICheckbox(&(cref->config.gsssenabled))) cref->config.reset = TRUE;
+    UIColumnHeader("SSS Exit Lighting", LEFT_COLUMN_WIDTH);
+    if (UICheckbox(&(cref->config.exitsss))) cref->config.reset = TRUE;
 
     UIMoveCursor(0, 15);
     float sboxwidth = width - 20 - 160;
     UIColumnHeader("Debug Mode", LEFT_COLUMN_WIDTH);
     size_t pp = PrimaryCameraID();
     SetCamera(g_edit_item_index);
-    UIDropdownMenu(sboxwidth, 4, DebugModeLabels(), DropdownSelectDebugMode, NULL);
+    UIDropdownMenu(sboxwidth, 6, DebugModeLabels(), DropdownSelectDebugMode, NULL);
     SetCamera(pp);
     UIColumnHeader("Max Bounces", LEFT_COLUMN_WIDTH);
     UIDragSize(&(cref->config.maxbounces), 0, 999999999, 1, sboxwidth);
@@ -243,6 +255,12 @@ static void DrawEditCamera(SceneCamera* cref, char* name, float width, float hei
     }
 	if (memcmp(&c, &oldc, sizeof(SimpleCamera))) cref->core = c;
     cref->config.showdof = used;
+    UIColumnHeader("Resolution", LEFT_COLUMN_WIDTH);
+    size_t w = cref->config.resolution.x;
+    size_t h = cref->config.resolution.y;
+    UIDoublet("wh", UI_SIZES, &w, &h, (UIMultiValue){ ._size = 10 }, (UIMultiValue){ ._size = 8000 }, (UIMultiValue){ ._size = 1 }, (UIMultiValue){ ._size = 900 }, width - LEFT_COLUMN_WIDTH - 10);
+    cref->config.resolution.x = w;
+    cref->config.resolution.y = h;
 }
 
 static void DrawEditPanel(float width, float height) {

@@ -6,6 +6,7 @@
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
+#include "renderer/subsurface.h"
 
 #define TRANSFER_ACQUIRE_VERTICES   (1 << 0)
 #define TRANSFER_ACQUIRE_NORMALS    (1 << 1)
@@ -53,6 +54,22 @@ void VUPDT_ExternalBuffer(ShaderBuffer* ebuffer) {
             ebuffer->size, ebuffer->size,
             ebuffer->vbuffer.buffer);
     }
+}
+
+void VUPDT_Subsurface(VulkanDataBuffer* gsss) {
+    static uint32_t empty[4] = { 0, 0, 0, 0 };
+    const size_t gssssize = g_vupdt_renderer_ref->geometry.gsss.size;
+    vkDeviceWaitIdle(g_vupdt_renderer_ref->vulkan.core.general.interface);
+    BOOL has = gssssize >= 4;
+    size_t bytes = has ? gssssize * sizeof(uint32_t) : sizeof(empty);
+    VUTIL_DestroyBuffer(*gsss);
+    VUTIL_CreateBuffer(
+        bytes,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        gsss);
+    VUTIL_CopyHostToBuffer(has ? g_vupdt_renderer_ref->geometry.gsss.data : (void*)empty, bytes, bytes, gsss->buffer);
+    ResolveSubsurfaceUpdate();
 }
 
 void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
@@ -238,7 +255,8 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             VK_SHADER_STAGE_COMPUTE_BIT, \
             0, sizeof(VulkanPushConstants), &pc);}
     PipelineFlags pflags = RendererCamera()->config.flags;
-    if (RendererCamera()->config.debug == DEBUG_BOUNCES) {
+    if (RendererCamera()->config.debug == DEBUG_BOUNCES || RendererCamera()->config.debug == DEBUG_SSS_PATH ||
+        RendererCamera()->config.debug == DEBUG_SSS_COST) {
         pflags |= (PATHTRACE_SHADER_FLAG | TONEMAP_SHADER_FLAG);
         pflags &= ~OVERLAY_SHADER_FLAG;
     }
@@ -504,6 +522,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     old_flags = RendererCamera()->config.flags;
     BOOL cam_reset = reset_count != 0;
     if (reset_count > 0) reset_count--;
+    if (cam_reset) g_vupdt_renderer_ref->stats.accumulation = 0;
 
     // persistant vars
     static uint32_t samples = 0;
@@ -561,6 +580,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.denoisenormal = RendererCamera()->config.denoisenormal;
         ubo.denoisedepth = RendererCamera()->config.denoisedepth;
         ubo.splatocclusion = (uint32_t)RendererCamera()->config.splatocclusion;
+        ubo.sssplats = (uint32_t)RendererCamera()->config.gsssenabled;
+        ubo.sssexitlight = (uint32_t)RendererCamera()->config.exitsss;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 
@@ -579,6 +600,32 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.light_base = (uint32_t)(g_vupdt_renderer_ref->geometry.triangles.size + g_vupdt_renderer_ref->geometry.splats.size);
         ubo.light_count = (uint32_t)g_vupdt_renderer_ref->geometry.lights.size;
         ubo.single_selected_lid = GetSelectedLight() < g_vupdt_renderer_ref->geometry.lights.size ? GetSelectedLight() : (uint32_t)-1;
+        ubo.camera_base = ubo.light_base + ubo.light_count;
+        ubo.primary_cid = (uint32_t)PrimaryCameraID();
+        size_t selected_camera = GetSelectedCamera();
+        ubo.single_selected_cid = selected_camera < MAX_CAMERA_GLYPHS ? (uint32_t)selected_camera : (uint32_t)-1;
+        if (ubo.mode == CAMERA_SELECT_MODE) {
+            size_t ncams = NumCameras();
+            if (ncams > MAX_CAMERA_GLYPHS) ncams = MAX_CAMERA_GLYPHS;
+            ubo.camera_count = (uint32_t)ncams;
+            for (size_t i = 0; i < ncams; i++) {
+                SceneCamera* cam = GetCamera(i);
+                vec3 u, v, w;
+                CameraUVW(cam->core, u, v, w);
+                float halffov = glm_rad(cam->core.fov) * 0.5f;
+                if (halffov < 0.05f) halffov = 0.05f;
+                if (halffov > 1.31f) halffov = 1.31f;
+                float aspect = cam->config.resolution.y > 0.0f ? cam->config.resolution.x / cam->config.resolution.y : 1.0f;
+                vec4 glyph[4];
+                glm_vec4(cam->core.position, tanf(halffov), glyph[0]);
+                glm_vec4(u, aspect, glyph[1]);
+                glm_vec4(v, cam->core.ortho ? 1.0f : 0.0f, glyph[2]);
+                glm_vec4(w, 0.0f, glyph[3]);
+                memcpy(&(ubo.camera_glyphs[i * 4]), glyph, sizeof(glyph));
+            }
+        } else {
+            ubo.camera_count = 0;
+        }
         ubo.hovered_tstart = 1;
         ubo.hovered_sstart = 1;
         ubo.selected_tstart = 1;

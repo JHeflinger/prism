@@ -1,7 +1,0 @@
-Deletion:
-never actualy remove a thing from the data structure, but when you "delete" it, just mark it as destroyed and add it to an array of "free resources" to peel from and use when adding anything
-
-Path Denoising:
-See if you can derive a way to denoise a individual unique path by getting a confidence metric - this metric is discerned by something like path similarity or bvh intersection or basically just trying to get a read on the likeliness of this path contributing a lot, and then each contribution sample can then be weighted based on that confidence.
-
-^ maybe this is extensible to GS, where the training tries and derives a smaller set of possible paths reflected/directed by the gaussians that can approximate the SSS well enough?

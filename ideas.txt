@@ -1,0 +1,4 @@
+GSSS:
+1. adopt to other material behaviors?
+2. make it work for animated meshes?
+3. also approximate scatter count

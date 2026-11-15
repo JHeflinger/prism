@@ -1,6 +1,7 @@
 #include "loader.h"
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
+#include "renderer/subsurface.h"
 #include "data/defaults.h"
 #include <assimp/postprocess.h>
 #include <assimp/material.h>
@@ -1044,6 +1045,7 @@ static void PrismReadGeometry(PrismStream* s, Geometry* g) {
     g->meshnames = (ARRLIST_DynamicString){ 0 };
     g->cameras = (ARRLIST_SceneCamera){ 0 };
     g->cameranames = (ARRLIST_DynamicString){ 0 };
+    g->gsss = (ARRLIST_uint32_t){ 0 };
     if (!s->ok) return;
     PRISM_READ_LIST(s, g->vertices);
     PRISM_READ_LIST(s, g->normals);
@@ -1570,8 +1572,11 @@ BOOL LoadPRISM(const char* filepath) {
     }
     Geometry loaded = { 0 };
     PrismReadGeometry(&s, &loaded);
+    size_t sss_words = PrismReadSize(&s);
+    uint32_t* sss = PrismReadElements(&s, sss_words, sizeof(uint32_t));
     fclose(file);
     if (!s.ok) {
+        EZ_FREE(sss);
         PrismFreeGeometry(&loaded);
         logerror("PRISM file \"%s\" is truncated or corrupt", filepath);
         return FALSE;
@@ -1594,6 +1599,8 @@ BOOL LoadPRISM(const char* filepath) {
     UpdateSkins();
     UpdatePoses();
     UpdateSplats();
+    SubsurfaceDeserialize(sss, sss ? sss_words : 0);
+    EZ_FREE(sss);
     loginfo("Successfully loaded prism session from \"%s\"", filepath);
     return TRUE;
 }
@@ -1615,6 +1622,11 @@ BOOL SavePRISM(const char* filepath) {
     PrismWrite(&s, &version, sizeof(version));
     PrismWrite(&s, &geomsize, sizeof(geomsize));
     PrismWriteGeometry(&s, &(RawRendererRef()->geometry));
+    size_t sss_words = 0;
+    uint32_t* sss = SubsurfaceSerialize(&sss_words);
+    PrismWriteSize(&s, sss_words);
+    PrismWrite(&s, sss, sss_words * sizeof(uint32_t));
+    EZ_FREE(sss);
     if (fclose(file) != 0) s.ok = FALSE;
     if (!s.ok) {
         logerror("Failed while writing PRISM file \"%s\"", filepath);

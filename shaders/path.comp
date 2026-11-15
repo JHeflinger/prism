@@ -12,6 +12,7 @@
 #import SplatDef;
 #import SplatChordDef;
 #import EmissionAliasDef;
+#import MeshDescriptorDef;
 
 layout(binding = 0) readonly #import UniformBufferObjectDef ubo;
 layout(binding = 1) #import RayGeneratorSSBODef;
@@ -26,15 +27,19 @@ layout(binding = 9) readonly #import LightSSBODef;
 layout(binding = 10) readonly #import SplatSSBODef;
 layout(binding = 11, rgba32f) writeonly #import GBufferImageDef;
 layout(binding = 12) readonly #import EmissionAliasSSBODef;
+layout(binding = 13) readonly #import TransformsSSBODef;
+layout(binding = 14) readonly #import SubsurfaceSSBODef;
 
 #import CutViewport
 #import GBufferSuite
 #import EpsilonOffset
 #import TriangleIntersectSuite
 #import QuatToMat
+#import RandomSuite
+#import SamplingSuite
+#import SubsurfaceSuite
 
 const float max_contribution = 10;
-uvec4 seed = uvec4(0);
 const uint SOBOL_DIRS[2][32] = uint[2][32](
     uint[32](
         0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,
@@ -119,24 +124,6 @@ void init_random(int x, int y) {
     seed = uvec4(x, y, ubo.seed, x + y);
 }
 
-void pcg4d(inout uvec4 v) {
-    v = v * 1664525u + 1013904223u;
-    v.x += v.y * v.w;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    v.w += v.y * v.z;
-    v = v ^ (v >> 16u);
-    v.x += v.y * v.w;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    v.w += v.y * v.z;
-}
-
-float random() {
-    pcg4d(seed);
-    return float(seed.x) / float(0xffffffffu);
-}
-
 float luminance(vec3 c) {
     return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
 }
@@ -178,22 +165,6 @@ Ray create_ray(vec2 rg) {
 
 float russian_roulette(vec3 throughput) {
     return clamp(max(max(throughput.x, throughput.y), throughput.z), 0.05, 0.999);
-}
-
-vec3 onb(vec3 normal, vec3 local) {
-	vec3 w = normal;
-	vec3 a = (abs(w.x) > 0.9) ? vec3(0, 1, 0) : vec3(1, 0, 0);
-	vec3 v = normalize(cross(w, a));
-	vec3 u = normalize(cross(w, v));
-	return normalize(local.x*u + local.y*v + local.z*w);
-}
-
-vec3 sample_cosine_weighted_lobe() {
-    float r1 = random();
-    float r2 = random();
-    float sqr2 = sqrt(r2);
-    float phi = 2.0 * PI * r1;
-    return vec3(cos(phi)*sqr2, sin(phi)*sqr2, sqrt(1.0 - r2));
 }
 
 vec3 sample_specular_phong_lobe(float shiny) {
@@ -246,10 +217,6 @@ vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, i
         (material.specular * (material.shiny + 2.0) /
         (2.0 * PI) * pow(max(dot(reflect(-outgoing, normal), incoming), 0.0), material.shiny))) *
         max(0.0, dot(incoming, normal));
-}
-
-vec3 safe_inverse(vec3 d) {
-    return 1.0 / mix(d, vec3(1e-20), lessThan(abs(d), vec3(1e-20)));
 }
 
 bool aabb_range(Ray ray, vec3 inv, uint node_ind, float tfar, out float tnear) {
@@ -405,54 +372,50 @@ vec3 cheap_spectral_color(in vec3 rgb) {
     return cheap_wavelength_to_rgb(lambdaR) * rgb.r + cheap_wavelength_to_rgb(lambdaG) * rgb.g + cheap_wavelength_to_rgb(lambdaB) * rgb.b;
 }
 
-vec3 sample_henyey_greenstein(vec3 outgoing, float g) {
-    float xi1 = random();
-    float xi2 = random();
-    float cos_theta = 0.0;
-    if (abs(g) < 0.001) {
-        cos_theta = 1.0 - 2.0 * xi1;
-    } else {
-        float sqr = (1.0 - g * g) / (1.0 - g + 2.0 * g * xi1);
-        cos_theta = (1.0 + g * g - sqr * sqr) / (2.0 * g);
-        cos_theta = clamp(cos_theta, -1.0, 1.0);
-    }
-    float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
-    float phi = 2.0 * PI * xi2;
-    vec3 local = vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
-    return onb(outgoing, local);
+bool sss_spectral(vec3 sigma_t) {
+    float hi = max(sigma_t.r, max(sigma_t.g, sigma_t.b));
+    float lo = min(sigma_t.r, min(sigma_t.g, sigma_t.b));
+    return (hi - lo) > 0.05 * hi;
 }
 
-void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium) {
+void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material material, inout uint medium, out bool exited, out vec3 exit_normal) {
+    exited = false;
+    exit_normal = hit.normal;
     throughput = vec3(1.0);
-    vec3 sigma_s = material.scattering;
-    vec3 sigma_a = material.absorbtion;
+    vec3 sigma_s = material.scattering * material.scale;
+    vec3 sigma_a = material.absorbtion * material.scale;
     vec3 sigma_t = sigma_s + sigma_a;
-    float sigma = max(luminance(sigma_t) * material.scale, EPS);
-    vec3 sigma_mul = sigma_s / max(sigma, EPS);
+    float sigma = max(luminance(sigma_t), EPS);
+    int channel = -1;
+    if (sss_spectral(sigma_t)) {
+        channel = min(int(random() * 3.0), 2);
+        sigma = max(sigma_t[channel], EPS);
+        throughput = vec3(0.0);
+        throughput[channel] = 3.0;
+    }
+    vec3 sigma_mul = sigma_s / sigma;
     uint boundary_id = uint(-1);
     medium = hit.material;
     for (int bounce = 0; bounce < ubo.maxsssbounces; ++bounce) {
-        Hit boundary = trace(ray, boundary_id);
-        float xi = max(random(), 1e-6);
-        float free_distance = -log(1.0 - xi) / sigma;
-        if (free_distance >= boundary.distance) { // exiting
-            ray.position = epsilon_offset(ray.position, ray.direction) + ray.direction * boundary.distance;
-            vec3 transmittance = exp(-sigma_t * boundary.distance);
-            throughput *= transmittance;
-            throughput *= sigma_mul;
+        float segment;
+        Hit boundary;
+        int flight = sss_walk_flight(ray, sigma, material.anisotropy, boundary_id, segment, boundary);
+        if (flight == SSS_FLIGHT_ESCAPED) { // escaped through a crack (or started outside): no valid exit
+            throughput = vec3(0.0);
+            break;
+        }
+        if (flight == SSS_FLIGHT_EXITED) {
+            if (channel < 0) throughput *= exp(-(sigma_t - sigma) * segment);
+            exited = true;
+            exit_normal = -boundary.normal; // trace() faces the normal towards the ray origin, which is inside
             //medium = AIR_MEDIUM; // TODO: this should not exactly be air medium, but the previous participating medium
                                  // might need to edit material here to prev material?
             break;
-        } else {
-            vec3 scatter_position = ray.position + ray.direction * free_distance;
-            throughput *= exp(-sigma_t * free_distance);
-            throughput *= sigma_mul;
-            vec3 new_direction = sample_henyey_greenstein(-ray.direction, material.anisotropy);
-            ray.position = scatter_position;
-            ray.direction = new_direction;
         }
+        if (channel < 0) throughput *= exp(-(sigma_t - sigma) * segment) * sigma_mul;
+        else throughput[channel] *= sigma_mul[channel];
         float p = russian_roulette(throughput);
-        if (random() > p) break; // TODO: how to propogate this termination?
+        if (random() > p) break;
         throughput /= p;
     }
     hit.normal = ray.direction;
@@ -475,7 +438,135 @@ void sample_lambertian(vec3 outgoing, Hit h, Material material, out vec3 incomin
     pdf = (pd * diffuse_pdf(h.normal, incoming) + ps * specular_pdf(incoming, R, material.shiny));
 }
 
-void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout float wavelength) {
+// sss persistent state stuff
+bool g_sss_exit = false;
+bool g_sss_projected = false;
+uint g_sss_debug_kind = 0u;
+uint g_sss_debug_cost = 0u;
+vec3 g_sss_exit_pos = vec3(0.0);
+vec3 g_sss_exit_normal = vec3(0.0, 0.0, 1.0);
+vec3 g_sss_exit_axis = vec3(0.0, 0.0, 1.0);
+float g_sss_exit_exponent = 1.0;
+
+bool sss_find_object(uint tid, out SSSObject o) {
+    o.base = 0u;
+    uint n = sssIn[0];
+    for (uint k = 0u; k < n; k++) {
+        uint e = 4u + 8u * k;
+        if (sssIn[e + 4u] == 0u) continue;
+        uint base = sssIn[e];
+        uint tstart = sssIn[e + 5u];
+        uint tcount = sssIn[base + SSSG_H_TCOUNT];
+        if (tid < tstart || tid >= tstart + tcount) continue;
+        MeshDescriptor md = transformsIn[sssIn[e + 3u]];
+        if (md.disabled != 0u || md.tstart != tstart || md.tend == uint(-1) || md.tend - md.tstart + 1u != tcount) continue;
+        o.base = base;
+        o.bases = uvec3(sssIn[e], sssIn[e + 1u], sssIn[e + 2u]);
+        o.channels = sssIn[e + 6u];
+        o.tstart = tstart;
+        o.tcount = tcount;
+        o.M = md.transform;
+        o.Minv = inverse(md.transform);
+        o.M3 = mat3(md.transform);
+        float det = determinant(o.M3);
+        o.scale = max(pow(abs(det), 1.0 / 3.0), 1e-8);
+        o.handed = det < 0.0 ? -1.0 : 1.0;
+        return true;
+    }
+    return false;
+}
+
+bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throughput, out vec3 direction) {
+    throughput = vec3(0.0);
+    direction = h.normal;
+    SSSObject o;
+    if (!sss_find_object(tid, o)) return false;
+    int channel = -1;
+    if (o.channels == 3u) {
+        channel = min(int(random() * 3.0), 2);
+        o.base = o.bases[channel];
+    }
+    SSSCloudSample s = sss_cloud_sample(o, o.base, h.position, tid);
+    float Lw = s.path_length * o.scale;
+    vec3 sigma_a = material.absorbtion * material.scale;
+    if (channel >= 0) {
+        throughput = vec3(0.0);
+        throughput[channel] = 3.0 * exp(-sigma_a[channel] * Lw);
+    } else {
+        vec3 sigma_tc = max((material.scattering + material.absorbtion) * material.scale, vec3(EPS));
+        float sigma_shared = max(luminance(sigma_tc), EPS);
+        throughput = exp(-sigma_a * (sigma_shared / sigma_tc) * Lw);
+    }
+    direction = s.direction;
+    h.position = s.position;
+    h.normal = s.normal;
+    g_sss_exit = true;
+    g_sss_projected = s.projected;
+    g_sss_exit_pos = s.position;
+    g_sss_exit_normal = s.normal;
+    g_sss_exit_axis = s.axis;
+    g_sss_exit_exponent = s.exponent;
+    return true;
+}
+
+vec3 sss_exit_scene_lights(vec3 pos, vec3 n, vec3 axis, float e) {
+    vec3 intensity = vec3(0);
+    for (uint i = 0; i < ubo.lights; i++) {
+        SceneLight light = lightIn[i];
+        vec3 incoming;
+        vec3 to_light = light.position - pos;
+        float distance_to_light = length(to_light);
+        float falloff = 1.0;
+        if (light.angle == 0 && light.direction == vec3(0)) { // point light
+            incoming = normalize(to_light);
+        } else if (light.angle != 0) { // spot light
+            if (light.direction == vec3(0)) light.direction = vec3(0, -1, 0);
+            incoming = normalize(to_light);
+            float angle = acos(clamp(dot(-incoming, normalize(light.direction)), -1.0, 1.0));
+            float lightangle = radians(light.angle / 2.0);
+            if (angle > lightangle) continue;
+            if (angle > lightangle * (1.0 - light.penumbra)) falloff -= (angle - lightangle * (1.0 - light.penumbra)) / (light.penumbra * lightangle);
+        } else { // directional light
+            incoming = -normalize(light.direction);
+            distance_to_light = FLTMAX;
+        }
+        float pdf = sss_dir_pdf(incoming, n, axis, e);
+        if (pdf <= 0.0) continue;
+        if (ubo.scenelightshadows != 0) {
+            Ray sray = { epsilon_offset(pos, n), incoming };
+            uint tid;
+            Hit shit = trace_max(sray, distance_to_light, tid);
+            if (shit.distance > 0) continue;
+            if (splat_occluded(sray, distance_to_light)) continue;
+        }
+        intensity += pdf * light.color * falloff;
+    }
+    return intensity;
+}
+
+vec3 sss_exit_direct(vec3 pos, vec3 n, vec3 axis, float e) {
+    uint eid;
+    float area;
+    float pmf;
+    vec3 lpos = sample_direct_light_point(eid, area, pmf);
+    if (pmf <= 0.0 || area <= 0.0) return vec3(0.0);
+    vec3 to_light = lpos - pos;
+    float dist = length(to_light);
+    to_light = normalize(to_light);
+    float pdf = sss_dir_pdf(to_light, n, axis, e);
+    if (pdf <= 0.0) return vec3(0.0);
+    Ray sray = { epsilon_offset(pos, n), to_light };
+    uint tid = 0;
+    Hit shit = trace_max(sray, dist * 1.001 + 1e-4, tid);
+    if (eid != tid || shit.distance <= 0.0) return vec3(0.0);
+    if (splat_occluded(sray, shit.distance)) return vec3(0.0);
+    float cos_light = max(dot(shit.normal, -to_light), 0.0);
+    if (cos_light <= 0.0) return vec3(0.0);
+    float p_omega = (pmf / area) * dist * dist / cos_light;
+    return materialIn[shit.material].emission * pdf / p_omega;
+}
+
+void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in uint tid, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout float wavelength) {
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
@@ -527,13 +618,32 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in Material material,
             float p_sss = material.subsurface;
             float p_surface = 1.0 - p_sss;
             if (random() <= p_sss) {
-                Ray ray;
-                ray.direction = sample_henyey_greenstein(outgoing, material.anisotropy);
-                ray.position = epsilon_offset(h.position, ray.direction);
-                subsurface_walk(ray, throughput, h, material, medium);
+                uint cost_before = bvh_counter;
+                if (ubo.sssplats != 0u && sss_splat_scatter(h, tid, material, throughput, incoming)) {
+                    throughput /= p_sss;
+                    pdf = 1.0;
+                    g_sss_debug_cost += bvh_counter - cost_before;
+                    if (g_sss_debug_kind == 0u) g_sss_debug_kind = g_sss_projected ? 1u : 3u;
+                    break;
+                }
+                Ray ray = sss_walk_enter(h.position, h.normal, -outgoing, material.anisotropy);
+                bool exited;
+                vec3 exit_normal;
+                subsurface_walk(ray, throughput, h, material, medium, exited, exit_normal);
+                g_sss_debug_cost += bvh_counter - cost_before;
+                if (g_sss_debug_kind == 0u) g_sss_debug_kind = 2u;
                 throughput /= p_sss;
                 incoming = h.normal;
                 pdf = 1.0;
+                if (exited && ubo.sssexitlight != 0u) {
+                    incoming = onb(exit_normal, sample_cosine_weighted_lobe());
+                    h.normal = exit_normal;
+                    g_sss_exit = true;
+                    g_sss_exit_pos = h.position;
+                    g_sss_exit_normal = exit_normal;
+                    g_sss_exit_axis = exit_normal; // folded cos^1 lobe around the normal == cos / pi
+                    g_sss_exit_exponent = 1.0;
+                }
             } else {
                 sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
                 throughput /= p_surface;
@@ -541,52 +651,6 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in Material material,
             break;
         default: break;
     }
-}
-
-float erf_approx(float x) { // Abramowitz & Stegun 7.1.26, abs error < 1.5e-7
-    float s = sign(x);
-    x = abs(x);
-    float t = 1.0 / (1.0 + 0.3275911 * x);
-    float y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-x * x);
-    return s * y;
-}
-
-float normal_cdf(float x) {
-    return 0.5 * (1.0 + erf_approx(x * 0.70710678));
-}
-
-float erfinv_approx(float x) { // M. Giles, single precision
-    float w = -log((1.0 - x) * (1.0 + x));
-    float p;
-    if (w < 5.0) {
-        w = w - 2.5;
-        p = 2.81022636e-08;
-        p = 3.43273939e-07 + p * w;
-        p = -3.5233877e-06 + p * w;
-        p = -4.39150654e-06 + p * w;
-        p = 0.00021858087 + p * w;
-        p = -0.00125372503 + p * w;
-        p = -0.00417768164 + p * w;
-        p = 0.246640727 + p * w;
-        p = 1.50140941 + p * w;
-    } else {
-        w = sqrt(w) - 3.0;
-        p = -0.000200214257;
-        p = 0.000100950558 + p * w;
-        p = 0.00134934322 + p * w;
-        p = -0.00367342844 + p * w;
-        p = 0.00573950773 + p * w;
-        p = -0.0076224613 + p * w;
-        p = 0.00943887047 + p * w;
-        p = 1.00167406 + p * w;
-        p = 2.83297682 + p * w;
-    }
-    return p * x;
-}
-
-float normal_quantile(float p) {
-    p = clamp(p, 1e-7, 1.0 - 1e-7);
-    return 1.41421356 * erfinv_approx(2.0 * p - 1.0);
 }
 
 vec3 splat_albedo(uint id) {
@@ -856,7 +920,20 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         vec3 incoming;
         vec3 color;
         float pdf;
-        brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, ior, medium, wavelength);
+        brdf(-ray.direction, ray.position, h, hid, material, incoming, pdf, color, ior, medium, wavelength);
+        if (g_sss_exit) {
+            // light arriving directly at the exit point of a subsurface cloud path
+            g_sss_exit = false;
+            uint nee_before = bvh_counter;
+            if (ubo.sssexitlight != 0u && pdf > 0.0) {
+                vec3 sss_weight = throughput * color / pdf;
+                if (ubo.scenelighting != 0 && ubo.lights > 0)
+                    radiance += min(sss_weight * sss_exit_scene_lights(g_sss_exit_pos, g_sss_exit_normal, g_sss_exit_axis, g_sss_exit_exponent), max_contribution);
+                if (ubo.direct != 0 && ubo.emissives > 0)
+                    radiance += min(sss_weight * sss_exit_direct(g_sss_exit_pos, g_sss_exit_normal, g_sss_exit_axis, g_sss_exit_exponent), max_contribution);
+            }
+            g_sss_debug_cost += bvh_counter - nee_before;
+        }
         if (ubo.scenelighting != 0) {
             if (material.model == DIELECTRIC_MODEL && b4medium == -1 && b4medium == medium) {
                 vec3 light = sample_scene_lights(-ray.direction, h, material);
@@ -882,6 +959,18 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         else count_emission = ubo.direct == 0;
     }
     if (ubo.debugmode == DEBUG_BOUNCES) return vec3(pow(float(i) / float(ubo.maxbounces), 2.0), 0, 0);
+    if (ubo.debugmode == DEBUG_SSS_PATH) {
+        // green: cloud, red: random walk, yellow: cloud whose exit projection failed, grey: no subsurface event
+        if (g_sss_debug_kind == 1u) return vec3(0.0, 1.0, 0.0);
+        if (g_sss_debug_kind == 2u) return vec3(1.0, 0.0, 0.0);
+        if (g_sss_debug_kind == 3u) return vec3(1.0, 1.0, 0.0);
+        return vec3(0.05);
+    }
+    if (ubo.debugmode == DEBUG_SSS_COST) {
+        // log scale heat map of BVH nodes visited for subsurface work: black 0, blue ~16, green ~256, red >= 4096
+        float t = clamp(log2(1.0 + float(g_sss_debug_cost)) / 12.0, 0.0, 1.0);
+        return clamp(vec3(3.0 * t - 1.5, 1.5 - abs(3.0 * t - 1.5), 1.5 - 3.0 * t) * step(0.5, float(g_sss_debug_cost)), 0.0, 1.0);
+    }
     return radiance;
 }
 

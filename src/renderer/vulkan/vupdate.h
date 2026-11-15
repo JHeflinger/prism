@@ -5,6 +5,8 @@
 
 void VUPDT_ExternalBuffer(ShaderBuffer* ebuffer);
 
+void VUPDT_Subsurface(VulkanDataBuffer* gsss);
+
 void VUPDT_Simulation(VulkanFluidSimulation* vfs);
 
 void VUPDT_Transforms(VulkanDataBuffer* transforms);

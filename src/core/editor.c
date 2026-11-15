@@ -2,12 +2,13 @@
 #include "core/dev.h"
 #include "renderer/renderer.h"
 #include "renderer/trainer.h"
+#include "renderer/subsurface.h"
 #include "renderer/loader.h"
 #include "ui/panels/diagnostics.h"
 #include "ui/panels/simulate.h"
 #include "ui/panels/viewport.h"
 #include "ui/panels/overview.h"
-#include "ui/panels/actions.h"
+#include "ui/panels/baking.h"
 #include "ui/panels/edit.h"
 #include "ui/panels/mesh.h"
 #include <ui/panels/console.h>
@@ -30,6 +31,7 @@ static void InitEditor() {
 	SetTraceLogLevel(LOG_NONE);
     SetConfigFlags((CONFGET(Bool, "default_vsync", TRUE) ? FLAG_VSYNC_HINT : 0) | FLAG_WINDOW_RESIZABLE);
     InitWindow(EDITOR_DEFAULT_WIDTH, EDITOR_DEFAULT_HEIGHT, "Prism");
+    SetExitKey(KEY_NULL);
     Image icon = LoadImage("assets/images/appico.png");
     SetWindowIcon(icon);
     UnloadImage(icon);
@@ -41,7 +43,7 @@ static void InitEditor() {
     ARRLIST_Panel_add(&g_shared_panels, GenerateDiagnosticsPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateSimulatePanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateOverviewPanel());
-    ARRLIST_Panel_add(&g_shared_panels, GenerateActionsPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateBakingPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateViewportPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateEditPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateMeshPanel());
@@ -57,7 +59,7 @@ static void InitEditor() {
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Viewport", 0.0f, FALSE, FALSE, FALSE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, GetScreenHeight() - 360.0f, TRUE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, TRUE});
-    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Actions", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Baking", 0.0f, FALSE, FALSE, FALSE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, TRUE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE});
     PreloadExtensions();
@@ -71,8 +73,8 @@ static void InitEditor() {
 
 static void UpdateEditor() {
     UpdateUI(g_ui);
-    // Gaussian splat training runs in small time slices so the editor stays interactive
     if (TrainingScenePhaseNow() == TRAINSCENE_CAPTURING || TrainingScenePhaseNow() == TRAINSCENE_TRAINING) TrainingSceneTick(0.03);
+    if (SubsurfaceTrainPhaseNow() == SUBSURFACE_TRAINING) SubsurfaceTrainTick(0.03);
 }
 
 static void PreRenderEditor() {

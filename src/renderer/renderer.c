@@ -8,6 +8,7 @@
 #include "renderer/simulator.h"
 #include "renderer/overlay.h"
 #include "renderer/trainer.h"
+#include "renderer/subsurface.h"
 #include "renderer/rmath.h"
 #include "ui/panels/edit.h"
 #include <core/config.h>
@@ -354,6 +355,36 @@ static size_t RemoveFlaggedTriangles(const uint8_t* doomed) {
     return removed;
 }
 
+static void SubmitDefaultMaterial() {
+    SurfaceMaterial dsm = { 0 };
+    #define DSMSETV3(name, default) {\
+    const char* n1 = "default_material_" #name "r"; \
+    dsm.name[0] = CONFGET(Float, n1, default); \
+    const char* n2 = "default_material_" #name "g"; \
+    dsm.name[1] = CONFGET(Float, n2, default); \
+    const char* n3 = "default_material_" #name "b"; \
+    dsm.name[2] = CONFGET(Float, n3, default);}
+    #define DSMSETF(name, default) {\
+    const char* n = "default_material_" #name; \
+    dsm.name = CONFGET(Float, n, default);}
+    DSMSETV3(emission, 0.0f);
+    DSMSETV3(ambient, 1.0f);
+    DSMSETV3(diffuse, 1.0f);
+    DSMSETV3(specular, 0.0f);
+    DSMSETV3(absorbtion, 0.0f);
+    DSMSETV3(dispersion, 0.0f);
+    DSMSETV3(scattering, 0.0f);
+    DSMSETF(anisotropy, 0.0f);
+    DSMSETF(scale, 1.0f);
+    DSMSETF(subsurface, 0.0f);
+    DSMSETF(ior, 0.0f);
+    DSMSETF(shiny, 10.0f);
+    dsm.model = CONFGET(Int, "default_material_model", 2);
+    #undef DSMSETV3
+    #undef DSMSETF
+    SubmitNamedMaterial(dsm, "Default");
+}
+
 Renderer* RawRendererRef() {
     return &g_renderer;
 }
@@ -498,33 +529,7 @@ void InitializeRenderer() {
     PollGPUCache(TRUE);
 
     // default material
-    SurfaceMaterial dsm = { 0 };
-    #define DSMSETV3(name, default) {\
-    const char* n1 = "default_material_" #name "r"; \
-    dsm.name[0] = CONFGET(Float, n1, default); \
-    const char* n2 = "default_material_" #name "g"; \
-    dsm.name[1] = CONFGET(Float, n2, default); \
-    const char* n3 = "default_material_" #name "b"; \
-    dsm.name[2] = CONFGET(Float, n3, default);}
-    #define DSMSETF(name, default) {\
-    const char* n = "default_material_" #name; \
-    dsm.name = CONFGET(Float, n, default);}
-    DSMSETV3(emission, 0.0f);
-    DSMSETV3(ambient, 1.0f);
-    DSMSETV3(diffuse, 1.0f);
-    DSMSETV3(specular, 0.0f);
-    DSMSETV3(absorbtion, 0.0f);
-    DSMSETV3(dispersion, 0.0f);
-    DSMSETV3(scattering, 0.0f);
-    DSMSETF(anisotropy, 0.0f);
-    DSMSETF(scale, 1.0f);
-    DSMSETF(subsurface, 0.0f);
-    DSMSETF(ior, 0.0f);
-    DSMSETF(shiny, 10.0f);
-    dsm.model = CONFGET(Int, "default_material_model", 2);
-    #undef DSMSETV3
-    #undef DSMSETF
-    SubmitNamedMaterial(dsm, "Default");
+    SubmitDefaultMaterial();
 
     // set overlay context
     SetOverlayContext(&g_renderer);
@@ -588,6 +593,8 @@ SceneCamera DefaultCamera() {
     sc.config.normals = TRUE;
     sc.config.reset = FALSE;
     sc.config.denoise = FALSE;
+    sc.config.gsssenabled = TRUE;
+    sc.config.exitsss = TRUE;
     sc.config.denoiseiterations = 4;
     sc.config.denoisecolor = 4.0f;
     sc.config.denoisenormal = 64.0f;
@@ -596,9 +603,11 @@ SceneCamera DefaultCamera() {
     sc.config.flags = PREVIEW_PIPELINE_FLAGS;
     sc.config.arap.iterations = 10;
     sc.config.arap.style = 0;
+
     sc.config.arap.cube_lambda = 0.5f;
     sc.config.arap.cube_rho = 1e-4f;
     sc.config.arap.addm = 5;
+    sc.config.resolution = (Vector2){ 1600, 900 };
     sc.core = (SimpleCamera){
         { 0.0f, 2.133f, 2.11f },
         { 0.0f, 0.0f, 0.0f },
@@ -1084,6 +1093,12 @@ void Render() {
         // dispatch transfer commands
         if (is_transferring) VUTIL_EndTransferCommands();
 
+        // subsurface clouds (rare, synchronous upload)
+        if (SubsurfaceNeedsUpdate()) {
+            VUPDT_Subsurface(&(g_renderer.vulkan.core.geometry.gsss));
+            resized_buffers = TRUE;
+        }
+
         // update all descriptor sets if needed
         if (resized_buffers) {
             dupdate_queue = 0;
@@ -1164,8 +1179,15 @@ void Render() {
 
         // end profiling
         ez_end_profile(&(g_renderer.stats.profile));
+        g_renderer.stats.accumulation++;
     } else {
         async_update = FALSE;
+    }
+
+    // resize resolution if needed
+    Vector2 targetres = RendererCamera()->config.resolution;
+    if (g_renderer.dimensions.x != targetres.x || g_renderer.dimensions.y != targetres.y) {
+        ResizeRenderer(targetres.x, targetres.y);
     }
 
     #undef TRANSFER_UPDATE
@@ -1894,12 +1916,15 @@ void ClearScene(BOOL hard) {
     ClearTriangles();
     ClearVertices();
     ClearNormals();
-    if (hard) ClearMaterials();
+    ClearMaterials();
+    if (!hard) SubmitDefaultMaterial();
+    UpdateMaterials();
     ClearLights();
     ClearMeshDescriptors();
     ClearAnimations();
     ClearSimulation();
     ClearSplats();
+    SubsurfaceClear();
     DeselectEditTarget();
     if (hard) ClearCameras();
 }
@@ -2254,6 +2279,7 @@ BOOL DeleteMesh(size_t id) {
     if (GetEditTarget(&type, &index) && (type == EDIT_SINGLE_TRIANGLE || type == EDIT_SINGLE_VERTEX))
         DeselectEditTarget();
     FixDeleteEditTarget(EDIT_MESH, id);
+    SubsurfaceMeshDeleted(id);
     UpdateNormals();
     UpdateVertices();
     UpdateTriangles();
@@ -2277,4 +2303,13 @@ BOOL DeleteCamera(size_t id) {
     FixDeleteEditTarget(EDIT_CAMERA, id);
     if (PrimaryCameraID() == id) SetCamera(0);
     return TRUE;
+}
+
+RendererStats GetRenderStats() {
+    return g_renderer.stats;
+}
+
+void ResetAccumulation() {
+    g_renderer.stats.accumulation = 0;
+    RendererCamera()->config.reset = TRUE;
 }

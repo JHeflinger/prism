@@ -7,12 +7,18 @@
 #include "renderer/vulkan/vconfig.h"
 #include <vulkan/vulkan.h>
 #include <easyprofile.h>
+#include <easybasics.h>
 #include <cglm/cglm.h>
 #include <raylib.h>
 
 #ifndef NO_MESH_MANIPULATION_SUPPORT
 #include <cholmod.h>
 #endif
+
+#define LAMBERTIAN_MODEL 2
+#define MIRROR_MODEL 5
+#define DIELECTRIC_MODEL 7
+#define SUBSURFACE_MODEL 11
 
 typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
@@ -190,6 +196,7 @@ typedef struct {
 typedef struct {
     ez_Profiler profile;
     GPUStatCache cache;
+    size_t accumulation;
 } RendererStats;
 
 typedef struct {
@@ -426,7 +433,9 @@ typedef enum {
     DEBUG_NONE = 0,
     DEBUG_NORMALS = 1,
     DEBUG_BVH = 2,
-    DEBUG_BOUNCES = 3
+    DEBUG_BOUNCES = 3,
+    DEBUG_SSS_PATH = 4,
+    DEBUG_SSS_COST = 5
 } DebugConfig;
 
 typedef struct {
@@ -451,6 +460,8 @@ typedef struct {
     BOOL reset;
     BOOL denoise;
     BOOL splatocclusion;
+    BOOL gsssenabled;
+    BOOL exitsss;
     size_t denoiseiterations;
     float denoisecolor;
     float denoisenormal;
@@ -458,6 +469,7 @@ typedef struct {
     DebugConfig debug;
     PipelineFlags flags;
     ARAPConfig arap;
+    Vector2 resolution;
 } RendererConfig;
 
 typedef struct {
@@ -500,6 +512,7 @@ typedef struct {
     ARRLIST_DynamicString meshnames;
     ARRLIST_SceneCamera cameras;
     ARRLIST_DynamicString cameranames;
+    ARRLIST_uint32_t gsss;
     size_t primarycamera;
     size_t maxprimitives;
     size_t mostprimitives;

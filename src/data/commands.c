@@ -10,6 +10,11 @@ static BlackBoardType InterpretType(const char* str) {
     if (strcmp(str, "False") == 0) return BB_BOOL;
     if (strcmp(str, "true") == 0) return BB_BOOL;
     if (strcmp(str, "false") == 0) return BB_BOOL;
+    if (strcmp(str, "NONE") == 0) return BB_LEVEL;
+    if (strcmp(str, "TRACE") == 0) return BB_LEVEL;
+    if (strcmp(str, "INFO") == 0) return BB_LEVEL;
+    if (strcmp(str, "WARN") == 0) return BB_LEVEL;
+    if (strcmp(str, "ERROR") == 0) return BB_LEVEL;
     BOOL numeric = TRUE;
     BOOL floaty = FALSE;
     for (size_t i = 0; str[i] != '\0'; i++) {
@@ -64,6 +69,28 @@ static BOOL ParseAndSetValue(BlackBoardValue* value, const char* str) {
                 return TRUE;
             }
             return FALSE;
+        case BB_LEVEL:
+            if (strcmp(str, "NONE") == 0) {
+                value->value._level = LEVEL_NONE;
+                return TRUE;
+            }
+            if (strcmp(str, "TRACE") == 0) {
+                value->value._level = LEVEL_TRACE;
+                return TRUE;
+            }
+            if (strcmp(str, "INFO") == 0) {
+                value->value._level = LEVEL_INFO;
+                return TRUE;
+            }
+            if (strcmp(str, "WARN") == 0) {
+                value->value._level = LEVEL_WARN;
+                return TRUE;
+            }
+            if (strcmp(str, "ERROR") == 0) {
+                value->value._level = LEVEL_ERROR;
+                return TRUE;
+            }
+            return FALSE;
         default: return FALSE;
     }
 }
@@ -98,6 +125,28 @@ BOOL ConfigureCommand(char** argv, int argc) {
                     break;
                 case BB_STRING:
                     loginfo("\"%s\" = %s", argv[1], value.value._string);
+                    break;
+                case BB_LEVEL:
+                    switch (value.value._level) {
+                        case LEVEL_NONE:
+                            loginfo("\"%s\" = NONE", argv[1]);
+                            break;
+                        case LEVEL_TRACE:
+                            loginfo("\"%s\" = TRACE", argv[1]);
+                            break;
+                        case LEVEL_INFO:
+                            loginfo("\"%s\" = INFO", argv[1]);
+                            break;
+                        case LEVEL_WARN:
+                            loginfo("\"%s\" = WARN", argv[1]);
+                            break;
+                        case LEVEL_ERROR:
+                            loginfo("\"%s\" = ERROR", argv[1]);
+                            break;
+                        default:
+                            loginfo("\"%s\" = UNKNOWN", argv[1]);
+                            break;
+                    }
                     break;
                 default:
                     logerror("\"%s\" has an unhandled datatype", argv[1]);

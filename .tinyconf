@@ -22,5 +22,7 @@ WINDOWS EXECUTE scripts/shaders.bat
 DEFINE PRISM
 WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
 
+FLAG audit
+
 # EXTRA MODULES AND EXTENSIONS
 # MODULE crys https://github.com/JHeflinger/crys.git .

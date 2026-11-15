@@ -2,6 +2,7 @@
 #define VSTRUCTS_H
 
 #include "renderer/rstructs.h"
+#include <stddef.h>
 
 typedef struct {
     VkImage image;
@@ -83,6 +84,8 @@ typedef struct {
     alignas(4) float denoisenormal;
     alignas(4) float denoisedepth;
     alignas(4) uint32_t splatocclusion;
+    alignas(4) uint32_t sssplats;
+    alignas(4) uint32_t sssexitlight;
 } UniformBufferObject;
 
 typedef struct {
@@ -117,7 +120,13 @@ typedef struct {
     alignas(4) uint32_t selected_tend;
     alignas(4) uint32_t selected_sstart;
     alignas(4) uint32_t selected_send;
+    alignas(4) uint32_t camera_base;
+    alignas(4) uint32_t camera_count;
+    alignas(4) uint32_t primary_cid;
+    alignas(4) uint32_t single_selected_cid;
+    alignas(16) vec4 camera_glyphs[MAX_CAMERA_GLYPHS * 4]; // per camera: [0] position + tan(half fov x), [1] u + aspect, [2] v + ortho flag, [3] w
 } OverlayUniformBufferObject;
+_Static_assert(offsetof(OverlayUniformBufferObject, camera_glyphs) == 96, "OverlayUniformBufferObject must match the std140 layout in shaders/shared.import");
 
 typedef struct {
 	alignas(4) TriangleID hovered_tid;
@@ -238,6 +247,7 @@ typedef struct {
     VulkanDataBuffer transforms;
     VulkanDataBuffer poses;
     VulkanDataBuffer skins;
+    VulkanDataBuffer gsss;
 } VulkanGeometry;
 
 typedef struct {

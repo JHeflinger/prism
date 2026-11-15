@@ -10,6 +10,7 @@ typedef enum {
     SPLAT_SELECT_MODE = 3,
     LIGHT_SELECT_MODE = 4,
     OBJECT_SELECT_MODE = 5,
+    CAMERA_SELECT_MODE = 6,
 } OverlayMode;
 
 void SetOverlayContext(Renderer* renderer);
@@ -43,5 +44,9 @@ LightID GetSelectedLight();
 size_t HoveredObject();
 
 size_t GetSelectedObject();
+
+size_t HoveredCamera();
+
+size_t GetSelectedCamera();
 
 #endif
