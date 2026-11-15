@@ -7,8 +7,6 @@
 #include <ui/extra.h>
 #include <util/logger.h>
 
-#define LEFT_COLUMN_WIDTH 150
-
 static size_t g_edit_item_index = 0;
 static BOOL g_item_selected = FALSE;
 static EditType g_edit_type = EDIT_MATERIAL;

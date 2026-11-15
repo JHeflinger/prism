@@ -8,7 +8,7 @@
 #include "ui/panels/simulate.h"
 #include "ui/panels/viewport.h"
 #include "ui/panels/overview.h"
-#include "ui/panels/actions.h"
+#include "ui/panels/baking.h"
 #include "ui/panels/edit.h"
 #include "ui/panels/mesh.h"
 #include <ui/panels/console.h>
@@ -43,7 +43,7 @@ static void InitEditor() {
     ARRLIST_Panel_add(&g_shared_panels, GenerateDiagnosticsPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateSimulatePanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateOverviewPanel());
-    ARRLIST_Panel_add(&g_shared_panels, GenerateActionsPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateBakingPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateViewportPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateEditPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateMeshPanel());
@@ -59,7 +59,7 @@ static void InitEditor() {
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Viewport", 0.0f, FALSE, FALSE, FALSE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, GetScreenHeight() - 360.0f, TRUE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, TRUE});
-    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Actions", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Baking", 0.0f, FALSE, FALSE, FALSE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, TRUE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE});
     PreloadExtensions();
