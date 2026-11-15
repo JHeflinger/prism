@@ -23,6 +23,20 @@ typedef enum {
     SUBSURFACE_FAILED
 } SubsurfaceTrainPhase;
 
+typedef enum {
+    SSSFIT_SETUP = 0,
+    SSSFIT_ORIENT,
+    SSSFIT_SURFACE,
+    SSSFIT_WALKS,
+    SSSFIT_LOBES,
+    SSSFIT_CLOUD,
+    SSSFIT_CHORDS,
+    SSSFIT_OPTIMISE,
+    SSSFIT_VALIDATE,
+    SSSFIT_DONE,
+    SSSFIT_FAILED
+} SSSFitPhase;
+
 typedef struct {
     BOOL linked;
     BOOL enabled;
@@ -51,6 +65,10 @@ BOOL SubsurfaceTrainTick(double seconds);
 void SubsurfaceTrainCancel();
 
 SubsurfaceTrainPhase SubsurfaceTrainPhaseNow();
+
+SSSFitPhase SubsurfaceFittingPhaseNow();
+
+int SubsurfaceTrainChannelNow();
 
 size_t SubsurfaceTrainMesh();
 

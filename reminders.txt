@@ -1,2 +1,0 @@
-fix gsss ui and percentages and improve visual status progression
-fix gs training ui

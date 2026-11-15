@@ -103,20 +103,6 @@ typedef struct {
 } SSSFitInput;
 
 typedef enum {
-    SSSFIT_SETUP = 0,
-    SSSFIT_ORIENT,
-    SSSFIT_SURFACE,
-    SSSFIT_WALKS,
-    SSSFIT_LOBES,
-    SSSFIT_CLOUD,
-    SSSFIT_CHORDS,
-    SSSFIT_OPTIMISE,
-    SSSFIT_VALIDATE,
-    SSSFIT_DONE,
-    SSSFIT_FAILED
-} SSSFitPhase;
-
-typedef enum {
     CRACK_ESCAPE = 0,
     SURFACE_REACH,
     STEP_LIMIT
@@ -2237,6 +2223,17 @@ void SubsurfaceTrainCancel() {
 
 SubsurfaceTrainPhase SubsurfaceTrainPhaseNow() {
     return g_job.phase;
+}
+
+SSSFitPhase SubsurfaceFittingPhaseNow() {
+    if (g_job.fitter) {
+        return g_job.fitter->phase;
+    }
+    return SSSFIT_FAILED;
+}
+
+int SubsurfaceTrainChannelNow() {
+    return g_job.channel;
 }
 
 size_t SubsurfaceTrainMesh() {
