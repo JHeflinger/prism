@@ -202,6 +202,10 @@ static void DrawCloudTrainingSection(float width) {
         cfg.walks = (uint32_t)s_walks;
         SubsurfaceTrainStart(mesh, &cfg);
     }
+    if (linked) {
+        if (UIButton("Delete Subsurface Cloud", width - 20)) SubsurfaceRemoveCloud(mesh);
+        if (UIButton("Create Cloud Preview", width - 20)) SubsurfacePreviewCloud(mesh);
+    }
     EnableUI();
     if (linked) {
         UIMoveCursor(0, 30);
