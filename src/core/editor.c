@@ -91,7 +91,7 @@ static void EditorResized() {
         (g_windowsize.x != GetScreenWidth() || g_windowsize.y != GetScreenHeight())) {
         g_windowsize.x = GetScreenWidth();
         g_windowsize.y = GetScreenHeight();
-        ResizeUI(g_ui);
+        ResizeUI();
     }
 }
 
