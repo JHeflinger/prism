@@ -265,4 +265,12 @@ RendererStats GetRenderStats();
 
 void ResetAccumulation();
 
+size_t RenderVarianceSamples();
+
+float RenderVariance();
+
+float RenderNoise();
+
+BOOL RenderConverged(float threshold);
+
 #endif

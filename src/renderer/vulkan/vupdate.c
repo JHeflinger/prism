@@ -31,6 +31,10 @@ static BOOL DenoiseActive() {
         cfg->debug == DEBUG_NONE;
 }
 
+static BOOL PathTraceDebug(DebugConfig debug) {
+    return debug == DEBUG_BOUNCES || debug == DEBUG_SSS_PATH || debug == DEBUG_SSS_COST || debug == DEBUG_VARIANCE;
+}
+
 static uint32_t DenoisePasses() {
     size_t iterations = RendererCamera()->config.denoiseiterations;
     if (iterations > 10) iterations = 10;
@@ -255,8 +259,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             VK_SHADER_STAGE_COMPUTE_BIT, \
             0, sizeof(VulkanPushConstants), &pc);}
     PipelineFlags pflags = RendererCamera()->config.flags;
-    if (RendererCamera()->config.debug == DEBUG_BOUNCES || RendererCamera()->config.debug == DEBUG_SSS_PATH ||
-        RendererCamera()->config.debug == DEBUG_SSS_COST) {
+    if (PathTraceDebug(RendererCamera()->config.debug)) {
         pflags |= (PATHTRACE_SHADER_FLAG | TONEMAP_SHADER_FLAG);
         pflags &= ~OVERLAY_SHADER_FLAG;
     }
@@ -514,6 +517,17 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     static int reset_count = 0;
     if (old_camera.fov == 0.0f) old_camera = RendererCamera()->core;
     if (old_flags == 0) old_flags = RendererCamera()->config.flags;
+
+    static DebugConfig old_debug = DEBUG_NONE;
+    DebugConfig debug = RendererCamera()->config.debug;
+    if (debug != old_debug) {
+        BOOL passive = (old_debug == DEBUG_NONE || old_debug == DEBUG_VARIANCE) &&
+            (debug == DEBUG_NONE || debug == DEBUG_VARIANCE) &&
+            (RendererCamera()->config.flags & PATHTRACE_SHADER_FLAG);
+        if (!passive) RendererCamera()->config.reset = TRUE;
+        old_debug = debug;
+    }
+
     if (RendererCamera()->config.reset || old_flags != RendererCamera()->config.flags ||
         memcmp(&old_camera, &(RendererCamera()->core), sizeof(SimpleCamera)) != 0)
         reset_count = CPUSWAP_LENGTH;
@@ -524,10 +538,15 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
     if (reset_count > 0) reset_count--;
     if (cam_reset) g_vupdt_renderer_ref->stats.accumulation = 0;
 
-    // persistant vars
-    static uint32_t samples = 0;
-    samples++;
-    if (cam_reset) samples = 1;
+    // exact sample count of the image this frame accumulates into, which the variance estimate depends on
+    VarianceStats* vstats = g_vupdt_renderer_ref->stats.variance;
+    size_t frame = g_vupdt_renderer_ref->swapchain.index;
+    if (cam_reset)
+        for (size_t i = 0; i < CPUSWAP_LENGTH; i++) vstats[i].samples = 0;
+    if ((RendererCamera()->config.flags & PATHTRACE_SHADER_FLAG) || PathTraceDebug(debug))
+        vstats[frame].submitted = cam_reset ? 1 : vstats[frame].submitted + 1;
+    else
+        vstats[frame].submitted = 0;
 
     // core uniform buffer
     {
@@ -553,7 +572,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.lights = g_vupdt_renderer_ref->geometry.lights.size;
         ubo.grid = (uint32_t)RendererCamera()->config.grid;
         ubo.reset = cam_reset;
-        ubo.samples = samples;
+        ubo.samples = (uint32_t)vstats[frame].submitted;
         ubo.direct = RendererCamera()->config.direct;
         ubo.whitepoint = RendererCamera()->config.whitepoint*RendererCamera()->config.whitepoint;
         ubo.gamma = RendererCamera()->config.gamma;

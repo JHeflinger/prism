@@ -31,6 +31,8 @@
 
 #define MAX_CAMERA_GLYPHS 64
 
+#define RENDER_CONVERGED_MIN_SAMPLES 16
+
 void DefaultPreload();
 
 void DefaultPostload();

@@ -1,17 +1,73 @@
 #import Boilerplate
+#import Definitions
 
 layout(binding = 0) #import UniformBufferObjectDef ubo;
 layout(binding = 1, rgba8) #import OutputImageDef;
 layout(binding = 2, rgba32f) #import HDRImageDef;
 layout(binding = 3, rgba16f) readonly #import DenoiseImageADef;
+layout(binding = 4) #import OverlaySSBODef;
+
+#import CutViewport
+#import VarianceSuite
+
+shared float s_variance[256];
+shared float s_noise[256];
+shared uint s_pixels[256];
+
+vec3 noise_heat(float noise) {
+    float t = clamp(log2(max(noise, 1e-9) / 0.002) / 8.0, 0.0, 1.0);
+    vec3 ramp = clamp(vec3(3.0 * t - 1.5, 1.5 - abs(3.0 * t - 1.5), 1.5 - 3.0 * t), 0.0, 1.0);
+    return ramp * smoothstep(0.0, 0.125, t);
+}
+
+#define ATOMIC_ADD_FLOAT(bits, value) { \
+    uint expected = bits; \
+    for (int attempt = 0; attempt < 1024; attempt++) { \
+        uint found = atomicCompSwap(bits, expected, floatBitsToUint(uintBitsToFloat(expected) + value)); \
+        if (found == expected) break; \
+        expected = found; \
+    }}
 
 void main() {
+    uint tid = gl_LocalInvocationID.x;
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
-	vec3 hdr_color = ubo.denoise != 0u ?
-        imageLoad(denoiseImageA, ivec2(rx, ry)).rgb :
-        vec3(imageLoad(hdrImage, ivec2(rx, ry)) / (float(ubo.samples) / ubo.swap));
-    hdr_color = (hdr_color * ((hdr_color/ubo.whitepoint) + vec3(1.0)))/(vec3(1.0) + hdr_color);
-    hdr_color = pow(hdr_color, vec3(1.0 / ubo.gamma)) / ubo.swap;
-	imageStore(outputImage, ivec2(rx, ry), vec4(hdr_color, 1.0));
+    bool inside = ry < int(ubo.height) && !cut_viewport(rx, ry);
+
+    float variance = 0.0;
+    float noise = 0.0;
+    bool measured = inside && pixel_variance(imageLoad(hdrImage, ivec2(rx, ry)), variance, noise);
+
+    if (ubo.debugmode == DEBUG_VARIANCE) {
+        // pixels with no estimate yet show up as fully noisy
+        vec3 heat = measured ? noise_heat(noise) : vec3(1.0, 0.0, 0.0);
+        if (!inside) heat = vec3(0.0);
+        imageStore(outputImage, ivec2(rx, ry), vec4(heat / ubo.swap, 1.0));
+    } else {
+        vec3 hdr_color = ubo.denoise != 0u ?
+            imageLoad(denoiseImageA, ivec2(rx, ry)).rgb :
+            vec3(imageLoad(hdrImage, ivec2(rx, ry)) / float(max(ubo.samples, 1u)));
+        hdr_color = (hdr_color * ((hdr_color/ubo.whitepoint) + vec3(1.0)))/(vec3(1.0) + hdr_color);
+        hdr_color = pow(hdr_color, vec3(1.0 / ubo.gamma)) / ubo.swap;
+        imageStore(outputImage, ivec2(rx, ry), vec4(hdr_color, 1.0));
+    }
+
+    // sum the work group, then add it to the image totals read back by the host (see RenderVariance)
+    s_variance[tid] = variance;
+    s_noise[tid] = noise;
+    s_pixels[tid] = measured ? 1u : 0u;
+    barrier();
+    for (uint off = 128u; off > 0u; off >>= 1u) {
+        if (tid < off) {
+            s_variance[tid] += s_variance[tid + off];
+            s_noise[tid] += s_noise[tid + off];
+            s_pixels[tid] += s_pixels[tid + off];
+        }
+        barrier();
+    }
+    if (tid == 0u && s_pixels[0] > 0u) {
+        ATOMIC_ADD_FLOAT(variance_bits, s_variance[0]);
+        ATOMIC_ADD_FLOAT(noise_bits, s_noise[0]);
+        atomicAdd(variance_pixels, s_pixels[0]);
+    }
 }

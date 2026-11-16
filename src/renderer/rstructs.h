@@ -194,9 +194,17 @@ typedef struct {
 } GPUStatCache;
 
 typedef struct {
+    size_t submitted;
+    size_t samples;
+    float variance;
+    float noise;
+} VarianceStats;
+
+typedef struct {
     ez_Profiler profile;
     GPUStatCache cache;
     size_t accumulation;
+    VarianceStats variance[CPUSWAP_LENGTH];
 } RendererStats;
 
 typedef struct {
@@ -435,7 +443,8 @@ typedef enum {
     DEBUG_BVH = 2,
     DEBUG_BOUNCES = 3,
     DEBUG_SSS_PATH = 4,
-    DEBUG_SSS_COST = 5
+    DEBUG_SSS_COST = 5,
+    DEBUG_VARIANCE = 6
 } DebugConfig;
 
 typedef struct {

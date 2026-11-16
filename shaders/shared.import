@@ -20,6 +20,7 @@ export Definitions {
     #define DEBUG_BOUNCES 3
     #define DEBUG_SSS_PATH 4
     #define DEBUG_SSS_COST 5
+    #define DEBUG_VARIANCE 6
     #define FLTMAX 3.402823466e+38
     #define LAMBERTIAN_MODEL 2
     #define MIRROR_MODEL 5
@@ -88,6 +89,9 @@ export OverlaySSBODef {
     	uint hovered_tid;
         vec2 vertex_position;
         vec2 selected_vertex_position;
+        uint variance_bits;
+        uint noise_bits;
+        uint variance_pixels;
     }
 }
 
@@ -261,6 +265,28 @@ export HitDef {
         uint material;
         vec3 normal;
         vec3 position;
+    }
+}
+
+export VarianceSuite {
+    #define VARIANCE_NOISE_FLOOR 0.01
+
+    float variance_luminance(vec3 c) {
+        return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
+    }
+
+    bool pixel_variance(vec4 accumulated, out float variance, out float noise) {
+        variance = 0.0;
+        noise = 0.0;
+        if (ubo.samples < 2u) return false;
+        float n = float(ubo.samples);
+        float mean = variance_luminance(accumulated.rgb) / n;
+        float s2 = max(accumulated.a - n * mean * mean, 0.0) / (n - 1.0);
+        float v = s2 / (n * ubo.swap);
+        if (isnan(v) || isinf(v) || isnan(mean) || isinf(mean)) return false;
+        variance = v;
+        noise = sqrt(v) / (abs(mean) + VARIANCE_NOISE_FLOOR);
+        return true;
     }
 }
 

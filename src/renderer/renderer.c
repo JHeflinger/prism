@@ -1167,6 +1167,20 @@ void Render() {
         // copy overlay results to host (from the buffer this frame's copy wrote into)
         memcpy((void*)ExposedOverlaySSBO(), g_renderer.vulkan.core.context.renderdata.overlay_mapped[new_ind], sizeof(OverlaySSBO));
 
+        {
+            OverlaySSBO* measured = ExposedOverlaySSBO();
+            VarianceStats* vstats = &(g_renderer.stats.variance[new_ind]);
+            vstats->samples = 0;
+            if (vstats->submitted >= 2 && measured->variance_pixels > 0) {
+                float variance_sum, noise_sum;
+                memcpy(&variance_sum, &(measured->variance_bits), sizeof(float));
+                memcpy(&noise_sum, &(measured->noise_bits), sizeof(float));
+                vstats->variance = variance_sum / (float)measured->variance_pixels;
+                vstats->noise = noise_sum / (float)measured->variance_pixels;
+                vstats->samples = vstats->submitted;
+            }
+        }
+
         // reset fences and update swapchain index
         vkResetFences(g_renderer.vulkan.core.general.interface, 1, &(g_renderer.vulkan.core.scheduler.syncro.fences[new_ind]));
         g_renderer.swapchain.index = new_ind;
@@ -2311,5 +2325,31 @@ RendererStats GetRenderStats() {
 
 void ResetAccumulation() {
     g_renderer.stats.accumulation = 0;
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) g_renderer.stats.variance[i].samples = 0;
     RendererCamera()->config.reset = TRUE;
+}
+
+size_t RenderVarianceSamples() {
+    size_t samples = (size_t)-1;
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++)
+        if (g_renderer.stats.variance[i].samples < samples) samples = g_renderer.stats.variance[i].samples;
+    return samples;
+}
+
+float RenderVariance() {
+    if (RenderVarianceSamples() < 2) return INFINITY;
+    float variance = 0.0f;
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) variance += g_renderer.stats.variance[i].variance;
+    return variance / (float)CPUSWAP_LENGTH;
+}
+
+float RenderNoise() {
+    if (RenderVarianceSamples() < 2) return INFINITY;
+    float noise = 0.0f;
+    for (size_t i = 0; i < CPUSWAP_LENGTH; i++) noise += g_renderer.stats.variance[i].noise;
+    return noise / (float)CPUSWAP_LENGTH;
+}
+
+BOOL RenderConverged(float threshold) {
+    return RenderVarianceSamples() >= RENDER_CONVERGED_MIN_SAMPLES && RenderNoise() <= threshold;
 }

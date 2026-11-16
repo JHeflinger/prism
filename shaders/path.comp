@@ -29,6 +29,7 @@ layout(binding = 11, rgba32f) writeonly #import GBufferImageDef;
 layout(binding = 12) readonly #import EmissionAliasSSBODef;
 layout(binding = 13) readonly #import TransformsSSBODef;
 layout(binding = 14) readonly #import SubsurfaceSSBODef;
+layout(binding = 15) #import OverlaySSBODef;
 
 #import CutViewport
 #import GBufferSuite
@@ -975,6 +976,13 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
 }
 
 void main() {
+    // clear the accumulation statistics that tonemap.comp sums up for this frame
+    if (gl_GlobalInvocationID.x == 0) {
+        variance_bits = 0u;
+        noise_bits = 0u;
+        variance_pixels = 0u;
+    }
+
 	// update ray info
     raygenIn[gl_GlobalInvocationID.x].tid = -1;
 
@@ -1002,11 +1010,12 @@ void main() {
     // denoiser features
     imageStore(gbufferImage, ivec2(rx, ry), vec4(encode_normal(normalize(g_first_normal)), g_first_distance, g_first_surface));
 
-    // write to image
+    // write to image (rgb: sum of samples, a: sum of squared sample luminance, used to estimate variance)
+    float lum = luminance(color);
     if (ubo.reset != 0) {
-	    imageStore(hdrImage, ivec2(rx, ry), vec4(color, 1.0));
+	    imageStore(hdrImage, ivec2(rx, ry), vec4(color, lum * lum));
     } else {
         vec4 accum = imageLoad(hdrImage, ivec2(rx, ry));
-        imageStore(hdrImage, ivec2(rx, ry), vec4(color, 0.0) + accum);
+        imageStore(hdrImage, ivec2(rx, ry), vec4(color, lum * lum) + accum);
     }
 }

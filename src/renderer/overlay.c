@@ -5,7 +5,7 @@
 
 static Renderer* g_overlay_renderer_ref = NULL;
 static Rectangle g_viewport_dims = { 0 };
-static OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (TriangleID)-1, { 0, 0 }, { 0, 0 } };
+static OverlaySSBO g_exposed_overlay_ssbo = (OverlaySSBO){ (TriangleID)-1, { 0, 0 }, { 0, 0 }, 0, 0, 0 };
 static TriangleID g_single_selected_triangle = -1;
 static VertexID g_single_selected_vertex = -1;
 static LightID g_single_selected_light = -1;

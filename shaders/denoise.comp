@@ -66,7 +66,7 @@ bool writes_a(uint stage) {
 }
 
 vec3 load_radiance(ivec2 p) {
-    float accumulated = float(ubo.samples) / ubo.swap;
+    float accumulated = float(max(ubo.samples, 1u));
     return imageLoad(hdrImage, p).rgb / accumulated;
 }
 

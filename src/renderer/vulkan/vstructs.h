@@ -132,7 +132,11 @@ typedef struct {
 	alignas(4) TriangleID hovered_tid;
     alignas(8) vec2 vertex_position;
     alignas(8) vec2 selected_vertex_position;
+    alignas(4) uint32_t variance_bits;
+    alignas(4) uint32_t noise_bits;
+    alignas(4) uint32_t variance_pixels;
 } OverlaySSBO;
+_Static_assert(offsetof(OverlaySSBO, variance_bits) == 24, "OverlaySSBO must match the std430 layout in shaders/shared.import");
 
 typedef struct {
     alignas(4) uint32_t elements;

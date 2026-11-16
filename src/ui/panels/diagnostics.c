@@ -67,6 +67,13 @@ static void DrawDevPanel(float width, float height) {
     UIDrawText("Renderer FPS: %d", (int)(1.0f / ((float)RenderTime() * RenderConfig()->multiplier / 1000.0f)));
     UIDrawText("Render Time: %.6f ms", (float)RenderTime() * RenderConfig()->multiplier);
     UIDrawText("Render Accumulation: %lu", (long unsigned int)GetRenderStats().accumulation);
+    if (RenderVarianceSamples() >= 2) {
+        UIDrawText("Render Variance: %.3e", RenderVariance());
+        UIDrawText("Render Noise: %.3f%c%s", 100.0f * RenderNoise(), '%', RenderConverged(0.01f) ? " (converged)" : "");
+    } else {
+        UIDrawText("Render Variance: N/A");
+        UIDrawText("Render Noise: N/A");
+    }
     UIDrawText("Triangles: %d", (int)NumTriangles());
     UIDrawText("Vertices: %d", (int)NumVertices());
     UIDrawText("Normals: %d", (int)NumNormals());
