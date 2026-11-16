@@ -17,7 +17,7 @@ static size_t DropdownSelectBakeMode(void* data, size_t index, BOOL cancel) {
 }
 
 static void DrawStatusSubStage(float width, int current, int target, int done, const char* fmt, const char* status, int soffset, BOOL first) {
-    DrawRectangle(UIGetCursor().x, UIGetCursor().y, width - 20, 20, (Color){ 255, 255, current == target ? 0 : 255, current == target ? 90 : 60 });
+    DrawRectangle(UIGetCursor().x, UIGetCursor().y, width - 20, 20, (Color){ 255, 255, current == target ? 0 : 255, current == target ? 40 : 10 });
     UIMoveCursor(10, 0);
     Color c = current == target ? GOLD : (current > target && current <= done ? GREEN : GRAY);
     DrawRectangle(UIGetCursor().x + 5, UIGetCursor().y + 9, 10, 2, c);
@@ -30,7 +30,7 @@ static void DrawStatusSubStage(float width, int current, int target, int done, c
 }
 
 static void DrawStatusStage(float width, int current, int target, int done, const char* fmt, const char* status, int soffset) {
-    DrawRectangle(UIGetCursor().x, UIGetCursor().y, width - 20, 20, (Color){ 255, 255, current == target ? 0 : 255, current == target ? 90 : 60 });
+    DrawRectangle(UIGetCursor().x, UIGetCursor().y, width - 20, 20, (Color){ 255, 255, current == target ? 0 : 255, current == target ? 40 : 10 });
     Color c = current == target ? GOLD : (current > target && current <= done ? GREEN : GRAY);
     DrawCircle(UIGetCursor().x + 15, UIGetCursor().y + 10, 5, c);
     UIMoveCursor(30, 0);
@@ -89,7 +89,7 @@ static void DrawSplatTrainingSection(float width) {
     DrawStatusStage(width, phase, TRAINSCENE_CAPTURING, TRAINSCENE_DONE, "Capturing %s %s", TrainingSceneStatus(), 16);
     DrawStatusStage(width, phase, TRAINSCENE_TRAINING, TRAINSCENE_DONE, "Training %s %s", TrainingSceneStatus(), 9);
     {
-        DrawRectangle(UIGetCursor().x, UIGetCursor().y, width - 20, 20, (Color){ 255, 255, 255, 60 });
+        DrawRectangle(UIGetCursor().x, UIGetCursor().y, width - 20, 20, (Color){ 255, 255, 255, 10 });
         Color c = phase == TRAINSCENE_DONE ? GREEN : GRAY;
         DrawCircle(UIGetCursor().x + 15, UIGetCursor().y + 10, 5, c);
         UIMoveCursor(30, 0);
@@ -181,7 +181,7 @@ static void DrawCloudTrainingSection(float width) {
     DrawStatusSubStage(width, channel * 100 + fitphase, 2 * 100 + SSSFIT_OPTIMISE, 99999, "Optimization %s %s", SubsurfaceTrainStatus(), 0, FALSE);
     DrawStatusSubStage(width, channel * 100 + fitphase, 2 * 100 + SSSFIT_VALIDATE, 99999, "Validation %s %s", SubsurfaceTrainStatus(), 0, FALSE);
     {
-        DrawRectangle(UIGetCursor().x, UIGetCursor().y, width - 20, 20, (Color){ 255, 255, 255, 60 });
+        DrawRectangle(UIGetCursor().x, UIGetCursor().y, width - 20, 20, (Color){ 255, 255, 255, 10 });
         Color c = phase == SUBSURFACE_DONE ? GREEN : GRAY;
         DrawCircle(UIGetCursor().x + 15, UIGetCursor().y + 10, 5, c);
         UIMoveCursor(30, 0);
