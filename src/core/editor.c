@@ -41,7 +41,7 @@ static void InitEditor() {
     InitializeRenderer();
     printf("\nEnvironment configuration:\n\tGPU: %s\n\tOperating System: %s\n\n", GPUModel(), OPSYS);
     ARRLIST_Panel_add(&g_shared_panels, GenerateDiagnosticsPanel());
-    ARRLIST_Panel_add(&g_shared_panels, GenerateSimulatePanel());
+    //ARRLIST_Panel_add(&g_shared_panels, GenerateSimulatePanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateOverviewPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateBakingPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateViewportPanel());
@@ -60,8 +60,8 @@ static void InitEditor() {
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, GetScreenHeight() - 360.0f, TRUE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, TRUE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Baking", 0.0f, FALSE, FALSE, FALSE, FALSE});
-    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, TRUE});
-    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    //ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE});
     PreloadExtensions();
     SetUIConfig(&g_default_ui_config);
     LoadUIConfig(&g_ui, g_shared_panels);
