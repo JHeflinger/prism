@@ -3,6 +3,8 @@
 
 #include <ui/ui.h>
 
+BOOL RequestingIgnoreScissor();
+
 Panel GenerateRecordingPanel();
 
 #endif

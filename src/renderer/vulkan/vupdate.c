@@ -7,6 +7,7 @@
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
 #include "renderer/subsurface.h"
+#include "ui/panels/recording.h"
 
 #define TRANSFER_ACQUIRE_VERTICES   (1 << 0)
 #define TRANSFER_ACQUIRE_NORMALS    (1 << 1)
@@ -564,8 +565,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.height = g_vupdt_renderer_ref->dimensions.y;
         ubo.triangles = g_vupdt_renderer_ref->geometry.triangles.size;
         ubo.splats = g_vupdt_renderer_ref->geometry.splats.size;
-        ubo.viewport[0] = g_vupdt_renderer_ref->viewport.x;
-        ubo.viewport[1] = g_vupdt_renderer_ref->viewport.y;
+        ubo.viewport[0] = RequestingIgnoreScissor() ? ubo.width : g_vupdt_renderer_ref->viewport.x;
+        ubo.viewport[1] = RequestingIgnoreScissor() ? ubo.height : g_vupdt_renderer_ref->viewport.y;
         ubo.emissives = g_vupdt_renderer_ref->geometry.emissives.size;
         ubo.frametime = RenderFrameTime();
         ubo.seed = rand();

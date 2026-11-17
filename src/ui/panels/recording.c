@@ -1,4 +1,5 @@
 #include "recording.h"
+#include "renderer/renderer.h"
 #include "data/defaults.h"
 #include <util/logger.h>
 #include <ui/extra.h>
@@ -8,6 +9,13 @@
 static char* g_mode_labels[] = { "image", "video" };
 static size_t g_render_mode = 0;
 static BOOL g_ffmpeg = FALSE;
+static float g_progress = 0.0f;
+static BOOL g_inprogress = FALSE;
+static BOOL g_vonly = FALSE;
+static float g_convergence = 0.0f;
+static size_t g_samples = 500;
+static char g_imagepath[2048] = "render.png";
+static char g_videopath[2048] = "render.mp4";
 
 static BOOL PollFFMPEG() {
     #ifdef _WIN32
@@ -33,36 +41,47 @@ static size_t DropdownSelectRenderMode(void* data, size_t index, BOOL cancel) {
 
 static void DrawImageRenderSettings(float width) {
     float rcolw = width - LEFT_COLUMN_WIDTH - 20;
-    static size_t w = 1600;
-    static size_t h = 900;
-    static BOOL vonly = FALSE;
-    static float conv = 0.0f;
+    if (g_inprogress) {
+        float curr = GetRenderStats().accumulation;
+        g_progress = 100.0f * curr / (float)g_samples;
+        if (RenderConverged(g_convergence / 100.0f)) g_progress = 100.0f;
+    }
     UIColumnHeader("Save to...", LEFT_COLUMN_WIDTH);
-    UIDrawText("TODO");
+    UIChooseFile(g_imagepath, 2048, rcolw, "png", FALSE);
     UIColumnHeader("Samples", LEFT_COLUMN_WIDTH);
-    UIDrawText("TODO");
+    UIDragSize(&g_samples, 0, 9999999999, 1, rcolw);
     UIColumnHeader("Convergence", LEFT_COLUMN_WIDTH);
-    UIDragFloat(&conv, 0, 100.0f, 0.01f, rcolw);
+    UIDragFloat(&g_convergence, 0, 100.0f, 0.01f, rcolw);
     UIColumnHeader("Viewport Only", LEFT_COLUMN_WIDTH);
-    UIMoveCursor(-4, 1);
-    UICheckbox(&vonly);
+    UIMoveCursor(-2, 1);
+    UICheckbox(&g_vonly);
     UIMoveCursor(0, -1);
-    UIColumnHeader("Resolution", LEFT_COLUMN_WIDTH);
-    UIDoublet("wh", UI_SIZES, &w, &h, (UIMultiValue){ ._size = 10 }, (UIMultiValue){ ._size = 8000 }, (UIMultiValue){ ._size = 1 }, (UIMultiValue){ ._size = 900 }, rcolw + 20);
+    UIMoveCursor(0, 10);
+    EnableUI();
+    if (!g_inprogress && UIButton("Render", width - 20)) {
+        g_inprogress = TRUE;
+        g_progress = 0.0f;
+        RenderConfig()->flags = PATHTRACE_PIPELINE_FLAGS;
+        ResetAccumulation();
+    } else if (g_inprogress && UIButton("Cancel", width - 20)) {
+        g_inprogress = FALSE;
+        g_progress = 0.0f;
+    }
 }
 
 static void DrawVideoRenderSettings(float width, float height) {
+    float rcolw = width - LEFT_COLUMN_WIDTH - 20;
     if (AvailableFFMPEG()) {
         UIColumnHeader("Save to...", LEFT_COLUMN_WIDTH);
-        UIDrawText("TODO");
+        UIChooseFile(g_videopath, 2048, rcolw, "mp4", FALSE);
         UIColumnHeader("Samples", LEFT_COLUMN_WIDTH);
-        UIDrawText("TODO");
+        UIDragSize(&g_samples, 0, 9999999999, 1, rcolw);
         UIColumnHeader("Convergence", LEFT_COLUMN_WIDTH);
-        UIDrawText("TODO");
+        UIDragFloat(&g_convergence, 0, 100.0f, 0.01f, rcolw);
         UIColumnHeader("Viewport Only", LEFT_COLUMN_WIDTH);
-        UIDrawText("TODO");
-        UIColumnHeader("Resolution", LEFT_COLUMN_WIDTH);
-        UIDrawText("TODO");
+        UIMoveCursor(-4, 1);
+        UICheckbox(&g_vonly);
+        UIMoveCursor(0, -1);
         UIColumnHeader("FPS", LEFT_COLUMN_WIDTH);
         UIDrawText("TODO");
         UIColumnHeader("Duration", LEFT_COLUMN_WIDTH);
@@ -74,7 +93,9 @@ static void DrawVideoRenderSettings(float width, float height) {
 }
 
 static void DrawRecordingPanel(float width, float height) {
+    if (g_inprogress) DisableUI();
     float rcolw = width - LEFT_COLUMN_WIDTH - 20;
+    float cursory = UIGetCursor().y;
     UIDividerLabeled(width, "Render Settings");
     UIMoveCursor(0, 5);
     UIColumnHeader("Render Mode", LEFT_COLUMN_WIDTH);
@@ -84,6 +105,33 @@ static void DrawRecordingPanel(float width, float height) {
     } else {
         DrawVideoRenderSettings(width, height);
     }
+    float drawnheight = UIGetCursor().y - cursory;
+    if (drawnheight > height - 70) {
+        UIMoveCursor(0, 20);
+        UIProgressBar(width - 20, g_progress);
+    } else {
+        Vector2 backup = UIGetCursor();
+        UISetCursor(10, height - 60);
+        UIProgressBar(width - 20, g_progress);
+        UISetCursor(backup.x, backup.y);
+    }
+    EnableUI();
+}
+
+static void UpdateRecordingPanel(float width, float height) {
+    if (g_inprogress && g_progress >= 100.0f) {
+        if (g_vonly) {
+            SaveViewportRender("render.png");
+        } else {
+            SaveRender("render.png");
+        }
+        loginfo("Finished rendering image! Saved to %s", g_imagepath);
+        g_inprogress = FALSE;
+    }
+}
+
+BOOL RequestingIgnoreScissor() {
+    return g_inprogress && !g_vonly;
 }
 
 Panel GenerateRecordingPanel() {
@@ -91,6 +139,7 @@ Panel GenerateRecordingPanel() {
 	Panel p = { 0 };
 	SetupPanel(&p, "Recording");
 	p.draw = DrawRecordingPanel;
+    p.update = UpdateRecordingPanel;
     p.scrollable = TRUE;
 	return p;
 }
