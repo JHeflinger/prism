@@ -1,5 +1,7 @@
 #include "animation.h"
 
+static float g_dt = -1.0f;
+
 static BoneChannel* FindChannel(Animation* clip, const char* name) {
     for (size_t i = 0; i < clip->channels.size; i++) {
         if (strcmp(clip->channels.data[i].name, name) == 0)
@@ -178,7 +180,7 @@ BOOL PlayAnimations(Geometry* geometry) {
             animation->_enable = TRUE;
             if (animation->playing) {
                 changes = TRUE;
-                float dt = GetFrameTime();
+                float dt = TimelineDT();
                 Animation* clip = &(animation->animations.data[animation->current]);
                 animation->time += dt * clip->tps;
                 if (animation->looping) animation->time = fmod(animation->time, clip->duration);
@@ -210,4 +212,13 @@ BOOL PlayAnimations(Geometry* geometry) {
         }
     }
     return changes;
+}
+
+float TimelineDT() {
+    if (g_dt < 0) return GetFrameTime();
+    return g_dt;
+}
+
+void OverrideTimelineDT(float dt) {
+    g_dt = dt;
 }

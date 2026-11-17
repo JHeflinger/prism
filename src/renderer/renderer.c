@@ -1836,6 +1836,16 @@ void SaveRender(const char* filepath) {
     UnloadRenderTexture(rt);
 }
 
+Image RenderToImage() {
+	RenderTexture rt = LoadRenderTexture(g_renderer.dimensions.x, g_renderer.dimensions.y);
+    BeginTextureMode(rt);
+    DrawHelper(0, 0, -g_renderer.dimensions.x, g_renderer.dimensions.y, g_renderer.dimensions.x, g_renderer.dimensions.y);
+    EndTextureMode();
+    Image image = LoadImageFromTexture(rt.texture);
+    UnloadRenderTexture(rt);
+    return image;
+}
+
 BOOL CaptureRender(uint8_t* rgba) {
     const int w = (int)g_renderer.dimensions.x;
     const int h = (int)g_renderer.dimensions.y;

@@ -205,6 +205,8 @@ void SaveViewportRender(const char* filepath);
 
 void SaveRender(const char* filepath);
 
+Image RenderToImage();
+
 BOOL CaptureRender(uint8_t* rgba);
 
 char* GPUModel();

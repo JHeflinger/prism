@@ -5,4 +5,8 @@
 
 BOOL PlayAnimations(Geometry* geometry);
 
+float TimelineDT();
+
+void OverrideTimelineDT(float dt);
+
 #endif
