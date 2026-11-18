@@ -220,7 +220,7 @@ static void UpdateRecordingPanel(float width, float height) {
         } else {
             SaveRender("render.png");
         }
-        loginfo("Finished rendering image! Saved to %s", g_imagepath);
+        loginfo("Finished rendering image in %.3fs! Saved to %s", g_timer, g_imagepath);
         g_inprogress = FALSE;
     } else if (g_render_mode == 1 && g_inprogress) {
         OverrideTimelineDT(0.0f);
@@ -228,7 +228,7 @@ static void UpdateRecordingPanel(float width, float height) {
             VideoRecorderStop(&g_encoder);
             OverrideTimelineDT(-1.0f);
             g_inprogress = FALSE;
-            loginfo("Finished rendering video! Saved to %s", g_videopath);
+            loginfo("Finished rendering videoin %.3fs! Saved to %s", g_timer, g_videopath);
         }
         float curr = GetRenderStats().accumulation;
         float frame_progress = 100.0f * curr / (float)g_samples;
