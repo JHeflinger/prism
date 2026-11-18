@@ -349,7 +349,7 @@ typedef struct {
 DECLARE_ARRLIST(MeshDescriptor);
 
 #define MAX_BONE_INFLUENCES 4
-#define MAX_BONES 256
+#define MAX_BONES 512
 
 typedef struct {
     alignas(4) VertexID indices[MAX_BONE_INFLUENCES];
