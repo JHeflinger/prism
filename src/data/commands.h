@@ -5,6 +5,8 @@
 
 BOOL ConfigureCommand(char** argv, int argc);
 
+BOOL ListCommand(char** argv, int argc);
+
 BOOL HelpCommand(char** argv, int argc);
 
 BOOL ClearCommand(char** argv, int argc);

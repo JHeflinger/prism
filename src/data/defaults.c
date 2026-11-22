@@ -11,6 +11,7 @@ void DefaultPreload() {
     RegisterCommand((Command){ "clear", ClearCommand, "clear {notifications}", "Clear a given data subject" });
     RegisterCommand((Command){ "refresh", RefreshCommand, "refresh {assets}", "Refresh a given data subject" });
     RegisterCommand((Command){ "select", SelectCommand, "select {worldname} {id}", "Select an entity given its world name and entity ID" });
+    RegisterCommand((Command){ "list", ListCommand, "list [prefix]", "lists all configuration options with given prefix" });
 }
 
 void DefaultPostload() { }

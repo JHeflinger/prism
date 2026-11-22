@@ -4,6 +4,7 @@
 #include <core/config.h>
 #include <easybasics.h>
 #include <easyparse.h>
+#include <stdlib.h>
 
 DECLARE_ARRLIST_NAMED(charPtr, char*);
 IMPL_ARRLIST_NAMED(charPtr, char*);
@@ -103,6 +104,71 @@ static BOOL ParseAndSetValue(BlackBoardValue* value, const char* str) {
     }
 }
 
+static const char* MessageLevelName(MessageLevel level) {
+    switch (level) {
+        case LEVEL_NONE:  return "NONE";
+        case LEVEL_TRACE: return "TRACE";
+        case LEVEL_INFO:  return "INFO";
+        case LEVEL_WARN:  return "WARN";
+        case LEVEL_ERROR: return "ERROR";
+        default:          return "UNKNOWN";
+    }
+}
+
+static BOOL LogConfigValue(const char* key, BlackBoardValue value) {
+    switch (value.type) {
+        case BB_INT:
+            loginfo("\"%s\" = %d", key, value.value._int);
+            return TRUE;
+        case BB_FLOAT:
+            loginfo("\"%s\" = %.6f", key, value.value._float);
+            return TRUE;
+        case BB_BOOL:
+            loginfo("\"%s\" = %s", key, value.value._bool ? "TRUE" : "FALSE");
+            return TRUE;
+        case BB_SIZE:
+            loginfo("\"%s\" = %llu", key, (unsigned long long)value.value._size);
+            return TRUE;
+        case BB_STRING:
+            loginfo("\"%s\" = %s", key, value.value._string);
+            return TRUE;
+        case BB_LEVEL:
+            loginfo("\"%s\" = %s", key, MessageLevelName(value.value._level));
+            return TRUE;
+        case BB_POINTER:
+            loginfo("\"%s\" = <pointer %p>", key, value.value._ptr);
+            return TRUE;
+        case BB_CAMERA:
+            loginfo("\"%s\" = <camera target=(%.2f, %.2f) offset=(%.2f, %.2f) rotation=%.2f zoom=%.2f>", key,
+                value.value._camera.target.x, value.value._camera.target.y,
+                value.value._camera.offset.x, value.value._camera.offset.y,
+                value.value._camera.rotation, value.value._camera.zoom);
+            return TRUE;
+        default:
+            logerror("\"%s\" has an unhandled datatype", key);
+            return FALSE;
+    }
+}
+
+typedef struct {
+    const char** keys;
+    size_t count;
+    size_t capacity;
+    const char* prefix;
+} ConfigKeyCollector;
+
+static void CollectConfigKey(const char* key, BlackBoardValue value, void* userdata) {
+    (void)value;
+    ConfigKeyCollector* collector = (ConfigKeyCollector*)userdata;
+    if (collector->count >= collector->capacity) return;
+    if (collector->prefix && strncmp(key, collector->prefix, strlen(collector->prefix)) != 0) return;
+    collector->keys[collector->count++] = key;
+}
+
+static int CompareConfigKeys(const void* a, const void* b) {
+    return strcmp(*(const char* const*)a, *(const char* const*)b);
+}
+
 static void UpdateTimeEvents() {
     for (size_t i = 0; i < g_eventcommands.size; i++) {
         g_eventtimes.data[i] -= GetFrameTime();
@@ -136,50 +202,7 @@ BOOL ConfigureCommand(char** argv, int argc) {
             logerror("\"%s\" is not an existing configuration property", argv[1]);
             return FALSE;
         } else {
-            BlackBoardValue value = ConfigGet(argv[1]);
-            switch (value.type) {
-                case BB_INT:
-                    loginfo("\"%s\" = %d", argv[1], value.value._int);
-                    break;
-                case BB_FLOAT:
-                    loginfo("\"%s\" = %.6f", argv[1], value.value._float);
-                    break;
-                case BB_BOOL:
-                    loginfo("\"%s\" = %s", argv[1], value.value._bool ? "TRUE" : "FALSE");
-                    break;
-                case BB_SIZE:
-                    loginfo("\"%s\" = %llu", argv[1], value.value._size);
-                    break;
-                case BB_STRING:
-                    loginfo("\"%s\" = %s", argv[1], value.value._string);
-                    break;
-                case BB_LEVEL:
-                    switch (value.value._level) {
-                        case LEVEL_NONE:
-                            loginfo("\"%s\" = NONE", argv[1]);
-                            break;
-                        case LEVEL_TRACE:
-                            loginfo("\"%s\" = TRACE", argv[1]);
-                            break;
-                        case LEVEL_INFO:
-                            loginfo("\"%s\" = INFO", argv[1]);
-                            break;
-                        case LEVEL_WARN:
-                            loginfo("\"%s\" = WARN", argv[1]);
-                            break;
-                        case LEVEL_ERROR:
-                            loginfo("\"%s\" = ERROR", argv[1]);
-                            break;
-                        default:
-                            loginfo("\"%s\" = UNKNOWN", argv[1]);
-                            break;
-                    }
-                    break;
-                default:
-                    logerror("\"%s\" has an unhandled datatype", argv[1]);
-                    return FALSE;
-            }
-            return TRUE;
+            return LogConfigValue(argv[1], ConfigGet(argv[1]));
         }
     } else if (strcmp(argv[0], "write") == 0) {
         if (argc != 3) {
@@ -212,6 +235,37 @@ BOOL ConfigureCommand(char** argv, int argc) {
         logerror("Unknown second argument \"%s\" detected - expected <read/write>", argv[0]);
         return FALSE;
     }
+}
+
+BOOL ListCommand(char** argv, int argc) {
+    if (argc > 1) {
+        logerror("At most 1 argument expected - list [prefix]");
+        return FALSE;
+    }
+    size_t total = ConfigCount();
+    if (total == 0) {
+        loginfo("No configuration properties are currently set");
+        return TRUE;
+    }
+    ConfigKeyCollector collector = { 0 };
+    collector.keys = EZ_ALLOC(total, sizeof(const char*));
+    collector.capacity = total;
+    collector.prefix = argc == 1 ? argv[0] : NULL;
+    ConfigForEach(CollectConfigKey, &collector);
+    if (collector.count == 0) {
+        loginfo("No configuration properties found matching prefix \"%s\"", collector.prefix);
+        EZ_FREE(collector.keys);
+        return TRUE;
+    }
+    qsort(collector.keys, collector.count, sizeof(const char*), CompareConfigKeys);
+    if (collector.prefix) loginfo("%llu configuration properties matching \"%s\":", (unsigned long long)collector.count, collector.prefix);
+    else loginfo("%llu configuration properties:", (unsigned long long)collector.count);
+    BOOL success = TRUE;
+    for (size_t i = 0; i < collector.count; i++) {
+        if (!LogConfigValue(collector.keys[i], ConfigGet(collector.keys[i]))) success = FALSE;
+    }
+    EZ_FREE(collector.keys);
+    return success;
 }
 
 BOOL HelpCommand(char** argv, int argc) {
