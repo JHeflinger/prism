@@ -40,7 +40,12 @@ if "%1"=="-u" (
 )
 
 :: expand shaders
-"./build/simp_windows.exe" shaders build/expanded
+if NOT exist "shaders\" (
+    echo "Submodule usage detected, retrieving shaders from submodule..."
+    "./build/simp_windows.bin" build/modules/prism/shaders build/expanded
+) else (
+    "./build/simp_windows.exe" shaders build/expanded
+)
 
 :: download glslc
 if NOT exist "build\glslc.exe" (

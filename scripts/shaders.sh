@@ -36,7 +36,12 @@ if [ ! -f "build/simp_linux.bin" ] || [ "$1" == "-u" ] || [ "$2" == "-u" ]; then
 fi
 
 # expand shaders
-./build/simp_linux.bin shaders build/expanded
+if [ ! -d "shaders" ]; then
+    echo "Submodule usage detected, retrieving shaders from submodule..."
+    ./build/simp_linux.bin build/modules/prism/shaders build/expanded
+else
+    ./build/simp_linux.bin shaders build/expanded
+fi
 
 # compile shaders
 echo "Compiling shaders..."
