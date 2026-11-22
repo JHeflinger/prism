@@ -12,8 +12,8 @@ MODULE gooey https://github.com/JHeflinger/gooey.git .
 MODULE vulkan https://github.com/JHeflinger/minis.git vulkan
 MODULE tgpu https://github.com/JHeflinger/minis.git tgpu
 
-PORT build/shaders
-PORT build/expanded
+PORT ../../../build/shaders
+PORT ../../../build/expanded
 PORT assets
 
 LINUX EXECUTE scripts/shaders.sh
