@@ -1,14 +1,15 @@
 #include "editor.h"
 #include "core/dev.h"
+#include "renderer/subsurface.h"
 #include "renderer/renderer.h"
 #include "renderer/trainer.h"
-#include "renderer/subsurface.h"
 #include "renderer/loader.h"
 #include "ui/panels/diagnostics.h"
 #include "ui/panels/recording.h"
 #include "ui/panels/simulate.h"
 #include "ui/panels/viewport.h"
 #include "ui/panels/overview.h"
+#include "ui/panels/settings.h"
 #include "ui/panels/baking.h"
 #include "ui/panels/edit.h"
 #include "ui/panels/mesh.h"
@@ -51,6 +52,7 @@ static void InitEditor() {
     ARRLIST_Panel_add(&g_shared_panels, GenerateGraphPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateConsolePanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateRecordingPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateSettingsPanel());
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, 1250.0f, FALSE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, 350.0f, FALSE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, GetScreenHeight() - 420.0f, TRUE, TRUE, TRUE, FALSE});
@@ -63,7 +65,8 @@ static void InitEditor() {
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, TRUE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Baking", 0.0f, FALSE, FALSE, FALSE, TRUE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Recording", 0.0f, FALSE, FALSE, FALSE, FALSE});
-    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Diagnostics", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Settings", 0.0f, FALSE, FALSE, FALSE, FALSE});
     //ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Simulate", 0.0f, FALSE, FALSE, FALSE, FALSE});
     PreloadExtensions();
     SetUIConfig(&g_default_ui_config);
@@ -96,6 +99,7 @@ static void EditorResized() {
         g_windowsize.y = GetScreenHeight();
         ResizeUI();
     }
+    RefreshUI(&g_ui, g_shared_panels);
 }
 
 static void CleanEditor() {

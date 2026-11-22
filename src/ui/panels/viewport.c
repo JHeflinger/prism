@@ -207,7 +207,7 @@ static const char* ButtonLabel(int b) {
 static void ToolbarLayout(float height, Rectangle rects[BTN_COUNT]) {
     Font font = FontAsset();
     float x = TOOLBAR_MARGIN;
-    float y = height - TOOLBAR_HEIGHT - TOOLBAR_MARGIN;
+    float y = height - TOOLBAR_HEIGHT - TOOLBAR_MARGIN - 25;
     for (int b = 0; b < BTN_COUNT; b++) {
         float w = MeasureTextEx(font, ButtonLabel(b), TOOLBAR_FONT, 0).x + TOOLBAR_PAD * 2.0f;
         if (b == BTN_SPACE) x += TOOLBAR_GAP * 2.0f;
@@ -503,7 +503,6 @@ static void UpdateViewportPanel(float width, float height) {
 Panel GenerateViewportPanel() {
 	Panel p = { 0 };
     SetupPanel(&p, "Viewport");
-	p.flush = TRUE;
     p.draw = DrawViewportPanel;
     p.update = UpdateViewportPanel;
     g_viewport_target = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());

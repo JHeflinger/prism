@@ -1,7 +1,15 @@
 #include "commands.h"
+#include <core/entrypoint.h>
 #include <util/logger.h>
 #include <core/config.h>
+#include <easybasics.h>
 #include <easyparse.h>
+
+DECLARE_ARRLIST_NAMED(charPtr, char*);
+IMPL_ARRLIST_NAMED(charPtr, char*);
+
+static ARRLIST_charPtr g_eventcommands = { 0 };
+static ARRLIST_float g_eventtimes = { 0 };
 
 static BlackBoardType InterpretType(const char* str) {
     if (strcmp(str, "TRUE") == 0) return BB_BOOL;
@@ -94,6 +102,25 @@ static BOOL ParseAndSetValue(BlackBoardValue* value, const char* str) {
         default: return FALSE;
     }
 }
+
+static void UpdateTimeEvents() {
+    for (size_t i = 0; i < g_eventcommands.size; i++) {
+        g_eventtimes.data[i] -= GetFrameTime();
+        if (g_eventtimes.data[i] <= 0.0f) {
+            ExecuteCommand(g_eventcommands.data[i]);
+            EZ_FREE(g_eventcommands.data[i]);
+            ARRLIST_charPtr_remove(&g_eventcommands, i);
+            ARRLIST_float_remove(&g_eventtimes, i);
+            i--;
+        }
+    }
+} REGISTER_PREUPDATE(UpdateTimeEvents);
+
+static void CleanTimeEvents() {
+    for (size_t i = 0; i < g_eventcommands.size; i++) EZ_FREE(g_eventcommands.data[i]);
+    ARRLIST_charPtr_clear(&g_eventcommands);
+    ARRLIST_float_clear(&g_eventtimes);
+} REGISTER_CLEANUP(CleanTimeEvents);
 
 BOOL ConfigureCommand(char** argv, int argc) {
     if (argc < 2) {
@@ -207,5 +234,113 @@ BOOL HelpCommand(char** argv, int argc) {
         logerror("Invalid usage detected. Correct usage - help <usage|descriptions>");
         return FALSE;
     }
+    return TRUE;
+}
+
+BOOL ClearCommand(char** argv, int argc) {
+    if (argc == 0) {
+        loginfo("No data subject targeted to clear");
+        return TRUE;
+    }
+    if (argc == 1) {
+        if (strcmp(argv[0], "notifications") == 0) {
+            CleanNotifications();
+        } else {
+            logerror("Invalid data subject \"%s\" detected", argv[0]);
+            return FALSE;
+        }
+    } else {
+        logerror("More than one data subject targeted to clear detected");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+BOOL NotifyCommand(char** argv, int argc) {
+    if (argc < 2) {
+        logerror("Not enough arguments detected. Usage - notify <level> ...");
+        return FALSE;
+    }
+    MessageLevel ml;
+    if (!ParseMessageLevel(argv[0], &ml)) {
+        logerror("Unable to parse message level \"%s\"", argv[0]);
+        return FALSE;
+    }
+    char* message = ez_reconstruct_command(&(argv[1]), argc - 1);
+    Notify(ml, message);
+    EZ_FREE(message);
+    logtrace("Successfully triggered notification");
+    return TRUE;
+}
+
+BOOL RefreshCommand(char** argv, int argc) {
+    if (argc == 0) {
+        loginfo("No data subject targeted to refresh");
+        return TRUE;
+    }
+    if (argc == 1) {
+        if (strcmp(argv[0], "assets") == 0) {
+            /* TODO: finish this
+            CleanNotifications();
+            if (GetActiveScene()) {
+                loginfo("Refreshing assets...");
+                RefreshAssets(GetActiveScene());
+                loginfo("Refreshed assets");
+            } else {
+                logerror("No active scene loaded");
+            }*/
+            logerror("This command has not been implemented yet");
+        } else {
+            logerror("Invalid data subject \"%s\" detected", argv[0]);
+            return FALSE;
+        }
+    } else {
+        logerror("More than one data subject targeted to refresh detected");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+BOOL TimeEventCommand(char** argv, int argc) {
+    if (argc < 2) {
+        logerror("Not enough arguments specified - there must be at least 1 float and 1 string command!");
+        return FALSE;
+    }
+    float time;
+    if (!ez_parse_float(argv[0], &time)) {
+        logerror("Unable to parse \"%s\" as a float", argv[0]);
+        return FALSE;
+    }
+    ARRLIST_charPtr_add(&g_eventcommands, ez_reconstruct_command(&(argv[1]), argc - 1));
+    ARRLIST_float_add(&g_eventtimes, time);
+    logtrace("Registered command \"%s\" to run in %.3f seconds", g_eventcommands.data[g_eventcommands.size - 1], time);
+    return TRUE;
+}
+
+BOOL SelectCommand(char** argv, int argc) {
+    /*
+    Scene* scene = GetActiveScene();
+    if (!scene) {
+        logerror("No active scene to select an entity from");
+        return FALSE;
+    }
+    if (argc != 2) {
+        logerror("This command requires 2 arguments - the world name and entity ID");
+        return FALSE;
+    }
+    World* world = FindWorld(scene, argv[0]);
+    if (!world) {
+        logerror("No active world under the name \"%s\" detected - unable to select entity", argv[0]);
+        return FALSE;
+    }
+    uint32_t id;
+    if (!ez_parse_uint(argv[1], &id)) {
+        logerror("Unable to parse \"%s\" as an ID", argv[1]);
+        return FALSE;
+    }
+    Entity e = (Entity){ id, world };
+    SelectEntity(e);
+    loginfo("Successfully selected entity");*/
+    logerror("This command has not been finished yet");
     return TRUE;
 }
