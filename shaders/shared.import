@@ -230,6 +230,7 @@ export PushConstantDef {
         uint elements;
         uint bitstart;
         uint update;
+        uint unused;
     }
 }
 
@@ -296,6 +297,12 @@ export OutputImageDef {
 
 export NormalSSBODef {
     buffer NormalSSBOIn {
+        vec3 originalNormalIn[ ];
+    }
+}
+
+export TransformedNormalSSBODef {
+    buffer TransformedNormalSSBOIn {
         vec3 normalIn[ ];
     }
 }
@@ -876,9 +883,12 @@ export TriangleIntersectSuite {
         if (hit.distance <= EPS) return false;
         hit.material = tri.material;
         hit.position = ray.position + (ray.direction * hit.distance);
-        if (ubo.normals != 0 && tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
-        else hit.normal = normalize(cross(e1, e2));
-        if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
+        if (ubo.normals != 0 && tri.an != -1) {
+            hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
+        } else {
+            hit.normal = normalize(cross(e1, e2));
+            if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
+        }
         return true;
     }
 

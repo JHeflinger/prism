@@ -142,6 +142,7 @@ typedef struct {
     alignas(4) uint32_t elements;
     alignas(4) uint32_t bitstart;
     alignas(4) uint32_t update;
+    alignas(4) uint32_t unused;
 } VulkanPushConstants;
 
 typedef struct {
@@ -230,7 +231,7 @@ typedef struct {
 typedef struct {
     VulkanDataBuffer original;
     VulkanDataBuffer transformed;
-} VulkanVertices;
+} VulkanTransformables;
 
 typedef struct {
     VulkanDataBuffer original;
@@ -239,8 +240,8 @@ typedef struct {
 
 typedef struct {
     VulkanBVH bvh;
-    VulkanDataBuffer normals;
-    VulkanVertices vertices;
+    VulkanTransformables normals;
+    VulkanTransformables vertices;
     VulkanDataBuffer triangles;
     VulkanSplats splats;
     VulkanDataBuffer emissives;

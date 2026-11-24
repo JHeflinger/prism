@@ -12,11 +12,14 @@ layout(binding = 3) readonly #import PoseSSBODef;
 layout(binding = 4) readonly #import SkinSSBODef;
 layout(binding = 5) readonly #import SplatSourceSSBODef;
 layout(binding = 6) writeonly #import SplatSSBODef;
+layout(binding = 7) readonly #import NormalSSBODef;
+layout(binding = 8) #import TransformedNormalSSBODef;
 
 layout(push_constant) uniform VertexPushConstants {
     uint meshes;
     uint vertices;
     uint splats;
+    uint normals;
 } pc;
 
 #import QuatToMat
@@ -42,6 +45,13 @@ void animate_vertex(inout vec4 vertex, uint poffset, VertexSkin skin) {
     vertex = skin_mat * vec4(vertex.xyz, 1.0);
 }
 
+void animate_normal(inout vec3 normal, uint poffset, VertexSkin skin) {
+    mat4 skin_mat = mat4(0);
+    for (int i = 0; i < MAX_BONE_INFLUENCES; i++)
+        skin_mat += skin.weights[i] * poseIn[poffset + skin.indices[i]];
+    normal = (skin_mat * vec4(normal, 1.0)).xyz;
+}
+
 void transform_vertex(uint id) {
     vec4 vertex = originalVertexIn[id];
     if (pc.meshes == 0) {
@@ -62,6 +72,27 @@ void transform_vertex(uint id) {
         animate_vertex(vertex, md.pose, skinIn[(id - md.start) + md.skinstart]);
     vec3 newpos = (md.transform * vec4(vertex.xyz, 1.0)).xyz;
     vertexIn[id] = vec4(newpos, originalVertexIn[id].w);
+}
+
+void transform_normal(uint id) {
+    vec3 normal = originalNormalIn[id];
+    if (pc.meshes == 0) {
+        normalIn[id] = normal;
+        return;
+    }
+    uint mi = find_transform(id);
+    if (mi == -1) {
+        normalIn[id] = normal;
+        return;
+    }
+    MeshDescriptor md = transformsIn[mi];
+    if (md.disabled != 0) {
+        normalIn[id] = vec3(0);
+        return;
+    }
+    if (md.pose != -1)
+        animate_normal(normal, md.pose, skinIn[(id - md.start) + md.skinstart]);
+    normalIn[id] = (md.transform * vec4(normal, 1.0)).xyz;
 }
 
 uint find_splat_transform(uint id) {
@@ -186,5 +217,6 @@ void transform_splat(uint id) {
 void main() {
     uint id = gl_GlobalInvocationID.x;
     if (id < pc.vertices) transform_vertex(id);
+    if (id < pc.normals) transform_normal(id);
     if (id < pc.splats) transform_splat(id);
 }

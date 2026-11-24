@@ -25,7 +25,7 @@ struct SSSValidationSample {
 layout(std430, binding = 0) readonly #import TriangleSSBODef;
 layout(std430, binding = 1) readonly #import TransformedVertexSSBODef;
 layout(std430, binding = 2) readonly #import BVHNodeSSBODef;
-layout(std430, binding = 3) readonly #import NormalSSBODef;
+layout(std430, binding = 3) readonly #import TransformedNormalSSBODef;
 layout(std430, binding = 4) readonly #import SubsurfaceSSBODef;
 layout(std430, binding = 5) readonly buffer SSSAreaCDF { float area_cdf[]; };
 layout(std430, binding = 6) buffer SSSRecords { SSSWalkRecord records[]; };

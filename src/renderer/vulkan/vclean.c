@@ -52,11 +52,12 @@ void VCLEAN_Simulation(VulkanFluidSimulation* vfs) {
     vkDestroySampler(g_vclean_renderer_ref->vulkan.core.general.interface, vfs->density.sampler, NULL);
 }
 
-void VCLEAN_Normals(VulkanDataBuffer* normals) {
-    VUTIL_DestroyBuffer(*normals);
+void VCLEAN_Normals(VulkanTransformables* normals) {
+    VUTIL_DestroyBuffer(normals->original);
+    VUTIL_DestroyBuffer(normals->transformed);
 }
 
-void VCLEAN_Vertices(VulkanVertices* vertices) {
+void VCLEAN_Vertices(VulkanTransformables* vertices) {
     VUTIL_DestroyBuffer(vertices->original);
     VUTIL_DestroyBuffer(vertices->transformed);
 }

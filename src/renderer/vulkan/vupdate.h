@@ -17,9 +17,9 @@ void VUPDT_Poses(VulkanDataBuffer* poses);
 
 void VUPDT_Lights(VulkanDataBuffer* lights);
 
-void VUPDT_Normals(VulkanDataBuffer* normals);
+void VUPDT_Normals(VulkanTransformables* normals);
 
-void VUPDT_Vertices(VulkanVertices* vertices);
+void VUPDT_Vertices(VulkanTransformables* vertices);
 
 void VUPDT_Triangles(VulkanDataBuffer* triangles);
 

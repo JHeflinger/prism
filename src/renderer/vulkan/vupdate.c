@@ -129,17 +129,17 @@ void VUPDT_Lights(VulkanDataBuffer* lights) {
     PENDING(TRANSFER_ACQUIRE_LIGHTS);
 }
 
-void VUPDT_Normals(VulkanDataBuffer* normals) {
+void VUPDT_Normals(VulkanTransformables* normals) {
     if (sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.maxsize == 0) return;
     if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.normals.data,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.size,
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.maxsize,
-        normals->buffer)) return;
+        normals->original.buffer)) return;
     PENDING(TRANSFER_ACQUIRE_NORMALS);
 }
 
-void VUPDT_Vertices(VulkanVertices* vertices) {
+void VUPDT_Vertices(VulkanTransformables* vertices) {
     if (sizeof(vec4) * g_vupdt_renderer_ref->geometry.vertices.maxsize == 0) return;
     if (!VUTIL_AsyncCopyHostToBuffer(
         g_vupdt_renderer_ref->geometry.vertices.data,
@@ -230,7 +230,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_ALIASES, g_vupdt_renderer_ref->vulkan.core.geometry.aliases.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRIANGLES, g_vupdt_renderer_ref->vulkan.core.geometry.triangles.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_SPLATS, g_vupdt_renderer_ref->vulkan.core.geometry.splats.original.buffer)
-            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_NORMALS, g_vupdt_renderer_ref->vulkan.core.geometry.normals.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_NORMALS, g_vupdt_renderer_ref->vulkan.core.geometry.normals.original.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRANSFORMS, g_vupdt_renderer_ref->vulkan.core.geometry.transforms.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_POSES, g_vupdt_renderer_ref->vulkan.core.geometry.poses.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_SKINS, g_vupdt_renderer_ref->vulkan.core.geometry.skins.buffer)
@@ -253,7 +253,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     // execute shader stages
     uint32_t radix_bits = 0;
     #define _record_push_constants(elements) { \
-        VulkanPushConstants pc = { elements, radix_bits, !queue_update_splats_bvh }; \
+        VulkanPushConstants pc = { elements, radix_bits, !queue_update_splats_bvh, 0 }; \
         vkCmdPushConstants( \
             command, \
             g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i], \
@@ -286,7 +286,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
                 0,
                 NULL);
             for (uint32_t pass = 0; pass < passes; pass++) {
-                VulkanPushConstants pc = { pass, passes, 0 };
+                VulkanPushConstants pc = { pass, passes, 0, 0 };
                 vkCmdPushConstants(
                     command,
                     g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],
@@ -306,9 +306,10 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             // vertex.comp also applies mesh descriptors to gaussian splats, but only when the acceleration structure
             // is being rebuilt (splats or descriptors changed) since the transformed splats are otherwise unchanged
             uint32_t nverts = (uint32_t)g_vupdt_renderer_ref->geometry.vertices.size;
+            uint32_t nnorms = (uint32_t)g_vupdt_renderer_ref->geometry.normals.size;
             uint32_t nsplats = queue_update_splats_bvh ? (uint32_t)g_vupdt_renderer_ref->geometry.splats.size : 0;
-            invocations = nverts > nsplats ? nverts : nsplats;
-            VulkanPushConstants pc = { (uint32_t)g_vupdt_renderer_ref->geometry.meshes.size, nverts, nsplats };
+            invocations = nnorms > nverts ? (nnorms > nsplats ? nnorms : nsplats) : (nverts > nsplats ? nverts : nsplats);
+            VulkanPushConstants pc = { (uint32_t)g_vupdt_renderer_ref->geometry.meshes.size, nverts, nsplats, nnorms };
             vkCmdPushConstants(
                 command,
                 g_vupdt_renderer_ref->vulkan.core.context.pipeline.layout[i],

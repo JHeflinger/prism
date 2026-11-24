@@ -21,9 +21,9 @@ void VCLEAN_BVH(VulkanBVH* bvh);
 
 void VCLEAN_Simulation(VulkanFluidSimulation* vfs);
 
-void VCLEAN_Normals(VulkanDataBuffer* normals);
+void VCLEAN_Normals(VulkanTransformables* normals);
 
-void VCLEAN_Vertices(VulkanVertices* vertices);
+void VCLEAN_Vertices(VulkanTransformables* vertices);
 
 void VCLEAN_Triangles(VulkanDataBuffer* triangles);
 

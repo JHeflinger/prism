@@ -457,7 +457,22 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 			STORAGE_BUFFER,
 			(SchrodingRef) {
 				TRUE,
-				&(renderer->vulkan.core.geometry.normals.buffer)
+				&(renderer->vulkan.core.geometry.normals.original.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.normals.size)
+				}, 0.0f,
+				sizeof(vec4)
+			}
+		};
+	} else if (strcmp(name, "TransformedNormalSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.normals.transformed.buffer)
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {

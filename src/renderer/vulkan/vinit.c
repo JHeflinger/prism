@@ -632,19 +632,24 @@ BOOL VINIT_Simulation(VulkanFluidSimulation* vfs) {
     return TRUE;
 }
 
-BOOL VINIT_Normals(VulkanDataBuffer* normals) {
+BOOL VINIT_Normals(VulkanTransformables* normals) {
     size_t arrsize = sizeof(vec4) * g_vinit_renderer_ref->geometry.normals.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
         arrsize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        normals);
+        &(normals->original));
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &(normals->transformed));
     VUPDT_Normals(normals);
     return TRUE;
 }
 
-BOOL VINIT_Vertices(VulkanVertices* vertices) {
+BOOL VINIT_Vertices(VulkanTransformables* vertices) {
     size_t arrsize = sizeof(vec4) * g_vinit_renderer_ref->geometry.vertices.maxsize;
     arrsize = arrsize > 0 ? arrsize : 1;
     VUTIL_CreateBuffer(
