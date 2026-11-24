@@ -49,7 +49,7 @@ void animate_normal(inout vec3 normal, uint poffset, VertexSkin skin) {
     mat4 skin_mat = mat4(0);
     for (int i = 0; i < MAX_BONE_INFLUENCES; i++)
         skin_mat += skin.weights[i] * poseIn[poffset + skin.indices[i]];
-    normal = (skin_mat * vec4(normal, 1.0)).xyz;
+    normal = (skin_mat * vec4(normal, 0.0)).xyz;
 }
 
 void transform_vertex(uint id) {
@@ -92,7 +92,7 @@ void transform_normal(uint id) {
     }
     if (md.pose != -1)
         animate_normal(normal, md.pose, skinIn[(id - md.start) + md.skinstart]);
-    normalIn[id] = (md.transform * vec4(normal, 1.0)).xyz;
+    normalIn[id] = normalize((md.transform * vec4(normal, 0.0)).xyz);
 }
 
 uint find_splat_transform(uint id) {
