@@ -10,6 +10,7 @@
 #include <util/logger.h>
 #include <easyparse.h>
 #include <easyfile.h>
+#include <easyhash.h>
 #include <ctype.h>
 #include <stddef.h>
 #include <errno.h>
@@ -32,6 +33,9 @@
 #define MAX_PLY_PROPERTY_NAME 64
 #define PRISM_MAGIC "PRSM"
 #define PRISM_VERSION 1u
+#define PBJ_MAGIC "PBJ"
+#define PBJ_VERSION 1u
+#define PBJ_MAX_NAME 4096
 
 #define SET_MTL_FLOAT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
 #define SET_MTL_UINT_FIELD(field, a) state->materials.data[state->materials.size - 1].field = a;
@@ -57,6 +61,9 @@
     (map).entries = PrismReadElements(s, _cap, sizeof(*((map).entries))); \
     (map).capacity = (map).entries ? _cap : 0; \
     if ((map).capacity == 0) { (map).size = 0; (map).tombstones = 0; } }
+
+DECLARE_HASHMAP(size_t, size_t, Index);
+IMPL_HASHMAP(size_t, size_t, Index, ez_hash_size_t);
 
 typedef struct {
     size_t face_index;
@@ -141,6 +148,21 @@ typedef struct {
     BOOL ok;
     size_t remaining;
 } PrismStream;
+
+typedef struct {
+    MeshDescriptor md;
+    ARRLIST_Triangle triangles;
+    ARRLIST_vec4 vertices;
+    ARRLIST_vec3 normals;
+    ARRLIST_SurfaceMaterial materials;
+    ARRLIST_DynamicString materialnames;
+    ARRLIST_GaussianSplat splats;
+    ARRLIST_MeshAnimation anims;
+    ARRLIST_VertexSkin skins;
+    ARRLIST_mat4 pose;
+    uint32_t* sss;
+    size_t sss_words;
+} PBJMesh;
 
 static void _aiv32v3(struct aiVector3D ai, vec3 out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; }
 static void _aiq2v(struct aiQuaternion ai, versor out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; out[3] = ai.w; }
@@ -1089,6 +1111,262 @@ static void PrismReadGeometry(PrismStream* s, Geometry* g) {
     if (s->ok && g->cameras.size > 0 && g->primarycamera >= g->cameras.size) g->primarycamera = 0;
 }
 
+static const char* PbjTypeName(PBJType type) {
+    switch (type) {
+        case PBJ_CAMERA: return "camera";
+        case PBJ_MATERIAL: return "material";
+        case PBJ_LIGHT: return "light";
+        case PBJ_MESH: return "object";
+        case PBJ_FORCE: return "force";
+        case PBJ_SOURCE: return "source";
+        default: return "unknown item";
+    }
+}
+
+static void PbjFreeMesh(PBJMesh* m) {
+    ARRLIST_Triangle_clear(&m->triangles);
+    ARRLIST_vec4_clear(&m->vertices);
+    ARRLIST_vec3_clear(&m->normals);
+    ARRLIST_SurfaceMaterial_clear(&m->materials);
+    PrismFreeNames(&m->materialnames);
+    ARRLIST_GaussianSplat_clear(&m->splats);
+    PrismFreeAnimations(&m->anims);
+    ARRLIST_VertexSkin_clear(&m->skins);
+    ARRLIST_mat4_clear(&m->pose);
+    if (m->sss) EZ_FREE(m->sss);
+    m->sss = NULL;
+    m->sss_words = 0;
+}
+
+static void PbjWriteMesh(PrismStream* s, size_t id) {
+    Geometry* geo = RendererGeometry();
+    MeshDescriptor* original = MeshReference(id);
+    MeshDescriptor copy = *original;
+    BOOL has_tris = !(original->tend < original->tstart || original->tend == (TriangleID)-1);
+    BOOL has_splats = !(original->send < original->sstart || original->send == (uint32_t)-1);
+    BOOL animated = original->pose != (uint32_t)-1;
+    if (animated && (original->pose + MAX_BONES > geo->poses.size ||
+                     original->pose / MAX_BONES >= NumAnimations() ||
+                     (size_t)original->skinstart + (original->end - original->start) >= geo->skins.size)) {
+        logwarn("Animation data of object %zu is inconsistent, saving it without animation", id);
+        animated = FALSE;
+    }
+    ARRLIST_Triangle triangles = { 0 };
+    ARRLIST_vec4 vertices = { 0 };
+    ARRLIST_VertexSkin skins = { 0 };
+    HASHMAP_Index vertexmap = { 0 };
+    ARRLIST_vec3 normals = { 0 };
+    HASHMAP_Index normalmap = { 0 };
+    ARRLIST_SurfaceMaterial materials = { 0 };
+    ARRLIST_DynamicString materialnames = { 0 };
+    HASHMAP_Index materialmap = { 0 };
+    ARRLIST_GaussianSplat splats = { 0 };
+    if (has_tris) {
+        for (TriangleID i = original->tstart; i <= original->tend; i++) {
+            Triangle t = *(TriangleReference(i));
+            uint32_t* verts[] = { &t.a, &t.b, &t.c };
+            uint32_t* norms[] = { &t.an, &t.bn, &t.cn };
+            for (size_t j = 0; j < 3; j++) {
+                if (!HASHMAP_Index_has(&vertexmap, *verts[j])) {
+                    ARRLIST_vec4_add(&vertices, VertexReference(*verts[j]));
+                    if (animated) ARRLIST_VertexSkin_add(&skins, geo->skins.data[original->skinstart + (*verts[j] - original->start)]);
+                    HASHMAP_Index_set(&vertexmap, *verts[j], vertices.size - 1);
+                }
+                *(verts[j]) = HASHMAP_Index_get(&vertexmap, *verts[j]);
+                if (*norms[j] != (uint32_t)-1) {
+                    if (!HASHMAP_Index_has(&normalmap, *norms[j])) {
+                        ARRLIST_vec3_add(&normals, NormalReference(*norms[j]));
+                        HASHMAP_Index_set(&normalmap, *norms[j], normals.size - 1);
+                    }
+                    *(norms[j]) = HASHMAP_Index_get(&normalmap, *norms[j]);
+                }
+            }
+            if (!HASHMAP_Index_has(&materialmap, t.material)) {
+                ARRLIST_SurfaceMaterial_add(&materials, *MaterialReference(t.material));
+                ARRLIST_DynamicString_add(&materialnames, MaterialName(t.material));
+                HASHMAP_Index_set(&materialmap, t.material, materials.size - 1);
+            }
+            t.material = HASHMAP_Index_get(&materialmap, t.material);
+            ARRLIST_Triangle_add(&triangles, t);
+        }
+    }
+    if (has_splats)
+        for (size_t i = original->sstart; i <= original->send; i++)
+            ARRLIST_GaussianSplat_add(&splats, *SplatReference(i));
+    copy.start = 0;
+    copy.end = (VertexID)vertices.size - 1;
+    copy.tstart = 0;
+    copy.tend = (TriangleID)triangles.size - 1;
+    copy.sstart = 0;
+    copy.send = (uint32_t)splats.size - 1;
+    copy.skinstart = 0;
+    copy.pose = animated ? 0 : (uint32_t)-1;
+    PrismWrite(s, &copy, sizeof(copy));
+    PRISM_WRITE_LIST(s, triangles);
+    PRISM_WRITE_LIST(s, vertices);
+    PRISM_WRITE_LIST(s, normals);
+    PRISM_WRITE_LIST(s, materials);
+    PrismWriteNames(s, &materialnames);
+    PRISM_WRITE_LIST(s, splats);
+    ARRLIST_MeshAnimation anims = { 0 };
+    MeshAnimation* anim = animated ? AnimationReference(original->pose / MAX_BONES) : NULL;
+    size_t meshid = 0;
+    if (anim) {
+        meshid = anim->meshid;
+        anim->meshid = 0;
+        anims.data = anim;
+        anims.size = 1;
+        anims.maxsize = 1;
+    }
+    PrismWriteAnimations(s, &anims);
+    if (anim) anim->meshid = meshid;
+    PRISM_WRITE_LIST(s, skins);
+    PrismWriteSize(s, animated ? MAX_BONES : 0);
+    if (animated) PrismWrite(s, &geo->poses.data[original->pose], MAX_BONES * sizeof(mat4));
+    size_t sss_words = 0;
+    uint32_t* sss = NULL;
+    SubsurfaceCloudInfo info;
+    if (QuerySubsurfaceCloudInfo(id, &info)) {
+        if (HASHMAP_Index_has(&materialmap, info.material)) sss = SubsurfaceSerializeMesh(id, HASHMAP_Index_get(&materialmap, info.material), &sss_words);
+        else logwarn("The subsurface cloud of object %zu uses a material the object no longer has, it was not saved", id);
+    }
+    PrismWriteSize(s, sss_words);
+    PrismWrite(s, sss, sss_words * sizeof(uint32_t));
+    if (sss) EZ_FREE(sss);
+    ARRLIST_Triangle_clear(&triangles);
+    ARRLIST_vec4_clear(&vertices);
+    ARRLIST_VertexSkin_clear(&skins);
+    ARRLIST_vec3_clear(&normals);
+    ARRLIST_SurfaceMaterial_clear(&materials);
+    ARRLIST_DynamicString_clear(&materialnames);
+    ARRLIST_GaussianSplat_clear(&splats);
+    HASHMAP_Index_clear(&vertexmap);
+    HASHMAP_Index_clear(&normalmap);
+    HASHMAP_Index_clear(&materialmap);
+}
+
+static void PbjReadMesh(PrismStream* s, PBJMesh* m) {
+    PrismRead(s, &m->md, sizeof(m->md));
+    PRISM_READ_LIST(s, m->triangles);
+    PRISM_READ_LIST(s, m->vertices);
+    PRISM_READ_LIST(s, m->normals);
+    PRISM_READ_LIST(s, m->materials);
+    PrismReadNames(s, &m->materialnames, MAX_MATERIAL_NAME_SIZE);
+    PRISM_READ_LIST(s, m->splats);
+    PrismReadAnimations(s, &m->anims);
+    PRISM_READ_LIST(s, m->skins);
+    PRISM_READ_LIST(s, m->pose);
+    m->sss_words = PrismReadSize(s);
+    m->sss = PrismReadElements(s, m->sss_words, sizeof(uint32_t));
+    if (!m->sss) m->sss_words = 0;
+}
+
+static const char* PbjMeshProblem(const PBJMesh* m) {
+    for (size_t i = 0; i < m->triangles.size; i++) {
+        const Triangle* t = &m->triangles.data[i];
+        if (t->a >= m->vertices.size || t->b >= m->vertices.size || t->c >= m->vertices.size ||
+            (t->an != (uint32_t)-1 && t->an >= m->normals.size) ||
+            (t->bn != (uint32_t)-1 && t->bn >= m->normals.size) ||
+            (t->cn != (uint32_t)-1 && t->cn >= m->normals.size) ||
+            t->material >= m->materials.size)
+            return "a triangle references data outside the file";
+    }
+    if (m->materialnames.size != m->materials.size) return "the material names do not match the materials";
+    if (m->triangles.size == 0 && m->splats.size == 0) return "the object has no triangles or splats";
+    return NULL;
+}
+
+static const char* PbjAnimationProblem(const PBJMesh* m) {
+    if (m->anims.size != 1) return "it does not have exactly one animation set";
+    MeshAnimation a; // local copy: the heap array is not aligned for Skeleton's mat4s
+    memcpy(&a, &m->anims.data[0], sizeof(a));
+    if (a.animations.size == 0) return "it has no clips";
+    if (m->skins.size != m->vertices.size) return "the skin count does not match the vertex count";
+    if (m->pose.size != MAX_BONES) return "the pose block is the wrong size";
+    if (a.skeleton.bonecount == 0 || a.skeleton.bonecount > MAX_BONES) return "the skeleton has an invalid bone count";
+    for (size_t b = 0; b < a.skeleton.bonecount; b++) {
+        // every bone must reach a root within bonecount steps, so the hierarchy has no cycles
+        size_t p = a.skeleton.bones[b].parent, steps = 0;
+        while (p != (size_t)-1) {
+            if (p >= a.skeleton.bonecount || ++steps > a.skeleton.bonecount) return "the skeleton hierarchy is invalid";
+            p = a.skeleton.bones[p].parent;
+        }
+    }
+    for (size_t i = 0; i < m->skins.size; i++) {
+        float total = 0.0f;
+        for (size_t k = 0; k < MAX_BONE_INFLUENCES; k++) {
+            if (m->skins.data[i].indices[k] >= MAX_BONES) return "a vertex is bound to a bone outside the pose block";
+            total += m->skins.data[i].weights[k];
+        }
+        if (!(total > 0.0f)) return "a vertex has no skin weight";
+    }
+    return NULL;
+}
+
+static size_t PbjSubmitMesh(PBJMesh* m, const char* name, BOOL animated) {
+    VertexID startv = (VertexID)NumVertices();
+    uint32_t startn = (uint32_t)NumNormals();
+    MaterialID startm = (MaterialID)NumMaterials();
+    TriangleID startt = (TriangleID)NumTriangles();
+    uint32_t startsp = (uint32_t)NumSplats();
+    VertexID startsk = (VertexID)NumSkins();
+    for (size_t i = 0; i < m->vertices.size; i++) SubmitVertex(m->vertices.data[i]);
+    for (size_t i = 0; i < m->normals.size; i++) SubmitNormal(m->normals.data[i]);
+    for (size_t i = 0; i < m->materials.size; i++) SubmitNamedMaterial(m->materials.data[i], m->materialnames.data[i] ? m->materialnames.data[i] : "Material");
+    for (size_t i = 0; i < m->triangles.size; i++) {
+        Triangle t = m->triangles.data[i];
+        t.a += startv;
+        t.b += startv;
+        t.c += startv;
+        if (t.an != (uint32_t)-1) t.an += startn;
+        if (t.bn != (uint32_t)-1) t.bn += startn;
+        if (t.cn != (uint32_t)-1) t.cn += startn;
+        t.material += startm;
+        SubmitTriangle(t);
+    }
+    for (size_t i = 0; i < m->splats.size; i++) SubmitSplat(m->splats.data[i]);
+    if (animated) for (size_t i = 0; i < m->skins.size; i++) SubmitVertexSkin(m->skins.data[i]);
+    MeshDescriptor md = m->md;
+    md.start = startv;
+    md.end = startv + (VertexID)m->vertices.size - 1;
+    md.tstart = startt;
+    md.tend = startt + (TriangleID)m->triangles.size - 1;
+    md.sstart = startsp;
+    md.send = startsp + (uint32_t)m->splats.size - 1;
+    md.skinstart = startsk;
+    md.pose = (uint32_t)-1;
+    SubmitMeshDescriptor(md, name);
+    size_t mesh = NumMeshes() - 1;
+    if (animated) {
+        MeshAnimation src;
+        memcpy(&src, &m->anims.data[0], sizeof(src));
+        for (size_t j = 0; j < src.animations.size; j++) {
+            Animation clip = src.animations.data[j];
+            if (j < src.names.size && src.names.data[j]) {
+                strncpy(clip.name, src.names.data[j], sizeof(clip.name) - 1);
+                clip.name[sizeof(clip.name) - 1] = '\0';
+            }
+            SubmitAnimation(mesh, src.skeleton, clip);
+            src.animations.data[j].channels = (ARRLIST_BoneChannel){ 0 }; // the scene owns the keyframes now
+        }
+        size_t aidx = NumAnimations() - 1;
+        MeshAnimation* dst = AnimationReference(aidx);
+        dst->current = src.current < dst->animations.size ? src.current : 0;
+        dst->time = src.time;
+        dst->looping = src.looping;
+        dst->playing = src.playing;
+        dst->enable = src.enable;
+        dst->_enable = src._enable;
+        dst->blending = FALSE;
+        MeshReference(mesh)->pose = (uint32_t)(aidx * MAX_BONES);
+        memcpy(&RendererGeometry()->poses.data[aidx * MAX_BONES], m->pose.data, MAX_BONES * sizeof(mat4)); // pose as saved
+        UpdatePoses();
+        UpdateMeshes();
+    }
+    if (m->sss_words > 0) SubsurfaceDeserializeMesh(m->sss, m->sss_words, mesh, startm);
+    return mesh;
+}
+
 const char* GetOpenFile(const char* type) {
     nfdchar_t* outpath = NULL;
     nfdresult_t result = NFD_OpenDialog(type, NULL, &outpath);
@@ -1605,6 +1883,108 @@ BOOL LoadPRISM(const char* filepath) {
     return TRUE;
 }
 
+BOOL LoadPBJ(const char* filepath, PBJType* loaded_type, size_t* loaded_index) {
+    if (!filepath) {
+        logerror("Cannot load from a NULL filepath");
+        return FALSE;
+    }
+    FILE* file = fopen(filepath, "rb");
+    if (!file) {
+        logerror("Unable to open PBJ file \"%s\": %s", filepath, strerror(errno));
+        return FALSE;
+    }
+    PrismStream s = { file, TRUE, 0 };
+    if (fseek(file, 0, SEEK_END) == 0) {
+        long len = ftell(file);
+        s.remaining = len > 0 ? (size_t)len : 0;
+    }
+    fseek(file, 0, SEEK_SET);
+    char magic[3] = { 0 };
+    uint32_t version = 0;
+    PrismRead(&s, magic, sizeof(magic));
+    PrismRead(&s, &version, sizeof(version));
+    if (!s.ok || memcmp(magic, PBJ_MAGIC, 3) != 0) {
+        fclose(file);
+        logerror("\"%s\" is not a PBJ file", filepath);
+        return FALSE;
+    }
+    if (version != PBJ_VERSION) {
+        fclose(file);
+        logerror("PBJ file \"%s\" was written by an incompatible build (version %u, expected %u)", filepath, version, PBJ_VERSION);
+        return FALSE;
+    }
+    uint32_t tag = (uint32_t)-1;
+    PrismRead(&s, &tag, sizeof(tag));
+    if (!s.ok || tag >= PBJ_TYPE_COUNT) {
+        fclose(file);
+        logerror("PBJ file \"%s\" holds an unknown item type", filepath);
+        return FALSE;
+    }
+    PBJType type = (PBJType)tag;
+    char* name = PrismReadString(&s, PBJ_MAX_NAME, 0);
+    SceneCamera camera = { 0 };
+    SurfaceMaterial material = { 0 };
+    SceneLight light = { 0 };
+    FluidForce force = { 0 };
+    FluidSource source = { 0 };
+    PBJMesh mesh = { 0 };
+    switch (type) {
+        case PBJ_CAMERA: PrismRead(&s, &camera, sizeof(camera)); break;
+        case PBJ_MATERIAL: PrismRead(&s, &material, sizeof(material)); break;
+        case PBJ_LIGHT: PrismRead(&s, &light, sizeof(light)); break;
+        case PBJ_MESH: PbjReadMesh(&s, &mesh); break;
+        case PBJ_FORCE: PrismRead(&s, &force, sizeof(force)); break;
+        case PBJ_SOURCE: PrismRead(&s, &source, sizeof(source)); break;
+        default: break;
+    }
+    if (s.ok && s.remaining != 0) s.ok = FALSE;
+    fclose(file);
+    const char* problem = !s.ok ? "the file is truncated or corrupt" : (type == PBJ_MESH ? PbjMeshProblem(&mesh) : NULL);
+    if (problem) {
+        logerror("Unable to load PBJ file \"%s\": %s", filepath, problem);
+        PbjFreeMesh(&mesh);
+        if (name) EZ_FREE(name);
+        return FALSE;
+    }
+    const char* label = name && name[0] ? name : ez_strip_filename(filepath);
+    size_t index = 0;
+    switch (type) {
+        case PBJ_CAMERA:
+            index = SubmitNamedCamera(camera, label);
+            break;
+        case PBJ_MATERIAL:
+            index = SubmitNamedMaterial(material, label);
+            break;
+        case PBJ_LIGHT:
+            index = SubmitNamedLight(light, label);
+            break;
+        case PBJ_MESH: {
+            const char* anim_problem = NULL;
+            BOOL has_anim = mesh.anims.size > 0 || mesh.skins.size > 0 || mesh.pose.size > 0;
+            if (has_anim) anim_problem = PbjAnimationProblem(&mesh);
+            if (anim_problem) logwarn("Loading \"%s\" without its animation: %s", filepath, anim_problem);
+            index = PbjSubmitMesh(&mesh, label, has_anim && !anim_problem);
+            break;
+        }
+        case PBJ_FORCE:
+            SubmitForce(force, label);
+            index = NumForces() - 1;
+            break;
+        case PBJ_SOURCE:
+            source.timer = source.lifetime;
+            SubmitSource(source, label);
+            index = NumSources() - 1;
+            break;
+        default: break;
+    }
+    loginfo("Loaded %s \"%s\" from \"%s\"", PbjTypeName(type), label, filepath);
+    PbjFreeMesh(&mesh);
+    if (name) EZ_FREE(name);
+    if (loaded_type) *loaded_type = type;
+    if (loaded_index) *loaded_index = index;
+    return TRUE;
+}
+
 BOOL SavePRISM(const char* filepath) {
     if (!filepath) {
         logerror("Cannot save to a NULL filepath");
@@ -1633,5 +2013,54 @@ BOOL SavePRISM(const char* filepath) {
         return FALSE;
     }
     loginfo("Saved session to \"%s\"", filepath);
+    return TRUE;
+}
+
+BOOL SavePBJ(PBJType type, size_t index, const char* filepath) {
+    if (!filepath) {
+        logerror("Cannot save to a NULL filepath");
+        return FALSE;
+    }
+    const char* name = NULL;
+    switch (type) {
+        case PBJ_CAMERA: if (index < NumCameras()) name = CameraName(index); break;
+        case PBJ_MATERIAL: if (index < NumMaterials()) name = MaterialName(index); break;
+        case PBJ_LIGHT: if (index < NumLights()) name = LightName(index); break;
+        case PBJ_MESH: if (index < NumMeshes()) name = *MeshNameReference(index); break;
+        case PBJ_FORCE: if (index < NumForces()) name = *ForceNameReference(index); break;
+        case PBJ_SOURCE: if (index < NumSources()) name = *SourceNameReference(index); break;
+        default: break;
+    }
+    if (!name) {
+        logerror("Invalid %s index %zu - unable to save PBJ to \"%s\"", PbjTypeName(type), index, filepath);
+        return FALSE;
+    }
+    FILE* file = fopen(filepath, "wb");
+    if (!file) {
+        logerror("Unable to open PBJ file \"%s\": %s", filepath, strerror(errno));
+        return FALSE;
+    }
+    PrismStream s = { file, TRUE, 0 };
+    uint32_t version = PBJ_VERSION;
+    uint32_t tag = (uint32_t)type;
+    PrismWrite(&s, PBJ_MAGIC, 3);
+    PrismWrite(&s, &version, sizeof(version));
+    PrismWrite(&s, &tag, sizeof(tag));
+    PrismWriteString(&s, name);
+    switch (type) {
+        case PBJ_CAMERA: PrismWrite(&s, GetCamera(index), sizeof(SceneCamera)); break;
+        case PBJ_MATERIAL: PrismWrite(&s, MaterialReference(index), sizeof(SurfaceMaterial)); break;
+        case PBJ_LIGHT: PrismWrite(&s, LightReference(index), sizeof(SceneLight)); break;
+        case PBJ_MESH: PbjWriteMesh(&s, index); break;
+        case PBJ_FORCE: PrismWrite(&s, ForceReference(index), sizeof(FluidForce)); break;
+        case PBJ_SOURCE: PrismWrite(&s, SourceReference(index), sizeof(FluidSource)); break;
+        default: break;
+    }
+    if (fclose(file) != 0) s.ok = FALSE;
+    if (!s.ok) {
+        logerror("Failed while writing PBJ file \"%s\"", filepath);
+        return FALSE;
+    }
+    loginfo("Saved %s \"%s\" to \"%s\"", PbjTypeName(type), name, filepath);
     return TRUE;
 }

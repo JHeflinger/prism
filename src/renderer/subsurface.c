@@ -2082,6 +2082,66 @@ static void FinishChannel(CloudTrainJob* j) {
     j->phase = SUBSURFACE_DONE;
 }
 
+static size_t CloudRecordWords(const Cloud* c) {
+    size_t n = SSS_RECORD_WORDS;
+    for (uint32_t k = 0; k < c->channels; k++) n += 2 + c->words[k];
+    return n;
+}
+
+static size_t WriteCloudRecord(const Cloud* c, uint32_t mesh, uint32_t tstart, MaterialID material, uint32_t* out) {
+    size_t w = 0;
+    out[w++] = mesh;
+    out[w++] = c->enabled ? 1u : 0u;
+    out[w++] = tstart;
+    out[w++] = c->tcount;
+    out[w++] = material;
+    memcpy(&out[w++], &c->anisotropy, 4);
+    memcpy(&out[w++], &c->scale, 4);
+    out[w++] = c->channels;
+    for (uint32_t k = 0; k < c->channels; k++) {
+        memcpy(&out[w++], &c->sigma[k], 4);
+        out[w++] = c->words[k];
+        memcpy(&out[w], c->blob[k], (size_t)c->words[k] * sizeof(uint32_t));
+        out[w + SSSG_H_TSTART] = tstart;
+        out[w + SSSG_H_MATERIAL] = material;
+        w += c->words[k];
+    }
+    return w;
+}
+
+static BOOL ReadCloudRecord(const uint32_t* data, size_t words, size_t* w, Cloud* out, BOOL* usable) {
+    memset(out, 0, sizeof(*out));
+    *usable = TRUE;
+    if (*w + SSS_RECORD_WORDS > words) return FALSE;
+    const uint32_t* r = &data[*w];
+    out->mesh = r[0];
+    out->enabled = r[1] != 0;
+    out->tstart = r[2];
+    out->tcount = r[3];
+    out->material = r[4];
+    memcpy(&out->anisotropy, &r[5], 4);
+    memcpy(&out->scale, &r[6], 4);
+    out->channels = r[7];
+    *w += SSS_RECORD_WORDS;
+    if (out->channels != 1 && out->channels != 3) return FALSE;
+    for (uint32_t k = 0; k < out->channels; k++) {
+        if (*w + 2 > words) { FreeCloud(out); return FALSE; }
+        memcpy(&out->sigma[k], &data[*w], 4);
+        out->words[k] = data[*w + 1];
+        *w += 2;
+        if (out->words[k] > words - *w) { FreeCloud(out); return FALSE; }
+        const uint32_t* blob = &data[*w];
+        *w += out->words[k];
+        if (SSSBlobWords(blob, out->words[k]) == 0 || blob[SSSG_H_TCOUNT] != out->tcount) {
+            *usable = FALSE;
+            continue;
+        }
+        out->blob[k] = EZ_ALLOC(out->words[k], sizeof(uint32_t));
+        memcpy(out->blob[k], blob, (size_t)out->words[k] * sizeof(uint32_t));
+    }
+    return TRUE;
+}
+
 GSSSConfig SubsurfaceDefaultConfig() {
     GSSSConfig c = { 0 };
     c.surface_gaussians = 384;
@@ -2400,31 +2460,26 @@ BOOL SubsurfacePreviewCloud(size_t mesh) {
 
 uint32_t* SubsurfaceSerialize(size_t* words) {
     size_t total = 1;
-    for (size_t i = 0; i < g_cloud_count; i++) {
-        total += SSS_RECORD_WORDS;
-        for (uint32_t k = 0; k < g_clouds[i].channels; k++)
-            total += 2 + g_clouds[i].words[k];
-    }
+    for (size_t i = 0; i < g_cloud_count; i++) total += CloudRecordWords(&g_clouds[i]);
     uint32_t* out = EZ_ALLOC(total, sizeof(uint32_t));
     out[0] = (uint32_t)g_cloud_count;
     size_t w = 1;
     for (size_t i = 0; i < g_cloud_count; i++) {
         const Cloud* c = &g_clouds[i];
-        out[w++] = c->mesh;
-        out[w++] = c->enabled ? 1u : 0u;
-        out[w++] = c->tstart;
-        out[w++] = c->tcount;
-        out[w++] = c->material;
-        memcpy(&out[w++], &c->anisotropy, 4);
-        memcpy(&out[w++], &c->scale, 4);
-        out[w++] = c->channels;
-        for (uint32_t k = 0; k < c->channels; k++) {
-            memcpy(&out[w++], &c->sigma[k], 4);
-            out[w++] = c->words[k];
-            memcpy(&out[w], c->blob[k], (size_t)c->words[k] * sizeof(uint32_t));
-            w += c->words[k];
-        }
+        w += WriteCloudRecord(c, c->mesh, c->tstart, c->material, &out[w]);
     }
+    *words = total;
+    return out;
+}
+
+uint32_t* SubsurfaceSerializeMesh(size_t mesh, MaterialID material, size_t* words) {
+    *words = 0;
+    const Cloud* c = FindCloud(mesh);
+    if (!c) return NULL;
+    size_t total = 1 + CloudRecordWords(c);
+    uint32_t* out = EZ_ALLOC(total, sizeof(uint32_t));
+    out[0] = 1;
+    WriteCloudRecord(c, 0, 0, material, &out[1]);
     *words = total;
     return out;
 }
@@ -2435,36 +2490,14 @@ BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words) {
     Geometry* geo = RendererGeometry();
     size_t count = data[0], w = 1, loaded = 0;
     BOOL ok = TRUE;
-    for (size_t i = 0; i < count && ok; i++) {
-        if (w + SSS_RECORD_WORDS > words) { ok = FALSE; break; }
-        Cloud c = { 0 };
-        c.mesh = data[w];
-        c.enabled = data[w + 1] != 0;
-        c.tstart = data[w + 2];
-        c.tcount = data[w + 3];
-        c.material = data[w + 4];
-        memcpy(&c.anisotropy, &data[w + 5], 4);
-        memcpy(&c.scale, &data[w + 6], 4);
-        c.channels = data[w + 7];
-        w += SSS_RECORD_WORDS;
-        if (c.channels != 1 && c.channels != 3) { ok = FALSE; break; }
-        BOOL valid = TRUE;
-        for (uint32_t k = 0; k < c.channels; k++) {
-            if (w + 2 > words) { ok = FALSE; break; }
-            memcpy(&c.sigma[k], &data[w], 4);
-            c.words[k] = data[w + 1];
-            w += 2;
-            if (c.words[k] > words - w) { ok = FALSE; break; }
-            const uint32_t* blob = &data[w];
-            w += c.words[k];
-            if (SSSBlobWords(blob, c.words[k]) == 0 || blob[SSSG_H_TCOUNT] != c.tcount) { valid = FALSE; continue; }
-            c.blob[k] = EZ_ALLOC(c.words[k], sizeof(uint32_t));
-            memcpy(c.blob[k], blob, (size_t)c.words[k] * sizeof(uint32_t));
-        }
+    for (size_t i = 0; i < count; i++) {
+        Cloud c;
+        BOOL usable;
+        if (!ReadCloudRecord(data, words, &w, &c, &usable)) { ok = FALSE; break; }
         uint32_t s, n;
-        if (!ok || !valid || c.mesh >= geo->meshes.size || !MeshTriangles(&geo->meshes.data[c.mesh], &s, &n) ||
+        if (!usable || c.mesh >= geo->meshes.size || !MeshTriangles(&geo->meshes.data[c.mesh], &s, &n) ||
             n != c.tcount || FindCloud(c.mesh)) {
-            if (ok) logwarn("Skipping a saved subsurface cloud that no longer matches its object");
+            logwarn("Skipping a saved subsurface cloud that no longer matches its object");
             FreeCloud(&c);
             continue;
         }
@@ -2478,6 +2511,33 @@ BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words) {
         loginfo("Restored %zu subsurface cloud%s", loaded, loaded == 1 ? "" : "s");
     }
     return ok;
+}
+
+BOOL SubsurfaceDeserializeMesh(const uint32_t* data, size_t words, size_t mesh, MaterialID material_base) {
+    if (!data || words == 0 || data[0] == 0) return TRUE;
+    size_t w = 1;
+    Cloud c;
+    BOOL usable;
+    if (!ReadCloudRecord(data, words, &w, &c, &usable)) {
+        logwarn("The object's subsurface cloud data is truncated, it was not restored");
+        return FALSE;
+    }
+    Geometry* geo = RendererGeometry();
+    uint32_t s = 0, n = 0;
+    if (!usable || mesh >= geo->meshes.size || !MeshTriangles(&geo->meshes.data[mesh], &s, &n) || n != c.tcount) {
+        logwarn("Skipping the object's subsurface cloud, it does not match the loaded mesh");
+        FreeCloud(&c);
+        return FALSE;
+    }
+    c.mesh = (uint32_t)mesh;
+    c.tstart = s;
+    c.material += material_base;
+    for (uint32_t k = 0; k < c.channels; k++) {
+        c.blob[k][SSSG_H_TSTART] = s;
+        c.blob[k][SSSG_H_MATERIAL] = c.material;
+    }
+    StoreCloud(c);
+    return TRUE;
 }
 
 BOOL SubsurfaceNeedsUpdate() {

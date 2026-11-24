@@ -329,7 +329,7 @@ typedef struct {
 #define SimSwapV(fs) { vec3* t = (fs).velocity; (fs).velocity = (fs).vswap; (fs).vswap = t; }
 #define SimSwapD(fs) { float* t = (fs).density; (fs).density = (fs).dswap; (fs).dswap = t; }
 
-typedef struct {
+typedef struct { // ends are inclusive, not exclusive!
     alignas(4) uint32_t disabled;
     alignas(4) VertexID start;
     alignas(4) VertexID end;

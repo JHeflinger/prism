@@ -44,9 +44,11 @@ static int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
     if (UIButton(".PLY", button_width)) return 5;
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
-    if (UIButton("Camera", button_width)) return 6;
+    if (UIButton(".PBJ", button_width)) return 6;
+    UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
+    if (UIButton("Camera", button_width)) return 7;
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
-    if (UIButton("Cancel", button_width)) return 7;
+    if (UIButton("Cancel", button_width)) return 8;
     return -1;
 }
 
@@ -70,6 +72,24 @@ static int add_ply_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     const char* filepath = GetOpenFile("ply");
     if (filepath && !LoadPLY(filepath)) {
         logerror("Unable to load ply file \"%s\"", filepath);
+    }
+    return 0;
+}
+
+static int add_pbj_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+    const char* filepath = GetOpenFile("pbj");
+    PBJType type;
+    size_t index;
+    if (filepath && LoadPBJ(filepath, &type, &index)) {
+        switch (type) {
+            case PBJ_CAMERA: SetEditCamera(index); break;
+            case PBJ_MATERIAL: SetEditMaterial(index); break;
+            case PBJ_LIGHT: SetEditLight(index); break;
+            case PBJ_MESH: SetEditMesh(index); break;
+            case PBJ_FORCE: SetEditForce(index); break;
+            case PBJ_SOURCE: SetEditSource(index); break;
+            default: break;
+        }
     }
     return 0;
 }
@@ -440,10 +460,10 @@ char** DebugModeLabels() {
 }
 Popup* GenerateAddObjectPopup() {
     Popup* popup = GenerateEmptyPopup();
-    popup->options = 7;
+    popup->options = 8;
     popup->behavior = add_object_popup_stage_0;
     popup->results = EZ_ALLOC(popup->options, sizeof(Popup*));
-    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0, add_obj_popup_stage_0, add_fbx_popup_stage_0, add_ply_popup_stage_0, add_camera_popup_stage_0 };
+    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0, add_obj_popup_stage_0, add_fbx_popup_stage_0, add_ply_popup_stage_0, add_pbj_popup_stage_0, add_camera_popup_stage_0 };
     for (size_t i = 0; i < popup->options; i++) {
         Popup* next = GenerateEmptyPopup();
         next->options = 0;

@@ -45,6 +45,8 @@ BOOL VertexLocked(VertexID vertex);
 
 void SubmitNormal(vec3 normal);
 
+float* NormalReference(VertexID normal);
+
 void ClearNormals();
 
 TriangleID SubmitTriangle(Triangle triangle);
@@ -234,6 +236,8 @@ void ClearSplats();
 size_t NumSplats();
 
 void SubmitSplat(GaussianSplat splat);
+
+GaussianSplat* SplatReference(uint32_t sid);
 
 void UpdateSplats();
 

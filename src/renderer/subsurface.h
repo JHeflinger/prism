@@ -90,7 +90,11 @@ BOOL SubsurfacePreviewCloud(size_t mesh);
 
 uint32_t* SubsurfaceSerialize(size_t* words);
 
+uint32_t* SubsurfaceSerializeMesh(size_t mesh, MaterialID material, size_t* words);
+
 BOOL SubsurfaceDeserialize(const uint32_t* data, size_t words);
+
+BOOL SubsurfaceDeserializeMesh(const uint32_t* data, size_t words, size_t mesh, MaterialID material_base);
 
 BOOL SubsurfaceNeedsUpdate();
 

@@ -1,16 +1,33 @@
 #include "edit.h"
+#include "renderer/subsurface.h"
 #include "renderer/renderer.h"
 #include "renderer/overlay.h"
+#include "renderer/loader.h"
 #include "renderer/rmath.h"
-#include "renderer/subsurface.h"
 #include "ui/shared.h"
-#include <ui/extra.h>
 #include <util/logger.h>
+#include <ui/extra.h>
 
 static size_t g_edit_item_index = 0;
 static BOOL g_item_selected = FALSE;
 static EditType g_edit_type = EDIT_MATERIAL;
 static const char* g_light_types[] = { "Directional", "Spot", "Point" };
+
+static void ExportEditTarget() {
+    if (!g_item_selected) { logwarn("Nothing selected to export"); return; }
+    PBJType type;
+    switch (g_edit_type) {
+        case EDIT_CAMERA: type = PBJ_CAMERA; break;
+        case EDIT_MATERIAL: type = PBJ_MATERIAL; break;
+        case EDIT_LIGHT: type = PBJ_LIGHT; break;
+        case EDIT_MESH: type = PBJ_MESH; break;
+        case EDIT_SINGLE_FORCE: type = PBJ_FORCE; break;
+        case EDIT_SINGLE_SOURCE: type = PBJ_SOURCE; break;
+        default: logerror("Single triangles and vertices can't be exported"); return;
+    }
+    const char* filepath = GetSaveFile("pbj");
+    if (filepath) SavePBJ(type, g_edit_item_index, filepath);
+}
 
 static void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, float height) {
     BOOL edited = FALSE;
@@ -440,10 +457,14 @@ static void DrawEditPanel(float width, float height) {
         float drawnheight = UIGetCursor().y - cursory;
         if (drawnheight > height - 70) {
             UIMoveCursor(0, 20);
+            if (UIButton("Export", width - 20)) ExportEditTarget();
+            UIMoveCursor(0, 5);
             if (UIButton("Delete", width - 20)) DeleteEditTarget();
         } else {
             Vector2 backup = UIGetCursor();
-            UISetCursor(10, height - 60);
+            UISetCursor(10, height - 80);
+            if (UIButton("Export", width - 20)) ExportEditTarget();
+            UIMoveCursor(0, 5);
             if (UIButton("Delete", width - 20)) DeleteEditTarget();
             UISetCursor(backup.x, backup.y);
         }

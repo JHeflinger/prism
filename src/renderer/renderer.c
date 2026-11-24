@@ -718,6 +718,11 @@ void SubmitNormal(vec3 normal) {
     UpdateNormals();
 }
 
+float* NormalReference(VertexID normal) {
+    EZ_ASSERT(normal < g_renderer.geometry.normals.size, "Normal reference does not exist for requested index");
+    return g_renderer.geometry.normals.data[normal];
+}
+
 void ClearNormals() {
     if (g_renderer.geometry.normals.maxsize == 0) return;
     ARRLIST_vec4_clear(&(g_renderer.geometry.normals));
@@ -1973,6 +1978,11 @@ size_t NumSplats() {
 void SubmitSplat(GaussianSplat splat) {
     ARRLIST_GaussianSplat_add(&(g_renderer.geometry.splats), splat);
     UpdateSplats();
+}
+
+GaussianSplat* SplatReference(uint32_t sid) {
+    EZ_ASSERT(sid < g_renderer.geometry.splats.size, "Splat reference does not exist for requested index");
+    return &(g_renderer.geometry.splats.data[sid]);
 }
 
 void UpdateSplats() {
