@@ -2,6 +2,7 @@
 #import Definitions
 
 #import RayGeneratorDef;
+#import TriangleDef;
 
 layout(binding = 0) readonly #import RayGeneratorSSBODef; 
 layout(binding = 1, rgba8) #import OutputImageDef;
@@ -9,6 +10,8 @@ layout(binding = 2) #import OverlayUniformBufferObjectDef o_ubo;
 layout(binding = 3) #import GeometryUniformBufferObjectDef g_ubo;
 layout(binding = 4) #import OverlaySSBODef;
 layout(binding = 5) readonly #import TransformedVertexSSBODef;
+layout(binding = 6) readonly #import TriangleSSBODef;
+layout(binding = 7) #import UniformBufferObjectDef ubo;
 
 const float vhighlight_radius = 50.0;
 const float mixfactor = 0.2;
@@ -90,70 +93,130 @@ void highlight_vertex(uint hvid, vec2 vpos) {
     }
 }
 
+const float WIRE_WIDTH = 1.25;
+const float WIRE_REFERENCE_HEIGHT = 900.0;
+const int WIRE_MAX_RADIUS = 3;
+const int WIRE_MAX_IDS = 16;
+
+vec3 to_camera(vec3 p) {
+    vec3 rel = p - ubo.position;
+    return vec3(dot(rel, ubo.u), dot(rel, ubo.v), -dot(rel, ubo.w));
+}
+
+vec2 to_pixel(vec3 c) {
+    vec2 s;
+    if (ubo.ortho != 0u) {
+        s = c.xy * (ubo.height / ubo.orthosize);
+    } else {
+        float focal = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * (ubo.width / 2.0);
+        s = c.xy * (focal / c.z);
+    }
+    return vec2(s.x + ubo.width * 0.5, ubo.height * 0.5 - s.y);
+}
+
+float edge_distance(vec3 a, vec3 b, vec2 p, float near) {
+    if (ubo.ortho == 0u) {
+        if (a.z < near && b.z < near) return FLTMAX;
+        if (a.z < near) a = mix(a, b, (near - a.z) / (b.z - a.z));
+        else if (b.z < near) b = mix(b, a, (near - b.z) / (a.z - b.z));
+    }
+    vec2 sa = to_pixel(a);
+    vec2 ab = to_pixel(b) - sa;
+    vec2 ap = p - sa;
+    float h = clamp(dot(ap, ab) / max(dot(ab, ab), 1e-12), 0.0, 1.0);
+    return length(ap - ab * h);
+}
+
+float triangle_edge_distance(uint tid, vec2 p, float near) {
+    Triangle t = triangleIn[tid];
+    vec3 a = to_camera(vertexIn[t.a].xyz);
+    vec3 b = to_camera(vertexIn[t.b].xyz);
+    vec3 c = to_camera(vertexIn[t.c].xyz);
+    return min(min(edge_distance(a, b, p, near), edge_distance(b, c, p, near)), edge_distance(c, a, p, near));
+}
+
 void outline_triangle() {
-	int rx = int(gl_GlobalInvocationID.x%o_ubo.image_width);
-    int ry = int(gl_GlobalInvocationID.x/o_ubo.image_width);
-    uint tid = raygenIn[gl_GlobalInvocationID.x].tid;
-    float d = raygenIn[gl_GlobalInvocationID.x].distance / length(g_ubo.maxBB - g_ubo.minBB);
-    if (tid != -1) {
-        int radius = 1;
-        int minx = 0;
-        int miny = 0;
-        int maxx = rx;
-        int maxy = ry;
-        if (rx > radius) minx = rx - radius;
-		if (ry > radius) miny = ry - radius;
-		if (maxx + radius < o_ubo.image_width) maxx += radius;
-		if (maxy + radius < o_ubo.image_height) maxy += radius;
-		bool border = false;
-		for (int x = minx; x < maxx; x++) {
-			for (int y = miny; y < maxy; y++) {
-				RayGenerator rg = raygenIn[y*o_ubo.image_width + x];
-				if (rg.tid != tid) {
-					border = true;
-				}
-			}
-		}
-		if (border) {
-			vec4 oldc = imageLoad(outputImage, ivec2(rx, ry));
-            vec4 newc = vec4(0.1, 0.1, 0.1, 1.0);
-            float vdist = vhighlight_radius;
-            vec3 mixc = vec3(0);
-            float vsum = 0;
-            if (o_ubo.single_selected_vid != -1) {
-                vdist = length(selected_vertex_position - vec2(rx, ry));
-                float swapdist = vhighlight_radius - vdist;
-                if (vdist < vhighlight_radius) {
-                    if (vertexIn[o_ubo.single_selected_vid].w != 0) {
-                        mixc += swapdist * vec3(lock_color);
-                    } else {
-                        mixc += swapdist * vec3(highlight_color);
-                    }
-                    vsum += swapdist;
-                }
+    int rx = int(gl_GlobalInvocationID.x % o_ubo.image_width);
+    int ry = int(gl_GlobalInvocationID.x / o_ubo.image_width);
+    uint own = raygenIn[gl_GlobalInvocationID.x].tid;
+    float width = WIRE_WIDTH * ubo.height / WIRE_REFERENCE_HEIGHT;
+    float strength = min(width, 1.0);
+    int radius = clamp(int(ceil(max(width, 1.0) * 0.5 + 0.5)), 1, WIRE_MAX_RADIUS);
+    float half_width = min(max(width, 1.0) * 0.5, float(radius) - 0.5);
+    uint ids[WIRE_MAX_IDS];
+    float depths[WIRE_MAX_IDS];
+    int count = 0;
+    bool uniform_block = true;
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            int x = rx + dx;
+            int y = ry + dy;
+            if (x < 0 || y < 0 || x >= int(o_ubo.image_width) || y >= int(o_ubo.image_height)) continue;
+            RayGenerator rg = raygenIn[y * o_ubo.image_width + x];
+            if (rg.tid != own) uniform_block = false;
+            if (rg.tid >= ubo.triangles) continue;
+            bool seen = false;
+            for (int k = 0; k < count; k++) seen = seen || ids[k] == rg.tid;
+            if (!seen && count < WIRE_MAX_IDS) {
+                ids[count] = rg.tid;
+                depths[count] = rg.distance;
+                count++;
             }
-            if (o_ubo.mode == VERTEX_SELECT && hovered_tid != o_ubo.single_selected_vid && hovered_tid != -1) {
-                float olddist = vdist;
-                vdist = length(vertex_position - vec2(rx, ry));
-                float swapdist = vhighlight_radius - vdist;
-                if (vdist < vhighlight_radius) {
-                    if (vertexIn[hovered_tid].w != 0) {
-                        mixc += swapdist * vec3(lock_color);
-                    } else {
-                        mixc += swapdist * vec3(highlight_color);
-                    }
-                    vsum += swapdist;
-                }
-                vdist = min(vdist, olddist);
-            }
-            if (vdist < vhighlight_radius) {
-                float mixing = 1.0 - (vdist / vhighlight_radius);
-                mixing = mixing*mixing*mixing;
-                newc = mix(newc, vec4(mixc / vsum, 1.0), mixing);
-            }
-			imageStore(outputImage, ivec2(rx, ry), mix(oldc, newc, min(1.0 / d, 1.0)));
         }
     }
+    if (uniform_block || count == 0) return;
+    float scene = length(g_ubo.maxBB - g_ubo.minBB);
+    float near = 1e-4 * scene;
+    vec2 p = vec2(rx, ry) + 0.5;
+    float best = FLTMAX;
+    float bestdepth = 0.0;
+    for (int k = 0; k < count; k++) {
+        float e = triangle_edge_distance(ids[k], p, near);
+        if (e < best) {
+            best = e;
+            bestdepth = depths[k];
+        }
+    }
+    float coverage = clamp(half_width + 0.5 - best, 0.0, 1.0) * strength;
+    if (coverage <= 0.0) return;
+    float d = bestdepth / scene;
+    vec4 oldc = imageLoad(outputImage, ivec2(rx, ry));
+    vec4 newc = vec4(0.1, 0.1, 0.1, 1.0);
+    float vdist = vhighlight_radius;
+    vec3 mixc = vec3(0);
+    float vsum = 0;
+    if (o_ubo.single_selected_vid != -1) {
+        vdist = length(selected_vertex_position - vec2(rx, ry));
+        float swapdist = vhighlight_radius - vdist;
+        if (vdist < vhighlight_radius) {
+            if (vertexIn[o_ubo.single_selected_vid].w != 0) {
+                mixc += swapdist * vec3(lock_color);
+            } else {
+                mixc += swapdist * vec3(highlight_color);
+            }
+            vsum += swapdist;
+        }
+    }
+    if (o_ubo.mode == VERTEX_SELECT && hovered_tid != o_ubo.single_selected_vid && hovered_tid != -1) {
+        float olddist = vdist;
+        vdist = length(vertex_position - vec2(rx, ry));
+        float swapdist = vhighlight_radius - vdist;
+        if (vdist < vhighlight_radius) {
+            if (vertexIn[hovered_tid].w != 0) {
+                mixc += swapdist * vec3(lock_color);
+            } else {
+                mixc += swapdist * vec3(highlight_color);
+            }
+            vsum += swapdist;
+        }
+        vdist = min(vdist, olddist);
+    }
+    if (vdist < vhighlight_radius) {
+        float mixing = 1.0 - (vdist / vhighlight_radius);
+        mixing = mixing*mixing*mixing;
+        newc = mix(newc, vec4(mixc / vsum, 1.0), mixing);
+    }
+    imageStore(outputImage, ivec2(rx, ry), mix(oldc, newc, coverage * min(1.0 / d, 1.0)));
 }
 
 void main() {
