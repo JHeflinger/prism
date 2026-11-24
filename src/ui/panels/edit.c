@@ -455,7 +455,7 @@ static void DrawEditPanel(float width, float height) {
             EZ_FATAL("Unhandled edit type detected");
         }
         float drawnheight = UIGetCursor().y - cursory;
-        if (drawnheight > height - 70) {
+        if (drawnheight > height - 90) {
             UIMoveCursor(0, 20);
             if (UIButton("Export", width - 20)) ExportEditTarget();
             UIMoveCursor(0, 5);
