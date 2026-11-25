@@ -521,7 +521,7 @@ void ReformatFromManifold(Geometry* geometry) {
             v1 = vertex_remapping[geometry->manifold.halfedges.data[he].vertex];
             v2 = vertex_remapping[geometry->manifold.halfedges.data[geometry->manifold.halfedges.data[he].next].vertex];
             v3 = vertex_remapping[geometry->manifold.halfedges.data[geometry->manifold.halfedges.data[geometry->manifold.halfedges.data[he].next].next].vertex];
-            SubmitTriangle((Triangle){ v1, v2, v3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 0});
+            SubmitTriangle((Triangle){ v1, v2, v3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 0, NO_UVS });
         }
     }
     EZ_FREE(vertex_remapping);

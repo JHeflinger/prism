@@ -1,5 +1,6 @@
 #include "overview.h"
 #include "renderer/renderer.h"
+#include "renderer/texture.h"
 #include "ui/panels/edit.h"
 #include "ui/shared.h"
 
@@ -27,6 +28,8 @@ static void DrawOverviewPanel(float width, float height) {
         UIDropList("Cameras", width - 20, NumCameras(), CameraNameReference(0), SetEditCamera, SelectedIndex(EDIT_CAMERA));
         UIMoveCursor(0, 5);
         UIDropList("Materials", width - 20, NumMaterials(), MaterialNameReference(0), SetEditMaterial, SelectedIndex(EDIT_MATERIAL));
+        UIMoveCursor(0, 5);
+        UIDropList("Textures", width - 20, NumTextures(), TextureNameReference(0), SetEditTexture, SelectedIndex(EDIT_TEXTURE));
         UIMoveCursor(0, 5);
         UIDropList("Lights", width - 20, NumLights(), LightNameReference(0), SetEditLight, SelectedIndex(EDIT_LIGHT));
         UIMoveCursor(0, 5);

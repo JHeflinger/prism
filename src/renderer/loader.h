@@ -12,6 +12,7 @@ typedef enum {
     PBJ_MESH,
     PBJ_FORCE,
     PBJ_SOURCE,
+    PBJ_TEXTURE,
     PBJ_TYPE_COUNT
 } PBJType;
 

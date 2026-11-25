@@ -49,6 +49,12 @@ float* NormalReference(VertexID normal);
 
 void ClearNormals();
 
+void SubmitUV(vec2 uv);
+
+float* UVReference(uint32_t uv);
+
+void ClearUVs();
+
 TriangleID SubmitTriangle(Triangle triangle);
 
 void ClearTriangles();
@@ -95,6 +101,8 @@ float RenderTime();
 
 size_t NumNormals();
 
+size_t NumUVs();
+
 size_t NumVertices();
 
 size_t NumTriangles();
@@ -106,6 +114,8 @@ size_t NumCameras();
 size_t NumEmissives();
 
 void UpdateNormals();
+
+void UpdateUVs();
 
 void UpdateVertices();
 

@@ -944,6 +944,7 @@ static void SetupPhase(SSSFitter* f) {
         tris[t].b = f->mesh.indices[t * 3 + 1];
         tris[t].c = f->mesh.indices[t * 3 + 2];
         tris[t].an = tris[t].bn = tris[t].cn = 0xFFFFFFFFu;
+        tris[t].at = tris[t].bt = tris[t].ct = NO_UV;
         tris[t].material = 0;
         cdf[t] = (float)(f->mesh.cdf[t] / total);
     }

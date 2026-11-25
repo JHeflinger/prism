@@ -169,6 +169,28 @@ BOOL VINIT_Subsurface(VulkanDataBuffer* gsss) {
     return TRUE;
 }
 
+BOOL VINIT_Textures(VulkanDataBuffer* textures) {
+    VUTIL_CreateBuffer(
+        sizeof(uint32_t) * 4,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        textures);
+    VUPDT_Textures(textures);
+    return TRUE;
+}
+
+BOOL VINIT_UVs(VulkanDataBuffer* uvs) {
+    size_t arrsize = sizeof(vec2) * g_vinit_renderer_ref->geometry.uvs.maxsize;
+    arrsize = arrsize > 0 ? arrsize : 1;
+    VUTIL_CreateBuffer(
+        arrsize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        uvs);
+    VUPDT_UVs(uvs);
+    return TRUE;
+}
+
 BOOL VINIT_Queue(VkQueue* queue) {
 	VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vinit_renderer_ref->vulkan.core.general.gpu);
     vkGetDeviceQueue(
@@ -953,6 +975,7 @@ BOOL VINIT_Geometry(VulkanGeometry* geometry) {
     if (!VINIT_BVH(&(geometry->bvh))) return FALSE;
     if (!VINIT_Normals(&(geometry->normals))) return FALSE;
     if (!VINIT_Vertices(&(geometry->vertices))) return FALSE;
+    if (!VINIT_UVs(&(geometry->uvs))) return FALSE;
 	if (!VINIT_Triangles(&(geometry->triangles))) return FALSE;
 	if (!VINIT_Splats(&(geometry->splats))) return FALSE;
 	if (!VINIT_Emissives(&(geometry->emissives))) return FALSE;
@@ -964,6 +987,7 @@ BOOL VINIT_Geometry(VulkanGeometry* geometry) {
 	if (!VINIT_Poses(&(geometry->poses))) return FALSE;
 	if (!VINIT_Skins(&(geometry->skins))) return FALSE;
 	if (!VINIT_Subsurface(&(geometry->gsss))) return FALSE;
+	if (!VINIT_Textures(&(geometry->textures))) return FALSE;
     return TRUE;
 }
 

@@ -9,6 +9,7 @@
 #include "renderer/overlay.h"
 #include "renderer/trainer.h"
 #include "renderer/subsurface.h"
+#include "renderer/texture.h"
 #include "renderer/rmath.h"
 #include "ui/panels/edit.h"
 #include <core/config.h>
@@ -729,6 +730,22 @@ void ClearNormals() {
     UpdateNormals();
 }
 
+void SubmitUV(vec2 uv) {
+    ARRLIST_vec2_add(&(g_renderer.geometry.uvs), uv);
+    UpdateUVs();
+}
+
+float* UVReference(uint32_t uv) {
+    EZ_ASSERT(uv < g_renderer.geometry.uvs.size, "UV reference does not exist for requested index");
+    return g_renderer.geometry.uvs.data[uv];
+}
+
+void ClearUVs() {
+    if (g_renderer.geometry.uvs.maxsize == 0) return;
+    ARRLIST_vec2_clear(&(g_renderer.geometry.uvs));
+    UpdateUVs();
+}
+
 TriangleID SubmitTriangle(Triangle triangle) {
     EZ_ASSERT(triangle.a < g_renderer.geometry.vertices.size &&
               triangle.b < g_renderer.geometry.vertices.size &&
@@ -1057,6 +1074,7 @@ void Render() {
 
         // transfer updates
         TRANSFER_UPDATE(normals, normals, g_renderer.geometry.normals.maxsize, g_renderer.geometry.normals.size, normals, Normals, FALSE);
+        TRANSFER_UPDATE(uvs, uvs, g_renderer.geometry.uvs.maxsize, g_renderer.geometry.uvs.size, uvs, UVs, FALSE);
         TRANSFER_UPDATE(vertices, vertices, g_renderer.geometry.vertices.maxsize, g_renderer.geometry.vertices.size, vertices, Vertices, FALSE);
         TRANSFER_UPDATE(triangles, triangles, g_renderer.geometry.triangles.maxsize, g_renderer.geometry.triangles.size, triangles, Triangles, TRUE);
         TRANSFER_UPDATE(splats, splats, g_renderer.geometry.splats.maxsize, g_renderer.geometry.splats.size, splats, Splats, TRUE);
@@ -1098,10 +1116,17 @@ void Render() {
         // dispatch transfer commands
         if (is_transferring) VUTIL_EndTransferCommands();
 
-        // subsurface clouds (rare, synchronous upload)
+        // subsurface clouds
         if (SubsurfaceNeedsUpdate()) {
             VUPDT_Subsurface(&(g_renderer.vulkan.core.geometry.gsss));
             resized_buffers = TRUE;
+        }
+
+        // textures
+        if (TexturesNeedUpdate()) {
+            VUPDT_Textures(&(g_renderer.vulkan.core.geometry.textures));
+            resized_buffers = TRUE;
+            RendererCamera()->config.reset = TRUE;
         }
 
         // update all descriptor sets if needed
@@ -1261,6 +1286,10 @@ size_t NumNormals() {
     return g_renderer.geometry.normals.size;
 }
 
+size_t NumUVs() {
+    return g_renderer.geometry.uvs.size;
+}
+
 size_t NumVertices() {
     return g_renderer.geometry.vertices.size;
 }
@@ -1283,6 +1312,10 @@ size_t NumEmissives() {
 
 void UpdateNormals() {
     g_renderer.geometry.changes.update_normals = TRUE;
+}
+
+void UpdateUVs() {
+    g_renderer.geometry.changes.update_uvs = TRUE;
 }
 
 void UpdateVertices() {
@@ -1945,6 +1978,7 @@ void ClearScene(BOOL hard) {
     ClearTriangles();
     ClearVertices();
     ClearNormals();
+    ClearUVs();
     ClearMaterials();
     if (!hard) SubmitDefaultMaterial();
     UpdateMaterials();
@@ -1954,6 +1988,7 @@ void ClearScene(BOOL hard) {
     ClearSimulation();
     ClearSplats();
     SubsurfaceClear();
+    ClearTextures();
     DeselectEditTarget();
     if (hard) ClearCameras();
 }
@@ -2234,6 +2269,17 @@ BOOL DeleteMesh(size_t id) {
         }
     }
     size_t ncount = (nmin <= nmax && nmax < g_renderer.geometry.normals.size) ? (size_t)nmax - nmin + 1 : 0;
+    uint32_t umin = UINT32_MAX;
+    uint32_t umax = 0;
+    for (size_t t = md.tstart; t < md.tstart + tcount; t++) {
+        uint32_t us[] = { g_renderer.geometry.triangles.data[t].at, g_renderer.geometry.triangles.data[t].bt, g_renderer.geometry.triangles.data[t].ct };
+        for (size_t k = 0; k < 3; k++) {
+            if (us[k] == NO_UV) continue;
+            if (us[k] < umin) umin = us[k];
+            if (us[k] > umax) umax = us[k];
+        }
+    }
+    size_t ucount = (umin <= umax && umax < g_renderer.geometry.uvs.size) ? (size_t)umax - umin + 1 : 0;
     for (size_t t = 0; t < g_renderer.geometry.triangles.size; t++) {
         if (t >= md.tstart && t < md.tstart + tcount) continue;
         Triangle tri = g_renderer.geometry.triangles.data[t];
@@ -2246,6 +2292,9 @@ BOOL DeleteMesh(size_t id) {
             }
             if (ncount && ns[k] != (uint32_t)-1 && ns[k] >= nmin && ns[k] <= nmax) ncount = 0;
         }
+        uint32_t us[] = { tri.at, tri.bt, tri.ct };
+        for (size_t k = 0; k < 3; k++)
+            if (ucount && us[k] != NO_UV && us[k] >= umin && us[k] <= umax) ucount = 0; // shared, keep them
     }
     ARRLIST_REMOVE_RANGE(g_renderer.geometry.triangles, md.tstart, tcount);
     for (size_t t = 0; t < g_renderer.geometry.triangles.size; t++) {
@@ -2260,9 +2309,15 @@ BOOL DeleteMesh(size_t id) {
             if (tri->bn != (uint32_t)-1 && tri->bn > nmax) tri->bn -= (uint32_t)ncount;
             if (tri->cn != (uint32_t)-1 && tri->cn > nmax) tri->cn -= (uint32_t)ncount;
         }
+        if (ucount) {
+            if (tri->at != NO_UV && tri->at > umax) tri->at -= (uint32_t)ucount;
+            if (tri->bt != NO_UV && tri->bt > umax) tri->bt -= (uint32_t)ucount;
+            if (tri->ct != NO_UV && tri->ct > umax) tri->ct -= (uint32_t)ucount;
+        }
     }
     ARRLIST_REMOVE_RANGE(g_renderer.geometry.vertices, md.start, vcount);
     if (ncount) ARRLIST_REMOVE_RANGE(g_renderer.geometry.normals, nmin, ncount);
+    if (ucount) ARRLIST_REMOVE_RANGE(g_renderer.geometry.uvs, umin, ucount);
     if (gcount) ARRLIST_REMOVE_RANGE(g_renderer.geometry.splats, md.sstart, gcount);
     size_t scount = 0;
     if (md.pose != (uint32_t)-1 && (size_t)md.skinstart + vcount <= g_renderer.geometry.skins.size) {
@@ -2315,6 +2370,7 @@ BOOL DeleteMesh(size_t id) {
     FixDeleteEditTarget(EDIT_MESH, id);
     SubsurfaceMeshDeleted(id);
     UpdateNormals();
+    UpdateUVs();
     UpdateVertices();
     UpdateTriangles();
     UpdateMeshes();

@@ -4,14 +4,85 @@
 #include "renderer/overlay.h"
 #include "renderer/loader.h"
 #include "renderer/rmath.h"
+#include "renderer/texture.h"
 #include "ui/shared.h"
 #include <util/logger.h>
 #include <ui/extra.h>
+#include <easyfile.h>
+
+#define TriangleHasUVs(t) ((t).at != NO_UV && (t).bt != NO_UV && (t).ct != NO_UV)
 
 static size_t g_edit_item_index = 0;
 static BOOL g_item_selected = FALSE;
 static EditType g_edit_type = EDIT_MATERIAL;
-static const char* g_light_types[] = { "Directional", "Spot", "Point" };
+static const char* g_light_types[] = { "Directional", "Spot", "Point", "Environment" };
+static uint32_t g_preview_level = 0;
+
+typedef struct {
+    SurfaceMaterial* material;
+    size_t slot;
+} MaterialSlotRef;
+
+static MaterialSlotRef g_slot_refs[MATERIAL_TEXTURE_SLOTS];
+
+static size_t ClampHandle(TextureHandle handle) {
+    return handle <= NumTextures() ? (size_t)handle : 0;
+}
+
+static size_t DropdownSelectMaterialTexture(void* data, size_t index, BOOL cancel) {
+    MaterialSlotRef* ref = (MaterialSlotRef*)data;
+    if (index == (size_t)-1) return ClampHandle(ref->material->textures[ref->slot]);
+    ref->material->textures[ref->slot] = (TextureHandle)index;
+    if (ref->slot == TEXSLOT_EMISSION) UpdateEmissives();
+    UpdateMaterials();
+    ResetAccumulation();
+    return index;
+}
+
+static size_t DropdownSelectLightTexture(void* data, size_t index, BOOL cancel) {
+    SceneLight* light = (SceneLight*)data;
+    if (index == (size_t)-1) return ClampHandle(light->texture);
+    light->texture = (TextureHandle)index;
+    UpdateLights();
+    if (light->mode == LIGHT_MODE_IBL) UpdateTextures();
+    ResetAccumulation();
+    return index;
+}
+
+static size_t DropdownSelectLightMode(void* data, size_t index, BOOL cancel) {
+    SceneLight* light = (SceneLight*)data;
+    if (index == (size_t)-1) return light->mode < LIGHT_MODE_COUNT ? light->mode : 0;
+    BOOL ibl = light->mode == LIGHT_MODE_IBL || index == LIGHT_MODE_IBL;
+    light->mode = (uint32_t)index;
+    UpdateLights();
+    if (ibl && light->texture) UpdateTextures();
+    ResetAccumulation();
+    return index;
+}
+
+static size_t DropdownSelectObjectFilter(void* data, size_t index, BOOL cancel) {
+    MeshDescriptor* md = (MeshDescriptor*)data;
+    if (index == (size_t)-1) return md->filter < TEXFILTER_COUNT ? md->filter : 0;
+    md->filter = (uint32_t)index;
+    UpdateMeshes();
+    ResetAccumulation();
+    return index;
+}
+
+static size_t DropdownSelectMipFilter(void* data, size_t index, BOOL cancel) {
+    SceneTexture* tex = (SceneTexture*)data;
+    if (index == (size_t)-1) return tex->settings.mipfilter < MIPFILTER_COUNT ? tex->settings.mipfilter : 0;
+    tex->settings.mipfilter = (uint32_t)index;
+    return index;
+}
+
+static size_t DropdownSelectTextureWrap(void* data, size_t index, BOOL cancel) {
+    SceneTexture* tex = (SceneTexture*)data;
+    if (index == (size_t)-1) return tex->settings.wrap < TEXWRAP_COUNT ? tex->settings.wrap : 0;
+    tex->settings.wrap = (uint32_t)index;
+    UpdateTextures();
+    return index;
+}
 
 static void ExportEditTarget() {
     if (!g_item_selected) { logwarn("Nothing selected to export"); return; }
@@ -23,6 +94,7 @@ static void ExportEditTarget() {
         case EDIT_MESH: type = PBJ_MESH; break;
         case EDIT_SINGLE_FORCE: type = PBJ_FORCE; break;
         case EDIT_SINGLE_SOURCE: type = PBJ_SOURCE; break;
+        case EDIT_TEXTURE: type = PBJ_TEXTURE; break;
         default: logerror("Single triangles and vertices can't be exported"); return;
     }
     const char* filepath = GetSaveFile("pbj");
@@ -37,6 +109,8 @@ static void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, f
     UIMoveCursor(0, 15);
     UITextInput("Name", name, MAX_MATERIAL_NAME_SIZE, width - 20, FALSE);
     UIMoveCursor(0, 15);
+    UIDividerLabeled(width, "Properties");
+    UIMoveCursor(0, 5);
     UIColumnHeader("Emission", LEFT_COLUMN_WIDTH);
     BOOL emission_edited = UITriplet("rgb", UI_FLOATS, &(matref->emission[0]), &(matref->emission[1]), &(matref->emission[2]), (UIMultiValue){ ._float = 0 }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.05f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
     edited |= emission_edited;
@@ -68,6 +142,27 @@ static void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, f
     UIMoveCursor(0, 35);
     UIColumnHeader("Lighting Model", LEFT_COLUMN_WIDTH);
     UIDropdownMenu(sboxwidth, 4, LightModelLabels(), DropdownSelectLightModel, matref);
+    UIMoveCursor(0, 15);
+    UIDividerLabeled(width, "Textures");
+    UIMoveCursor(0, 5);
+    for (size_t k = 0; k < MATERIAL_TEXTURE_SLOTS; k++) g_slot_refs[k] = (MaterialSlotRef){ matref, k };
+    #define TEXTURE_SLOT_ROW(k) { \
+        UIColumnHeader(MaterialTextureSlotLabels()[k], LEFT_COLUMN_WIDTH); \
+        UIDropdownMenu(sboxwidth, NumTextures() + 1, TextureHandleLabels(), DropdownSelectMaterialTexture, &(g_slot_refs[k])); }
+    TEXTURE_SLOT_ROW(TEXSLOT_DIFFUSE);
+    TEXTURE_SLOT_ROW(TEXSLOT_SPECULAR);
+    TEXTURE_SLOT_ROW(TEXSLOT_NORMAL);
+    TEXTURE_SLOT_ROW(TEXSLOT_EMISSION);
+    TEXTURE_SLOT_ROW(TEXSLOT_AMBIENT);
+    TEXTURE_SLOT_ROW(TEXSLOT_SHINY);
+    TEXTURE_SLOT_ROW(TEXSLOT_ABSORBTION);
+    TEXTURE_SLOT_ROW(TEXSLOT_SCATTERING);
+    TEXTURE_SLOT_ROW(TEXSLOT_DISPERSION);
+    TEXTURE_SLOT_ROW(TEXSLOT_IOR);
+    TEXTURE_SLOT_ROW(TEXSLOT_ANISOTROPY);
+    TEXTURE_SLOT_ROW(TEXSLOT_SCALE);
+    TEXTURE_SLOT_ROW(TEXSLOT_SUBSURFACE);
+    #undef TEXTURE_SLOT_ROW
     if (edited) UpdateMaterials();
     if (emission_edited) UpdateEmissives();
     if (was_emissive != is_emissive) RefreshEmissives();
@@ -76,7 +171,9 @@ static void DrawEditMaterial(SurfaceMaterial* matref, char* name, float width, f
 static void DrawEditLight(SceneLight* lref, char* name, float width, float height) {
     BOOL edited = FALSE;
     int light_type = 0;
-    if (lref->direction[0] == 0 && lref->direction[1] == 0 && lref->direction[2] == 0) {
+    if (lref->mode == LIGHT_MODE_IBL) {
+        light_type = 3;
+    } else if (lref->direction[0] == 0 && lref->direction[1] == 0 && lref->direction[2] == 0) {
         light_type = 2;
     } else if (lref->angle != 0) {
         light_type = 1;
@@ -98,7 +195,23 @@ static void DrawEditLight(SceneLight* lref, char* name, float width, float heigh
     edited |= UIDragFloat(&(lref->penumbra), 0, 1.0f, 0.01f, sboxwidth);
     UIColumnHeader("Opening Angle", LEFT_COLUMN_WIDTH);
     edited |= UIDragFloat(&(lref->angle), 0, FLT_MAX, 0.1f, sboxwidth);
-    if (edited) UpdateLights();
+    UIMoveCursor(0, 15);
+    UIDividerLabeled(width, "Texture");
+    UIMoveCursor(0, 5);
+    UIColumnHeader("Mode", LEFT_COLUMN_WIDTH);
+    UIDropdownMenu(sboxwidth, LIGHT_MODE_COUNT, LightModeLabels(), DropdownSelectLightMode, lref);
+    UIColumnHeader(lref->mode == LIGHT_MODE_IBL ? "Environment Map" : "Projected Texture", LEFT_COLUMN_WIDTH);
+    UIDropdownMenu(sboxwidth, NumTextures() + 1, TextureHandleLabels(), DropdownSelectLightTexture, lref);
+    UIColumnHeader(lref->mode == LIGHT_MODE_IBL ? "Yaw" : "Roll", LEFT_COLUMN_WIDTH);
+    edited |= UIDragFloat(&(lref->rotation), -FLT_MAX, FLT_MAX, 0.5f, sboxwidth);
+    if (lref->mode == LIGHT_MODE_PROJECTOR && light_type == 0) {
+        UIColumnHeader("Projection Width", LEFT_COLUMN_WIDTH);
+        edited |= UIDragFloat(&(lref->projsize), 0.0f, FLT_MAX, 0.05f, sboxwidth);
+    }
+    if (edited) {
+        UpdateLights();
+        if (lref->mode != LIGHT_MODE_STANDARD) ResetAccumulation();
+    }
 }
 
 static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float height) {
@@ -140,6 +253,31 @@ static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float heig
     md->disabled = disabled;
     if (edited) UpdateObjectTransform(g_edit_item_index);
     if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) {
+        float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
+        UIMoveCursor(0, 15);
+        UIDividerLabeled(width, "Texturing");
+        UIMoveCursor(0, 5);
+        UIColumnHeader("Texture Filtering", LEFT_COLUMN_WIDTH);
+        UIDropdownMenu(sboxwidth, TEXFILTER_COUNT, TextureFilterLabels(), DropdownSelectObjectFilter, md);
+        if (md->filter == TEXFILTER_ANISOTROPIC) {
+            UIColumnHeader("Max Anisotropy", LEFT_COLUMN_WIDTH);
+            uint32_t aniso = md->anisotaps == 0 ? DEFAULT_MAX_ANISOTROPY : md->anisotaps;
+            if (UIDragUInt(&aniso, 1, 64, 1, sboxwidth)) {
+                md->anisotaps = aniso;
+                UpdateMeshes();
+                ResetAccumulation();
+            }
+        }
+        UIColumnHeader("Recursive Ray Diff.", LEFT_COLUMN_WIDTH);
+        BOOL raydiff = md->raydiff != 0;
+        if (UICheckbox(&raydiff)) {
+            md->raydiff = raydiff ? 1 : 0;
+            UpdateMeshes();
+            ResetAccumulation();
+        }
+        UIDrawSubtleText(raydiff ? "Secondary hits filter with propagated differentials" : "Secondary hits sample the base level");
+    }
+    if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) {
         SubsurfaceCloudInfo info = { 0 };
         BOOL linked = QuerySubsurfaceCloudInfo(g_edit_item_index, &info);
         if (linked) {
@@ -147,6 +285,96 @@ static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float heig
             BOOL enabled = info.enabled;
             if (UICheckbox(&enabled)) SubsurfaceSetCloudEnabled(g_edit_item_index, enabled);
         }
+    }
+}
+
+static void DrawEditTexture(size_t index, float width, float height) {
+    SceneTexture* tex = TextureReference(index);
+    TextureSettings* st = &(tex->settings);
+    float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
+    UIMoveCursor((width - 20 - UITextWidth("Edit Texture")) / 2.0f, 0);
+    UIDrawText("Edit Texture");
+    UIMoveCursor(0, 15);
+    UITextInput("Name", TextureName(index), MAX_TEXTURE_NAME_SIZE, width - 20, FALSE);
+    UIMoveCursor(0, 5);
+    UIDividerLabeled(width, "Statistics");
+    UIMoveCursor(0, 5);
+    UIColumnHeader("Format", LEFT_COLUMN_WIDTH);
+    DrawRectangle(UIGetCursor().x, UIGetCursor().y, sboxwidth, 20, (Color){ 0, 0, 0, 245 });
+    UIDrawText("%u x %u %s", st->width, st->height, st->hdr ? "HDR (rgba16f)" : "LDR (rgba8)");
+    UIColumnHeader("Mip levels", LEFT_COLUMN_WIDTH);
+    DrawRectangle(UIGetCursor().x, UIGetCursor().y, sboxwidth, 20, (Color){ 0, 0, 0, 245 });
+    UIDrawText("%u", st->levels);
+    UIColumnHeader("Size", LEFT_COLUMN_WIDTH);
+    DrawRectangle(UIGetCursor().x, UIGetCursor().y, sboxwidth, 20, (Color){ 0, 0, 0, 245 });
+    UIDrawText("%.2f MB", TextureBytes(index) / (1024.0 * 1024.0));
+    UIMoveCursor(0, 15);
+    UIDividerLabeled(width, "Sampling");
+    UIMoveCursor(0, 5);
+    UIColumnHeader("sRGB Color Data", LEFT_COLUMN_WIDTH);
+    if (st->hdr) UIDrawSubtleText("linear (HDR)");
+    else if (UICheckbox(&(st->srgb))) UpdateTextures();
+    UIColumnHeader("Wrap Mode", LEFT_COLUMN_WIDTH);
+    UIDropdownMenu(sboxwidth, TEXWRAP_COUNT, TextureWrapLabels(), DropdownSelectTextureWrap, tex);
+    UIColumnHeader("Normal Map", LEFT_COLUMN_WIDTH);
+    if (UICheckbox(&(st->normalmap))) {
+        if (st->normalmap) st->srgb = FALSE;
+        UpdateTextures();
+    }
+    if (st->normalmap) {
+        UIColumnHeader("Flip Green (DX)", LEFT_COLUMN_WIDTH);
+        if (UICheckbox(&(st->flipgreen))) UpdateTextures();
+    }
+    UIMoveCursor(0, 15);
+    UIDividerLabeled(width, "Mipmaps");
+    UIMoveCursor(0, 5);
+    UIColumnHeader("Downsampling", LEFT_COLUMN_WIDTH);
+    UIDropdownMenu(sboxwidth, MIPFILTER_COUNT, MipFilterLabels(), DropdownSelectMipFilter, tex);
+    UIColumnHeader("Sharpness", LEFT_COLUMN_WIDTH);
+    UIDragFloat(&(st->sharpness), 0.25f, 4.0f, 0.01f, sboxwidth);
+    UIColumnHeader("Linear Space", LEFT_COLUMN_WIDTH);
+    if (!st->srgb || st->hdr || st->normalmap) UIDrawSubtleText(st->normalmap ? "renormalized normals" : "already linear");
+    else UICheckbox(&(st->linearmips));
+    UIColumnHeader("Max Levels", LEFT_COLUMN_WIDTH);
+    UIDragUInt(&(st->maxlevels), 0, MAX_TEXTURE_LEVELS, 1, sboxwidth);
+    UIMoveCursor(0, 5);
+    if (UIButton(st->levels > 1 ? "Regenerate Mipmaps" : "Generate Mipmaps", width - 20)) {
+        GenerateTextureMipmaps(index);
+        g_preview_level = 0;
+    }
+    UIMoveCursor(0, 5);
+    if (st->levels <= 1) DisableUI();
+    if (UIButton("Clear Mipmaps", width - 20)) {
+        ClearTextureMipmaps(index);
+        g_preview_level = 0;
+    }
+    EnableUI();
+    UIMoveCursor(0, 15);
+    UIDividerLabeled(width, "Preview");
+    UIMoveCursor(0, 5);
+    if (g_preview_level >= st->levels) g_preview_level = st->levels - 1;
+    char buf[256] = { 0 };
+    TextureLevel* lv = &(tex->mips[g_preview_level]);
+    sprintf(buf, "Level (%u x %u)", lv->width, lv->height);
+    UIColumnHeader(buf, LEFT_COLUMN_WIDTH);
+    if (st->levels <= 1) DisableUI();
+    UIDragUInt(&g_preview_level, 0, st->levels - 1, 1, sboxwidth);
+    EnableUI();
+    UIMoveCursor(0, 15);
+    Texture2D* preview = TexturePreview(index, g_preview_level);
+    if (preview && preview->id != 0 && lv->width > 0 && lv->height > 0) {
+        float maxw = width - 20;
+        float maxh = 360.0f;
+        float scale = maxw / (float)lv->width;
+        if ((float)lv->height * scale > maxh) scale = maxh / (float)lv->height;
+        float dw = (float)lv->width * scale;
+        float dh = (float)lv->height * scale;
+        Vector2 at = UIGetCursor();
+        at.x += (maxw - dw) / 2.0f;
+        DrawRectangle(at.x - 1, at.y - 1, dw + 2, dh + 2, GRAY);
+        DrawTexturePro(*preview, (Rectangle){ 0, 0, (float)preview->width, (float)preview->height },
+            (Rectangle){ at.x, at.y, dw, dh }, (Vector2){ 0, 0 }, 0.0f, WHITE);
+        UIMoveCursor(0, dh + 10);
     }
 }
 
@@ -208,7 +436,7 @@ static void DrawEditCamera(SceneCamera* cref, char* name, float width, float hei
     UIColumnHeader("Debug Mode", LEFT_COLUMN_WIDTH);
     size_t pp = PrimaryCameraID();
     SetCamera(g_edit_item_index);
-    UIDropdownMenu(sboxwidth, 7, DebugModeLabels(), DropdownSelectDebugMode, NULL);
+    UIDropdownMenu(sboxwidth, 8, DebugModeLabels(), DropdownSelectDebugMode, NULL);
     SetCamera(pp);
     UIColumnHeader("Max Bounces", LEFT_COLUMN_WIDTH);
     UIDragSize(&(cref->config.maxbounces), 0, 999999999, 1, sboxwidth);
@@ -310,6 +538,38 @@ static void DrawEditPanel(float width, float height) {
             UIColumnHeader("Material", LEFT_COLUMN_WIDTH);
             float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
             UIDropdownMenu(sboxwidth, NumMaterials(), MaterialNameReference(0), DropdownSelectMaterial, tref);
+            UIMoveCursor(0, 15);
+            UIDividerLabeled(width, "UVs");
+            UIMoveCursor(0, 5);
+            if (TriangleHasUVs(*tref) && tref->at < NumUVs() && tref->bt < NumUVs() && tref->ct < NumUVs()) {
+                // uvs can be shared with neighbouring faces, like vertices
+                BOOL uvedited = FALSE;
+                float* ua = UVReference(tref->at);
+                float* ub = UVReference(tref->bt);
+                float* uc = UVReference(tref->ct);
+                uvedited |= UIDoublet("uv", UI_FLOATS, &(ua[0]), &(ua[1]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 0.0f }, width);
+                uvedited |= UIDoublet("uv", UI_FLOATS, &(ub[0]), &(ub[1]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 0.0f }, width);
+                uvedited |= UIDoublet("uv", UI_FLOATS, &(uc[0]), &(uc[1]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 0.0f }, width);
+                UIDrawSubtleText("uv indices %u, %u, %u", tref->at, tref->bt, tref->ct);
+                if (uvedited) UpdateUVs();
+                UIMoveCursor(0, 5);
+                if (UIButton("Remove UVs", width - 20)) {
+                    tref->at = NO_UV;
+                    tref->bt = NO_UV;
+                    tref->ct = NO_UV;
+                    UpdateTriangles();
+                }
+            } else {
+                UIDrawSubtleText("No uvs - the material's plain values are used");
+                if (UIButton("Add UVs", width - 20)) {
+                    vec2 defaults[3] = { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f } };
+                    tref->at = (uint32_t)NumUVs();
+                    tref->bt = tref->at + 1;
+                    tref->ct = tref->at + 2;
+                    for (size_t k = 0; k < 3; k++) SubmitUV(defaults[k]);
+                    UpdateTriangles();
+                }
+            }
             vec3 adiff;
             glm_vec3_sub(VertexReference(tref->a), old_a, adiff);
             glm_vec3_add(VertexReference(tref->b), adiff, VertexReference(tref->b));
@@ -451,6 +711,8 @@ static void DrawEditPanel(float width, float height) {
         } else if (g_edit_type == EDIT_CAMERA) {
             SceneCamera* cref = GetCamera(g_edit_item_index);
             DrawEditCamera(cref, *(CameraNameReference(g_edit_item_index)), width, height);
+        } else if (g_edit_type == EDIT_TEXTURE) {
+            DrawEditTexture(g_edit_item_index, width, height);
         } else {
             EZ_FATAL("Unhandled edit type detected");
         }
@@ -565,6 +827,16 @@ void SetEditMesh(size_t index) {
     SetSelectedLight((LightID)-1);
 }
 
+void SetEditTexture(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_TEXTURE;
+    g_preview_level = 0;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
+    SetSelectedLight((LightID)-1);
+}
+
 void DeselectEditTarget() {
     g_item_selected = FALSE;
     SetSelectedTriangle((TriangleID)-1);
@@ -595,6 +867,9 @@ void DeleteEditTarget() {
             break;
         case EDIT_CAMERA:
             if (!DeleteCamera(g_edit_item_index)) return;
+            break;
+        case EDIT_TEXTURE:
+            if (!DeleteTexture(g_edit_item_index)) return;
             break;
         default:
             logerror("Deleting this element has not been supported yet");

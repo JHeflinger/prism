@@ -512,6 +512,36 @@ static VulkanBoundVariable get_bound_variable(Renderer* renderer, const char* na
 				sizeof(uint32_t)
 			}
 		};
+	} else if (strcmp(name, "UVSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.uvs.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.uvs.size)
+				}, 0.0f,
+				sizeof(vec2)
+			}
+		};
+	} else if (strcmp(name, "TextureSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				TRUE,
+				&(renderer->vulkan.core.geometry.textures.buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					TRUE,
+					&(renderer->geometry.textures.size)
+				}, 0.0f,
+				sizeof(uint32_t)
+			}
+		};
 	} else if (strcmp(name, "OverlaySSBO") == 0) {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,

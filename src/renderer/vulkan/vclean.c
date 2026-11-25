@@ -87,10 +87,19 @@ void VCLEAN_Subsurface(VulkanDataBuffer* gsss) {
     VUTIL_DestroyBuffer(*gsss);
 }
 
+void VCLEAN_UVs(VulkanDataBuffer* uvs) {
+    VUTIL_DestroyBuffer(*uvs);
+}
+
+void VCLEAN_Textures(VulkanDataBuffer* textures) {
+    VUTIL_DestroyBuffer(*textures);
+}
+
 void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_BVH(&(geometry->bvh));
     VCLEAN_Normals(&(geometry->normals));
     VCLEAN_Vertices(&(geometry->vertices));
+    VCLEAN_UVs(&(geometry->uvs));
     VCLEAN_Triangles(&(geometry->triangles));
     VCLEAN_Splats(&(geometry->splats));
     VCLEAN_Emissives(&(geometry->emissives));
@@ -102,6 +111,7 @@ void VCLEAN_Geometry(VulkanGeometry* geometry) {
     VCLEAN_Poses(&(geometry->poses));
     VCLEAN_Skins(&(geometry->skins));
     VCLEAN_Subsurface(&(geometry->gsss));
+    VCLEAN_Textures(&(geometry->textures));
 }
 
 void VCLEAN_Metadata(VulkanMetadata* metadata) {

@@ -21,6 +21,7 @@ export Definitions {
     #define DEBUG_SSS_PATH 4
     #define DEBUG_SSS_COST 5
     #define DEBUG_VARIANCE 6
+    #define DEBUG_UVS 7
     #define FLTMAX 3.402823466e+38
     #define LAMBERTIAN_MODEL 2
     #define MIRROR_MODEL 5
@@ -29,7 +30,24 @@ export Definitions {
     #define PI 3.14159265358979323846
     #define MAX_BONE_INFLUENCES 4
     #define MAX_SSS_BOUNCES 16
+    #define MATERIAL_TEXTURE_SLOTS 13
     const uint AIR_MEDIUM = uint(-1);
+    const uint TEXSLOT_EMISSION = 0u;
+    const uint TEXSLOT_AMBIENT = 1u;
+    const uint TEXSLOT_DIFFUSE = 2u;
+    const uint TEXSLOT_SPECULAR = 3u;
+    const uint TEXSLOT_ABSORBTION = 4u;
+    const uint TEXSLOT_DISPERSION = 5u;
+    const uint TEXSLOT_SCATTERING = 6u;
+    const uint TEXSLOT_ANISOTROPY = 7u;
+    const uint TEXSLOT_SCALE = 8u;
+    const uint TEXSLOT_SUBSURFACE = 9u;
+    const uint TEXSLOT_IOR = 10u;
+    const uint TEXSLOT_SHINY = 11u;
+    const uint TEXSLOT_NORMAL = 12u;
+    const uint LIGHT_MODE_STANDARD = 0u;
+    const uint LIGHT_MODE_PROJECTOR = 1u;
+    const uint LIGHT_MODE_IBL = 2u;
 }
 
 export RayGeneratorDef {
@@ -55,6 +73,9 @@ export TriangleDef {
         uint bn;
         uint cn;
         uint material;
+        uint at;
+        uint bt;
+        uint ct;
     }
 }
 
@@ -145,8 +166,7 @@ export OverlayUniformBufferObjectDef {
         uint camera_count;
         uint primary_cid;
         uint single_selected_cid;
-        // per camera (indexed by camera id): [0] position + tan(half fov x), [1] u + aspect, [2] v + ortho flag, [3] w
-        vec4 camera_glyphs[MAX_CAMERA_GLYPHS * 4];
+        vec4 camera_glyphs[MAX_CAMERA_GLYPHS * 4]; // per camera (indexed by camera id): [0] position + tan(half fov x), [1] u + aspect, [2] v + ortho flag, [3] w
     }
 }
 
@@ -199,6 +219,7 @@ export UniformBufferObjectDef {
         uint splatocclusion;
         uint sssplats;
         uint sssexitlight;
+        uint meshes;
     }
 }
 
@@ -266,6 +287,7 @@ export HitDef {
         uint material;
         vec3 normal;
         vec3 position;
+        vec2 uv;
     }
 }
 
@@ -358,6 +380,7 @@ export MaterialDef {
         float ior;
         float shiny;
         uint model;
+        uint textures[MATERIAL_TEXTURE_SLOTS]; // 0 = none
     }
 }
 
@@ -368,6 +391,10 @@ export SceneLightDef {
         vec3 direction;
         float penumbra;
         float angle;
+        uint texture; // 0 = none
+        uint mode;
+        float projsize; // world space width of a directional projector
+        float rotation; // roll of a projector, yaw of an environment map
     }
 }
 
@@ -464,6 +491,9 @@ export MeshDescriptorDef {
         vec3 rotate;
         vec3 scale;
         mat4 transform;
+        uint texfilter;
+        uint raydiff;
+        uint anisotaps;
     }
 }
 
@@ -882,6 +912,7 @@ export TriangleIntersectSuite {
         hit.distance = f * dot(e2, q);
         if (hit.distance <= EPS) return false;
         hit.material = tri.material;
+        hit.uv = vec2(u, v);
         hit.position = ray.position + (ray.direction * hit.distance);
         if (ubo.normals != 0 && tri.an != -1) {
             hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
@@ -1612,5 +1643,399 @@ export SubsurfaceSuite {
         s.path_length = D + excess;
         s.projected = projected;
         return s;
+    }
+}
+
+export UVSSBODef {
+    buffer UVSSBOIn {
+        vec2 uvIn[ ];
+    }
+}
+
+export TextureSSBODef {
+    buffer TextureSSBOIn {
+        uint texIn[ ];
+    }
+}
+
+export TextureSuite {
+    // mirrors the packing in src/renderer/texture.c: [0] texture count, then a TEX_RECORD_STRIDE word record per
+    // texture (0 width, 1 height, 2 levels, 3 flags, 4 importance table, 5 table width, 6 table height, 8.. level offsets)
+    // texel rows run top to bottom, uvs use the OBJ convention (v up), so v = 1 is the first row
+    const uint TEX_RECORD_STRIDE = 24u;
+    const uint TEX_MAX_LEVELS = 16u;
+    const uint TEX_FLAG_HDR = 1u;
+    const uint TEX_FLAG_SRGB = 2u;
+    const uint TEX_WRAP_SHIFT = 2u;
+    const uint TEX_FLAG_NORMAL = 16u;
+    const uint TEX_FLAG_FLIPGREEN = 32u;
+    const uint TEXFILTER_BILINEAR = 0u;
+    const uint TEXFILTER_TRILINEAR = 1u;
+    const uint TEXFILTER_ANISOTROPIC = 2u;
+    const uint TEXFILTER_NEAREST = 3u;
+    const uint TEX_DEFAULT_ANISO = 16u;
+    const uint TEX_MAX_ANISO = 64u;
+    const float TEX_PI = 3.14159265358979323846;
+
+    bool tex_valid(uint handle) {
+        return handle != 0u && handle <= texIn[0];
+    }
+
+    uint tex_record(uint handle) {
+        return 1u + (handle - 1u) * TEX_RECORD_STRIDE;
+    }
+
+    uint tex_flags(uint handle) {
+        return tex_valid(handle) ? texIn[tex_record(handle) + 3u] : 0u;
+    }
+
+    float tex_f(uint i) {
+        return uintBitsToFloat(texIn[i]);
+    }
+
+    vec3 tex_srgb_to_linear(vec3 c) {
+        return mix(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, lessThanEqual(c, vec3(0.04045)));
+    }
+
+    int tex_wrap(int i, int n, uint mode) {
+        if (n <= 1) return 0;
+        if (mode == 1u) return clamp(i, 0, n - 1);
+        if (mode == 2u) {
+            int period = 2 * n;
+            int p = i - period * int(floor(float(i) / float(period)));
+            return p < n ? p : period - 1 - p;
+        }
+        return i - n * int(floor(float(i) / float(n)));
+    }
+
+    uvec2 tex_level_size(uint rec, uint level) {
+        return uvec2(max(texIn[rec] >> level, 1u), max(texIn[rec + 1u] >> level, 1u));
+    }
+
+    vec4 tex_texel(uint rec, uint level, int x, int y, bool raw) {
+        level = min(level, texIn[rec + 2u] - 1u);
+        uvec2 size = tex_level_size(rec, level);
+        uint flags = texIn[rec + 3u];
+        uint wrap = (flags >> TEX_WRAP_SHIFT) & 3u;
+        uint ux = uint(clamp(tex_wrap(x, int(size.x), wrap), 0, int(size.x) - 1));
+        uint uy = uint(clamp(tex_wrap(y, int(size.y), wrap), 0, int(size.y) - 1));
+        uint base = texIn[rec + 8u + level];
+        if ((flags & TEX_FLAG_HDR) != 0u) {
+            uint o = base + 2u * (uy * size.x + ux);
+            return vec4(unpackHalf2x16(texIn[o]), unpackHalf2x16(texIn[o + 1u]));
+        }
+        vec4 c = unpackUnorm4x8(texIn[base + uy * size.x + ux]);
+        if (!raw && (flags & TEX_FLAG_SRGB) != 0u) c.rgb = tex_srgb_to_linear(c.rgb);
+        return c;
+    }
+
+    vec4 tex_nearest(uint rec, uint level, vec2 uv, bool raw) {
+        vec2 p = vec2(uv.x, 1.0 - uv.y) * vec2(tex_level_size(rec, level));
+        return tex_texel(rec, level, int(floor(p.x)), int(floor(p.y)), raw);
+    }
+
+    vec4 tex_bilinear(uint rec, uint level, vec2 uv, bool raw) {
+        vec2 p = vec2(uv.x, 1.0 - uv.y) * vec2(tex_level_size(rec, level)) - 0.5;
+        vec2 f = floor(p);
+        vec2 t = p - f;
+        ivec2 i = ivec2(f);
+        vec4 a = tex_texel(rec, level, i.x, i.y, raw);
+        vec4 b = tex_texel(rec, level, i.x + 1, i.y, raw);
+        vec4 c = tex_texel(rec, level, i.x, i.y + 1, raw);
+        vec4 d = tex_texel(rec, level, i.x + 1, i.y + 1, raw);
+        return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
+    }
+
+    vec4 tex_trilinear(uint rec, float lod, vec2 uv, bool raw) {
+        uint levels = texIn[rec + 2u];
+        lod = clamp(lod, 0.0, float(levels - 1u));
+        uint l0 = min(uint(lod), levels - 1u);
+        float f = lod - float(l0);
+        vec4 a = tex_bilinear(rec, l0, uv, raw);
+        if (f <= 0.0 || l0 + 1u >= levels) return a;
+        return mix(a, tex_bilinear(rec, l0 + 1u, uv, raw), f);
+    }
+
+    vec4 tex_sample(uint handle, vec2 uv, vec2 dx, vec2 dy, uint tfilter, uint anisotaps, bool raw) {
+        if (!tex_valid(handle)) return vec4(1.0);
+        uint rec = tex_record(handle);
+        if (any(isnan(uv)) || any(isinf(uv))) uv = vec2(0.0);
+        if (any(isnan(dx)) || any(isinf(dx)) || any(isnan(dy)) || any(isinf(dy))) { dx = vec2(0.0); dy = vec2(0.0); }
+        if (tfilter == TEXFILTER_NEAREST) return tex_nearest(rec, 0u, uv, raw);
+        if (tfilter != TEXFILTER_TRILINEAR && tfilter != TEXFILTER_ANISOTROPIC) return tex_bilinear(rec, 0u, uv, raw);
+        vec2 size = vec2(tex_level_size(rec, 0u));
+        float lx = length(dx * size);
+        float ly = length(dy * size);
+        float pmax = max(lx, ly);
+        if (!(pmax > 1e-6)) return tex_bilinear(rec, 0u, uv, raw);
+        if (tfilter == TEXFILTER_TRILINEAR) return tex_trilinear(rec, log2(pmax), uv, raw);
+        float pmin = max(min(lx, ly), 1e-6);
+        float limit = float(clamp(anisotaps == 0u ? TEX_DEFAULT_ANISO : anisotaps, 1u, TEX_MAX_ANISO));
+        float taps = clamp(ceil(pmax / pmin), 1.0, limit);
+        float lod = log2(pmax / taps);
+        vec2 axis = lx >= ly ? dx : dy;
+        int n = int(taps);
+        vec4 sum = vec4(0.0);
+        for (int i = 0; i < n; i++) sum += tex_trilinear(rec, lod, uv + axis * ((float(i) + 0.5) / taps - 0.5), raw);
+        return sum / taps;
+    }
+
+    vec3 tex_rotate_y(vec3 d, float degrees) {
+        float a = radians(degrees);
+        float c = cos(a);
+        float s = sin(a);
+        return vec3(c * d.x + s * d.z, d.y, -s * d.x + c * d.z);
+    }
+
+    vec2 tex_dir_to_equirect(vec3 d) {
+        float phi = (abs(d.x) + abs(d.z)) > 1e-12 ? atan(d.z, d.x) : 0.0;
+        float theta = acos(clamp(d.y, -1.0, 1.0));
+        return vec2(phi / (2.0 * TEX_PI) + 0.5, theta / TEX_PI);
+    }
+
+    vec3 tex_equirect_to_dir(vec2 e) {
+        float phi = (e.x - 0.5) * 2.0 * TEX_PI;
+        float theta = e.y * TEX_PI;
+        float st = sin(theta);
+        return vec3(st * cos(phi), cos(theta), st * sin(phi));
+    }
+
+    vec2 tex_equirect_uv(vec3 d) {
+        vec2 e = tex_dir_to_equirect(d);
+        return vec2(e.x, 1.0 - e.y);
+    }
+
+    bool tex_has_importance(uint handle) {
+        return tex_valid(handle) && texIn[tex_record(handle) + 4u] != 0u;
+    }
+
+    uint tex_cdf_search(uint base, uint n, float xi) { // largest k in [0, n) with cdf[k] <= xi (the cdf has n + 1 entries starting at base)
+        uint lo = 0u;
+        uint hi = n;
+        while (lo + 1u < hi) {
+            uint mid = (lo + hi) / 2u;
+            if (tex_f(base + mid) <= xi) lo = mid;
+            else hi = mid;
+        }
+        return lo;
+    }
+
+    vec3 tex_importance_sample(uint handle, vec2 xi, out float pdf) {
+        uint rec = tex_record(handle);
+        uint base = texIn[rec + 4u];
+        uint gw = texIn[rec + 5u];
+        uint gh = texIn[rec + 6u];
+        uint j = tex_cdf_search(base, gh, xi.y);
+        float m0 = tex_f(base + j);
+        float m1 = tex_f(base + j + 1u);
+        uint row = base + gh + 1u + j * (gw + 1u);
+        uint i = tex_cdf_search(row, gw, xi.x);
+        float c0 = tex_f(row + i);
+        float c1 = tex_f(row + i + 1u);
+        float ty = clamp((xi.y - m0) / max(m1 - m0, 1e-12), 0.0, 1.0);
+        float tx = clamp((xi.x - c0) / max(c1 - c0, 1e-12), 0.0, 1.0);
+        vec2 e = vec2((float(i) + tx) / float(gw), (float(j) + ty) / float(gh));
+        float st = sin(e.y * TEX_PI);
+        pdf = st > 1e-6 ? (m1 - m0) * (c1 - c0) * float(gw) * float(gh) / (2.0 * TEX_PI * TEX_PI * st) : 0.0;
+        return tex_equirect_to_dir(e);
+    }
+
+    float tex_importance_pdf(uint handle, vec3 d) {
+        uint rec = tex_record(handle);
+        uint base = texIn[rec + 4u];
+        uint gw = texIn[rec + 5u];
+        uint gh = texIn[rec + 6u];
+        vec2 e = tex_dir_to_equirect(d);
+        uint i = min(uint(max(e.x, 0.0) * float(gw)), gw - 1u);
+        uint j = min(uint(max(e.y, 0.0) * float(gh)), gh - 1u);
+        uint row = base + gh + 1u + j * (gw + 1u);
+        float pm = tex_f(base + j + 1u) - tex_f(base + j);
+        float pc = tex_f(row + i + 1u) - tex_f(row + i);
+        float st = sin(e.y * TEX_PI);
+        return st > 1e-6 ? pm * pc * float(gw) * float(gh) / (2.0 * TEX_PI * TEX_PI * st) : 0.0;
+    }
+}
+
+export RayDifferentialSuite {
+    struct RayDiff {
+        vec3 dpx;
+        vec3 dpy;
+        vec3 ddx;
+        vec3 ddy;
+    };
+
+    const float RD_DIFFUSE_SPREAD = 0.125; // direction spread assumed after diffuse / volume scattering (heuristic)
+
+    RayDiff rd_zero() {
+        RayDiff r;
+        r.dpx = vec3(0.0);
+        r.dpy = vec3(0.0);
+        r.ddx = vec3(0.0);
+        r.ddy = vec3(0.0);
+        return r;
+    }
+
+    RayDiff rd_camera(Ray ray) {
+        RayDiff r = rd_zero();
+        if (ubo.ortho != 0u) {
+            float wpp = ubo.orthosize / ubo.height;
+            r.dpx = ubo.u * wpp;
+            r.dpy = -ubo.v * wpp;
+            return r;
+        }
+        float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * (ubo.width / 2.0);
+        float along = dot(ray.direction, -ubo.w);
+        if (along <= 1e-6) return r;
+        vec3 q = ray.direction * (d / along); // unnormalized direction u * U + v * V - d * W
+        float qq = dot(q, q);
+        float inv = inversesqrt(qq) / qq;
+        r.ddx = (ubo.u * qq - q * dot(q, ubo.u)) * inv;
+        r.ddy = (-ubo.v * qq + q * dot(q, ubo.v)) * inv;
+        return r;
+    }
+
+    void rd_transfer(inout RayDiff r, vec3 dir, float t, vec3 n) {
+        vec3 ax = r.dpx + t * r.ddx;
+        vec3 ay = r.dpy + t * r.ddy;
+        float dn = dot(dir, n);
+        if (abs(dn) < 1e-8) {
+            r.dpx = ax;
+            r.dpy = ay;
+            return;
+        }
+        r.dpx = ax - (dot(ax, n) / dn) * dir;
+        r.dpy = ay - (dot(ay, n) / dn) * dir;
+    }
+
+    void rd_reflect(inout RayDiff r, vec3 dir, vec3 n, vec3 dnx, vec3 dny) {
+        float dn = dot(dir, n);
+        float ddnx = dot(r.ddx, n) + dot(dir, dnx);
+        float ddny = dot(r.ddy, n) + dot(dir, dny);
+        r.ddx = r.ddx - 2.0 * (dn * dnx + ddnx * n);
+        r.ddy = r.ddy - 2.0 * (dn * dny + ddny * n);
+    }
+
+    void rd_refract(inout RayDiff r, vec3 dir, vec3 t, vec3 n, vec3 dnx, vec3 dny, float eta) {
+        float dn = dot(dir, n);
+        float tn = dot(t, n);
+        if (abs(tn) < 1e-6) {
+            rd_reflect(r, dir, n, dnx, dny);
+            return;
+        }
+        float mu = eta * dn - tn;
+        float k = eta - eta * eta * dn / tn;
+        float ddnx = dot(r.ddx, n) + dot(dir, dnx);
+        float ddny = dot(r.ddy, n) + dot(dir, dny);
+        r.ddx = eta * r.ddx - (mu * dnx + k * ddnx * n);
+        r.ddy = eta * r.ddy - (mu * dny + k * ddny * n);
+    }
+
+    void rd_scatter(inout RayDiff r, vec3 dir, float spread) {
+        vec3 a = abs(dir.x) > 0.9 ? vec3(0, 1, 0) : vec3(1, 0, 0);
+        vec3 t1 = normalize(cross(dir, a));
+        vec3 t2 = cross(dir, t1);
+        r.ddx = t1 * spread;
+        r.ddy = t2 * spread;
+    }
+
+    vec2 rd_barycentric(vec3 e1, vec3 e2, vec3 dp) {
+        float a = dot(e1, e1);
+        float b = dot(e1, e2);
+        float c = dot(e2, e2);
+        float det = a * c - b * b;
+        if (abs(det) < 1e-30) return vec2(0.0);
+        float p = dot(e1, dp);
+        float q = dot(e2, dp);
+        return vec2(c * p - b * q, a * q - b * p) / det;
+    }
+}
+
+export SurfaceSuite {
+    struct SurfaceTexcoord {
+        bool valid;
+        vec2 uv;
+        vec2 dx;
+        vec2 dy;
+        vec3 dpdu;
+        vec3 dpdv;
+        vec3 dndx;
+        vec3 dndy;
+    };
+
+    uint surface_mesh(uint tid) {
+        uint lo = 0u;
+        uint hi = ubo.meshes;
+        while (lo < hi) {
+            uint mid = lo + (hi - lo) / 2u;
+            if (transformsIn[mid].tstart <= tid) lo = mid + 1u;
+            else hi = mid;
+        }
+        if (lo == 0u) return uint(-1);
+        uint tstart = transformsIn[lo - 1u].tstart;
+        uint tend = transformsIn[lo - 1u].tend;
+        if (tend == uint(-1) || tend < tstart || tid > tend) return uint(-1);
+        return lo - 1u;
+    }
+
+    vec3 surface_geometric_normal(uint tid) {
+        Triangle tri = triangleIn[tid];
+        vec3 n = cross(vertexIn[tri.b].xyz - vertexIn[tri.a].xyz, vertexIn[tri.c].xyz - vertexIn[tri.a].xyz);
+        float l = length(n);
+        return l > 0.0 ? n / l : vec3(0, 1, 0);
+    }
+
+    bool surface_has_uvs(Triangle tri) {
+        return tri.at != uint(-1) && tri.bt != uint(-1) && tri.ct != uint(-1);
+    }
+
+    SurfaceTexcoord surface_texcoord(uint tid, vec2 uv, RayDiff rd, bool footprint) {
+        SurfaceTexcoord s;
+        s.valid = false;
+        s.uv = vec2(0.0);
+        s.dx = vec2(0.0);
+        s.dy = vec2(0.0);
+        s.dpdu = vec3(0.0);
+        s.dpdv = vec3(0.0);
+        s.dndx = vec3(0.0);
+        s.dndy = vec3(0.0);
+        Triangle tri = triangleIn[tid];
+        vec3 p0 = vertexIn[tri.a].xyz;
+        vec3 e1 = vertexIn[tri.b].xyz - p0;
+        vec3 e2 = vertexIn[tri.c].xyz - p0;
+        vec2 bx = footprint ? rd_barycentric(e1, e2, rd.dpx) : vec2(0.0);
+        vec2 by = footprint ? rd_barycentric(e1, e2, rd.dpy) : vec2(0.0);
+        if (ubo.normals != 0 && tri.an != uint(-1)) {
+            vec3 n0 = normalIn[tri.an];
+            vec3 n1 = normalIn[tri.bn] - n0;
+            vec3 n2 = normalIn[tri.cn] - n0;
+            s.dndx = bx.x * n1 + bx.y * n2;
+            s.dndy = by.x * n1 + by.y * n2;
+        }
+        if (!surface_has_uvs(tri)) return s;
+        s.valid = true;
+        vec2 t0 = uvIn[tri.at];
+        vec2 d1 = uvIn[tri.bt] - t0;
+        vec2 d2 = uvIn[tri.ct] - t0;
+        s.uv = t0 + uv.x * d1 + uv.y * d2;
+        s.dx = bx.x * d1 + bx.y * d2;
+        s.dy = by.x * d1 + by.y * d2;
+        float det = d1.x * d2.y - d1.y * d2.x;
+        if (abs(det) > 1e-20) {
+            float inv = 1.0 / det;
+            s.dpdu = (e1 * d2.y - e2 * d1.y) * inv;
+            s.dpdv = (e2 * d1.x - e1 * d2.x) * inv;
+        }
+        return s;
+    }
+
+    vec3 surface_normal_map(SurfaceTexcoord s, vec3 n, vec3 tn) {
+        vec3 t = s.dpdu - n * dot(n, s.dpdu);
+        if (!(dot(t, t) > 1e-24)) return n;
+        t = normalize(t);
+        vec3 b = s.dpdv - n * dot(n, s.dpdv) - t * dot(t, s.dpdv);
+        b = dot(b, b) > 1e-24 ? normalize(b) : cross(n, t);
+        vec3 m = t * tn.x + b * tn.y + n * max(tn.z, 1e-3);
+        float l = length(m);
+        return l > 0.0 ? m / l : n;
     }
 }

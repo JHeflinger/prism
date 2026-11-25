@@ -30,6 +30,8 @@ layout(binding = 12) readonly #import EmissionAliasSSBODef;
 layout(binding = 13) readonly #import TransformsSSBODef;
 layout(binding = 14) readonly #import SubsurfaceSSBODef;
 layout(binding = 15) #import OverlaySSBODef;
+layout(binding = 16) readonly #import TextureSSBODef;
+layout(binding = 17) readonly #import UVSSBODef;
 
 #import CutViewport
 #import GBufferSuite
@@ -39,6 +41,9 @@ layout(binding = 15) #import OverlaySSBODef;
 #import RandomSuite
 #import SamplingSuite
 #import SubsurfaceSuite
+#import TextureSuite
+#import RayDifferentialSuite
+#import SurfaceSuite
 
 const float max_contribution = 10;
 const uint SOBOL_DIRS[2][32] = uint[2][32](
@@ -111,6 +116,119 @@ float fresnel_dielectric(float cosi, float ior_i, float ior_t) {
     float Rs = (ior_t * cosi - ior_i * cost) / (ior_t * cosi + ior_i * cost);
     float Rp = (ior_i * cosi - ior_t * cost) / (ior_i * cosi + ior_t * cost);
     return 0.5 * (Rs * Rs + Rp * Rp);
+}
+
+bool g_last_lambertian = false;
+bool g_last_lobe_specular = false;
+float g_refract_eta = 1.0;
+RayDiff g_rd;
+
+float mis_power(float a, float b) {
+    float a2 = a * a;
+    float b2 = b * b;
+    return a2 + b2 > 0.0 ? a2 / (a2 + b2) : 0.0;
+}
+
+void light_basis(vec3 axis, float roll, out vec3 u, out vec3 v) {
+    vec3 a = abs(axis.y) < 0.999 ? vec3(0, 1, 0) : vec3(1, 0, 0);
+    u = normalize(cross(axis, a));
+    v = cross(u, axis);
+    float r = radians(roll);
+    float c = cos(r);
+    float s = sin(r);
+    vec3 ru = c * u + s * v;
+    v = -s * u + c * v;
+    u = ru;
+}
+
+vec3 light_projection(SceneLight light, vec3 pos, vec3 incoming) {
+    if (light.mode != LIGHT_MODE_PROJECTOR || !tex_valid(light.texture)) return vec3(1.0);
+    vec2 uv = vec2(0.0);
+    if (light.direction == vec3(0) && light.angle == 0) { // point light: spherical projection around it
+        uv = tex_equirect_uv(tex_rotate_y(-incoming, -light.rotation));
+    } else {
+        vec3 axis = light.direction == vec3(0) ? vec3(0, -1, 0) : normalize(light.direction);
+        vec3 u;
+        vec3 v;
+        light_basis(axis, light.rotation, u, v);
+        if (light.angle != 0) { // spot light: perspective projection filling its cone
+            vec3 l = -incoming;
+            float z = dot(l, axis);
+            if (z <= 1e-6) return vec3(0.0);
+            float th = tan(radians(clamp(abs(light.angle), 0.1, 179.0) / 2.0));
+            uv = vec2(dot(l, u), dot(l, v)) / (z * th) * 0.5 + 0.5;
+        } else { // directional light: orthographic projection centered on the light position
+            float size = light.projsize > 0.0 ? light.projsize : 1.0;
+            vec3 off = pos - light.position;
+            uv = vec2(dot(off, u), dot(off, v)) / size + 0.5;
+        }
+    }
+    return tex_sample(light.texture, uv, vec2(0.0), vec2(0.0), TEXFILTER_BILINEAR, 1u, false).rgb;
+}
+
+vec3 env_radiance(SceneLight light, vec3 dir) {
+    if (!tex_valid(light.texture)) return light.color; // constant environment
+    vec2 uv = tex_equirect_uv(tex_rotate_y(dir, -light.rotation));
+    return light.color * tex_sample(light.texture, uv, vec2(0.0), vec2(0.0), TEXFILTER_BILINEAR, 1u, false).rgb;
+}
+
+float env_pdf(SceneLight light, vec3 dir) {
+    if (!tex_has_importance(light.texture)) return 1.0 / (4.0 * PI);
+    return tex_importance_pdf(light.texture, tex_rotate_y(dir, -light.rotation));
+}
+
+vec3 env_sample(SceneLight light, out float pdf) {
+    vec2 xi = vec2(random(), random());
+    if (!tex_has_importance(light.texture)) {
+        float z = 1.0 - 2.0 * xi.x;
+        float r = sqrt(max(0.0, 1.0 - z * z));
+        float phi = 2.0 * PI * xi.y;
+        pdf = 1.0 / (4.0 * PI);
+        return vec3(r * cos(phi), z, r * sin(phi));
+    }
+    vec3 d = tex_importance_sample(light.texture, xi, pdf);
+    return tex_rotate_y(d, light.rotation);
+}
+
+bool scene_light(uint i, vec3 pos, out vec3 incoming, out float dist, out vec3 radiance, out float pdf) {
+    SceneLight light = lightIn[i];
+    pdf = 1.0;
+    radiance = vec3(0.0);
+    if (light.mode == LIGHT_MODE_IBL) {
+        incoming = env_sample(light, pdf);
+        dist = FLTMAX;
+        radiance = env_radiance(light, incoming);
+        return pdf > 0.0;
+    }
+    vec3 to_light = light.position - pos;
+    dist = length(to_light);
+    float falloff = 1.0;
+    if (light.angle == 0 && light.direction == vec3(0)) { // point light
+        incoming = normalize(to_light);
+    } else if (light.angle != 0) { // spot light
+        if (light.direction == vec3(0)) light.direction = vec3(0, -1, 0);
+        incoming = normalize(to_light);
+        float angle = acos(clamp(dot(-incoming, normalize(light.direction)), -1.0, 1.0));
+        float lightangle = radians(light.angle / 2.0);
+        if (angle > lightangle) return false;
+        if (angle > lightangle * (1.0 - light.penumbra)) falloff -= (angle - lightangle * (1.0 - light.penumbra)) / (light.penumbra * lightangle);
+    } else { // directional light
+        incoming = -normalize(light.direction);
+        dist = FLTMAX;
+    }
+    radiance = light.color * falloff * light_projection(light, pos, incoming);
+    return true;
+}
+
+vec3 environment_radiance(vec3 dir, bool weighted, float bsdf_pdf) {
+    vec3 sum = vec3(0.0);
+    for (uint i = 0; i < ubo.lights; i++) {
+        SceneLight light = lightIn[i];
+        if (light.mode != LIGHT_MODE_IBL) continue;
+        float w = weighted ? mis_power(bsdf_pdf, env_pdf(light, dir)) : 1.0;
+        sum += w * env_radiance(light, dir);
+    }
+    return sum;
 }
 
 vec3 background_color(Ray ray) {
@@ -213,6 +331,14 @@ bool refract_ray(vec3 outgoing, vec3 normal, float eta, out vec3 incoming) {
     return true;
 }
 
+float lambertian_pdf(vec3 outgoing, vec3 normal, vec3 incoming, Material material) {
+    float ks = luminance(material.specular);
+    float kd = luminance(material.diffuse);
+    float pd = ks + kd > 0.0 ? kd / (ks + kd) : 1.0;
+    vec3 R = reflect(-outgoing, normal);
+    return pd * diffuse_pdf(normal, incoming) + (1.0 - pd) * specular_pdf(incoming, R, material.shiny);
+}
+
 vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
     return ((material.diffuse / PI) +
         (material.specular * (material.shiny + 2.0) /
@@ -266,6 +392,49 @@ bool splat_occluded(Ray ray, float tmax) {
     return false;
 }
 
+vec3 emission_at(uint tid, Hit h) {
+    vec3 e = materialIn[h.material].emission;
+    uint handle = materialIn[h.material].textures[TEXSLOT_EMISSION];
+    if (handle == 0u || e == vec3(0.0)) return e;
+    SurfaceTexcoord s = surface_texcoord(tid, h.uv, rd_zero(), false);
+    if (!s.valid) return e;
+    uint mesh = surface_mesh(tid);
+    uint tfilter = mesh != uint(-1) ? transformsIn[mesh].texfilter : TEXFILTER_BILINEAR;
+    return e * tex_sample(handle, s.uv, vec2(0.0), vec2(0.0), tfilter, 1u, false).rgb;
+}
+
+void apply_textures(inout Material material, inout Hit h, SurfaceTexcoord s, uint tfilter, uint anisotaps, vec3 dir) {
+    if (!s.valid) return;
+    for (uint k = 0u; k < TEXSLOT_NORMAL; k++) {
+        uint handle = material.textures[k];
+        if (handle == 0u) continue;
+        vec4 t = tex_sample(handle, s.uv, s.dx, s.dy, tfilter, anisotaps, false);
+        switch (k) {
+            case TEXSLOT_EMISSION: material.emission *= t.rgb; break;
+            case TEXSLOT_AMBIENT: material.ambient *= t.rgb; break;
+            case TEXSLOT_DIFFUSE: material.diffuse *= t.rgb; break;
+            case TEXSLOT_SPECULAR: material.specular *= t.rgb; break;
+            case TEXSLOT_ABSORBTION: material.absorbtion *= t.rgb; break;
+            case TEXSLOT_DISPERSION: material.dispersion *= t.rgb; break;
+            case TEXSLOT_SCATTERING: material.scattering *= t.rgb; break;
+            case TEXSLOT_ANISOTROPY: material.anisotropy *= t.r; break;
+            case TEXSLOT_SCALE: material.scale *= t.r; break;
+            case TEXSLOT_SUBSURFACE: material.subsurface *= t.r; break;
+            case TEXSLOT_IOR: material.ior *= t.r; break;
+            case TEXSLOT_SHINY: material.shiny *= t.r; break;
+            default: break;
+        }
+    }
+    uint nh = material.textures[TEXSLOT_NORMAL];
+    if (nh != 0u) {
+        vec3 tn = tex_sample(nh, s.uv, s.dx, s.dy, tfilter, anisotaps, true).xyz * 2.0 - 1.0;
+        if ((tex_flags(nh) & TEX_FLAG_FLIPGREEN) != 0u) tn.y = -tn.y;
+        vec3 n = surface_normal_map(s, h.normal, tn);
+        float side = dot(h.normal, -dir);
+        if (dot(n, -dir) * side > 0.0) h.normal = n;
+    }
+}
+
 vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     uint eid;
     float area;
@@ -280,7 +449,7 @@ vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     Hit shit = trace(sray, tid);
     if (eid != tid || shit.distance <= 0.0) return vec3(0.0);
     if (splat_occluded(sray, shit.distance)) return vec3(0.0);
-    vec3 emission = materialIn[shit.material].emission;
+    vec3 emission = emission_at(tid, shit);
     float p_area = pmf / area;
     float cos_light = max(dot(shit.normal, -to_light), 0.0);
     float p_omega = p_area * dist * dist / cos_light;
@@ -292,27 +461,16 @@ vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
     return emission * lambertian_throughput(outgoing, h.normal, to_light, material) / (p_omega);
 }
 
-vec3 sample_scene_lights(vec3 outgoing, Hit h, Material material) {
+vec3 sample_scene_lights(vec3 outgoing, Hit h, Material material, bool ibl) {
     vec3 intensity = vec3(0);
     for (uint i = 0; i < ubo.lights; i++) {
-        SceneLight light = lightIn[i];
+        bool env = lightIn[i].mode == LIGHT_MODE_IBL;
+        if (env && !ibl) continue;
         vec3 incoming;
-        vec3 to_light = light.position - h.position;
-        float distance_to_light = length(to_light);
-        float falloff = 1.0;
-        if (light.angle == 0 && light.direction == vec3(0)) { // point light
-            incoming = normalize(to_light);
-        } else if (light.angle != 0) { // spot light
-            if (light.direction == vec3(0)) light.direction = vec3(0, -1, 0);
-            incoming = normalize(to_light);
-            float angle = acos(clamp(dot(-incoming, normalize(light.direction)), -1.0, 1.0));
-            float lightangle = radians(light.angle / 2.0);
-            if (angle > lightangle) continue;
-            if (angle > lightangle * (1.0 - light.penumbra)) falloff -= (angle - lightangle * (1.0 - light.penumbra)) / (light.penumbra * lightangle);
-        } else { // directional light
-            incoming = -normalize(light.direction);
-            distance_to_light = FLTMAX;
-        }
+        float distance_to_light;
+        vec3 light;
+        float pdf;
+        if (!scene_light(i, h.position, incoming, distance_to_light, light, pdf)) continue;
         float ndotl = max(dot(incoming, h.normal), 0.0);
         if (ndotl <= 0) continue;
         if (ubo.scenelightshadows != 0) {
@@ -322,7 +480,9 @@ vec3 sample_scene_lights(vec3 outgoing, Hit h, Material material) {
             if (shit.distance > 0 && shit.distance < distance_to_light) continue;
             if (splat_occluded(sray, distance_to_light)) continue;
         }
-        intensity += lambertian_throughput(outgoing, h.normal, incoming, material) * light.color * falloff;
+        vec3 f = lambertian_throughput(outgoing, h.normal, incoming, material);
+        if (env) f *= mis_power(pdf, lambertian_pdf(outgoing, h.normal, incoming, material)) / pdf;
+        intensity += f * light;
     }
     return intensity;
 }
@@ -409,8 +569,6 @@ void subsurface_walk(in Ray ray, inout vec3 throughput, inout Hit hit, Material 
             if (channel < 0) throughput *= exp(-(sigma_t - sigma) * segment);
             exited = true;
             exit_normal = -boundary.normal; // trace() faces the normal towards the ray origin, which is inside
-            //medium = AIR_MEDIUM; // TODO: this should not exactly be air medium, but the previous participating medium
-                                 // might need to edit material here to prev material?
             break;
         }
         if (channel < 0) throughput *= exp(-(sigma_t - sigma) * segment) * sigma_mul;
@@ -427,10 +585,12 @@ void sample_lambertian(vec3 outgoing, Hit h, Material material, out vec3 incomin
     float ks = luminance(material.specular);
     float kd = luminance(material.diffuse);
     float kskd = ks + kd;
-    float pd = kd/kskd;
-    float ps = ks/kskd;
+    float pd = kskd > 0.0 ? kd / kskd : 1.0;
+    float ps = 1.0 - pd;
     vec3 R = reflect(-outgoing, h.normal);
-    incoming = random() < pd ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
+    g_last_lambertian = true;
+    g_last_lobe_specular = !(random() < pd);
+    incoming = !g_last_lobe_specular ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
     throughput = 
         ((material.diffuse / PI) +
         (material.specular * (material.shiny + 2.0) /
@@ -513,24 +673,12 @@ bool sss_splat_scatter(inout Hit h, uint tid, Material material, out vec3 throug
 vec3 sss_exit_scene_lights(vec3 pos, vec3 n, vec3 axis, float e) {
     vec3 intensity = vec3(0);
     for (uint i = 0; i < ubo.lights; i++) {
-        SceneLight light = lightIn[i];
+        if (lightIn[i].mode == LIGHT_MODE_IBL) continue; // reached by the exit direction escaping instead
         vec3 incoming;
-        vec3 to_light = light.position - pos;
-        float distance_to_light = length(to_light);
-        float falloff = 1.0;
-        if (light.angle == 0 && light.direction == vec3(0)) { // point light
-            incoming = normalize(to_light);
-        } else if (light.angle != 0) { // spot light
-            if (light.direction == vec3(0)) light.direction = vec3(0, -1, 0);
-            incoming = normalize(to_light);
-            float angle = acos(clamp(dot(-incoming, normalize(light.direction)), -1.0, 1.0));
-            float lightangle = radians(light.angle / 2.0);
-            if (angle > lightangle) continue;
-            if (angle > lightangle * (1.0 - light.penumbra)) falloff -= (angle - lightangle * (1.0 - light.penumbra)) / (light.penumbra * lightangle);
-        } else { // directional light
-            incoming = -normalize(light.direction);
-            distance_to_light = FLTMAX;
-        }
+        float distance_to_light;
+        vec3 light;
+        float lpdf;
+        if (!scene_light(i, pos, incoming, distance_to_light, light, lpdf)) continue;
         float pdf = sss_dir_pdf(incoming, n, axis, e);
         if (pdf <= 0.0) continue;
         if (ubo.scenelightshadows != 0) {
@@ -540,7 +688,7 @@ vec3 sss_exit_scene_lights(vec3 pos, vec3 n, vec3 axis, float e) {
             if (shit.distance > 0) continue;
             if (splat_occluded(sray, distance_to_light)) continue;
         }
-        intensity += pdf * light.color * falloff;
+        intensity += pdf * light;
     }
     return intensity;
 }
@@ -564,10 +712,11 @@ vec3 sss_exit_direct(vec3 pos, vec3 n, vec3 axis, float e) {
     float cos_light = max(dot(shit.normal, -to_light), 0.0);
     if (cos_light <= 0.0) return vec3(0.0);
     float p_omega = (pmf / area) * dist * dist / cos_light;
-    return materialIn[shit.material].emission * pdf / p_omega;
+    return emission_at(tid, shit) * pdf / p_omega;
 }
 
 void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in uint tid, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout float wavelength) {
+    g_last_lambertian = false;
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             sample_lambertian(outgoing, h, material, incoming, pdf, throughput);
@@ -602,6 +751,7 @@ void brdf(in vec3 outgoing, in vec3 previous, inout Hit h, in uint tid, in Mater
                 pdf = F * pdf_mod;
             } else {
                 float eta = (cosi > 0.0) ? eta_i / eta_t : eta_t / eta_i;
+                g_refract_eta = eta;
                 vec3 Nt = (cosi > 0.0) ? h.normal : -h.normal;
                 if (!refract_ray(-outgoing, Nt, eta, incoming)) {
                     incoming = reflect(-outgoing, h.normal);
@@ -777,24 +927,12 @@ vec3 sample_phase(vec3 forward, float g) {
 vec3 sample_scene_lights_volume(vec3 pos, vec3 travel_dir, vec3 albedo) {
     vec3 intensity = vec3(0);
     for (uint i = 0; i < ubo.lights; i++) {
-        SceneLight light = lightIn[i];
+        bool env = lightIn[i].mode == LIGHT_MODE_IBL;
         vec3 incoming;
-        vec3 to_light = light.position - pos;
-        float distance_to_light = length(to_light);
-        float falloff = 1.0;
-        if (light.angle == 0 && light.direction == vec3(0)) { // point light
-            incoming = normalize(to_light);
-        } else if (light.angle != 0) { // spot light
-            if (light.direction == vec3(0)) light.direction = vec3(0, -1, 0);
-            incoming = normalize(to_light);
-            float angle = acos(clamp(dot(-incoming, normalize(light.direction)), -1.0, 1.0));
-            float lightangle = radians(light.angle / 2.0);
-            if (angle > lightangle) continue;
-            if (angle > lightangle * (1.0 - light.penumbra)) falloff -= (angle - lightangle * (1.0 - light.penumbra)) / (light.penumbra * lightangle);
-        } else { // directional light
-            incoming = -normalize(light.direction);
-            distance_to_light = FLTMAX;
-        }
+        float distance_to_light;
+        vec3 light;
+        float lpdf;
+        if (!scene_light(i, pos, incoming, distance_to_light, light, lpdf)) continue;
         Ray sray = Ray(pos, incoming);
         if (ubo.scenelightshadows != 0) {
             uint tid;
@@ -802,7 +940,9 @@ vec3 sample_scene_lights_volume(vec3 pos, vec3 travel_dir, vec3 albedo) {
             if (shit.distance > 0 && shit.distance < distance_to_light) continue;
         }
         float vis = volume_transmittance(sray, distance_to_light);
-        intensity += albedo * hg_phase(dot(incoming, travel_dir), SPLAT_G) * light.color * falloff * vis;
+        float phase = hg_phase(dot(incoming, travel_dir), SPLAT_G);
+        float w = env ? mis_power(lpdf, phase) / lpdf : 1.0;
+        intensity += albedo * phase * light * vis * w;
     }
     return intensity;
 }
@@ -822,7 +962,7 @@ vec3 sample_direct_light_volume(vec3 pos, vec3 travel_dir, vec3 albedo) {
     if (eid != tid || shit.distance <= 0.0) return vec3(0.0);
     float cos_light = max(dot(shit.normal, -to_light), 0.0);
     if (cos_light <= 0.0) return vec3(0.0);
-    vec3 emission = materialIn[shit.material].emission;
+    vec3 emission = emission_at(tid, shit);
     float p_area = pmf / area;
     float p_omega = p_area * dist * dist / cos_light;
     float vis = volume_transmittance(sray, shit.distance);
@@ -843,6 +983,9 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     uint medium = AIR_MEDIUM;
     bool count_emission = true;
     float wavelength = -1.0;
+    bool primary = true;
+    bool last_nee = false;
+    float last_pdf = 0.0;
     uint i = 0;
     for (; i < ubo.maxbounces; i++) {
         Hit h = trace(ray, hid);
@@ -893,13 +1036,50 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
                 float pv = russian_roulette(throughput);
                 if (random() > pv) break;
                 throughput /= pv;
+                vec3 previous_direction = ray.direction;
                 ray.position = vpos;
                 ray.direction = sample_phase(ray.direction, SPLAT_G);
+                g_rd.dpx += t_vol * g_rd.ddx;
+                g_rd.dpy += t_vol * g_rd.ddy;
+                rd_scatter(g_rd, ray.direction, RD_DIFFUSE_SPREAD);
+                primary = false;
+                last_nee = ubo.scenelighting != 0 && ubo.lights > 0;
+                last_pdf = hg_phase(dot(ray.direction, previous_direction), SPLAT_G);
                 count_emission = ubo.direct == 0;
                 continue;
             }
         }
-        if (h.distance <= 0) break;
+        if (h.distance <= 0) {
+            if (ubo.scenelighting != 0 && ubo.lights > 0)
+                radiance += min(throughput * environment_radiance(ray.direction, last_nee, last_pdf), max_contribution);
+            break;
+        }
+
+        rd_transfer(g_rd, ray.direction, h.distance, surface_geometric_normal(hid));
+        SurfaceTexcoord st = surface_texcoord(hid, h.uv, g_rd, true);
+        bool textured = false;
+        for (uint k = 0u; k < MATERIAL_TEXTURE_SLOTS; k++) textured = textured || material.textures[k] != 0u;
+        if (textured && st.valid) {
+            uint mesh = surface_mesh(hid);
+            uint tfilter = TEXFILTER_BILINEAR;
+            uint anisotaps = TEX_DEFAULT_ANISO;
+            bool recursive = false;
+            if (mesh != uint(-1)) {
+                tfilter = transformsIn[mesh].texfilter;
+                anisotaps = transformsIn[mesh].anisotaps;
+                recursive = transformsIn[mesh].raydiff != 0u;
+            }
+            if (!(primary || recursive)) {
+                st.dx = vec2(0.0);
+                st.dy = vec2(0.0);
+            }
+            apply_textures(material, h, st, tfilter, anisotaps, ray.direction);
+        }
+        vec3 shade_n = h.normal;
+        bool mapped = st.valid && material.textures[TEXSLOT_NORMAL] != 0u;
+        vec3 dnx = mapped ? vec3(0.0) : st.dndx - shade_n * dot(shade_n, st.dndx);
+        vec3 dny = mapped ? vec3(0.0) : st.dndy - shade_n * dot(shade_n, st.dndy);
+
         bool dispersive = material.model == LAMBERTIAN_MODEL || material.model == SUBSURFACE_MODEL;
         bool reflective = material.model == DIELECTRIC_MODEL || material.model == MIRROR_MODEL;
         if (material.emission != vec3(0.0) && count_emission) {
@@ -909,7 +1089,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         bool same_medium = medium == h.material;
         uint b4medium = medium;
         if (ubo.scenelighting != 0 && ubo.lights > 0 && dispersive) {
-            vec3 light = sample_scene_lights(-ray.direction, h, material);
+            vec3 light = sample_scene_lights(-ray.direction, h, material, true);
             radiance += min(throughput * light, max_contribution);
             if (ubo.scenelightingonly != 0) break;
         }
@@ -922,6 +1102,16 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         vec3 color;
         float pdf;
         brdf(-ray.direction, ray.position, h, hid, material, incoming, pdf, color, ior, medium, wavelength);
+        if (material.model == MIRROR_MODEL || material.model == DIELECTRIC_MODEL) {
+            if (dot(incoming, shade_n) * dot(-ray.direction, shade_n) > 0.0) rd_reflect(g_rd, ray.direction, shade_n, dnx, dny);
+            else rd_refract(g_rd, ray.direction, incoming, shade_n, dnx, dny, g_refract_eta);
+        } else {
+            float spread = g_last_lambertian && g_last_lobe_specular ? RD_DIFFUSE_SPREAD * sqrt(2.0 / (max(material.shiny, 0.0) + 2.0)) : RD_DIFFUSE_SPREAD;
+            rd_scatter(g_rd, incoming, spread);
+        }
+        primary = false;
+        last_nee = dispersive && g_last_lambertian && ubo.scenelighting != 0 && ubo.lights > 0 && ubo.scenelightingonly == 0;
+        last_pdf = pdf;
         if (g_sss_exit) {
             // light arriving directly at the exit point of a subsurface cloud path
             g_sss_exit = false;
@@ -937,14 +1127,14 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         }
         if (ubo.scenelighting != 0) {
             if (material.model == DIELECTRIC_MODEL && b4medium == -1 && b4medium == medium) {
-                vec3 light = sample_scene_lights(-ray.direction, h, material);
+                vec3 light = sample_scene_lights(-ray.direction, h, material, false);
                 radiance += min(throughput * light, max_contribution);
             }
             if (same_medium && medium != h.material) {
                 Hit h2 = h;
                 h2.position += EPS * incoming;
                 h2.normal *= -1;
-                vec3 light = sample_scene_lights(incoming, h2, material);
+                vec3 light = sample_scene_lights(incoming, h2, material, false);
                 radiance += min(throughput * light, max_contribution);
             }
         }
@@ -999,7 +1189,9 @@ void main() {
 	// calculate ray color
     uint hit_id = -1;
     float hit_distance = -1.0f;
-    vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id, hit_distance);
+    Ray camera_ray = create_ray(vec2(rx, ry));
+    g_rd = rd_camera(camera_ray);
+    vec3 color = pathtrace(camera_ray, hit_id, hit_distance);
     if (ubo.spectral != 0) color = cheap_spectral_color(color);
     raygenIn[gl_GlobalInvocationID.x].tid = hit_id;
     raygenIn[gl_GlobalInvocationID.x].distance = hit_distance;

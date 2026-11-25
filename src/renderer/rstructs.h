@@ -10,6 +10,7 @@
 #include <easybasics.h>
 #include <cglm/cglm.h>
 #include <raylib.h>
+#include <stddef.h>
 
 #ifndef NO_MESH_MANIPULATION_SUPPORT
 #include <cholmod.h>
@@ -24,6 +25,44 @@ typedef uint32_t MaterialID;
 typedef uint32_t TriangleID;
 typedef uint32_t VertexID;
 typedef uint32_t LightID;
+typedef uint32_t TextureHandle; // 0 = no texture, otherwise texture index + 1
+
+#define NO_UV ((uint32_t)-1)
+#define NO_UVS NO_UV, NO_UV, NO_UV
+
+typedef enum {
+    TEXSLOT_EMISSION = 0,
+    TEXSLOT_AMBIENT,
+    TEXSLOT_DIFFUSE,
+    TEXSLOT_SPECULAR,
+    TEXSLOT_ABSORBTION,
+    TEXSLOT_DISPERSION,
+    TEXSLOT_SCATTERING,
+    TEXSLOT_ANISOTROPY,
+    TEXSLOT_SCALE,
+    TEXSLOT_SUBSURFACE,
+    TEXSLOT_IOR,
+    TEXSLOT_SHINY,
+    TEXSLOT_NORMAL,
+    MATERIAL_TEXTURE_SLOTS
+} MaterialTextureSlot;
+
+typedef enum {
+    TEXFILTER_BILINEAR = 0,
+    TEXFILTER_TRILINEAR,
+    TEXFILTER_ANISOTROPIC,
+    TEXFILTER_NEAREST,
+    TEXFILTER_COUNT
+} TexFilterMode;
+
+#define DEFAULT_MAX_ANISOTROPY 16
+
+typedef enum {
+    LIGHT_MODE_STANDARD = 0,
+    LIGHT_MODE_PROJECTOR,
+    LIGHT_MODE_IBL,
+    LIGHT_MODE_COUNT
+} LightMode;
 
 typedef struct {
     VertexID a;
@@ -41,6 +80,7 @@ DECLARE_ARRLIST(Edge);
 DECLARE_ARRLIST(TriangleID);
 DECLARE_ARR_ARRLIST(vec4);
 DECLARE_ARR_ARRLIST(vec3);
+DECLARE_ARR_ARRLIST(vec2);
 DECLARE_HASHMAP(VertexID, BOOL, Locks);
 DECLARE_HASHMAP(Edge, EdgeMeta, EdgeGlue);
 DECLARE_ARR_ARRLIST(mat4);
@@ -87,6 +127,9 @@ typedef struct {
     alignas(4) uint32_t bn;
     alignas(4) uint32_t cn;
     alignas(4) MaterialID material;
+    alignas(4) uint32_t at;
+    alignas(4) uint32_t bt;
+    alignas(4) uint32_t ct;
 } Triangle;
 DECLARE_ARRLIST(Triangle);
 
@@ -127,6 +170,7 @@ typedef struct {
     alignas(4) float ior;
     alignas(4) float shiny;
     alignas(4) uint32_t model;
+    alignas(4) TextureHandle textures[MATERIAL_TEXTURE_SLOTS];
 } SurfaceMaterial;
 DECLARE_ARRLIST(SurfaceMaterial);
 
@@ -143,11 +187,12 @@ typedef struct {
 typedef struct {
 	RenderTexture2D target[CPUSWAP_LENGTH];
 	size_t index;
-    void* reference[CPUSWAP_LENGTH]; // mapped readback buffer for each in-flight frame
+    void* reference[CPUSWAP_LENGTH];
 } CPUSwap;
 
 typedef struct {
     size_t max_normals;
+    size_t max_uvs;
     size_t max_vertices;
     size_t max_triangles;
     size_t max_splats;
@@ -160,6 +205,7 @@ typedef struct {
     size_t max_skins;
     size_t max_poses;
     size_t num_normals;
+    size_t num_uvs;
     size_t num_vertices;
     size_t num_triangles;
     size_t num_splats;
@@ -171,6 +217,7 @@ typedef struct {
     size_t num_skins;
     size_t num_poses;
     BOOL update_normals;
+    BOOL update_uvs;
     BOOL update_vertices;
     BOOL update_triangles;
     BOOL update_splats;
@@ -213,6 +260,10 @@ typedef struct {
     alignas(16) vec3 direction;
     alignas(4) float penumbra;
     alignas(4) float angle;
+    alignas(4) TextureHandle texture;
+    alignas(4) uint32_t mode;
+    alignas(4) float projsize;
+    alignas(4) float rotation;
 } SceneLight;
 DECLARE_ARRLIST(SceneLight);
 
@@ -345,6 +396,9 @@ typedef struct { // ends are inclusive, not exclusive!
     alignas(16) vec3 rotate;
     alignas(16) vec3 scale;
     alignas(16) mat4 transform;
+    alignas(4) uint32_t filter;
+    alignas(4) uint32_t raydiff;
+    alignas(4) uint32_t anisotaps;
 } MeshDescriptor;
 DECLARE_ARRLIST(MeshDescriptor);
 
@@ -444,7 +498,8 @@ typedef enum {
     DEBUG_BOUNCES = 3,
     DEBUG_SSS_PATH = 4,
     DEBUG_SSS_COST = 5,
-    DEBUG_VARIANCE = 6
+    DEBUG_VARIANCE = 6,
+    DEBUG_UVS = 7
 } DebugConfig;
 
 typedef struct {
@@ -498,6 +553,7 @@ typedef struct {
     ManifoldMesh manifold;
     ARRLIST_vec4 vertices;
     ARRLIST_vec4 normals;
+    ARRLIST_vec2 uvs;
     ARRLIST_SceneLight lights;
     ARRLIST_DynamicString lightnames;
     ARRLIST_Triangle triangles;
@@ -522,6 +578,7 @@ typedef struct {
     ARRLIST_SceneCamera cameras;
     ARRLIST_DynamicString cameranames;
     ARRLIST_uint32_t gsss;
+    ARRLIST_uint32_t textures;
     size_t primarycamera;
     size_t maxprimitives;
     size_t mostprimitives;

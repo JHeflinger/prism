@@ -2,6 +2,7 @@
 #include "renderer/renderer.h"
 #include "renderer/rmath.h"
 #include "renderer/subsurface.h"
+#include "renderer/texture.h"
 #include "data/defaults.h"
 #include <assimp/postprocess.h>
 #include <assimp/material.h>
@@ -126,16 +127,13 @@ IMPL_ARRLIST(MaterialID);
 typedef struct {
     ARRLIST_vec3 vertices;
     ARRLIST_vec3 normals;
-    ARRLIST_UV uvs; // NOTE: textures are not implemented yet! This field doesn't have any effect yet!
+    ARRLIST_UV uvs;
     ARRLIST_Face faces;
     ARRLIST_DynamicString material_names;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_UseMaterialMarker markers;
     const char* filepath;
 } StateOBJ;
-
-typedef BOOL (*ParseFuncOBJ)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
-typedef BOOL (*ParseFuncMTL)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
 
 typedef struct {
     const char* filepath;
@@ -154,6 +152,7 @@ typedef struct {
     ARRLIST_Triangle triangles;
     ARRLIST_vec4 vertices;
     ARRLIST_vec3 normals;
+    ARRLIST_vec2 uvs;
     ARRLIST_SurfaceMaterial materials;
     ARRLIST_DynamicString materialnames;
     ARRLIST_GaussianSplat splats;
@@ -163,6 +162,16 @@ typedef struct {
     uint32_t* sss;
     size_t sss_words;
 } PBJMesh;
+
+typedef struct {
+    size_t count;
+    SceneTexture* textures;
+    char** names;
+    TextureHandle* map; // local handle - 1 -> handle in the scene, filled when submitted
+} PrismTextureSet;
+
+typedef BOOL (*ParseFuncOBJ)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
+typedef BOOL (*ParseFuncMTL)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
 
 static void _aiv32v3(struct aiVector3D ai, vec3 out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; }
 static void _aiq2v(struct aiQuaternion ai, versor out) { out[0] = ai.x; out[1] = ai.y; out[2] = ai.z; out[3] = ai.w; }
@@ -535,10 +544,79 @@ static BOOL ParseMTL_newmtl(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], s
         logerror("Invalid format for newmtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
         return FALSE;
     }
-    char* name = EZ_ALLOC(strlen(lineargs[1]), sizeof(char));
+    char* name = EZ_ALLOC(strlen(lineargs[1]) + 1, sizeof(char));
     strcpy(name, lineargs[1]);
     ARRLIST_DynamicString_add(&(state->material_names), name);
     ARRLIST_SurfaceMaterial_add(&(state->materials), (SurfaceMaterial){ 0 });
+    return TRUE;
+}
+
+static BOOL ParseMTLTextureMap(const char* line, const char* mtldir, StateOBJ* state) {
+    char key[MAX_MTL_ARG_SIZE] = { 0 };
+    if (sscanf(line, " %31s", key) != 1) return FALSE;
+    int slot = -1;
+    BOOL color = TRUE;
+    BOOL normal = FALSE;
+    if (strcmp(key, "map_Kd") == 0) slot = TEXSLOT_DIFFUSE;
+    else if (strcmp(key, "map_Ks") == 0) slot = TEXSLOT_SPECULAR;
+    else if (strcmp(key, "map_Ke") == 0) slot = TEXSLOT_EMISSION;
+    else if (strcmp(key, "map_Ka") == 0) slot = TEXSLOT_AMBIENT;
+    else if (strcmp(key, "map_Ns") == 0) { slot = TEXSLOT_SHINY; color = FALSE; }
+    else if (strcmp(key, "map_Ni") == 0) { slot = TEXSLOT_IOR; color = FALSE; }
+    else if (strcmp(key, "norm") == 0 || strcmp(key, "map_Bump") == 0 || strcmp(key, "map_bump") == 0 || strcmp(key, "bump") == 0) {
+        slot = TEXSLOT_NORMAL;
+        color = FALSE;
+        normal = TRUE;
+    } else if (strncmp(key, "map_", 4) == 0 || strcmp(key, "disp") == 0 || strcmp(key, "decal") == 0 || strcmp(key, "refl") == 0) {
+        logwarn("MTL texture map \"%s\" is not supported, skipping it", key);
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+    if (state->materials.size == 0) {
+        logwarn("MTL texture map \"%s\" appears before any newmtl, skipping it", key);
+        return TRUE;
+    }
+    char buf[MAX_MTL_LINE_SIZE] = { 0 };
+    strncpy(buf, line, MAX_MTL_LINE_SIZE - 1);
+    char* hash = strchr(buf, '#');
+    if (hash) *hash = '\0';
+    size_t len = strlen(buf);
+    while (len > 0 && IsWhitespace(buf[len - 1])) buf[--len] = '\0';
+    char* name = buf + len;
+    while (name > buf && !IsWhitespace(name[-1])) name--;
+    if (!name[0] || strcmp(name, key) == 0) {
+        logwarn("MTL texture map \"%s\" has no file name", key);
+        return TRUE;
+    }
+    for (char* c = name; *c; c++) if (*c == '\\') *c = '/';
+    char path[MAX_TEXTURE_PATH_SIZE] = { 0 };
+    snprintf(path, sizeof(path), "%s%s", name[0] == '/' ? "" : mtldir, name);
+    size_t before = NumTextures();
+    size_t tex = LoadTextureFile(path, TRUE);
+    if (tex == (size_t)-1) {
+        logwarn("Unable to load texture \"%s\" referenced by %s, the material keeps its plain values", path, key);
+        return TRUE;
+    }
+    if (NumTextures() > before) {
+        SceneTexture* st = TextureReference(tex);
+        if (!color) st->settings.srgb = FALSE;
+        if (normal) st->settings.normalmap = TRUE;
+    }
+    SurfaceMaterial* m = &(state->materials.data[state->materials.size - 1]);
+    m->textures[slot] = TextureHandleOf(tex);
+    float* base = NULL;
+    switch (slot) {
+        case TEXSLOT_DIFFUSE: base = m->diffuse; break;
+        case TEXSLOT_SPECULAR: base = m->specular; break;
+        case TEXSLOT_EMISSION: base = m->emission; break;
+        case TEXSLOT_AMBIENT: base = m->ambient; break;
+        default: break;
+    }
+    if (base && base[0] == 0.0f && base[1] == 0.0f && base[2] == 0.0f) { base[0] = 1.0f; base[1] = 1.0f; base[2] = 1.0f; }
+    if (slot == TEXSLOT_SHINY && m->shiny == 0.0f) m->shiny = 1.0f;
+    if (slot == TEXSLOT_IOR && m->ior == 0.0f) m->ior = 1.0f;
+    UpdateTextures();
     return TRUE;
 }
 
@@ -584,7 +662,13 @@ static BOOL ParseOBJ_mtllib(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], s
     ez_FileParser parser = ez_parser(file);
     char line[MAX_MTL_LINE_SIZE] = { 0 };
     BOOL failure = FALSE;
+    char mtldir[MAX_MTLLIB_PATH_SIZE] = { 0 };
+    strcpy(mtldir, mtlpath);
+    char* mtlname = (char*)ez_strip_filename(mtldir);
+    if (mtlname) mtlname[0] = 0;
+    else mtldir[0] = 0;
     while (ez_next_line(&parser, line, MAX_MTL_LINE_SIZE)) {
+        if (ParseMTLTextureMap(line, mtldir, state)) continue;
         char lineargs[MAX_MTL_NUM_ARGS][MAX_MTL_ARG_SIZE] = { 0 };
         size_t numargs = ParseLineArgsOBJ(line, lineargs);
         if (numargs > 0 && lineargs[0][0] != '#') {
@@ -785,17 +869,25 @@ static BOOL ConstructOBJ(const StateOBJ state) {
             logerror("Face %d references an invalid vertex normal %d - there are only %d normals available", (int)i, (int)state.faces.data[i].cn, (int)state.normals.size);
             failure = TRUE;
         }
+        if (state.faces.data[i].textures &&
+            (state.faces.data[i].at >= state.uvs.size || state.faces.data[i].bt >= state.uvs.size || state.faces.data[i].ct >= state.uvs.size)) {
+            logerror("Face %d references an invalid texture coordinate - there are only %d available", (int)i, (int)state.uvs.size);
+            failure = TRUE;
+        }
     }
     if (failure) return FALSE;
     ARRLIST_MaterialID ids = { 0 };
     size_t vertices_start = NumVertices();
     size_t normals_start = NumNormals();
+    size_t uvs_start = NumUVs();
     for (size_t i = 0; i < state.materials.size; i++)
         ARRLIST_MaterialID_add(&ids, SubmitNamedMaterial(state.materials.data[i], state.material_names.data[i]));
     for (size_t i = 0; i < state.vertices.size; i++)
         SubmitVertex(state.vertices.data[i]);
     for (size_t i = 0; i < state.normals.size; i++)
         SubmitNormal(state.normals.data[i]);
+    for (size_t i = 0; i < state.uvs.size; i++)
+        SubmitUV((vec2){ state.uvs.data[i].u, state.uvs.data[i].v });
     size_t current_marker = 0;
     MaterialID current_material = 0;
     for (size_t i = 0; i < state.faces.size; i++) {
@@ -810,8 +902,14 @@ static BOOL ConstructOBJ(const StateOBJ state) {
             state.normals.size > 0 && state.faces.data[i].normals ? normals_start + state.faces.data[i].an : (uint32_t)-1,
             state.normals.size > 0 && state.faces.data[i].normals ? normals_start + state.faces.data[i].bn : (uint32_t)-1,
             state.normals.size > 0 && state.faces.data[i].normals ? normals_start + state.faces.data[i].cn : (uint32_t)-1,
-            current_material
+            current_material,
+            NO_UVS
         };
+        if (state.faces.data[i].textures) {
+            triangle.at = (uint32_t)(uvs_start + state.faces.data[i].at);
+            triangle.bt = (uint32_t)(uvs_start + state.faces.data[i].bt);
+            triangle.ct = (uint32_t)(uvs_start + state.faces.data[i].ct);
+        }
         SubmitTriangle(triangle);
     }
     ARRLIST_MaterialID_clear(&ids);
@@ -992,6 +1090,7 @@ static void PrismReadAnimations(PrismStream* s, ARRLIST_MeshAnimation* anims) {
 static void PrismFreeGeometry(Geometry* g) {
     ARRLIST_vec4_clear(&(g->vertices));
     ARRLIST_vec4_clear(&(g->normals));
+    ARRLIST_vec2_clear(&(g->uvs));
     ARRLIST_SceneLight_clear(&(g->lights));
     PrismFreeNames(&(g->lightnames));
     ARRLIST_Triangle_clear(&(g->triangles));
@@ -1017,6 +1116,7 @@ static void PrismWriteGeometry(PrismStream* s, Geometry* g) {
     PrismWrite(s, g, sizeof(Geometry));
     PRISM_WRITE_LIST(s, g->vertices);
     PRISM_WRITE_LIST(s, g->normals);
+    PRISM_WRITE_LIST(s, g->uvs);
     PRISM_WRITE_LIST(s, g->lights);
     PrismWriteNames(s, &(g->lightnames));
     PRISM_WRITE_LIST(s, g->triangles);
@@ -1046,6 +1146,7 @@ static void PrismReadGeometry(PrismStream* s, Geometry* g) {
     g->changes = (ChangeSet){ 0 };
     g->vertices = (ARRLIST_vec4){ 0 };
     g->normals = (ARRLIST_vec4){ 0 };
+    g->uvs = (ARRLIST_vec2){ 0 };
     g->lights = (ARRLIST_SceneLight){ 0 };
     g->lightnames = (ARRLIST_DynamicString){ 0 };
     g->triangles = (ARRLIST_Triangle){ 0 };
@@ -1068,9 +1169,11 @@ static void PrismReadGeometry(PrismStream* s, Geometry* g) {
     g->cameras = (ARRLIST_SceneCamera){ 0 };
     g->cameranames = (ARRLIST_DynamicString){ 0 };
     g->gsss = (ARRLIST_uint32_t){ 0 };
+    g->textures = (ARRLIST_uint32_t){ 0 };
     if (!s->ok) return;
     PRISM_READ_LIST(s, g->vertices);
     PRISM_READ_LIST(s, g->normals);
+    PRISM_READ_LIST(s, g->uvs);
     PRISM_READ_LIST(s, g->lights);
     PrismReadNames(s, &(g->lightnames), MAX_LIGHT_NAME_SIZE);
     PRISM_READ_LIST(s, g->triangles);
@@ -1102,13 +1205,117 @@ static void PrismReadGeometry(PrismStream* s, Geometry* g) {
     for (size_t i = 0; s->ok && i < g->triangles.size; i++) {
         Triangle t = g->triangles.data[i];
         if (t.a >= g->vertices.size || t.b >= g->vertices.size || t.c >= g->vertices.size ||
-            t.material >= g->materials.size) s->ok = FALSE;
+            t.material >= g->materials.size ||
+            (t.at != NO_UV && t.at >= g->uvs.size) || (t.bt != NO_UV && t.bt >= g->uvs.size) ||
+            (t.ct != NO_UV && t.ct >= g->uvs.size)) s->ok = FALSE;
     }
     for (size_t i = 0; s->ok && i < g->meshes.size; i++) {
         MeshDescriptor* md = &(g->meshes.data[i]);
         if (!(md->send < md->sstart || md->send == (uint32_t)-1) && md->send >= g->splats.size) s->ok = FALSE;
     }
     if (s->ok && g->cameras.size > 0 && g->primarycamera >= g->cameras.size) g->primarycamera = 0;
+}
+
+static size_t PrismTextureLevelBytes(const TextureSettings* settings, const TextureLevel* level) {
+    return (size_t)level->width * level->height * 4 * (settings->hdr ? sizeof(float) : sizeof(uint8_t));
+}
+
+static void PrismWriteTexture(PrismStream* s, size_t index) {
+    SceneTexture* t = TextureReference(index);
+    PrismWriteString(s, TextureName(index));
+    PrismWriteString(s, t->source);
+    PrismWrite(s, &(t->settings), sizeof(TextureSettings));
+    for (uint32_t l = 0; l < t->settings.levels; l++) {
+        uint32_t dims[2] = { t->mips[l].width, t->mips[l].height };
+        PrismWrite(s, dims, sizeof(dims));
+        PrismWrite(s, t->mips[l].data, PrismTextureLevelBytes(&(t->settings), &(t->mips[l])));
+    }
+}
+
+static BOOL PrismReadTexture(PrismStream* s, SceneTexture* t, char** name) {
+    *t = (SceneTexture){ 0 };
+    *name = PrismReadString(s, MAX_TEXTURE_NAME_SIZE, 0);
+    char* source = PrismReadString(s, MAX_TEXTURE_PATH_SIZE - 1, 0);
+    if (source) {
+        strncpy(t->source, source, MAX_TEXTURE_PATH_SIZE - 1);
+        EZ_FREE(source);
+    }
+    PrismRead(s, &(t->settings), sizeof(TextureSettings));
+    if (!s->ok) return FALSE;
+    TextureSettings* st = &(t->settings);
+    if (st->levels < 1 || st->levels > MAX_TEXTURE_LEVELS || st->width < 1 || st->height < 1 ||
+        st->width > MAX_TEXTURE_DIMENSION || st->height > MAX_TEXTURE_DIMENSION) {
+        s->ok = FALSE;
+        return FALSE;
+    }
+    uint32_t w = st->width, h = st->height;
+    for (uint32_t l = 0; l < st->levels && s->ok; l++) {
+        uint32_t dims[2] = { 0 };
+        PrismRead(s, dims, sizeof(dims));
+        if (!s->ok || dims[0] != w || dims[1] != h) { s->ok = FALSE; break; }
+        t->mips[l].width = w;
+        t->mips[l].height = h;
+        t->mips[l].data = PrismReadElements(s, (size_t)w * h * 4, st->hdr ? sizeof(float) : sizeof(uint8_t));
+        if (!t->mips[l].data) s->ok = FALSE;
+        w = w > 1 ? w / 2 : 1;
+        h = h > 1 ? h / 2 : 1;
+    }
+    return s->ok;
+}
+
+static void PrismWriteTextureList(PrismStream* s, const TextureHandle* handles, size_t count) {
+    PrismWriteSize(s, count);
+    for (size_t i = 0; i < count; i++) PrismWriteTexture(s, handles[i] - 1);
+}
+
+static void PrismFreeTextureSet(PrismTextureSet* set) {
+    for (size_t i = 0; i < set->count; i++) {
+        if (set->textures) FreeSceneTexture(&(set->textures[i]));
+        if (set->names && set->names[i]) EZ_FREE(set->names[i]);
+    }
+    if (set->textures) EZ_FREE(set->textures);
+    if (set->names) EZ_FREE(set->names);
+    if (set->map) EZ_FREE(set->map);
+    *set = (PrismTextureSet){ 0 };
+}
+
+static void PrismReadTextureSet(PrismStream* s, PrismTextureSet* set) {
+    *set = (PrismTextureSet){ 0 };
+    size_t n = PrismReadSize(s);
+    if (n == 0 || !PrismFits(s, n, sizeof(TextureSettings))) return;
+    set->textures = EZ_ALLOC(n, sizeof(SceneTexture));
+    set->names = EZ_ALLOC(n, sizeof(char*));
+    set->map = EZ_ALLOC(n, sizeof(TextureHandle));
+    set->count = n;
+    for (size_t i = 0; i < n && s->ok; i++) PrismReadTexture(s, &(set->textures[i]), &(set->names[i]));
+}
+
+static void PrismSubmitTextureSet(PrismTextureSet* set) {
+    for (size_t i = 0; i < set->count; i++) {
+        size_t index = SubmitNamedTexture(set->textures[i], set->names[i] && set->names[i][0] ? set->names[i] : "Texture");
+        set->map[i] = TextureHandleOf(index);
+        set->textures[i] = (SceneTexture){ 0 };
+    }
+}
+
+static TextureHandle PrismRemapTexture(const PrismTextureSet* set, TextureHandle local) {
+    if (local == 0 || local > set->count || !set->map) return 0;
+    return set->map[local - 1];
+}
+
+static TextureHandle PrismCollectTexture(ARRLIST_uint32_t* handles, TextureHandle global) {
+    if (global == 0 || global > NumTextures()) return 0;
+    for (size_t i = 0; i < handles->size; i++) if (handles->data[i] == global) return (TextureHandle)(i + 1);
+    ARRLIST_uint32_t_add(handles, global);
+    return (TextureHandle)handles->size;
+}
+
+static void PrismCollectMaterialTextures(ARRLIST_uint32_t* handles, SurfaceMaterial* m) {
+    for (size_t k = 0; k < MATERIAL_TEXTURE_SLOTS; k++) m->textures[k] = PrismCollectTexture(handles, m->textures[k]);
+}
+
+static void PrismRemapMaterialTextures(const PrismTextureSet* set, SurfaceMaterial* m) {
+    for (size_t k = 0; k < MATERIAL_TEXTURE_SLOTS; k++) m->textures[k] = PrismRemapTexture(set, m->textures[k]);
 }
 
 static const char* PbjTypeName(PBJType type) {
@@ -1119,6 +1326,7 @@ static const char* PbjTypeName(PBJType type) {
         case PBJ_MESH: return "object";
         case PBJ_FORCE: return "force";
         case PBJ_SOURCE: return "source";
+        case PBJ_TEXTURE: return "texture";
         default: return "unknown item";
     }
 }
@@ -1127,6 +1335,7 @@ static void PbjFreeMesh(PBJMesh* m) {
     ARRLIST_Triangle_clear(&m->triangles);
     ARRLIST_vec4_clear(&m->vertices);
     ARRLIST_vec3_clear(&m->normals);
+    ARRLIST_vec2_clear(&m->uvs);
     ARRLIST_SurfaceMaterial_clear(&m->materials);
     PrismFreeNames(&m->materialnames);
     ARRLIST_GaussianSplat_clear(&m->splats);
@@ -1157,6 +1366,8 @@ static void PbjWriteMesh(PrismStream* s, size_t id) {
     HASHMAP_Index vertexmap = { 0 };
     ARRLIST_vec3 normals = { 0 };
     HASHMAP_Index normalmap = { 0 };
+    ARRLIST_vec2 uvs = { 0 };
+    HASHMAP_Index uvmap = { 0 };
     ARRLIST_SurfaceMaterial materials = { 0 };
     ARRLIST_DynamicString materialnames = { 0 };
     HASHMAP_Index materialmap = { 0 };
@@ -1166,6 +1377,7 @@ static void PbjWriteMesh(PrismStream* s, size_t id) {
             Triangle t = *(TriangleReference(i));
             uint32_t* verts[] = { &t.a, &t.b, &t.c };
             uint32_t* norms[] = { &t.an, &t.bn, &t.cn };
+            uint32_t* texs[] = { &t.at, &t.bt, &t.ct };
             for (size_t j = 0; j < 3; j++) {
                 if (!HASHMAP_Index_has(&vertexmap, *verts[j])) {
                     ARRLIST_vec4_add(&vertices, VertexReference(*verts[j]));
@@ -1179,6 +1391,13 @@ static void PbjWriteMesh(PrismStream* s, size_t id) {
                         HASHMAP_Index_set(&normalmap, *norms[j], normals.size - 1);
                     }
                     *(norms[j]) = HASHMAP_Index_get(&normalmap, *norms[j]);
+                }
+                if (*texs[j] != NO_UV) {
+                    if (!HASHMAP_Index_has(&uvmap, *texs[j])) {
+                        ARRLIST_vec2_add(&uvs, UVReference(*texs[j]));
+                        HASHMAP_Index_set(&uvmap, *texs[j], uvs.size - 1);
+                    }
+                    *(texs[j]) = HASHMAP_Index_get(&uvmap, *texs[j]);
                 }
             }
             if (!HASHMAP_Index_has(&materialmap, t.material)) {
@@ -1201,10 +1420,13 @@ static void PbjWriteMesh(PrismStream* s, size_t id) {
     copy.send = (uint32_t)splats.size - 1;
     copy.skinstart = 0;
     copy.pose = animated ? 0 : (uint32_t)-1;
+    ARRLIST_uint32_t texhandles = { 0 };
+    for (size_t i = 0; i < materials.size; i++) PrismCollectMaterialTextures(&texhandles, &(materials.data[i]));
     PrismWrite(s, &copy, sizeof(copy));
     PRISM_WRITE_LIST(s, triangles);
     PRISM_WRITE_LIST(s, vertices);
     PRISM_WRITE_LIST(s, normals);
+    PRISM_WRITE_LIST(s, uvs);
     PRISM_WRITE_LIST(s, materials);
     PrismWriteNames(s, &materialnames);
     PRISM_WRITE_LIST(s, splats);
@@ -1233,15 +1455,19 @@ static void PbjWriteMesh(PrismStream* s, size_t id) {
     PrismWriteSize(s, sss_words);
     PrismWrite(s, sss, sss_words * sizeof(uint32_t));
     if (sss) EZ_FREE(sss);
+    PrismWriteTextureList(s, texhandles.data, texhandles.size);
+    ARRLIST_uint32_t_clear(&texhandles);
     ARRLIST_Triangle_clear(&triangles);
     ARRLIST_vec4_clear(&vertices);
     ARRLIST_VertexSkin_clear(&skins);
     ARRLIST_vec3_clear(&normals);
+    ARRLIST_vec2_clear(&uvs);
     ARRLIST_SurfaceMaterial_clear(&materials);
     ARRLIST_DynamicString_clear(&materialnames);
     ARRLIST_GaussianSplat_clear(&splats);
     HASHMAP_Index_clear(&vertexmap);
     HASHMAP_Index_clear(&normalmap);
+    HASHMAP_Index_clear(&uvmap);
     HASHMAP_Index_clear(&materialmap);
 }
 
@@ -1250,6 +1476,7 @@ static void PbjReadMesh(PrismStream* s, PBJMesh* m) {
     PRISM_READ_LIST(s, m->triangles);
     PRISM_READ_LIST(s, m->vertices);
     PRISM_READ_LIST(s, m->normals);
+    PRISM_READ_LIST(s, m->uvs);
     PRISM_READ_LIST(s, m->materials);
     PrismReadNames(s, &m->materialnames, MAX_MATERIAL_NAME_SIZE);
     PRISM_READ_LIST(s, m->splats);
@@ -1268,6 +1495,9 @@ static const char* PbjMeshProblem(const PBJMesh* m) {
             (t->an != (uint32_t)-1 && t->an >= m->normals.size) ||
             (t->bn != (uint32_t)-1 && t->bn >= m->normals.size) ||
             (t->cn != (uint32_t)-1 && t->cn >= m->normals.size) ||
+            (t->at != NO_UV && t->at >= m->uvs.size) ||
+            (t->bt != NO_UV && t->bt >= m->uvs.size) ||
+            (t->ct != NO_UV && t->ct >= m->uvs.size) ||
             t->material >= m->materials.size)
             return "a triangle references data outside the file";
     }
@@ -1306,12 +1536,14 @@ static const char* PbjAnimationProblem(const PBJMesh* m) {
 static size_t PbjSubmitMesh(PBJMesh* m, const char* name, BOOL animated) {
     VertexID startv = (VertexID)NumVertices();
     uint32_t startn = (uint32_t)NumNormals();
+    uint32_t startu = (uint32_t)NumUVs();
     MaterialID startm = (MaterialID)NumMaterials();
     TriangleID startt = (TriangleID)NumTriangles();
     uint32_t startsp = (uint32_t)NumSplats();
     VertexID startsk = (VertexID)NumSkins();
     for (size_t i = 0; i < m->vertices.size; i++) SubmitVertex(m->vertices.data[i]);
     for (size_t i = 0; i < m->normals.size; i++) SubmitNormal(m->normals.data[i]);
+    for (size_t i = 0; i < m->uvs.size; i++) SubmitUV(m->uvs.data[i]);
     for (size_t i = 0; i < m->materials.size; i++) SubmitNamedMaterial(m->materials.data[i], m->materialnames.data[i] ? m->materialnames.data[i] : "Material");
     for (size_t i = 0; i < m->triangles.size; i++) {
         Triangle t = m->triangles.data[i];
@@ -1321,6 +1553,9 @@ static size_t PbjSubmitMesh(PBJMesh* m, const char* name, BOOL animated) {
         if (t.an != (uint32_t)-1) t.an += startn;
         if (t.bn != (uint32_t)-1) t.bn += startn;
         if (t.cn != (uint32_t)-1) t.cn += startn;
+        if (t.at != NO_UV) t.at += startu;
+        if (t.bt != NO_UV) t.bt += startu;
+        if (t.ct != NO_UV) t.ct += startu;
         t.material += startm;
         SubmitTriangle(t);
     }
@@ -1434,14 +1669,46 @@ BOOL LoadOBJ(const char* filepath) {
         SubmitMeshDescriptor((MeshDescriptor){
             FALSE, startv, NumVertices() - 1, startt, NumTriangles() - 1, 0, (uint32_t)-1,
             (uint32_t)NumSplats(), (uint32_t)NumSplats() - 1, INLINEV3(center), INLINEV3(extent), { 0 }, { 0 },
-            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, ez_strip_filename(filepath));
+            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT, TEXFILTER_BILINEAR, FALSE, 1 }, ez_strip_filename(filepath));
     }
     CleanStateOBJ(&state);
     ez_free_file(file);
     return TRUE;
 }
 
-static MaterialID LoadFBXMaterial(const struct aiMaterial* mat) {
+static void LoadFBXTexture(const struct aiMaterial* mat, enum aiTextureType type, const char* dir, SurfaceMaterial* m, int slot, BOOL color, BOOL normal) {
+    if (m->textures[slot] != 0 || aiGetMaterialTextureCount(mat, type) == 0) return;
+    struct aiString texpath;
+    if (aiGetMaterialTexture(mat, type, 0, &texpath, NULL, NULL, NULL, NULL, NULL, NULL) != AI_SUCCESS) return;
+    if (texpath.data[0] == '*') {
+        logwarn("Embedded FBX texture \"%s\" is not supported, extract it next to the file to use it", texpath.data);
+        return;
+    }
+    char name[MAX_TEXTURE_PATH_SIZE] = { 0 };
+    strncpy(name, texpath.data, sizeof(name) - 1);
+    for (char* c = name; *c; c++) if (*c == '\\') *c = '/';
+    char path[MAX_TEXTURE_PATH_SIZE] = { 0 };
+    BOOL absolute = name[0] == '/' || (name[0] != 0 && name[1] == ':');
+    snprintf(path, sizeof(path), "%s%s", absolute ? "" : dir, name);
+    size_t before = NumTextures();
+    size_t tex = LoadTextureFile(path, TRUE);
+    const char* basename = ez_strip_filename(name);
+    if (tex == (size_t)-1 && absolute && basename) {
+        snprintf(path, sizeof(path), "%s%s", dir, basename);
+        tex = LoadTextureFile(path, TRUE);
+    }
+    if (tex == (size_t)-1) {
+        logwarn("Unable to load FBX texture \"%s\", the material keeps its plain values", texpath.data);
+        return;
+    }
+    if (NumTextures() > before) {
+        if (!color) TextureReference(tex)->settings.srgb = FALSE;
+        if (normal) TextureReference(tex)->settings.normalmap = TRUE;
+    }
+    m->textures[slot] = TextureHandleOf(tex);
+}
+
+static MaterialID LoadFBXMaterial(const struct aiMaterial* mat, const char* dir) {
     SurfaceMaterial m = { 0 };
     struct aiColor4D color;
     float fval;
@@ -1464,6 +1731,20 @@ static MaterialID LoadFBXMaterial(const struct aiMaterial* mat) {
     } else {
         m.model = 2;
     }
+    LoadFBXTexture(mat, aiTextureType_DIFFUSE, dir, &m, TEXSLOT_DIFFUSE, TRUE, FALSE);
+    LoadFBXTexture(mat, aiTextureType_BASE_COLOR, dir, &m, TEXSLOT_DIFFUSE, TRUE, FALSE);
+    LoadFBXTexture(mat, aiTextureType_SPECULAR, dir, &m, TEXSLOT_SPECULAR, TRUE, FALSE);
+    LoadFBXTexture(mat, aiTextureType_EMISSIVE, dir, &m, TEXSLOT_EMISSION, TRUE, FALSE);
+    LoadFBXTexture(mat, aiTextureType_AMBIENT, dir, &m, TEXSLOT_AMBIENT, TRUE, FALSE);
+    LoadFBXTexture(mat, aiTextureType_SHININESS, dir, &m, TEXSLOT_SHINY, FALSE, FALSE);
+    LoadFBXTexture(mat, aiTextureType_NORMALS, dir, &m, TEXSLOT_NORMAL, FALSE, TRUE);
+    LoadFBXTexture(mat, aiTextureType_NORMAL_CAMERA, dir, &m, TEXSLOT_NORMAL, FALSE, TRUE);
+    float* bases[] = { m.diffuse, m.specular, m.emission, m.ambient };
+    int slots[] = { TEXSLOT_DIFFUSE, TEXSLOT_SPECULAR, TEXSLOT_EMISSION, TEXSLOT_AMBIENT };
+    for (int k = 0; k < 4; k++) // a map multiplies the plain value, so a map given without the matching color would vanish
+        if (m.textures[slots[k]] && bases[k][0] == 0.0f && bases[k][1] == 0.0f && bases[k][2] == 0.0f)
+            bases[k][0] = bases[k][1] = bases[k][2] = 1.0f;
+    if (m.textures[TEXSLOT_SHINY] && m.shiny == 0.0f) m.shiny = 1.0f;
     struct aiString matname;
     const char* namestr = "Untitled FBXMaterial";
     if (aiGetMaterialString(mat, AI_MATKEY_NAME, &matname) == AI_SUCCESS) namestr = matname.data;
@@ -1488,12 +1769,13 @@ static uint32_t LookupOrRegisterBone(Skeleton* sk, const char* name, const struc
     return (uint32_t)(sk->bonecount++);
 }
 
-static BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialID mat_id, size_t vertices_start, size_t normals_start) {
+static BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialID mat_id, size_t vertices_start, size_t normals_start, size_t uvs_start) {
     if (!(mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)) {
         logwarn("Non-triangle FBX mesh detected - skipping \"%s\"", mesh->mName.data);
         return TRUE;
     }
     BOOL has_normals = mesh->mNormals != NULL;
+    const struct aiVector3D* uvs = mesh->mTextureCoords[0];
     for (size_t i = 0; i < mesh->mNumVertices; i++) {
         vec3 v;
         _aiv32v3(mesh->mVertices[i], v);
@@ -1524,6 +1806,7 @@ static BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialI
             SubmitNormal(n);
         }
     }
+    if (uvs) for (unsigned int i = 0; i < mesh->mNumVertices; i++) SubmitUV((vec2){ uvs[i].x, uvs[i].y });
     for (size_t i = 0; i < mesh->mNumFaces; i++) {
         const struct aiFace* face = &mesh->mFaces[i];
         if (face->mNumIndices != 3) {
@@ -1540,8 +1823,14 @@ static BOOL LoadFBXMesh(Skeleton* skeleton, const struct aiMesh* mesh, MaterialI
             has_normals ? (normals_start + ia) : (VertexID)-1,
             has_normals ? (normals_start + ib) : (VertexID)-1,
             has_normals ? (normals_start + ic) : (VertexID)-1,
-            mat_id
+            mat_id,
+            NO_UVS
         };
+        if (uvs) {
+            tri.at = (uint32_t)(uvs_start + ia);
+            tri.bt = (uint32_t)(uvs_start + ib);
+            tri.ct = (uint32_t)(uvs_start + ic);
+        }
         SubmitTriangle(tri);
     }
     return TRUE;
@@ -1645,7 +1934,8 @@ static BOOL TraverseFBXNode(Skeleton* skeleton, const struct aiNode* node, const
         MaterialID mat_id = mat_ids[mesh->mMaterialIndex];
         size_t vstart = NumVertices();
         size_t nstart = NumNormals();
-        if (!LoadFBXMesh(skeleton, mesh, mat_id, vstart, nstart))
+        size_t ustart = NumUVs();
+        if (!LoadFBXMesh(skeleton, mesh, mat_id, vstart, nstart, ustart))
             return FALSE;
         for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
             vec3 vtx;
@@ -1672,7 +1962,6 @@ BOOL LoadFBX(const char* filepath) {
                        | aiProcess_GenSmoothNormals     // generate normals if missing
                        | aiProcess_JoinIdenticalVertices
                        | aiProcess_LimitBoneWeights     // cap bone influences per vertex
-                       | aiProcess_FlipUVs              // match your UV convention
                        | aiProcess_PopulateArmatureData; // reconstruct skeleton hierarchy, converting world-space animation channels to local-space
     const struct aiScene* scene = aiImportFile(filepath, flags);
     if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !scene->mRootNode) {
@@ -1683,7 +1972,12 @@ BOOL LoadFBX(const char* filepath) {
     VertexID startv = NumVertices();
     TriangleID startt = NumTriangles();
     MaterialID* mat_ids = EZ_ALLOC(scene->mNumMaterials, sizeof(MaterialID));
-    for (unsigned int i = 0; i < scene->mNumMaterials; i++) mat_ids[i] = LoadFBXMaterial(scene->mMaterials[i]);
+    char fbxdir[MAX_TEXTURE_PATH_SIZE] = { 0 };
+    strncpy(fbxdir, filepath, sizeof(fbxdir) - 1);
+    char* fbxname = (char*)ez_strip_filename(fbxdir);
+    if (fbxname) fbxname[0] = 0;
+    else fbxdir[0] = 0;
+    for (unsigned int i = 0; i < scene->mNumMaterials; i++) mat_ids[i] = LoadFBXMaterial(scene->mMaterials[i], fbxdir); // uvs stay in the OBJ convention (v up)
     vec3 aabb_min = GLM_VEC3_ZERO_INIT;
     vec3 aabb_max = GLM_VEC3_ZERO_INIT;
     BOOL aabb_init = FALSE;
@@ -1711,7 +2005,7 @@ BOOL LoadFBX(const char* filepath) {
             (uint32_t)NumSplats(), (uint32_t)NumSplats() - 1,
             INLINEV3(center), INLINEV3(extent),
             { 0 }, { 0 },
-            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT
+            { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT, TEXFILTER_BILINEAR, FALSE, 1
         }, ez_strip_filename(filepath));
         size_t num_anims = 0;
         Animation* anims = LoadFBXAnimations(scene, &num_anims);
@@ -1852,9 +2146,12 @@ BOOL LoadPRISM(const char* filepath) {
     PrismReadGeometry(&s, &loaded);
     size_t sss_words = PrismReadSize(&s);
     uint32_t* sss = PrismReadElements(&s, sss_words, sizeof(uint32_t));
+    PrismTextureSet textures = { 0 };
+    PrismReadTextureSet(&s, &textures);
     fclose(file);
     if (!s.ok) {
         EZ_FREE(sss);
+        PrismFreeTextureSet(&textures);
         PrismFreeGeometry(&loaded);
         logerror("PRISM file \"%s\" is truncated or corrupt", filepath);
         return FALSE;
@@ -1867,8 +2164,12 @@ BOOL LoadPRISM(const char* filepath) {
     loaded.arap = live->arap;
     loaded.fluid = live->fluid;
     loaded.changes = live->changes;
+    ARRLIST_uint32_t_clear(&(live->textures));
     *live = loaded;
+    PrismSubmitTextureSet(&textures);
+    PrismFreeTextureSet(&textures);
     UpdateNormals();
+    UpdateUVs();
     UpdateVertices();
     UpdateMaterials();
     UpdateLights();
@@ -1928,13 +2229,17 @@ BOOL LoadPBJ(const char* filepath, PBJType* loaded_type, size_t* loaded_index) {
     FluidForce force = { 0 };
     FluidSource source = { 0 };
     PBJMesh mesh = { 0 };
+    PrismTextureSet textures = { 0 };
+    SceneTexture texture = { 0 };
+    char* texname = NULL;
     switch (type) {
         case PBJ_CAMERA: PrismRead(&s, &camera, sizeof(camera)); break;
-        case PBJ_MATERIAL: PrismRead(&s, &material, sizeof(material)); break;
-        case PBJ_LIGHT: PrismRead(&s, &light, sizeof(light)); break;
-        case PBJ_MESH: PbjReadMesh(&s, &mesh); break;
+        case PBJ_MATERIAL: PrismRead(&s, &material, sizeof(material)); PrismReadTextureSet(&s, &textures); break;
+        case PBJ_LIGHT: PrismRead(&s, &light, sizeof(light)); PrismReadTextureSet(&s, &textures); break;
+        case PBJ_MESH: PbjReadMesh(&s, &mesh); PrismReadTextureSet(&s, &textures); break;
         case PBJ_FORCE: PrismRead(&s, &force, sizeof(force)); break;
         case PBJ_SOURCE: PrismRead(&s, &source, sizeof(source)); break;
+        case PBJ_TEXTURE: PrismReadTexture(&s, &texture, &texname); break;
         default: break;
     }
     if (s.ok && s.remaining != 0) s.ok = FALSE;
@@ -1943,9 +2248,16 @@ BOOL LoadPBJ(const char* filepath, PBJType* loaded_type, size_t* loaded_index) {
     if (problem) {
         logerror("Unable to load PBJ file \"%s\": %s", filepath, problem);
         PbjFreeMesh(&mesh);
+        PrismFreeTextureSet(&textures);
+        FreeSceneTexture(&texture);
+        if (texname) EZ_FREE(texname);
         if (name) EZ_FREE(name);
         return FALSE;
     }
+    PrismSubmitTextureSet(&textures);
+    PrismRemapMaterialTextures(&textures, &material);
+    light.texture = PrismRemapTexture(&textures, light.texture);
+    for (size_t i = 0; i < mesh.materials.size; i++) PrismRemapMaterialTextures(&textures, &(mesh.materials.data[i]));
     const char* label = name && name[0] ? name : ez_strip_filename(filepath);
     size_t index = 0;
     switch (type) {
@@ -1975,9 +2287,15 @@ BOOL LoadPBJ(const char* filepath, PBJType* loaded_type, size_t* loaded_index) {
             SubmitSource(source, label);
             index = NumSources() - 1;
             break;
+        case PBJ_TEXTURE:
+            index = SubmitNamedTexture(texture, label);
+            break;
         default: break;
     }
+    if (type == PBJ_LIGHT && light.mode == LIGHT_MODE_IBL) UpdateTextures(); // importance table for the environment
     loginfo("Loaded %s \"%s\" from \"%s\"", PbjTypeName(type), label, filepath);
+    PrismFreeTextureSet(&textures);
+    if (texname) EZ_FREE(texname);
     PbjFreeMesh(&mesh);
     if (name) EZ_FREE(name);
     if (loaded_type) *loaded_type = type;
@@ -2007,6 +2325,8 @@ BOOL SavePRISM(const char* filepath) {
     PrismWriteSize(&s, sss_words);
     PrismWrite(&s, sss, sss_words * sizeof(uint32_t));
     EZ_FREE(sss);
+    PrismWriteSize(&s, NumTextures());
+    for (size_t i = 0; i < NumTextures(); i++) PrismWriteTexture(&s, i);
     if (fclose(file) != 0) s.ok = FALSE;
     if (!s.ok) {
         logerror("Failed while writing PRISM file \"%s\"", filepath);
@@ -2029,6 +2349,7 @@ BOOL SavePBJ(PBJType type, size_t index, const char* filepath) {
         case PBJ_MESH: if (index < NumMeshes()) name = *MeshNameReference(index); break;
         case PBJ_FORCE: if (index < NumForces()) name = *ForceNameReference(index); break;
         case PBJ_SOURCE: if (index < NumSources()) name = *SourceNameReference(index); break;
+        case PBJ_TEXTURE: if (index < NumTextures()) name = TextureName(index); break;
         default: break;
     }
     if (!name) {
@@ -2047,15 +2368,30 @@ BOOL SavePBJ(PBJType type, size_t index, const char* filepath) {
     PrismWrite(&s, &version, sizeof(version));
     PrismWrite(&s, &tag, sizeof(tag));
     PrismWriteString(&s, name);
+    ARRLIST_uint32_t texhandles = { 0 };
     switch (type) {
         case PBJ_CAMERA: PrismWrite(&s, GetCamera(index), sizeof(SceneCamera)); break;
-        case PBJ_MATERIAL: PrismWrite(&s, MaterialReference(index), sizeof(SurfaceMaterial)); break;
-        case PBJ_LIGHT: PrismWrite(&s, LightReference(index), sizeof(SceneLight)); break;
+        case PBJ_MATERIAL: {
+            SurfaceMaterial m = *MaterialReference(index);
+            PrismCollectMaterialTextures(&texhandles, &m);
+            PrismWrite(&s, &m, sizeof(SurfaceMaterial));
+            PrismWriteTextureList(&s, texhandles.data, texhandles.size);
+            break;
+        }
+        case PBJ_LIGHT: {
+            SceneLight l = *LightReference(index);
+            l.texture = PrismCollectTexture(&texhandles, l.texture);
+            PrismWrite(&s, &l, sizeof(SceneLight));
+            PrismWriteTextureList(&s, texhandles.data, texhandles.size);
+            break;
+        }
         case PBJ_MESH: PbjWriteMesh(&s, index); break;
         case PBJ_FORCE: PrismWrite(&s, ForceReference(index), sizeof(FluidForce)); break;
         case PBJ_SOURCE: PrismWrite(&s, SourceReference(index), sizeof(FluidSource)); break;
+        case PBJ_TEXTURE: PrismWriteTexture(&s, index); break;
         default: break;
     }
+    ARRLIST_uint32_t_clear(&texhandles);
     if (fclose(file) != 0) s.ok = FALSE;
     if (!s.ok) {
         logerror("Failed while writing PBJ file \"%s\"", filepath);

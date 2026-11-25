@@ -2,6 +2,7 @@
 #include "renderer/renderer.h"
 #include "renderer/loader.h"
 #include "renderer/rmath.h"
+#include "renderer/texture.h"
 #include "ui/panels/edit.h"
 #include <data/colors.h>
 #include <util/logger.h>
@@ -10,7 +11,7 @@
 static char* g_lightmodel_labels[] = { "lambertian", "mirror", "dielectric", "subsurface" };
 static char* g_arapmodel_labels[] = { "rigid", "cubic" };
 static char* g_sim_visual_labels[] = { "smoke", "fire", "water", "plasma" };
-static char* g_debugmode_labels[] = { "none", "normals", "bvh", "bounces", "sss path", "sss cost", "variance" };
+static char* g_debugmode_labels[] = { "none", "normals", "bvh", "bounces", "sss path", "sss cost", "variance", "uvs" };
 static FluidForce g_fluid_force = { 0 };
 static FluidSource g_fluid_source = { 0 };
 static vec3 g_cube_position = { 0 };
@@ -22,7 +23,7 @@ static Triangle g_dummy_triangle = { 0 };
 
 static int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 250;
-    float height = 330;
+    float height = 360;
     float xpos = x + ((w - width) / 2.0f);
     float ypos = y + ((h - height) / 2.0f);
     float button_width = 200;
@@ -47,8 +48,10 @@ static int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     if (UIButton(".PBJ", button_width)) return 6;
     UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
     if (UIButton("Camera", button_width)) return 7;
+    UIMoveCursor(xpos + (width / 2) - (button_width / 2) - 10, 10);
+    if (UIButton("Texture", button_width)) return 8;
     UISetCursor(xpos + (width / 2) - (button_width / 2), ypos + height - 40);
-    if (UIButton("Cancel", button_width)) return 8;
+    if (UIButton("Cancel", button_width)) return 9;
     return -1;
 }
 
@@ -88,8 +91,19 @@ static int add_pbj_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
             case PBJ_MESH: SetEditMesh(index); break;
             case PBJ_FORCE: SetEditForce(index); break;
             case PBJ_SOURCE: SetEditSource(index); break;
+            case PBJ_TEXTURE: SetEditTexture(index); break;
             default: break;
         }
+    }
+    return 0;
+}
+
+static int add_texture_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
+    const char* filepath = GetOpenFile("png,jpg,jpeg,tga,bmp,hdr,psd,gif,pic,ppm,pgm");
+    if (filepath) {
+        size_t index = LoadTextureFile(filepath, FALSE);
+        if (index != (size_t)-1) SetEditTexture(index);
+        else logerror("Unable to load texture \"%s\"", filepath);
     }
     return 0;
 }
@@ -161,25 +175,48 @@ static int add_cube_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     SubmitVertex(v6);
     SubmitVertex(v7);
     SubmitVertex(v8);
-    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 1, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 2, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 5, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 6, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 2, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 6, vertex_base + 2, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 0, vertex_base + 4, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 4, vertex_base + 7, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 6, vertex_base + 7, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 4, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 0, vertex_base + 1, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
-    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 4, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material });
+    size_t cube_tstart = NumTriangles();
+    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 1, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 2, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 5, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 6, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 2, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 6, vertex_base + 2, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 0, vertex_base + 4, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 4, vertex_base + 7, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 6, vertex_base + 7, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 4, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 0, vertex_base + 1, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 4, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, g_dummy_triangle.material, NO_UVS });
     g_dummy_triangle = (Triangle){ 0 };
+    for (size_t t = cube_tstart; t < NumTriangles(); t++) {
+        Triangle* tri = TriangleReference(t);
+        float* p[3] = { VertexReference(tri->a), VertexReference(tri->b), VertexReference(tri->c) };
+        vec3 e1, e2, n;
+        glm_vec3_sub(p[1], p[0], e1);
+        glm_vec3_sub(p[2], p[0], e2);
+        glm_vec3_cross(e1, e2, n);
+        int axis = fabsf(n[0]) > fabsf(n[1]) ? (fabsf(n[0]) > fabsf(n[2]) ? 0 : 2) : (fabsf(n[1]) > fabsf(n[2]) ? 1 : 2);
+        int ua = axis == 0 ? 2 : 0;
+        int va = axis == 1 ? 2 : 1;
+        float side = (p[0][axis] + p[1][axis] + p[2][axis]) / 3.0f - g_cube_position[axis];
+        float flip = side > 0.0f ? 1.0f : -1.0f;
+        if (axis == 1) flip = -flip;
+        uint32_t* corners[3] = { &(tri->at), &(tri->bt), &(tri->ct) };
+        for (size_t k = 0; k < 3; k++) {
+            float u = (p[k][ua] - (g_cube_position[ua] - g_cube_scale[ua] / 2.0f)) / g_cube_scale[ua];
+            float v = (p[k][va] - (g_cube_position[va] - g_cube_scale[va] / 2.0f)) / g_cube_scale[va];
+            *(corners[k]) = (uint32_t)NumUVs();
+            SubmitUV((vec2){ axis == 0 ? (flip > 0.0f ? 1.0f - u : u) : (flip > 0.0f ? u : 1.0f - u), v });
+        }
+    }
+    UpdateTriangles();
     vec3 extent;
     glm_vec3_scale(g_cube_scale, 0.5f, extent);
     SubmitMeshDescriptor((MeshDescriptor){
         FALSE, vertex_base, NumVertices() - 1, triangle_base, NumTriangles() - 1, 0, (uint32_t)-1,
         (uint32_t)NumSplats(), (uint32_t)NumSplats() - 1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
-        { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, g_object_name);
+        { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT, TEXFILTER_BILINEAR, FALSE, 1 }, g_object_name);
     memset(g_object_name, 0, MAX_MESH_NAME_SIZE);
     strcpy(g_object_name, "New Cube");
     SetEditMesh(NumMeshes() - 1);
@@ -460,10 +497,10 @@ char** DebugModeLabels() {
 }
 Popup* GenerateAddObjectPopup() {
     Popup* popup = GenerateEmptyPopup();
-    popup->options = 8;
+    popup->options = 9;
     popup->behavior = add_object_popup_stage_0;
     popup->results = EZ_ALLOC(popup->options, sizeof(Popup*));
-    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0, add_obj_popup_stage_0, add_fbx_popup_stage_0, add_ply_popup_stage_0, add_pbj_popup_stage_0, add_camera_popup_stage_0 };
+    PopupFunction stage_1[] = {add_material_popup_stage_0, add_light_popup_stage_0, add_cube_popup_stage_0, add_obj_popup_stage_0, add_fbx_popup_stage_0, add_ply_popup_stage_0, add_pbj_popup_stage_0, add_camera_popup_stage_0, add_texture_popup_stage_0 };
     for (size_t i = 0; i < popup->options; i++) {
         Popup* next = GenerateEmptyPopup();
         next->options = 0;

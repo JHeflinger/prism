@@ -160,24 +160,24 @@ static void CreateBoxLight(float x, float y, float z) {
     SubmitVertex(v6);
     SubmitVertex(v7);
     SubmitVertex(v8);
-    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 1, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 2, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 5, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 6, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 2, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 6, vertex_base + 2, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 0, vertex_base + 4, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 4, vertex_base + 7, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 6, vertex_base + 7, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 4, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 0, vertex_base + 1, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
-    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 4, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1 });
+    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 1, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 2, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 5, vertex_base + 1, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 2, vertex_base + 6, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 2, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 6, vertex_base + 2, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 3, vertex_base + 0, vertex_base + 4, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 4, vertex_base + 7, vertex_base + 3, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 6, vertex_base + 7, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 7, vertex_base + 4, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 0, vertex_base + 1, vertex_base + 5, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
+    SubmitTriangle((Triangle){ vertex_base + 5, vertex_base + 4, vertex_base + 0, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1, 1, NO_UVS });
     vec3 extent;
     glm_vec3_scale(scale, 0.5f, extent);
     SubmitMeshDescriptor((MeshDescriptor){
         FALSE, vertex_base, NumVertices() - 1, triangle_base, NumTriangles() - 1, 0, (uint32_t)-1,
         (uint32_t)NumSplats(), (uint32_t)NumSplats() - 1, { 0 }, INLINEV3(extent), { 0 }, { 0 },
-        { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT }, "Cube Light");
+        { 1.0f, 1.0f, 1.0f }, GLM_MAT4_IDENTITY_INIT, TEXFILTER_BILINEAR, FALSE, 1 }, "Cube Light");
 }
 
 static void ResetCamera() {
@@ -216,7 +216,7 @@ static void StartTestSuite() {
     g_qstage = 0;
     g_testing = TRUE;
     ClearScene(FALSE);
-    SubmitNamedLight((SceneLight){{0,1,1},{5,5,5},{0,0,0},0,0}, "Rabbit Point Light");
+    SubmitNamedLight((SceneLight){{0,1,1},{5,5,5},{0,0,0},0,0,0,0,0,0}, "Rabbit Point Light");
     LoadOBJ("assets/models/OBJ/naked/bunny.obj");
     ChangeToWax();
     SetVoidCamera();
@@ -527,7 +527,7 @@ static void TestSuite() {
                     g_estage++;
                     ClearScene(FALSE);
                     ChangeToWax();
-                    SubmitNamedLight((SceneLight){{0,1.9,0},{5,5,5},{0,-1,0},1,170.0f}, "Box Spot Light");
+                    SubmitNamedLight((SceneLight){{0,1.9,0},{5,5,5},{0,-1,0},1,170.0f,0,0,0,0}, "Box Spot Light");
                     LoadOBJ("assets/models/OBJ/naked/bunny.obj");
                     LoadOBJ("assets/models/OBJ/dressed/CornellBox-Original.obj");
                     MeshDescriptor* md = MeshReference(0);

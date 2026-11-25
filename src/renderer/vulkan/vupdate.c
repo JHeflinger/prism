@@ -1,5 +1,6 @@
 #include "vupdate.h"
 #include <easylogger.h>
+#include <util/logger.h>
 #include "renderer/vulkan/vutils.h"
 #include "renderer/vulkan/vinit.h"
 #include "renderer/vulkan/vclean.h"
@@ -7,6 +8,7 @@
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
 #include "renderer/subsurface.h"
+#include "renderer/texture.h"
 #include "ui/panels/recording.h"
 
 #define TRANSFER_ACQUIRE_VERTICES   (1 << 0)
@@ -20,6 +22,7 @@
 #define TRANSFER_ACQUIRE_TRANSFORMS (1 << 8)
 #define TRANSFER_ACQUIRE_POSES      (1 << 9)
 #define TRANSFER_ACQUIRE_SKINS      (1 << 10)
+#define TRANSFER_ACQUIRE_UVS        (1 << 11)
 #define PENDING(x) g_vupdt_renderer_ref->vulkan.core.transfer.pending |= x
 
 static Renderer* g_vupdt_renderer_ref = NULL;
@@ -75,6 +78,33 @@ void VUPDT_Subsurface(VulkanDataBuffer* gsss) {
         gsss);
     VUTIL_CopyHostToBuffer(has ? g_vupdt_renderer_ref->geometry.gsss.data : (void*)empty, bytes, bytes, gsss->buffer);
     ResolveSubsurfaceUpdate();
+}
+
+void VUPDT_Textures(VulkanDataBuffer* textures) {
+    vkDeviceWaitIdle(g_vupdt_renderer_ref->vulkan.core.general.interface);
+    ARRLIST_uint32_t* packed = &(g_vupdt_renderer_ref->geometry.textures);
+    if (TexturesNeedUpdate() || packed->size == 0 || packed->data == NULL) PackTextures();
+    ResolveTextureUpdate();
+    size_t bytes = packed->size * sizeof(uint32_t);
+    VkPhysicalDeviceProperties props = { 0 };
+    vkGetPhysicalDeviceProperties(g_vupdt_renderer_ref->vulkan.core.general.gpu, &props);
+    if (bytes > props.limits.maxStorageBufferRange) {
+        logerror("Textures need %zu MB of GPU memory, but this GPU can bind at most %u MB in one buffer - textures are disabled until some are removed or downsized",
+            bytes >> 20, props.limits.maxStorageBufferRange >> 20);
+        ARRLIST_uint32_t_clear(packed);
+        ARRLIST_uint32_t_zero(packed, 1);
+        bytes = sizeof(uint32_t);
+    }
+    VUTIL_DestroyBuffer(*textures);
+    VUTIL_CreateBuffer(
+        bytes,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        textures);
+    VUTIL_CopyHostToBuffer(packed->data, bytes, bytes, textures->buffer);
+    size_t words = bytes / sizeof(uint32_t);
+    ARRLIST_uint32_t_clear(packed);
+    packed->size = words;
 }
 
 void VUPDT_Simulation(VulkanFluidSimulation* vfs) {
@@ -137,6 +167,16 @@ void VUPDT_Normals(VulkanTransformables* normals) {
         sizeof(vec4) * g_vupdt_renderer_ref->geometry.normals.maxsize,
         normals->original.buffer)) return;
     PENDING(TRANSFER_ACQUIRE_NORMALS);
+}
+
+void VUPDT_UVs(VulkanDataBuffer* uvs) {
+    if (sizeof(vec2) * g_vupdt_renderer_ref->geometry.uvs.maxsize == 0) return;
+    if (!VUTIL_AsyncCopyHostToBuffer(
+        g_vupdt_renderer_ref->geometry.uvs.data,
+        sizeof(vec2) * g_vupdt_renderer_ref->geometry.uvs.size,
+        sizeof(vec2) * g_vupdt_renderer_ref->geometry.uvs.maxsize,
+        uvs->buffer)) return;
+    PENDING(TRANSFER_ACQUIRE_UVS);
 }
 
 void VUPDT_Vertices(VulkanTransformables* vertices) {
@@ -209,7 +249,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
     VulkanFamilyGroup families = VUTIL_FindQueueFamilies(g_vupdt_renderer_ref->vulkan.core.general.gpu);
     if (g_vupdt_renderer_ref->vulkan.core.transfer.pending) {
         if (families.transfer.value != families.graphics.value) {
-            VkBufferMemoryBarrier barriers[11] = { 0 };
+            VkBufferMemoryBarrier barriers[12] = { 0 };
             uint32_t count = 0;
             #define MAYBE_ACQUIRE(flag, buf) \
                 if (g_vupdt_renderer_ref->vulkan.core.transfer.pending & (flag)) { \
@@ -234,6 +274,7 @@ void VUPDT_RecordCommand(VkCommandBuffer command) {
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_TRANSFORMS, g_vupdt_renderer_ref->vulkan.core.geometry.transforms.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_POSES, g_vupdt_renderer_ref->vulkan.core.geometry.poses.buffer)
             MAYBE_ACQUIRE(TRANSFER_ACQUIRE_SKINS, g_vupdt_renderer_ref->vulkan.core.geometry.skins.buffer)
+            MAYBE_ACQUIRE(TRANSFER_ACQUIRE_UVS, g_vupdt_renderer_ref->vulkan.core.geometry.uvs.buffer)
             #undef MAYBE_ACQUIRE
             if (count > 0) vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, count, barriers, 0, NULL);
         }
@@ -603,6 +644,7 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
         ubo.splatocclusion = (uint32_t)RendererCamera()->config.splatocclusion;
         ubo.sssplats = (uint32_t)RendererCamera()->config.gsssenabled;
         ubo.sssexitlight = (uint32_t)RendererCamera()->config.exitsss;
+        ubo.meshes = (uint32_t)g_vupdt_renderer_ref->geometry.meshes.size;
         memcpy(ubos->mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(UniformBufferObject));
     }
 

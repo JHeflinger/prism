@@ -2,7 +2,6 @@
 #define VSTRUCTS_H
 
 #include "renderer/rstructs.h"
-#include <stddef.h>
 
 typedef struct {
     VkImage image;
@@ -86,6 +85,7 @@ typedef struct {
     alignas(4) uint32_t splatocclusion;
     alignas(4) uint32_t sssplats;
     alignas(4) uint32_t sssexitlight;
+    alignas(4) uint32_t meshes;
 } UniformBufferObject;
 
 typedef struct {
@@ -242,6 +242,7 @@ typedef struct {
     VulkanBVH bvh;
     VulkanTransformables normals;
     VulkanTransformables vertices;
+    VulkanDataBuffer uvs;
     VulkanDataBuffer triangles;
     VulkanSplats splats;
     VulkanDataBuffer emissives;
@@ -253,6 +254,7 @@ typedef struct {
     VulkanDataBuffer poses;
     VulkanDataBuffer skins;
     VulkanDataBuffer gsss;
+    VulkanDataBuffer textures;
 } VulkanGeometry;
 
 typedef struct {

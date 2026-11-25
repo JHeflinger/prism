@@ -9,6 +9,8 @@
 #import HitDef;
 #import SplatDef;
 #import SceneLightDef;
+#import MaterialDef;
+#import MeshDescriptorDef;
 
 layout(binding = 0) #import UniformBufferObjectDef ubo;
 layout(binding = 1) #import RayGeneratorSSBODef;
@@ -20,6 +22,10 @@ layout(binding = 6) readonly #import BVHNodeSSBODef;
 layout(binding = 7) readonly #import SplatSSBODef;
 layout(binding = 8) readonly #import LightSSBODef;
 layout(binding = 9) #import OverlayUniformBufferObjectDef o_ubo;
+layout(binding = 10) readonly #import MaterialSSBODef;
+layout(binding = 11) readonly #import TransformsSSBODef;
+layout(binding = 12) readonly #import TextureSSBODef;
+layout(binding = 13) readonly #import UVSSBODef;
 
 #import CreateSimpleRay
 #import LightGlyphSuite
@@ -27,6 +33,9 @@ layout(binding = 9) #import OverlayUniformBufferObjectDef o_ubo;
 #import CutViewport
 #import TriangleIntersectSuite
 #import QuatToMat
+#import TextureSuite
+#import RayDifferentialSuite
+#import SurfaceSuite
 
 vec3 key_light = vec3(0.408248, 0.408248, 0.816497);
 vec3 fill_light = vec3(-0.440225, 0.17609, 0.880451);
@@ -46,6 +55,25 @@ vec3 shade(Ray ray, Hit hit) {
                      0.35*lambert(hit.normal, fill_light) +
                      0.3*lambert(hit.normal, back_light);
     return clamp((lighting + rim + ambient) * vec3(0.8), vec3(0.25), vec3(1));
+}
+
+vec3 shade_textured(Ray ray, Hit hit, uint tid, vec3 color) {
+    RayDiff rd = rd_camera(ray);
+    rd_transfer(rd, ray.direction, hit.distance, surface_geometric_normal(tid));
+    uint mesh = surface_mesh(tid);
+    uint tfilter = mesh != uint(-1) ? transformsIn[mesh].texfilter : TEXFILTER_BILINEAR;
+    uint anisotaps = mesh != uint(-1) ? transformsIn[mesh].anisotaps : TEX_DEFAULT_ANISO;
+    SurfaceTexcoord s = surface_texcoord(tid, hit.uv, rd, true);
+    if (ubo.debugmode == DEBUG_UVS) {
+        if (!s.valid) return vec3(0.3, 0.0, 0.3);
+        vec2 f = fract(s.uv);
+        float checker = mod(floor(s.uv.x * 8.0) + floor(s.uv.y * 8.0), 2.0);
+        return mix(vec3(f, 0.0), vec3(f, 0.0) * 0.6, checker);
+    }
+    uint handle = materialIn[hit.material].textures[TEXSLOT_DIFFUSE];
+    if (!s.valid || handle == 0u) return color;
+    vec4 t = tex_sample(handle, s.uv, s.dx, s.dy, tfilter, anisotaps, true); // display encoded, like the clay colors
+    return color * clamp(t.rgb, 0.0, 1.0) * 1.25;
 }
 
 float plane_intersect(Ray ray, vec3 planepoint, vec3 normal) {
@@ -127,6 +155,7 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
     float xfract = fract(grid_plane_point.x);
     float yfract = fract(grid_plane_point.z);
     hit = trace(ray, hit_id);
+    bool trianglehit = hit.distance > 0.0;
     if (ubo.splats > 0) {
         Hit shit;
         shit.distance = -1.0;
@@ -135,6 +164,7 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
         if (shit.distance > 0 && (hit.distance < 0 || shit.distance < hit.distance)) {
             hit = shit;
             hit_id = shit_id + ubo.triangles;
+            trianglehit = false;
         }
     }
     bool gridhit = false;
@@ -151,6 +181,7 @@ vec3 getcolor(vec2 ray_coordinate, inout uint hit_id, inout float hit_distance) 
     }
     if (hit.distance > 0.0) {
         color = shade(ray, hit);
+        if (trianglehit && ubo.debugmode != DEBUG_NORMALS) color = shade_textured(ray, hit, hit_id, color);
         if (ubo.showdof != 0) {
             float distance_to_focal_plane = abs(dot(hit.position - ubo.position, normalize(ubo.look)) - ubo.focus);
             color = mix(color, vec3(1.0), 1.0 / ((ubo.aperature * distance_to_focal_plane) + EPS));
