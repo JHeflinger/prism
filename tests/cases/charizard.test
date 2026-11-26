@@ -1,0 +1,11 @@
+name = charizard
+description = Simple lambertian-only low-poly charizard
+scene = tests/tests/prism/scenes/charizard.prism
+truth = tests/tests/prism/truth/charizard.png
+samples = 512
+min_ssim = 0.90
+min_psnr =
+max_rmse =
+max_render_time =
+tags =
+enabled = true

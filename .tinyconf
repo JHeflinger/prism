@@ -15,12 +15,16 @@ MODULE tgpu https://github.com/JHeflinger/minis.git tgpu
 PORT build/shaders
 PORT build/expanded
 PORT assets
+PORT tests
 
 LINUX EXECUTE scripts/shaders.sh
 WINDOWS EXECUTE scripts/shaders.bat
 
 DEFINE PRISM
 WINDOWS DEFINE NO_MESH_MANIPULATION_SUPPORT
+
+LINUX TEST tests/run_tests.sh
+WINDOWS TEST tests/run_tests.bat
 
 FLAG audit
 

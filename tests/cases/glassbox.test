@@ -1,0 +1,11 @@
+name = glassbox
+description = Cornell box with 2 disco glass balls
+scene = tests/tests/prism/scenes/glassbox.prism
+truth = tests/tests/prism/truth/glassbox.png
+samples = 512
+min_ssim = 0.90
+min_psnr =
+max_rmse =
+max_render_time =
+tags =
+enabled = true

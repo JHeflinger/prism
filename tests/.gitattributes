@@ -1,0 +1,4 @@
+*.sh text eol=lf
+*.bat text eol=crlf
+*.test text eol=lf
+results.json text eol=lf
