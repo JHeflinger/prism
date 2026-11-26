@@ -1,7 +1,6 @@
 #ifndef GIZMO_H
 #define GIZMO_H
 
-#include "renderer/rstructs.h"
 #include "renderer/rig.h"
 #include "ui/panels/edit.h"
 

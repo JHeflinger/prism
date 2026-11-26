@@ -89,7 +89,7 @@ static const char* g_mode_labels[RIG_MODE_COUNT] = { "Edit Rig", "Pose", "Weight
 static const char* g_handle_labels[EDIT_HANDLE_COUNT] = { "Whole Bone", "Head", "Tail" };
 static const char* g_autoweight_labels[AUTOWEIGHT_COUNT] = { "Bone Heat", "Envelope" };
 static const char* g_brush_labels[BRUSH_COUNT] = { "Add", "Subtract", "Replace", "Smooth" };
-static WeldGraph g_graph = { (size_t)-1 };
+static WeldGraph g_graph = { (size_t)-1, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL };
 static const vec4* g_sort_vertices = NULL;
 static HeatJob g_job = { 0 };
 static vec3* g_skinned = NULL;
@@ -1974,7 +1974,7 @@ size_t RigCreateIKWithTarget(size_t bone, uint32_t chain) {
     if (len < 1e-6f) len = 0.05f;
     glm_vec3_scale(up, len, ttail);
     glm_vec3_add(tail, ttail, ttail);
-    char name[256];
+    char name[512];
     snprintf(name, sizeof(name), "%s.IK", sk->bones[bone].name);
     size_t target = RigAddBone(parent, tail, ttail, name);
     if (target == (size_t)-1) return (size_t)-1;

@@ -216,7 +216,7 @@ static void DrawRig(const ViewProjection* vp, size_t a, RigMode mode) {
         }
 }
 
-void RigViewportDraw(const ViewProjection* vp, float width, float height) {
+static void RigViewportDraw(const ViewProjection* vp, float width, float height) {
     if (!RigViewportActive()) return;
     RigMode mode = RigGetMode();
     size_t active = RigActiveAnimation();
@@ -262,7 +262,7 @@ static void PickBone(size_t animid, size_t b, BOOL shift) {
     else DeselectEditTarget();
 }
 
-BOOL RigViewportUpdate(const ViewProjection* vp, const vec2 mouse, BOOL hovered, BOOL pressed, BOOL down) {
+static BOOL RigViewportUpdate(const ViewProjection* vp, const vec2 mouse, BOOL hovered, BOOL pressed, BOOL down) {
     if (!down) g_painting = FALSE;
     if (!RigViewportActive()) return FALSE;
     MeshAnimation* anim = RigActive();

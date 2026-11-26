@@ -158,7 +158,7 @@ BOOL RigAutoWeightsRunning();
 
 float RigAutoWeightsProgress();
 
-void RigAutoWeightsTick(double budget_seconds);
+void RigAutoWeightsTick(double budget);
 
 void RigAutoWeightsCancel();
 

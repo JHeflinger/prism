@@ -88,15 +88,15 @@ Animation* CurrentClip(MeshAnimation* anim);
 
 size_t ClipCreate(MeshAnimation* anim, const char* name);
 
-size_t ClipDuplicate(MeshAnimation* anim, size_t clip);
+size_t ClipDuplicate(MeshAnimation* anim, size_t index);
 
-void ClipDelete(MeshAnimation* anim, size_t clip);
+void ClipDelete(MeshAnimation* anim, size_t index);
 
-void ClipRename(MeshAnimation* anim, size_t clip, const char* name);
+void ClipRename(MeshAnimation* anim, size_t index, const char* name);
 
-BOOL ClipMakeEditable(MeshAnimation* anim, size_t clip);
+BOOL ClipMakeEditable(MeshAnimation* anim, size_t index);
 
-void ClipSelect(MeshAnimation* anim, size_t clip);
+void ClipSelect(MeshAnimation* anim, size_t index);
 
 void ClipRecomputeDuration(Animation* clip);
 
