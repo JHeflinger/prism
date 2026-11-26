@@ -3,8 +3,11 @@
 #include "renderer/loader.h"
 #include "renderer/rmath.h"
 #include "renderer/texture.h"
+#include "renderer/rig.h"
 #include "ui/panels/edit.h"
 #include <data/colors.h>
+#include <data/fonts.h>
+#include <data/input.h>
 #include <util/logger.h>
 #include <ui/popup.h>
 
@@ -20,6 +23,11 @@ static char g_force_name[MAX_FORCE_NAME_SIZE] = "Untitled Force";
 static char g_source_name[MAX_SOURCE_NAME_SIZE] = "Untitled Source";
 static char g_object_name[MAX_MESH_NAME_SIZE] = "Untitled Object";
 static Triangle g_dummy_triangle = { 0 };
+static float g_fx = 10.0f;
+static float g_fy = 0.0f;
+static float g_fw = 0.0f;
+static char* g_bone_items[MAX_BONES + 1];
+static char g_none_label[] = "None";
 
 static int add_object_popup_stage_0(size_t x, size_t y, size_t w, size_t h) {
     float width = 250;
@@ -523,4 +531,92 @@ Popup* GenerateAddSimObjectPopup() {
         ((Popup**)popup->results)[i] = next;
     }
     return popup;
+}
+
+void AnimFlowBegin(float y, float width) {
+    g_fx = 10.0f;
+    g_fy = y;
+    g_fw = width;
+}
+
+void AnimFlowNext(float w) {
+    if (g_fx + w > g_fw - 10.0f && g_fx > 10.0f) {
+        g_fx = 10.0f;
+        g_fy += LINE_HEIGHT + 4.0f;
+    }
+    UISetCursor(g_fx, g_fy);
+    g_fx += w + 6.0f;
+}
+
+float AnimFlowEnd() {
+    return g_fy + LINE_HEIGHT + 6.0f;
+}
+
+float AnimLabel(const char* label) {
+    Vector2 c = UIGetCursor();
+    float w = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x + 5.0f;
+    DrawTextEx(FontAsset(), label, c, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+    UISetCursor(c.x + w, c.y);
+    return w;
+}
+
+float AnimButtonWidth(const char* label) {
+    return MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0).x + 20.0f;
+}
+
+BOOL AnimToggleButton(const char* label, float w, BOOL active) {
+    Vector2 c = UIGetCursor();
+    Vector2 p = UIGetPosition();
+    Vector2 size = MeasureTextEx(FontAsset(), label, LINE_HEIGHT, 0);
+    float bw = w < size.x + 20.0f ? size.x + 20.0f : w;
+    Rectangle hit = { c.x + p.x, c.y + p.y + 1, bw, LINE_HEIGHT - 2 };
+    Color color = active ? MappedColor(PANEL_BTN_PRS_COLOR) : MappedColor(PANEL_BTN_BG_COLOR);
+    BOOL clicked = FALSE;
+    if (!InputsBlocked() && CheckCollisionPointRec(GetMousePosition(), hit)) {
+        if (!active) color = MappedColor(PANEL_BTN_HVR_COLOR);
+        clicked = InputButtonPressed(IK_MOUSELEFT);
+    }
+    DrawRectangle(c.x, c.y + 1, bw, LINE_HEIGHT - 2, color);
+    if (active) DrawRectangleLinesEx((Rectangle){ c.x, c.y + 1, bw, LINE_HEIGHT - 2 }, 1.0f, (Color){ 255, 255, 255, 170 });
+    DrawTextEx(FontAsset(), label, (Vector2){ c.x + (bw - size.x) / 2.0f, c.y }, LINE_HEIGHT, 0, MappedColor(UI_TEXT_COLOR));
+    UISetCursor(10, c.y + LINE_HEIGHT);
+    return clicked;
+}
+
+BOOL AnimPanelHovered(const char* name) {
+    const char* h = HoveredPanel();
+    return h && strcmp(h, name) == 0;
+}
+
+Vector2 AnimPanelMouse() {
+    Vector2 m = GetMousePosition();
+    Vector2 p = UIGetPosition();
+    return (Vector2){ m.x - p.x, m.y - p.y };
+}
+
+char** AnimBoneItems(BOOL with_none, size_t* count) {
+    MeshAnimation* anim = RigActive();
+    size_t n = 0;
+    if (with_none) g_bone_items[n++] = g_none_label;
+    if (anim) for (size_t b = 0; b < anim->skeleton.bonecount && n < MAX_BONES + 1; b++) g_bone_items[n++] = anim->skeleton.bones[b].name;
+    if (n == 0) g_bone_items[n++] = g_none_label;
+    *count = n;
+    return g_bone_items;
+}
+
+void AnimDrawTextClipped(const char* text, float x, float y, float size, float maxw, Color color) {
+    Font font = FontAsset();
+    if (MeasureTextEx(font, text, size, 0).x <= maxw) {
+        DrawTextEx(font, text, (Vector2){ x, y }, size, 0, color);
+        return;
+    }
+    char buf[300];
+    size_t len = strlen(text);
+    if (len > 290) len = 290;
+    while (len > 0) {
+        snprintf(buf, sizeof(buf), "%.*s...", (int)len, text);
+        if (MeasureTextEx(font, buf, size, 0).x <= maxw) break;
+        len--;
+    }
+    if (len > 0) DrawTextEx(font, buf, (Vector2){ x, y }, size, 0, color);
 }

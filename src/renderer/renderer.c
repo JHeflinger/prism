@@ -11,6 +11,7 @@
 #include "renderer/subsurface.h"
 #include "renderer/texture.h"
 #include "renderer/rmath.h"
+#include "renderer/rig.h"
 #include "ui/panels/edit.h"
 #include <core/config.h>
 #include <util/logger.h>
@@ -1775,36 +1776,92 @@ void UpdateMeshes() {
     g_renderer.geometry.changes.update_meshes = TRUE;
 }
 
-void SubmitAnimation(size_t meshid, Skeleton skeleton, Animation animation) {
-    char* name = EZ_ALLOC(strlen(animation.name) + 1, sizeof(char));
-    strcpy(name, animation.name);
-    for (size_t i = 0; i < g_renderer.geometry.animations.size; i++) {
-        if (g_renderer.geometry.animations.data[i].meshid == meshid) {
-            ARRLIST_Animation_add(&(g_renderer.geometry.animations.data[i].animations), animation);
-            ARRLIST_DynamicString_add(&(g_renderer.geometry.animations.data[i].names), name);
-            return;
-        }
+size_t SubmitRig(size_t meshid, const Skeleton* skeleton) {
+    for (size_t i = 0; i < g_renderer.geometry.animations.size; i++)
+        if (g_renderer.geometry.animations.data[i].meshid == meshid) return i;
+    ARRLIST_MeshAnimation* list = &(g_renderer.geometry.animations); // grown by hand: a MeshAnimation is several hundred kilobytes and must never travel by value
+    if (list->size >= list->maxsize) {
+        size_t cap = list->maxsize ? list->maxsize * 2 : 1;
+        list->data = list->maxsize ? EZ_REALLOC(list->data, cap, sizeof(MeshAnimation)) : EZ_ALLOC(cap, sizeof(MeshAnimation));
+        list->maxsize = cap;
     }
-    ARRLIST_Animation a = { 0 };
-    ARRLIST_DynamicString n = { 0 };
-    ARRLIST_Animation_add(&a, animation);
-    ARRLIST_DynamicString_add(&n, name);
-    ARRLIST_MeshAnimation_add(&(g_renderer.geometry.animations), (MeshAnimation){
-        meshid, skeleton, a, n,
-        0, 0.0f, TRUE, FALSE, TRUE, TRUE,
-        0, 0.0f, 1.0f, 0.5f, FALSE
-    });
+    size_t index = list->size++;
+    MeshAnimation* anim = &(list->data[index]);
+    memset((void*)anim, 0, sizeof(MeshAnimation));
+    anim->meshid = meshid;
+    memcpy((void*)&(anim->skeleton), (const void*)skeleton, sizeof(Skeleton));
+    anim->looping = TRUE;
+    anim->enable = TRUE;
+    anim->_enable = TRUE;
+    anim->bweight = 1.0f;
+    anim->bduration = 0.5f;
+    anim->evalclip = (size_t)-1;
+    anim->dirty = TRUE;
+    SkeletonFinalize(&(anim->skeleton));
+    KeysChanged();
     for (size_t i = 0; i < MAX_BONES; i++) {
         mat4 m = GLM_MAT4_IDENTITY_INIT;
         ARRLIST_mat4_add(&(g_renderer.geometry.poses), m);
     }
     UpdatePoses();
+    return index;
+}
+
+BOOL DeleteRig(size_t meshid) {
+    if (meshid >= g_renderer.geometry.meshes.size) return FALSE;
+    MeshDescriptor* md = &(g_renderer.geometry.meshes.data[meshid]);
+    if (md->pose == (uint32_t)-1) return FALSE;
+    uint32_t pose = md->pose;
+    size_t aidx = pose / MAX_BONES;
+    BOOL has_verts = !(md->end < md->start || md->end == (VertexID)-1);
+    size_t vcount = has_verts ? (size_t)md->end - md->start + 1 : 0;
+    size_t scount = 0;
+    if (vcount && (size_t)md->skinstart + vcount <= g_renderer.geometry.skins.size) {
+        scount = vcount;
+        ARRLIST_REMOVE_RANGE(g_renderer.geometry.skins, md->skinstart, scount);
+    }
+    if (aidx < g_renderer.geometry.animations.size) {
+        FreeMeshAnimation(&(g_renderer.geometry.animations.data[aidx]));
+        ARRLIST_MeshAnimation_remove(&(g_renderer.geometry.animations), aidx);
+    }
+    ARRLIST_REMOVE_RANGE(g_renderer.geometry.poses, pose, (size_t)MAX_BONES);
+    uint32_t skinstart = md->skinstart;
+    md->pose = (uint32_t)-1;
+    md->skinstart = (VertexID)g_renderer.geometry.skins.size;
+    for (size_t i = 0; i < g_renderer.geometry.meshes.size; i++) {
+        if (i == meshid) continue;
+        MeshDescriptor* other = &(g_renderer.geometry.meshes.data[i]);
+        if (scount && other->skinstart >= skinstart + scount) other->skinstart -= (uint32_t)scount;
+        if (other->pose != (uint32_t)-1 && other->pose > pose) other->pose -= MAX_BONES;
+    }
+    UpdateMeshes();
+    UpdateSkins();
+    UpdatePoses();
+    return TRUE;
+}
+
+void SubmitAnimation(size_t meshid, Skeleton skeleton, Animation animation) {
+    size_t index = SubmitRig(meshid, &skeleton);
+    MeshAnimation* anim = &(g_renderer.geometry.animations.data[index]);
+    char* name = EZ_ALLOC(strlen(animation.name) + 1, sizeof(char));
+    strcpy(name, animation.name);
+    ARRLIST_Animation_add(&(anim->animations), animation);
+    ARRLIST_DynamicString_add(&(anim->names), name);
+    anim->dirty = TRUE;
+    KeysChanged();
 }
 
 void SubmitVertexSkin(VertexSkin skin) {
     float total = 0.0f;
-    for (size_t i = 0; i < MAX_BONE_INFLUENCES; i++) total += skin.weights[i];
-    EZ_ASSERT(total != 0.0f, "Zero skin weight detected");
+    for (size_t i = 0; i < MAX_BONE_INFLUENCES; i++) {
+        if (!(skin.weights[i] > 0.0f)) skin.weights[i] = 0.0f;
+        total += skin.weights[i];
+    }
+    if (!(total > 0.0f)) {
+        memset(&skin, 0, sizeof(VertexSkin));
+        skin.weights[0] = 1.0f;
+        total = 1.0f;
+    }
     for (size_t i = 0; i < MAX_BONE_INFLUENCES; i++) skin.weights[i] /= total;
     ARRLIST_VertexSkin_add(&(g_renderer.geometry.skins), skin);
     UpdateSkins();
@@ -1824,6 +1881,12 @@ MeshAnimation* AnimationReference(size_t animid) {
 
 void SwitchAnimation(MeshAnimation* anim, size_t newind) {
     if (anim->current == newind) return;
+    anim->dirty = TRUE;
+    if (anim->synced || anim->current >= anim->animations.size) {
+        anim->current = newind;
+        anim->blending = FALSE;
+        return;
+    }
     anim->previous = anim->current;
     anim->ptime = anim->time;
     anim->current = newind;
@@ -1833,6 +1896,7 @@ void SwitchAnimation(MeshAnimation* anim, size_t newind) {
 }
 
 void ClearAnimations() {
+    KeysChanged();
     for (size_t i = 0; i < g_renderer.geometry.animations.size; i++)
         FreeMeshAnimation(AnimationReference(i));
     ARRLIST_MeshAnimation_clear(&(g_renderer.geometry.animations));
@@ -1984,6 +2048,7 @@ void ClearScene(BOOL hard) {
     UpdateMaterials();
     ClearLights();
     ClearMeshDescriptors();
+    RigReleaseCaches();
     ClearAnimations();
     ClearSimulation();
     ClearSplats();

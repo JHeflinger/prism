@@ -1,5 +1,7 @@
 #include "loader.h"
 #include "renderer/renderer.h"
+#include "renderer/animation.h"
+#include "renderer/rig.h"
 #include "renderer/rmath.h"
 #include "renderer/subsurface.h"
 #include "renderer/texture.h"
@@ -1350,7 +1352,8 @@ static void PbjFreeMesh(PBJMesh* m) {
 static void PbjWriteMesh(PrismStream* s, size_t id) {
     Geometry* geo = RendererGeometry();
     MeshDescriptor* original = MeshReference(id);
-    MeshDescriptor copy = *original;
+    MeshDescriptor copy;
+    memcpy((void*)&copy, (const void*)original, sizeof(MeshDescriptor)); // heap descriptors are only 8 byte aligned
     BOOL has_tris = !(original->tend < original->tstart || original->tend == (TriangleID)-1);
     BOOL has_splats = !(original->send < original->sstart || original->send == (uint32_t)-1);
     BOOL animated = original->pose != (uint32_t)-1;
@@ -1401,7 +1404,9 @@ static void PbjWriteMesh(PrismStream* s, size_t id) {
                 }
             }
             if (!HASHMAP_Index_has(&materialmap, t.material)) {
-                ARRLIST_SurfaceMaterial_add(&materials, *MaterialReference(t.material));
+                SurfaceMaterial copy; // byte copy: heap materials are only 8 byte aligned
+                memcpy((void*)&copy, (const void*)MaterialReference(t.material), sizeof(SurfaceMaterial));
+                ARRLIST_SurfaceMaterial_add(&materials, copy);
                 ARRLIST_DynamicString_add(&materialnames, MaterialName(t.material));
                 HASHMAP_Index_set(&materialmap, t.material, materials.size - 1);
             }
@@ -1510,7 +1515,6 @@ static const char* PbjAnimationProblem(const PBJMesh* m) {
     if (m->anims.size != 1) return "it does not have exactly one animation set";
     MeshAnimation a; // local copy: the heap array is not aligned for Skeleton's mat4s
     memcpy(&a, &m->anims.data[0], sizeof(a));
-    if (a.animations.size == 0) return "it has no clips";
     if (m->skins.size != m->vertices.size) return "the skin count does not match the vertex count";
     if (m->pose.size != MAX_BONES) return "the pose block is the wrong size";
     if (a.skeleton.bonecount == 0 || a.skeleton.bonecount > MAX_BONES) return "the skeleton has an invalid bone count";
@@ -1544,7 +1548,11 @@ static size_t PbjSubmitMesh(PBJMesh* m, const char* name, BOOL animated) {
     for (size_t i = 0; i < m->vertices.size; i++) SubmitVertex(m->vertices.data[i]);
     for (size_t i = 0; i < m->normals.size; i++) SubmitNormal(m->normals.data[i]);
     for (size_t i = 0; i < m->uvs.size; i++) SubmitUV(m->uvs.data[i]);
-    for (size_t i = 0; i < m->materials.size; i++) SubmitNamedMaterial(m->materials.data[i], m->materialnames.data[i] ? m->materialnames.data[i] : "Material");
+    for (size_t i = 0; i < m->materials.size; i++) {
+        SurfaceMaterial copy; // byte copy: heap materials are only 8 byte aligned
+        memcpy((void*)&copy, (const void*)&(m->materials.data[i]), sizeof(SurfaceMaterial));
+        SubmitNamedMaterial(copy, m->materialnames.data[i] ? m->materialnames.data[i] : "Material");
+    }
     for (size_t i = 0; i < m->triangles.size; i++) {
         Triangle t = m->triangles.data[i];
         t.a += startv;
@@ -1573,26 +1581,38 @@ static size_t PbjSubmitMesh(PBJMesh* m, const char* name, BOOL animated) {
     SubmitMeshDescriptor(md, name);
     size_t mesh = NumMeshes() - 1;
     if (animated) {
-        MeshAnimation src;
-        memcpy(&src, &m->anims.data[0], sizeof(src));
-        for (size_t j = 0; j < src.animations.size; j++) {
-            Animation clip = src.animations.data[j];
-            if (j < src.names.size && src.names.data[j]) {
-                strncpy(clip.name, src.names.data[j], sizeof(clip.name) - 1);
+        // heap copy: a MeshAnimation is too large to keep on the stack
+        MeshAnimation* src = EZ_ALLOC(1, sizeof(MeshAnimation));
+        memcpy((void*)src, (const void*)&m->anims.data[0], sizeof(MeshAnimation));
+        size_t aidx = SubmitRig(mesh, &(src->skeleton));
+        MeshAnimation* dst = AnimationReference(aidx);
+        for (size_t j = 0; j < src->animations.size; j++) {
+            Animation clip = src->animations.data[j];
+            if (j < src->names.size && src->names.data[j]) {
+                strncpy(clip.name, src->names.data[j], sizeof(clip.name) - 1);
                 clip.name[sizeof(clip.name) - 1] = '\0';
             }
-            SubmitAnimation(mesh, src.skeleton, clip);
-            src.animations.data[j].channels = (ARRLIST_BoneChannel){ 0 }; // the scene owns the keyframes now
+            char* clipname = EZ_ALLOC(strlen(clip.name) + 1, sizeof(char));
+            strcpy(clipname, clip.name);
+            ARRLIST_Animation_add(&(dst->animations), clip);
+            ARRLIST_DynamicString_add(&(dst->names), clipname);
+            src->animations.data[j].channels = (ARRLIST_BoneChannel){ 0 }; // the scene owns the keyframes now
         }
-        size_t aidx = NumAnimations() - 1;
-        MeshAnimation* dst = AnimationReference(aidx);
-        dst->current = src.current < dst->animations.size ? src.current : 0;
-        dst->time = src.time;
-        dst->looping = src.looping;
-        dst->playing = src.playing;
-        dst->enable = src.enable;
-        dst->_enable = src._enable;
+        dst->current = src->current < dst->animations.size ? src->current : 0;
+        dst->time = src->time;
+        dst->looping = src->looping;
+        dst->playing = src->playing;
+        dst->enable = src->enable;
+        dst->_enable = src->_enable;
+        dst->synced = src->synced;
         dst->blending = FALSE;
+        dst->rest = FALSE;
+        dst->dirty = TRUE;
+        memcpy(dst->posed, src->posed, sizeof(dst->posed));
+        memcpy((void*)dst->overrides, (const void*)src->overrides, sizeof(dst->overrides));
+        memcpy((void*)dst->ik, (const void*)src->ik, sizeof(dst->ik));
+        dst->numik = src->numik <= MAX_IK_CONSTRAINTS ? src->numik : 0;
+        EZ_FREE(src);
         MeshReference(mesh)->pose = (uint32_t)(aidx * MAX_BONES);
         memcpy(&RendererGeometry()->poses.data[aidx * MAX_BONES], m->pose.data, MAX_BONES * sizeof(mat4)); // pose as saved
         UpdatePoses();
@@ -2011,7 +2031,29 @@ BOOL LoadFBX(const char* filepath) {
         Animation* anims = LoadFBXAnimations(scene, &num_anims);
         for (size_t i = 0; i < num_anims; i++) SubmitAnimation(NumMeshes() - 1, skeleton, anims[i]);
         EZ_FREE(anims);
-        if (num_anims > 0) MeshReference(NumMeshes() - 1)->pose = (NumAnimations() - 1) * MAX_BONES;
+        if (num_anims > 0) {
+            MeshReference(NumMeshes() - 1)->pose = (NumAnimations() - 1) * MAX_BONES;
+        } else if (skeleton.bonecount > 0) {
+            for (size_t b = 0; b < skeleton.bonecount; b++) {
+                mat4 inv, bind, local;
+                memcpy(inv, skeleton.bones[b].inversebind, sizeof(mat4));
+                glm_mat4_inv(inv, bind);
+                size_t p = skeleton.bones[b].parent;
+                if (p != (size_t)-1 && p < skeleton.bonecount && p != b) {
+                    mat4 pinv;
+                    memcpy(pinv, skeleton.bones[p].inversebind, sizeof(mat4));
+                    glm_mat4_mul(pinv, bind, local);
+                } else {
+                    memcpy(local, bind, sizeof(mat4));
+                }
+                memcpy(skeleton.bones[b].localbind, local, sizeof(mat4));
+            }
+            size_t aidx = SubmitRig(NumMeshes() - 1, &skeleton);
+            AnimationReference(aidx)->synced = TRUE;
+            AnimationReference(aidx)->looping = FALSE;
+            MeshReference(NumMeshes() - 1)->pose = (uint32_t)(aidx * MAX_BONES);
+            loginfo("\"%s\" has a %zu bone skeleton without animations - it is ready to pose and animate", filepath, skeleton.bonecount);
+        }
     }
     aiReleaseImport(scene);
     return TRUE;
@@ -2157,6 +2199,8 @@ BOOL LoadPRISM(const char* filepath) {
         return FALSE;
     }
     ClearScene(TRUE);
+    RigAutoWeightsCancel();
+    RigSetActiveMesh((size_t)-1);
     Renderer* renderer = RawRendererRef();
     Geometry* live = &(renderer->geometry);
     PrismFreeGeometry(live);
@@ -2180,6 +2224,14 @@ BOOL LoadPRISM(const char* filepath) {
     UpdateSplats();
     SubsurfaceDeserialize(sss, sss ? sss_words : 0);
     EZ_FREE(sss);
+    KeysChanged();
+    for (size_t i = 0; i < NumAnimations(); i++) {
+        MeshAnimation* anim = AnimationReference(i);
+        anim->rest = FALSE;
+        anim->blending = FALSE;
+        anim->evalclip = (size_t)-1;
+        anim->dirty = TRUE;
+    }
     loginfo("Successfully loaded prism session from \"%s\"", filepath);
     return TRUE;
 }

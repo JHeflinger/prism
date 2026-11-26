@@ -168,11 +168,16 @@ static void DrawVideoRenderSettings(float width, float height) {
             RenderConfig()->flags = PATHTRACE_PIPELINE_FLAGS;
             ResetAccumulation();
             OverrideTimelineDT(0.0f);
+            if (NumAnimations() > 0) {
+                Timeline()->frame = Timeline()->start;
+                Timeline()->playing = TRUE;
+            }
             VideoStart(&g_encoder, g_videopath, RenderResolution().x, RenderResolution().y, g_fps);
         } else if (g_inprogress && UIButton("Cancel", width - 20)) {
             g_inprogress = FALSE;
             g_progress = 0.0f;
             OverrideTimelineDT(-1.0f);
+            Timeline()->playing = FALSE;
             VideoRecorderStop(&g_encoder);
             loginfo("Rendering cancelled");
         }
@@ -227,6 +232,7 @@ static void UpdateRecordingPanel(float width, float height) {
         if (g_progress >= 100.0f) {
             VideoRecorderStop(&g_encoder);
             OverrideTimelineDT(-1.0f);
+            Timeline()->playing = FALSE;
             g_inprogress = FALSE;
             loginfo("Finished rendering videoin %.3fs! Saved to %s", g_timer, g_videopath);
         }

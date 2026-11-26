@@ -8,6 +8,7 @@
 #include "renderer/overlay.h"
 #include "renderer/rmath.h"
 #include "renderer/subsurface.h"
+#include "renderer/rig.h"
 #include "renderer/texture.h"
 #include "ui/panels/recording.h"
 
@@ -717,6 +718,8 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
                 ubo.selected_send = NumTriangles() + md->send;
             }
         }
+        ubo.weight_bone = (uint32_t)-1;
+        RigWeightOverlay(&ubo.weight_bone, &ubo.weight_tstart, &ubo.weight_tend, &ubo.weight_vstart, &ubo.weight_skinstart);
         memcpy(ubos->overlay_mapped[g_vupdt_renderer_ref->swapchain.index], &ubo, sizeof(OverlayUniformBufferObject));
     }
 

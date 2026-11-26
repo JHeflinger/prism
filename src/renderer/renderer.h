@@ -195,6 +195,10 @@ void UpdateObjectTransform(size_t i);
 
 void UpdateMeshes();
 
+size_t SubmitRig(size_t meshid, const Skeleton* skeleton);
+
+BOOL DeleteRig(size_t meshid);
+
 void SubmitAnimation(size_t meshid, Skeleton skeleton, Animation animation);
 
 void SubmitVertexSkin(VertexSkin skin);

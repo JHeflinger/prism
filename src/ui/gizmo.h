@@ -2,6 +2,7 @@
 #define GIZMO_H
 
 #include "renderer/rstructs.h"
+#include "renderer/rig.h"
 #include "ui/panels/edit.h"
 
 #define GIZMO_RING_SEGMENTS 64
@@ -132,6 +133,7 @@ typedef struct {
     vec3 points[3];
     vec3 world_points[3];
     mat4 to_object[3];
+    RigBoneSnapshot bone;
 } TargetSnapshot;
 
 void InitializeGizmo(Gizmo* g);
@@ -163,5 +165,7 @@ void TargetBegin(TargetSnapshot* snap, const TargetCaps* caps, const GizmoFrame*
 void TargetApply(const TargetSnapshot* snap, GizmoMode mode, const GizmoResult* r);
 
 void TargetRestore(const TargetSnapshot* snap);
+
+void TargetEnd(const TargetSnapshot* snap);
 
 #endif

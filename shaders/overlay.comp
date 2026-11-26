@@ -2,7 +2,9 @@
 #import Definitions
 
 #import RayGeneratorDef;
+#import RayDef;
 #import TriangleDef;
+#import VertexSkinDef;
 
 layout(binding = 0) readonly #import RayGeneratorSSBODef; 
 layout(binding = 1, rgba8) #import OutputImageDef;
@@ -12,6 +14,9 @@ layout(binding = 4) #import OverlaySSBODef;
 layout(binding = 5) readonly #import TransformedVertexSSBODef;
 layout(binding = 6) readonly #import TriangleSSBODef;
 layout(binding = 7) #import UniformBufferObjectDef ubo;
+layout(binding = 8) readonly #import SkinSSBODef;
+
+#import CreateSimpleRay
 
 const float vhighlight_radius = 50.0;
 const float mixfactor = 0.2;
@@ -219,8 +224,55 @@ void outline_triangle() {
     imageStore(outputImage, ivec2(rx, ry), mix(oldc, newc, coverage * min(1.0 / d, 1.0)));
 }
 
+float bone_weight(uint vid) {
+    VertexSkin skin = skinIn[vid - o_ubo.weight_vstart + o_ubo.weight_skinstart];
+    float w = 0.0;
+    for (int i = 0; i < MAX_BONE_INFLUENCES; i++)
+        if (skin.indices[i] == o_ubo.weight_bone) w += skin.weights[i];
+    return w;
+}
+
+vec3 weight_ramp(float w) {
+    w = clamp(w, 0.0, 1.0);
+    vec3 c0 = vec3(0.02, 0.03, 0.40);
+    vec3 c1 = vec3(0.00, 0.55, 0.85);
+    vec3 c2 = vec3(0.10, 0.85, 0.15);
+    vec3 c3 = vec3(0.95, 0.90, 0.10);
+    vec3 c4 = vec3(0.95, 0.10, 0.05);
+    if (w < 0.25) return mix(c0, c1, w / 0.25);
+    if (w < 0.5) return mix(c1, c2, (w - 0.25) / 0.25);
+    if (w < 0.75) return mix(c2, c3, (w - 0.5) / 0.25);
+    return mix(c3, c4, (w - 0.75) / 0.25);
+}
+
+void show_weights() {
+    if (o_ubo.weight_bone == uint(-1) || o_ubo.divisor != 1u) return;
+    RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+    if (rg.tid == uint(-1) || rg.tid < o_ubo.weight_tstart || rg.tid > o_ubo.weight_tend || rg.distance < 0.0) return;
+    int rx = int(gl_GlobalInvocationID.x % o_ubo.image_width);
+    int ry = int(gl_GlobalInvocationID.x / o_ubo.image_width);
+    Ray ray = create_ray(vec2(rx, ry));
+    vec3 p = ray.position + ray.direction * rg.distance;
+    Triangle t = triangleIn[rg.tid];
+    vec3 a = vertexIn[t.a].xyz;
+    vec3 e0 = vertexIn[t.b].xyz - a;
+    vec3 e1 = vertexIn[t.c].xyz - a;
+    vec3 e2 = p - a;
+    float d00 = dot(e0, e0), d01 = dot(e0, e1), d11 = dot(e1, e1), d20 = dot(e2, e0), d21 = dot(e2, e1);
+    float denom = d00 * d11 - d01 * d01;
+    if (abs(denom) < 1e-30) return;
+    float v = clamp((d11 * d20 - d01 * d21) / denom, 0.0, 1.0);
+    float w = clamp((d00 * d21 - d01 * d20) / denom, 0.0, 1.0);
+    float u = clamp(1.0 - v - w, 0.0, 1.0);
+    float weight = u * bone_weight(t.a) + v * bone_weight(t.b) + w * bone_weight(t.c);
+    vec4 oldc = imageLoad(outputImage, ivec2(rx, ry));
+    float shade = clamp(dot(oldc.rgb, vec3(0.299, 0.587, 0.114)) * 1.4, 0.25, 1.0);
+    imageStore(outputImage, ivec2(rx, ry), vec4(weight_ramp(weight) * shade, 1.0));
+}
+
 void main() {
     calculate_highlight_color();
+    show_weights();
     if (o_ubo.divisor == 1.0 && o_ubo.wireframe != 0)
         outline_triangle();
     if (o_ubo.mode == TRIANGLE_SELECT)

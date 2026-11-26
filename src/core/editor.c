@@ -13,6 +13,8 @@
 #include "ui/panels/baking.h"
 #include "ui/panels/edit.h"
 #include "ui/panels/mesh.h"
+#include "ui/panels/timeline.h"
+#include "ui/panels/rigging.h"
 #include <ui/panels/console.h>
 #include <ui/panels/graph.h>
 #include <core/entrypoint.h>
@@ -53,14 +55,19 @@ static void InitEditor() {
     ARRLIST_Panel_add(&g_shared_panels, GenerateConsolePanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateRecordingPanel());
     ARRLIST_Panel_add(&g_shared_panels, GenerateSettingsPanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateTimelinePanel());
+    ARRLIST_Panel_add(&g_shared_panels, GenerateRigPanel());
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, 1250.0f, FALSE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, 350.0f, FALSE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, GetScreenHeight() - 420.0f, TRUE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Edit Selected", 0.0f, FALSE, FALSE, FALSE, TRUE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Rig", 0.0f, FALSE, FALSE, FALSE, TRUE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Mesh", 0.0f, FALSE, FALSE, FALSE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Profiling", 0.0f, FALSE, FALSE, FALSE, TRUE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Console", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, GetScreenHeight() - 290.0f, TRUE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Viewport", 0.0f, FALSE, FALSE, FALSE, FALSE});
+    ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Timeline", 0.0f, FALSE, FALSE, FALSE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){{ 0 }, GetScreenHeight() - 360.0f, TRUE, TRUE, TRUE, FALSE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Overview", 0.0f, FALSE, FALSE, FALSE, TRUE});
     ARRLIST_UIConfig_add(&g_default_ui_config, (UIConfig){"Baking", 0.0f, FALSE, FALSE, FALSE, TRUE});
@@ -79,6 +86,7 @@ static void InitEditor() {
 
 static void UpdateEditor() {
     UpdateUI(g_ui);
+    UpdateRigging();
     if (TrainingScenePhaseNow() == TRAINSCENE_CAPTURING || TrainingScenePhaseNow() == TRAINSCENE_TRAINING) TrainingSceneTick(0.03);
     if (SubsurfaceTrainPhaseNow() == SUBSURFACE_TRAINING) SubsurfaceTrainTick(0.03);
 }

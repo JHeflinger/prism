@@ -411,11 +411,18 @@ typedef struct {
 } VertexSkin;
 DECLARE_ARRLIST(VertexSkin);
 
+#define BONE_FLAG_DEFORM      0b1     // influences the skin (auto weights only consider deforming bones)
+#define BONE_FLAG_CONNECTED   0b10    // head is glued to the parent's tail while editing the rest pose
+#define BONE_FLAG_INITIALIZED 0b100   // tail/flags were computed or authored (imported bones get them on submission)
+#define BONE_FLAG_HIDDEN      0b1000  // not drawn or pickable in the viewport
+
 typedef struct {
     char name[256];
     mat4 inversebind;
     mat4 localbind;
     size_t parent;
+    vec3 tail;
+    uint32_t flags;
 } Bone;
 
 typedef struct {
@@ -424,15 +431,24 @@ typedef struct {
 } Skeleton;
 DECLARE_ARRLIST(Skeleton);
 
+typedef enum {
+    KEY_INTERP_LINEAR = 0,
+    KEY_INTERP_STEP,
+    KEY_INTERP_SMOOTH,
+    KEY_INTERP_COUNT
+} KeyInterpolation;
+
 typedef struct {
-    float time; // keyframe time in ticks
+    float time;
     vec3 value;
+    uint32_t interp; // KeyInterpolation
 } Vec3Key;
 DECLARE_ARRLIST(Vec3Key);
 
 typedef struct {
     float time;
-    versor value; // quaternion (cglm: vec4 xyzw)
+    float value[4]; // quaternion xyzw, using float so 8 byte aligned
+    uint32_t interp;
 } QuatKey;
 DECLARE_ARRLIST(QuatKey);
 
@@ -444,13 +460,40 @@ typedef struct {
 } BoneChannel;
 DECLARE_ARRLIST(BoneChannel);
 
+typedef enum {
+    ANIMATION_IMPORTED = 0,
+    ANIMATION_AUTHORED = 1,
+} AnimationMode;
+
 typedef struct {
     char name[256];
     float duration;
     float tps;
     ARRLIST_BoneChannel channels;
+    uint32_t mode; // AnimationMode
 } Animation;
 DECLARE_ARRLIST(Animation);
+
+typedef struct {
+    vec3 location;
+    float rotation[4]; // quaternion xyzw (plain floats, see QuatKey)
+    vec3 scale;
+} BonePose;
+
+#define MAX_IK_CONSTRAINTS 32
+#define IK_NO_BONE ((uint32_t)-1)
+
+typedef struct {
+    uint32_t enabled;
+    uint32_t bone;
+    uint32_t target;
+    uint32_t pole;
+    uint32_t chain;
+    uint32_t iterations;
+    float influence;
+    float poleangle;
+    uint32_t matchrotation;
+} IKConstraint;
 
 typedef struct {
     size_t meshid;
@@ -468,8 +511,30 @@ typedef struct {
     float bweight;
     float bduration;
     BOOL blending;
+    BOOL synced;
+    BOOL rest;
+    BOOL dirty;
+    float evaltime;
+    size_t evalclip;
+    uint32_t posed[MAX_BONES / 32];
+    BonePose overrides[MAX_BONES];
+    IKConstraint ik[MAX_IK_CONSTRAINTS];
+    uint32_t numik;
+    mat4 locals[MAX_BONES];
+    mat4 globals[MAX_BONES];
 } MeshAnimation;
 DECLARE_ARRLIST(MeshAnimation);
+
+typedef struct {
+    float fps;
+    float start;
+    float end;
+    float frame;
+    BOOL playing;
+    BOOL looping;
+    BOOL autokey;
+    float speed;
+} AnimationTimeline;
 
 typedef struct {
     size_t style;
@@ -582,6 +647,7 @@ typedef struct {
     size_t primarycamera;
     size_t maxprimitives;
     size_t mostprimitives;
+    AnimationTimeline timeline;
 } Geometry;
 
 #endif

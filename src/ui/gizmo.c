@@ -273,10 +273,6 @@ static Color WithAlpha(Color c, float a) {
     return c;
 }
 
-static Vector2 V2(const vec2 v) {
-    return (Vector2){ v[0], v[1] };
-}
-
 static void FillTriangle(Vector2 a, Vector2 b, Vector2 c, Color col) {
     DrawTriangle(a, b, c, col);
     DrawTriangle(a, c, b, col);
@@ -789,6 +785,14 @@ TargetCaps TargetQuery() {
             caps.can[GIZMO_TRANSLATE] = caps.can[GIZMO_ROTATE] = caps.can[GIZMO_SCALE] = TRUE;
             break;
         }
+        case EDIT_BONE: {
+            MeshAnimation* anim = RigActive();
+            RigMode mode = RigGetMode();
+            if (!anim || index >= anim->skeleton.bonecount || (mode != RIG_MODE_EDIT && mode != RIG_MODE_POSE) || !RigViewportActive()) return caps;
+            if (RigActiveMesh() >= NumMeshes() || MeshReference(RigActiveMesh())->disabled) return caps;
+            caps.can[GIZMO_TRANSLATE] = caps.can[GIZMO_ROTATE] = caps.can[GIZMO_SCALE] = TRUE;
+            break;
+        }
         default:
             return caps;
     }
@@ -858,6 +862,24 @@ BOOL TargetFrame(const TargetCaps* caps, GizmoMode mode, TransformSpace space, B
             }
             return TRUE;
         }
+        case EDIT_BONE: {
+            vec3 head, tail;
+            if (!RigBoneWorld(caps->index, head, tail)) return FALSE;
+            BOOL edit = RigGetMode() == RIG_MODE_EDIT;
+            if (edit && RigEditHandle() == EDIT_HANDLE_TAIL) {
+                glm_vec3_copy(tail, out->pivot);
+            } else if (edit && RigEditHandle() == EDIT_HANDLE_BONE && pivot_center && mode == GIZMO_TRANSLATE) {
+                glm_vec3_add(head, tail, out->pivot);
+                glm_vec3_scale(out->pivot, 0.5f, out->pivot);
+            } else {
+                glm_vec3_copy(head, out->pivot);
+            }
+            if (local || mode == GIZMO_SCALE) {
+                vec3 axes[3];
+                if (RigBoneWorldAxes(caps->index, axes)) for (int i = 0; i < 3; i++) glm_vec3_copy(axes[i], out->axes[i]);
+            }
+            return TRUE;
+        }
         default:
             return FALSE;
     }
@@ -901,6 +923,9 @@ void TargetBegin(TargetSnapshot* snap, const TargetCaps* caps, const GizmoFrame*
             }
             break;
         }
+        case EDIT_BONE:
+            RigSnapshotTake(caps->index, &snap->bone);
+            break;
         default: break;
     }
 }
@@ -985,6 +1010,11 @@ void TargetApply(const TargetSnapshot* snap, GizmoMode mode, const GizmoResult* 
             WritePoints(snap, points);
             break;
         }
+        case EDIT_BONE:
+            if (mode == GIZMO_TRANSLATE) RigApplyTranslate(&snap->bone, r->translation);
+            else if (mode == GIZMO_ROTATE) RigApplyRotate(&snap->bone, r->rotation_axis, r->angle);
+            else RigApplyScale(&snap->bone, r->scale);
+            break;
         default: break;
     }
 }
@@ -1011,6 +1041,13 @@ void TargetRestore(const TargetSnapshot* snap) {
         case EDIT_SINGLE_TRIANGLE:
             WritePoints(snap, (vec3*)snap->points);
             break;
+        case EDIT_BONE:
+            RigSnapshotRestore(&snap->bone);
+            break;
         default: break;
     }
+}
+
+void TargetEnd(const TargetSnapshot* snap) {
+    if (snap->type == EDIT_BONE) RigSnapshotCommit(&snap->bone);
 }

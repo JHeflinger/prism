@@ -14,6 +14,7 @@ typedef enum {
     EDIT_MESH,
     EDIT_CAMERA,
     EDIT_TEXTURE,
+    EDIT_BONE,
 } EditType;
 
 BOOL GetEditTarget(EditType* type, size_t* index);
@@ -37,6 +38,8 @@ void SetEditSource(size_t index);
 void SetEditMesh(size_t index);
 
 void SetEditTexture(size_t index);
+
+void SetEditBone(size_t index);
 
 void DeselectEditTarget();
 

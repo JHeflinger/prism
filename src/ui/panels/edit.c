@@ -5,7 +5,10 @@
 #include "renderer/loader.h"
 #include "renderer/rmath.h"
 #include "renderer/texture.h"
+#include "renderer/animation.h"
+#include "renderer/rig.h"
 #include "ui/shared.h"
+#include <data/input.h>
 #include <util/logger.h>
 #include <ui/extra.h>
 #include <easyfile.h>
@@ -95,6 +98,7 @@ static void ExportEditTarget() {
         case EDIT_SINGLE_FORCE: type = PBJ_FORCE; break;
         case EDIT_SINGLE_SOURCE: type = PBJ_SOURCE; break;
         case EDIT_TEXTURE: type = PBJ_TEXTURE; break;
+        case EDIT_BONE: logerror("Bones are exported with their object - select the object and export it"); return;
         default: logerror("Single triangles and vertices can't be exported"); return;
     }
     const char* filepath = GetSaveFile("pbj");
@@ -221,22 +225,43 @@ static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float heig
     UIMoveCursor(0, 15);
     UITextInput("Name", name, MAX_MESH_NAME_SIZE, width - 20, FALSE);
     UIMoveCursor(0, 15);
-    if (md->pose != (uint32_t)-1) {
-        MeshAnimation* anim = AnimationReference(md->pose);
+    if (md->pose != (uint32_t)-1 && md->pose / MAX_BONES < NumAnimations()) {
+        MeshAnimation* anim = AnimationReference(md->pose / MAX_BONES);
         float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
-        UIMoveCursor(0, 15);
-        UIColumnHeader("Animation", LEFT_COLUMN_WIDTH);
-        UIDropdownMenu(sboxwidth, anim->animations.size, anim->names.data, DropdownSelectAnimation, anim);
-        UIColumnHeader("Transition", LEFT_COLUMN_WIDTH);
-        UIDragFloat(&(anim->bduration), 0, FLT_MAX, 0.01f, sboxwidth);
-        UIColumnHeader("Time", LEFT_COLUMN_WIDTH);
-        UIDragFloat(&(anim->time), 0, FLT_MAX, 0.01f, sboxwidth);
-        UIColumnHeader("Loop", LEFT_COLUMN_WIDTH);
-        UICheckbox(&(anim->looping));
-        UIColumnHeader("Play", LEFT_COLUMN_WIDTH);
-        UICheckbox(&(anim->playing));
+        UIDividerLabeled(width, "Animation");
+        UIMoveCursor(0, 5);
+        UIColumnHeader("Rig", LEFT_COLUMN_WIDTH);
+        UIDrawText("%zu bones, %zu clips", anim->skeleton.bonecount, anim->animations.size);
+        if (anim->animations.size > 0) {
+            UIColumnHeader("Animation", LEFT_COLUMN_WIDTH);
+            UIDropdownMenu(sboxwidth, anim->animations.size, anim->names.data, DropdownSelectAnimation, anim);
+        }
         UIColumnHeader("Enable", LEFT_COLUMN_WIDTH);
         UICheckbox(&(anim->enable));
+        UIColumnHeader("Follow Timeline", LEFT_COLUMN_WIDTH);
+        if (UICheckbox(&(anim->synced))) anim->dirty = TRUE;
+        UIColumnHeader("Loop", LEFT_COLUMN_WIDTH);
+        UICheckbox(&(anim->looping));
+        if (!anim->synced) {
+            UIColumnHeader("Transition", LEFT_COLUMN_WIDTH);
+            UIDragFloat(&(anim->bduration), 0, FLT_MAX, 0.01f, sboxwidth);
+            UIColumnHeader("Time", LEFT_COLUMN_WIDTH);
+            UIDragFloat(&(anim->time), 0, FLT_MAX, 0.01f, sboxwidth);
+            UIColumnHeader("Play", LEFT_COLUMN_WIDTH);
+            UICheckbox(&(anim->playing));
+        }
+        if (RigActiveMesh() != g_edit_item_index || !RigViewportActive()) {
+            UIMoveCursor(0, 5);
+            if (UIButton("Pose This Rig (Shift+A)", width - 20)) {
+                RigSetActiveMesh(g_edit_item_index);
+                RigSetMode(RIG_MODE_POSE);
+            }
+        }
+    } else if (!(md->end < md->start || md->end == (VertexID)-1)) {
+        UIMoveCursor(0, 5);
+        if (UIButton("Create Rig", width - 20)) {
+            if (RigCreateForMesh(g_edit_item_index)) RigSetMode(RIG_MODE_EDIT);
+        }
     }
     UIMoveCursor(0, 15);
     UIColumnHeader("Translation", LEFT_COLUMN_WIDTH);
@@ -285,6 +310,228 @@ static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float heig
             BOOL enabled = info.enabled;
             if (UICheckbox(&enabled)) SubsurfaceSetCloudEnabled(g_edit_item_index, enabled);
         }
+    }
+}
+
+static char g_bone_name[256] = { 0 };
+static size_t g_bone_name_for = (size_t)-1;
+static size_t g_bone_name_anim = (size_t)-1;
+static vec3 g_bone_euler = { 0 };
+static float g_bone_euler_quat[4] = { 0, 0, 0, 1 };
+static uint32_t g_ik_chain = 2;
+
+static size_t DropdownSelectBoneParent(void* data, size_t index, BOOL cancel) {
+    MeshAnimation* anim = RigActive();
+    size_t bone = g_edit_item_index;
+    if (!anim || bone >= anim->skeleton.bonecount) return 0;
+    if (index != (size_t)-1 && !cancel) RigSetParent(bone, index == 0 ? (size_t)-1 : index - 1);
+    size_t p = anim->skeleton.bones[bone].parent;
+    return p < anim->skeleton.bonecount ? p + 1 : 0;
+}
+
+static size_t DropdownSelectIKTarget(void* data, size_t index, BOOL cancel) {
+    MeshAnimation* anim = RigActive();
+    size_t c = (size_t)data;
+    if (!anim || c >= anim->numik) return 0;
+    IKConstraint* ik = &(anim->ik[c]);
+    if (index != (size_t)-1 && !cancel) {
+        ik->target = index == 0 ? IK_NO_BONE : (uint32_t)(index - 1);
+        anim->dirty = TRUE;
+    }
+    return ik->target < anim->skeleton.bonecount ? ik->target + 1 : 0;
+}
+
+static size_t DropdownSelectIKPole(void* data, size_t index, BOOL cancel) {
+    MeshAnimation* anim = RigActive();
+    size_t c = (size_t)data;
+    if (!anim || c >= anim->numik) return 0;
+    IKConstraint* ik = &(anim->ik[c]);
+    if (index != (size_t)-1 && !cancel) {
+        ik->pole = index == 0 ? IK_NO_BONE : (uint32_t)(index - 1);
+        anim->dirty = TRUE;
+    }
+    return ik->pole < anim->skeleton.bonecount ? ik->pole + 1 : 0;
+}
+
+static BOOL BoneButton(const char* label, float w) {
+    return UIButton(label, w) && AnimPanelHovered("Edit Selected") && !InputsBlocked();
+}
+
+static void DrawEditBone(size_t bone, float width, float height) {
+    MeshAnimation* anim = RigActive();
+    if (!anim || bone >= anim->skeleton.bonecount) {
+        UIDrawSubtleText("The selected bone no longer exists");
+        return;
+    }
+    Bone* b = &(anim->skeleton.bones[bone]);
+    float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
+    UIMoveCursor((width - 20 - UITextWidth("Edit Bone")) / 2.0f, 0);
+    UIDrawText("Edit Bone");
+    UIMoveCursor(0, 15);
+    size_t aidx = RigActiveAnimation();
+    if (g_bone_name_for != bone || g_bone_name_anim != aidx) {
+        snprintf(g_bone_name, sizeof(g_bone_name), "%s", b->name);
+        g_bone_name_for = bone;
+        g_bone_name_anim = aidx;
+    }
+    if (UITextInput("Name", g_bone_name, sizeof(g_bone_name) - 1, width - 20, FALSE)) {
+        RigRenameBone(bone, g_bone_name);
+        g_bone_name_for = (size_t)-1;
+    }
+    UIDrawSubtleText("press enter to rename (keys follow the bone)");
+    UIMoveCursor(0, 5);
+    size_t nitems = 0;
+    char** items = AnimBoneItems(TRUE, &nitems);
+    UIColumnHeader("Parent", LEFT_COLUMN_WIDTH);
+    UIDropdownMenu(sboxwidth, nitems, items, DropdownSelectBoneParent, NULL);
+    BOOL deform = (b->flags & BONE_FLAG_DEFORM) != 0;
+    UIColumnHeader("Deform", LEFT_COLUMN_WIDTH);
+    if (UICheckbox(&deform)) RigSetBoneFlag(bone, BONE_FLAG_DEFORM, deform);
+    BOOL connected = (b->flags & BONE_FLAG_CONNECTED) != 0;
+    UIColumnHeader("Connected", LEFT_COLUMN_WIDTH);
+    if (UICheckbox(&connected)) RigSetBoneFlag(bone, BONE_FLAG_CONNECTED, connected);
+    BOOL hidden = (b->flags & BONE_FLAG_HIDDEN) != 0;
+    UIColumnHeader("Hidden", LEFT_COLUMN_WIDTH);
+    if (UICheckbox(&hidden)) RigSetBoneFlag(bone, BONE_FLAG_HIDDEN, hidden);
+
+    // pose
+    UIMoveCursor(0, 10);
+    UIDividerLabeled(width, "Pose");
+    UIMoveCursor(0, 5);
+    BonePose pose;
+    BoneCurrentPose(anim, bone, &pose);
+    versor q;
+    memcpy(q, pose.rotation, sizeof(versor));
+    float qd = fabsf(q[0] * g_bone_euler_quat[0] + q[1] * g_bone_euler_quat[1] + q[2] * g_bone_euler_quat[2] + q[3] * g_bone_euler_quat[3]);
+    if (qd < 0.99999f) {
+        mat4 rm;
+        glm_quat_mat4(q, rm);
+        vec3 rad;
+        glm_euler_angles(rm, rad);
+        for (int i = 0; i < 3; i++) g_bone_euler[i] = glm_deg(rad[i]);
+        memcpy(g_bone_euler_quat, q, sizeof(g_bone_euler_quat));
+    }
+    BOOL posed = FALSE;
+    UIColumnHeader("Location", LEFT_COLUMN_WIDTH);
+    posed |= UITriplet("xyz", UI_FLOATS, &(pose.location[0]), &(pose.location[1]), &(pose.location[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
+    UIColumnHeader("Rotation (deg)", LEFT_COLUMN_WIDTH);
+    BOOL rotated = UITriplet("xyz", UI_FLOATS, &(g_bone_euler[0]), &(g_bone_euler[1]), &(g_bone_euler[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.5f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
+    UIColumnHeader("Scale", LEFT_COLUMN_WIDTH);
+    posed |= UITriplet("xyz", UI_FLOATS, &(pose.scale[0]), &(pose.scale[1]), &(pose.scale[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 1.0f }, width - LEFT_COLUMN_WIDTH);
+    if (rotated) {
+        vec3 rad = { glm_rad(g_bone_euler[0]), glm_rad(g_bone_euler[1]), glm_rad(g_bone_euler[2]) };
+        mat4 rm;
+        glm_euler_xyz(rad, rm);
+        versor nq;
+        glm_mat4_quat(rm, nq);
+        memcpy(pose.rotation, nq, sizeof(pose.rotation));
+        memcpy(g_bone_euler_quat, nq, sizeof(g_bone_euler_quat));
+        posed = TRUE;
+    }
+    if (posed) {
+        BoneSetPose(anim, bone, &pose);
+        if (Timeline()->autokey) KeyInsert(anim, bone, Timeline()->frame, KEY_CHANNEL_ALL);
+    }
+    Animation* clip = CurrentClip(anim);
+    BOOL keyed = clip && KeyExists(clip, b->name, AnimationFrameToTicks(clip, Timeline()->frame));
+    UIColumnHeader("State", LEFT_COLUMN_WIDTH);
+    UIDrawSubtleText("%s%s", keyed ? "keyed at this frame" : "not keyed at this frame", BoneIsPosed(anim, bone) ? ", unkeyed changes" : "");
+    UIMoveCursor(0, 5);
+    float half = (width - 30) / 2.0f;
+    Vector2 row = UIGetCursor();
+    if (BoneButton("Insert Key", half)) KeyInsert(anim, bone, Timeline()->frame, KEY_CHANNEL_ALL);
+    UISetCursor(row.x + half + 10, row.y);
+    if (BoneButton("Delete Key", half) && clip) {
+        KeyDelete(clip, b->name, AnimationFrameToTicks(clip, Timeline()->frame));
+        anim->dirty = TRUE;
+    }
+    row = UIGetCursor();
+    if (BoneButton("Reset Pose", half)) {
+        BonePose identity;
+        PoseIdentity(&identity);
+        BoneSetPose(anim, bone, &identity);
+        if (Timeline()->autokey) KeyInsert(anim, bone, Timeline()->frame, KEY_CHANNEL_ALL);
+    }
+    UISetCursor(row.x + half + 10, row.y);
+    if (BoneButton("Revert To Keys", half)) BoneClearOverride(anim, bone);
+
+    // rest
+    UIMoveCursor(0, 10);
+    UIDividerLabeled(width, "Rest Pose");
+    UIMoveCursor(0, 5);
+    vec3 head, tail;
+    RigRestHeadTail(bone, head, tail);
+    float roll = glm_deg(RigBoneRoll(bone));
+    BOOL rest = FALSE;
+    UIColumnHeader("Head", LEFT_COLUMN_WIDTH);
+    rest |= UITriplet("xyz", UI_FLOATS, &(head[0]), &(head[1]), &(head[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
+    UIColumnHeader("Tail", LEFT_COLUMN_WIDTH);
+    rest |= UITriplet("xyz", UI_FLOATS, &(tail[0]), &(tail[1]), &(tail[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
+    UIColumnHeader("Roll (deg)", LEFT_COLUMN_WIDTH);
+    rest |= UIDragFloat(&roll, -FLT_MAX, FLT_MAX, 0.5f, sboxwidth);
+    UIColumnHeader("Length", LEFT_COLUMN_WIDTH);
+    UIDrawText("%.4f", glm_vec3_distance(head, tail));
+    if (rest) RigSetBoneRest(bone, head, tail, glm_rad(roll));
+    UIDrawSubtleText("rest edits keep the mesh in place (weights are not recomputed)");
+
+    // inverse kinematics
+    UIMoveCursor(0, 10);
+    UIDividerLabeled(width, "Inverse Kinematics");
+    UIMoveCursor(0, 5);
+    size_t c = RigFindIK(bone);
+    if (c == (size_t)-1) {
+        UIColumnHeader("Chain Length", LEFT_COLUMN_WIDTH);
+        UIDragUInt(&g_ik_chain, 0, MAX_BONES, 1, sboxwidth);
+        UIDrawSubtleText("bones from this one up (0 = up to the root)");
+        if (BoneButton("Add IK With New Target", width - 20)) {
+            size_t made = RigCreateIKWithTarget(bone, g_ik_chain);
+            if (made != (size_t)-1) {
+                RigSelectBone(anim->ik[made].target, FALSE);
+                SetEditBone(anim->ik[made].target);
+            }
+        }
+        size_t other = (size_t)-1;
+        for (size_t o = 0; o < anim->skeleton.bonecount; o++) if (o != bone && RigBoneSelected(o)) { other = o; break; }
+        if (other != (size_t)-1) {
+            char label[320];
+            snprintf(label, sizeof(label), "Add IK Targeting %.200s", anim->skeleton.bones[other].name);
+            if (BoneButton(label, width - 20)) {
+                size_t made = RigAddIK(bone, other);
+                if (made != (size_t)-1) anim->ik[made].chain = g_ik_chain;
+            }
+        } else {
+            UIDrawSubtleText("shift-select another bone to use it as the target");
+        }
+    } else {
+        IKConstraint* ik = &(anim->ik[c]);
+        BOOL edited = FALSE;
+        BOOL enabled = ik->enabled != 0;
+        UIColumnHeader("Enabled", LEFT_COLUMN_WIDTH);
+        if (UICheckbox(&enabled)) { ik->enabled = enabled ? 1 : 0; edited = TRUE; }
+        UIColumnHeader("Target", LEFT_COLUMN_WIDTH);
+        UIDropdownMenu(sboxwidth, nitems, items, DropdownSelectIKTarget, (void*)c);
+        UIColumnHeader("Pole", LEFT_COLUMN_WIDTH);
+        UIDropdownMenu(sboxwidth, nitems, items, DropdownSelectIKPole, (void*)c);
+        UIColumnHeader("Chain Length", LEFT_COLUMN_WIDTH);
+        edited |= UIDragUInt(&(ik->chain), 0, MAX_BONES, 1, sboxwidth);
+        UIColumnHeader("Iterations", LEFT_COLUMN_WIDTH);
+        edited |= UIDragUInt(&(ik->iterations), 1, 256, 1, sboxwidth);
+        UIColumnHeader("Influence", LEFT_COLUMN_WIDTH);
+        edited |= UIDragFloat(&(ik->influence), 0.0f, 1.0f, 0.01f, sboxwidth);
+        UIColumnHeader("Pole Angle (deg)", LEFT_COLUMN_WIDTH);
+        edited |= UIDragFloat(&(ik->poleangle), -360.0f, 360.0f, 0.5f, sboxwidth);
+        BOOL match = ik->matchrotation != 0;
+        UIColumnHeader("Match Target Rot.", LEFT_COLUMN_WIDTH);
+        if (UICheckbox(&match)) { ik->matchrotation = match ? 1 : 0; edited = TRUE; }
+        if (edited) anim->dirty = TRUE;
+        if (ik->target >= anim->skeleton.bonecount) UIDrawSubtleText("pick a target bone for the chain to reach");
+        else if (SkeletonIsDescendant(&(anim->skeleton), ik->target, ik->bone)) UIDrawSubtleText("warning: the target is a child of the chain");
+        UIMoveCursor(0, 5);
+        if (ik->target < anim->skeleton.bonecount && BoneButton("Select Target", width - 20)) {
+            RigSelectBone(ik->target, FALSE);
+            SetEditBone(ik->target);
+        }
+        if (BoneButton("Remove IK", width - 20)) RigRemoveIK(c);
     }
 }
 
@@ -713,6 +960,8 @@ static void DrawEditPanel(float width, float height) {
             DrawEditCamera(cref, *(CameraNameReference(g_edit_item_index)), width, height);
         } else if (g_edit_type == EDIT_TEXTURE) {
             DrawEditTexture(g_edit_item_index, width, height);
+        } else if (g_edit_type == EDIT_BONE) {
+            DrawEditBone(g_edit_item_index, width, height);
         } else {
             EZ_FATAL("Unhandled edit type detected");
         }
@@ -744,6 +993,7 @@ BOOL GetEditTarget(EditType* type, size_t* index) {
 }
 
 void FixDeleteEditTarget(EditType type, size_t index) {
+    if (type == EDIT_MESH) RigMeshDeleted(index);
     if (!g_item_selected) return;
     if (index > g_edit_item_index) return;
     if (type == g_edit_type) {
@@ -837,6 +1087,15 @@ void SetEditTexture(size_t index) {
     SetSelectedLight((LightID)-1);
 }
 
+void SetEditBone(size_t index) {
+    g_item_selected = TRUE;
+    g_edit_item_index = index;
+    g_edit_type = EDIT_BONE;
+    SetSelectedTriangle((TriangleID)-1);
+    SetSelectedVertex((VertexID)-1);
+    SetSelectedLight((LightID)-1);
+}
+
 void DeselectEditTarget() {
     g_item_selected = FALSE;
     SetSelectedTriangle((TriangleID)-1);
@@ -870,6 +1129,13 @@ void DeleteEditTarget() {
             break;
         case EDIT_TEXTURE:
             if (!DeleteTexture(g_edit_item_index)) return;
+            break;
+        case EDIT_BONE:
+            if (RigGetMode() != RIG_MODE_EDIT) {
+                logwarn("Switch the rig to Edit Rig mode to delete bones");
+                return;
+            }
+            if (!RigDeleteBone(g_edit_item_index)) return;
             break;
         default:
             logerror("Deleting this element has not been supported yet");

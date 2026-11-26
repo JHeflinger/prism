@@ -35,6 +35,14 @@ static void SelectCameraMode() {
     g_overlay_mode = CAMERA_SELECT_MODE;
 }
 
+static void SelectAnimationMode() {
+    g_overlay_mode = ANIMATION_SELECT_MODE;
+}
+
+void SetOverlayMode(OverlayMode mode) {
+    g_overlay_mode = mode;
+}
+
 void SetOverlayContext(Renderer* renderer) {
     g_overlay_renderer_ref = renderer;
     AddBind("no select mode", SelectNoneMode,
@@ -55,6 +63,9 @@ void SetOverlayContext(Renderer* renderer) {
     AddBind("camera select mode", SelectCameraMode,
         (BindCommand){ IK_SELECT, BIND_KEY_DOWN },
         (BindCommand){ IK_SELECT_CAMERA, BIND_KEY_PRESSED });
+    AddBind("animation select mode", SelectAnimationMode,
+        (BindCommand){ IK_SELECT, BIND_KEY_DOWN },
+        (BindCommand){ IK_A_OVERRIDE, BIND_KEY_PRESSED });
 }
 
 void SetViewportRec(Rectangle rec) {

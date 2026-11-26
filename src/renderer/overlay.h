@@ -11,6 +11,7 @@ typedef enum {
     LIGHT_SELECT_MODE = 4,
     OBJECT_SELECT_MODE = 5,
     CAMERA_SELECT_MODE = 6,
+    ANIMATION_SELECT_MODE = 7, // bones of rigged objects are shown and selectable (see renderer/rig.h)
 } OverlayMode;
 
 void SetOverlayContext(Renderer* renderer);
@@ -28,6 +29,8 @@ void SetSelectedTriangle(TriangleID tid);
 TriangleID GetSelectedTriangle();
 
 OverlayMode GetOverlayMode();
+
+void SetOverlayMode(OverlayMode mode);
 
 VertexID HoveredVertex();
 

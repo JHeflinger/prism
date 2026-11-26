@@ -12,6 +12,7 @@ export Definitions {
     #define LIGHT_SELECT 4
     #define OBJECT_SELECT 5
     #define CAMERA_SELECT 6
+    #define ANIMATION_SELECT 7
     #define MAX_CAMERA_GLYPHS 64
     #define EPS 0.000001
     #define DEBUG_NONE 0
@@ -167,6 +168,11 @@ export OverlayUniformBufferObjectDef {
         uint primary_cid;
         uint single_selected_cid;
         vec4 camera_glyphs[MAX_CAMERA_GLYPHS * 4]; // per camera (indexed by camera id): [0] position + tan(half fov x), [1] u + aspect, [2] v + ortho flag, [3] w
+        uint weight_bone;
+        uint weight_tstart;
+        uint weight_tend;
+        uint weight_vstart;
+        uint weight_skinstart;
     }
 }
 

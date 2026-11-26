@@ -69,4 +69,6 @@ void Jacobi3(double a[3][3], double evals[3], double v[3][3]);
 
 void Cholesky3(const double c[3][3], mat3 L);
 
+Vector2 V2(const vec2 v);
+
 #endif

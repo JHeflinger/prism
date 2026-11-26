@@ -376,3 +376,7 @@ void Cholesky3(const double c[3][3], mat3 L) {
     L[1][2] = (float)l21;
     L[2][2] = (float)l22;
 }
+
+Vector2 V2(const vec2 v) {
+    return (Vector2){ v[0], v[1] };
+}
