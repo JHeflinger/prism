@@ -437,6 +437,13 @@ size_t DropdownSelectMaterial(void* data, size_t index, BOOL cancel) {
     return index;
 }
 
+size_t DropdownSelectBaseMaterial(void* data, size_t index, BOOL cancel) {
+    MaterialID* mid = (MaterialID*)data;
+    if (index == (size_t)-1) return *mid;
+    *mid = index;
+    return index;
+}
+
 size_t DropdownSelectLightModel(void* data, size_t index, BOOL cancel) {
     SurfaceMaterial* matref = (SurfaceMaterial*)data;
     if (index == (size_t)-1) {

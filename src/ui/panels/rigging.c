@@ -11,6 +11,7 @@
 #include <data/fonts.h>
 #include <data/input.h>
 #include <util/logger.h>
+#include <core/binds.h>
 
 #define BONE_ROW_HEIGHT 20.0f
 
@@ -80,8 +81,8 @@ static void DrawBoneTree(MeshAnimation* anim, float width) {
         BOOL selected = RigBoneSelected(b);
         BOOL active = RigActiveBone() == b;
         Color bg = (row % 2) ? (Color){ 30, 30, 36, 255 } : (Color){ 35, 35, 42, 255 };
-        if (selected) bg = (Color){ 70, 58, 32, 255 };
-        if (active) bg = (Color){ 96, 76, 36, 255 };
+        if (selected) bg = (Color){ 32, 70, 58, 255 };
+        if (active) bg = (Color){ 36, 96, 76, 255 };
         BOOL over = hovered && CheckCollisionPointRec(mouse, rect);
         if (over && !selected) bg = (Color){ 45, 45, 55, 255 };
         DrawRectangleRec(rect, bg);
@@ -94,7 +95,7 @@ static void DrawBoneTree(MeshAnimation* anim, float width) {
         for (uint32_t i = 0; i < anim->numik; i++) if (anim->ik[i].target == b) { strcat(tags, " target"); break; }
         if (bone->flags & BONE_FLAG_HIDDEN) strcat(tags, " hidden");
         float tagw = tags[0] ? MeasureTextEx(font, tags, 14, 0).x + 6 : 0.0f;
-        Color tc = active ? (Color){ 255, 225, 150, 255 } : (selected ? (Color){ 240, 210, 150, 255 } : MappedColor(UI_TEXT_COLOR));
+        Color tc = active ? (Color){ 150, 255, 225, 255 } : (selected ? (Color){ 150, 240, 210, 255 } : MappedColor(UI_TEXT_COLOR));
         AnimDrawTextClipped(bone->name, x, c.y + 1, 17, rect.width - (x - c.x) - tagw - 14, tc);
         if (tags[0]) DrawTextEx(font, tags, (Vector2){ rect.x + rect.width - tagw - 12, c.y + 3 }, 14, 0, (Color){ 140, 170, 210, 255 });
         if (BoneIsPosed(anim, b)) DrawCircle(rect.x + rect.width - 6, c.y + BONE_ROW_HEIGHT / 2, 3, (Color){ 90, 200, 255, 255 });
@@ -120,13 +121,12 @@ static void DrawRigPanel(float width, float height) {
     size_t meshid = RigActiveMesh();
     MeshAnimation* anim = RigActive();
     if (meshid == (size_t)-1 || meshid >= NumMeshes()) {
-        UIDrawTextWrapped(width - 20, "Select an object (Objects list, or Shift+O object select in the viewport) to rig and animate it.");
+        UISetCursor((width - UITextWidth("No Selected Object"))/2.0f, height / 2.0f - 20);
+        UIDrawText("No Selected Object");
         return;
     }
     UIDrawText("Object: %s", *MeshNameReference(meshid));
     if (!anim) {
-        UIMoveCursor(0, 5);
-        UIDrawTextWrapped(width - 20, "This object has no rig yet. Creating one adds a root bone and binds every vertex to it.");
         UIMoveCursor(0, 5);
         if (Button("Create Rig", width - 20) && RigCreateForMesh(meshid)) RigSetMode(RIG_MODE_EDIT);
         return;
@@ -276,14 +276,26 @@ static void DrawRigPanel(float width, float height) {
     }
 
     UIMoveCursor(0, 15);
-    if (Button("Remove Rig", width - 20)) {
-        if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {
-            DeselectEditTarget();
-            RigRemove(meshid);
-        } else {
-            logwarn("Hold Shift and click \"Remove Rig\" to delete the rig, its weights and clips");
-        }
+    if (Button("Delete Rig", width - 20)) {
+        DeselectEditTarget();
+        RigRemove(meshid);
     }
+}
+
+static BOOL GizmoSwitchCondition() {
+    return RigGetMode() == RIG_MODE_EDIT;
+}
+
+static void GizmoSwitchWhole() {
+    RigSetEditHandle(EDIT_HANDLE_BONE);
+}
+
+static void GizmoSwitchHead() {
+    RigSetEditHandle(EDIT_HANDLE_HEAD);
+}
+
+static void GizmoSwitchTail() {
+    RigSetEditHandle(EDIT_HANDLE_TAIL);
 }
 
 void UpdateRigging() {
@@ -304,5 +316,8 @@ Panel GenerateRigPanel() {
     SetupPanel(&p, "Rig");
     p.draw = DrawRigPanel;
     p.scrollable = TRUE;
+    AddConditionalBind("switch gizmo to whole bone", GizmoSwitchCondition, GizmoSwitchWhole, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_TOGGLE_GIZMOS, BIND_KEY_DOWN }, (BindCommand){ IK_GIZMO_WHOLE, BIND_KEY_PRESSED });
+    AddConditionalBind("switch gizmo to bone head", GizmoSwitchCondition, GizmoSwitchHead, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_TOGGLE_GIZMOS, BIND_KEY_DOWN }, (BindCommand){ IK_GIZMO_HEAD, BIND_KEY_PRESSED });
+    AddConditionalBind("switch gizmo to bone tail", GizmoSwitchCondition, GizmoSwitchTail, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_TOGGLE_GIZMOS, BIND_KEY_DOWN }, (BindCommand){ IK_GIZMO_TAIL, BIND_KEY_PRESSED });
     return p;
 }

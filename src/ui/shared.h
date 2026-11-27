@@ -7,6 +7,8 @@ size_t DropdownSelectSimVisual(void* data, size_t index, BOOL cancel);
 
 size_t DropdownSelectMaterial(void* data, size_t index, BOOL cancel);
 
+size_t DropdownSelectBaseMaterial(void* data, size_t index, BOOL cancel);
+
 size_t DropdownSelectLightModel(void* data, size_t index, BOOL cancel);
 
 size_t DropdownSelectARAPModel(void* data, size_t index, BOOL cancel);

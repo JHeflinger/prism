@@ -536,12 +536,12 @@ static void DrawDopesheet(MeshAnimation* anim, float top, float width, float hei
         size_t bone = g_rows[r];
         BOOL selected = bone != SUMMARY_ROW && RigBoneSelected(bone);
         Color rowbg = (r % 2) ? (Color){ 26, 26, 31, 255 } : (Color){ 29, 29, 35, 255 };
-        if (selected) rowbg = (Color){ 52, 46, 30, 255 };
+        if (selected) rowbg = (Color){ 30, 52, 46, 255 };
         DrawRectangle(left, y, TL_NAME_WIDTH, TL_ROW_HEIGHT, rowbg);
         DrawRectangle(x0, y, x1 - x0, TL_ROW_HEIGHT, (Color){ rowbg.r, rowbg.g, rowbg.b, 120 });
         const char* label = bone == SUMMARY_ROW ? "Summary" : anim->skeleton.bones[bone].name;
         float indent = 6.0f + g_row_depth[r] * 10.0f;
-        Color tc = bone == SUMMARY_ROW ? (Color){ 230, 200, 120, 255 } : (selected ? (Color){ 255, 220, 140, 255 } : MappedColor(UI_TEXT_COLOR));
+        Color tc = bone == SUMMARY_ROW ? (Color){ 120, 230, 200, 255 } : (selected ? (Color){ 140, 255, 220, 255 } : MappedColor(UI_TEXT_COLOR));
         AnimDrawTextClipped(label, left + indent, y + 1, TL_FONT, TL_NAME_WIDTH - indent - 4, tc);
         if (bone != SUMMARY_ROW && BoneIsPosed(anim, bone)) DrawCircle(left + TL_NAME_WIDTH - 7, y + TL_ROW_HEIGHT / 2, 3, (Color){ 90, 200, 255, 255 });
         if (!clip) continue;
@@ -568,17 +568,17 @@ static void DrawDopesheet(MeshAnimation* anim, float top, float width, float hei
     }
     float cx = FrameToX(tl->frame, x0, x1);
     if (cx >= x0 && cx <= x1) {
-        DrawLineEx((Vector2){ cx, top }, (Vector2){ cx, bottom }, 2.0f, (Color){ 255, 140, 40, 255 });
+        DrawLineEx((Vector2){ cx, top }, (Vector2){ cx, bottom }, 2.0f, (Color){ 40, 255, 140, 255 });
         char label[32];
         snprintf(label, sizeof(label), "%.0f", tl->frame);
         float lw = MeasureTextEx(font, label, 13, 0).x + 8;
-        DrawRectangle(cx - lw / 2, top + 1, lw, 16, (Color){ 255, 140, 40, 255 });
+        DrawRectangle(cx - lw / 2, top + 1, lw, 16, (Color){ 40, 255, 140, 255 });
         DrawTextEx(font, label, (Vector2){ cx - lw / 2 + 4, top + 2 }, 13, 0, (Color){ 20, 20, 20, 255 });
     }
     if (g_drag == DRAG_BOX) {
         Rectangle box = { fminf(g_box_start.x, mouse.x), fminf(g_box_start.y, mouse.y), fabsf(mouse.x - g_box_start.x), fabsf(mouse.y - g_box_start.y) };
-        DrawRectangleRec(box, (Color){ 255, 175, 60, 40 });
-        DrawRectangleLinesEx(box, 1.0f, (Color){ 255, 175, 60, 200 });
+        DrawRectangleRec(box, (Color){ 60, 255, 175, 40 });
+        DrawRectangleLinesEx(box, 1.0f, (Color){ 60, 255, 175, 200 });
     }
     DrawLine(x0, top, x0, bottom, (Color){ 60, 60, 70, 255 });
     if (maxscroll > 0.0f) {

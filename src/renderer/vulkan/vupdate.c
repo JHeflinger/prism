@@ -529,30 +529,20 @@ void VUPDT_UniformBuffers(UBOArray* ubos) {
 	// relative mouse coords
     Rectangle viewport_rec = GetViewportRec();
     Vector2 renderer_dimensions = g_vupdt_renderer_ref->dimensions;
-    float diffw = GetScreenWidth() - renderer_dimensions.x;
-    float diffh = GetScreenHeight() - renderer_dimensions.y;
-    float scale = diffh > diffw ? GetScreenHeight() / renderer_dimensions.y : GetScreenWidth() / renderer_dimensions.x;
-    Vector2 scaled_rdims = {
-        renderer_dimensions.x * scale,
-        renderer_dimensions.y * scale
-    };
-    Vector2 offset = {
-        viewport_rec.x + (viewport_rec.width / 2.0f) - (scaled_rdims.x / 2.0f),
-        viewport_rec.y + (viewport_rec.height / 2.0f) - (scaled_rdims.y / 2.0f)
-    };
-    Vector2 relm = {
-        GetMouseX() - offset.x,
-        GetMouseY() - offset.y
-    };
-    // only report a mouse position while it is over the viewport panel; otherwise send an out of image position so the
-    // overlay pass clears any hover (negative coordinates must not be cast straight to uint32_t)
     uint32_t mx = (uint32_t)-1;
     uint32_t my = (uint32_t)-1;
     Vector2 mouse = GetMousePosition();
-    if (CheckCollisionPointRec(mouse, viewport_rec) && relm.x >= 0.0f && relm.y >= 0.0f &&
-        relm.x < scaled_rdims.x && relm.y < scaled_rdims.y) {
-        mx = (uint32_t)((relm.x / scaled_rdims.x) * renderer_dimensions.x);
-        my = (uint32_t)((relm.y / scaled_rdims.y) * renderer_dimensions.y);
+    if (viewport_rec.width > 0.0f && viewport_rec.height > 0.0f && CheckCollisionPointRec(mouse, viewport_rec)) {
+        float diffw = renderer_dimensions.x / viewport_rec.width;
+        float diffh = renderer_dimensions.y / viewport_rec.height;
+        float slice_w = diffw < diffh ? renderer_dimensions.x : renderer_dimensions.y * (viewport_rec.width / viewport_rec.height);
+        float slice_h = diffh < diffw ? renderer_dimensions.y : renderer_dimensions.x * (viewport_rec.height / viewport_rec.width);
+        float px = (renderer_dimensions.x - slice_w) / 2.0f + ((mouse.x - viewport_rec.x) / viewport_rec.width) * slice_w;
+        float py = (renderer_dimensions.y - slice_h) / 2.0f + ((mouse.y - viewport_rec.y) / viewport_rec.height) * slice_h;
+        if (px >= 0.0f && py >= 0.0f && px < renderer_dimensions.x && py < renderer_dimensions.y) {
+            mx = (uint32_t)px;
+            my = (uint32_t)py;
+        }
     }
 
     // check for camera reset

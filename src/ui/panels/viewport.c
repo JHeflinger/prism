@@ -96,8 +96,8 @@ static void DrawBone(const ViewProjection* vp, size_t animid, const MeshAnimatio
     Color base = (Color){ 200, 205, 220, 255 };
     if (!(bone->flags & BONE_FLAG_DEFORM)) base = (Color){ 110, 200, 140, 255 };
     if (IsIKTarget(anim, b)) base = (Color){ 225, 120, 215, 255 };
-    if (selected) base = (Color){ 255, 160, 50, 255 };
-    if (active) base = (Color){ 255, 215, 110, 255 };
+    if (selected) base = (Color){ 50, 205, 170, 255 };
+    if (active) base = (Color){ 0, 255, 170, 255 };
     if (!active_rig) base = (Color){ base.r / 2 + 40, base.g / 2 + 40, base.b / 2 + 40, 255 };
     Color fill = base;
     fill.a = active ? 140 : (selected ? 110 : (active_rig ? 80 : 45));
@@ -216,6 +216,52 @@ static void DrawRig(const ViewProjection* vp, size_t a, RigMode mode) {
         }
 }
 
+static void ViewportModeDraw(float width) {
+    char label[400] = { 0 };
+    Color c = (Color){ 230, 230, 235, 255 };
+    switch (GetOverlayMode()) {
+        case TRIANGLE_SELECT_MODE:
+            snprintf(label, sizeof(label), "SELECT | Face");
+            break;
+        case VERTEX_SELECT_MODE:
+            snprintf(label, sizeof(label), "SELECT | Vertex");
+            break;
+        case SPLAT_SELECT_MODE:
+            snprintf(label, sizeof(label), "SELECT | Splat");
+            break;
+        case LIGHT_SELECT_MODE:
+            snprintf(label, sizeof(label), "SELECT | Light");
+            break;
+        case OBJECT_SELECT_MODE:
+            snprintf(label, sizeof(label), "SELECT | Object");
+            break;
+        case CAMERA_SELECT_MODE:
+            snprintf(label, sizeof(label), "SELECT | Camera");
+            break;
+        case ANIMATION_SELECT_MODE:
+            {
+                MeshAnimation* anim = RigActive();
+                RigMode mode = RigGetMode();
+                const char* names[RIG_MODE_COUNT] = { "EDIT RIG", "POSE", "WEIGHT PAINT" };
+                size_t bone = RigActiveBone();
+                if (anim) {
+                    snprintf(label, sizeof(label), "ANIMATION  |  %s  |  frame %.0f%s%.200s", names[mode], Timeline()->frame,
+                    bone != (size_t)-1 ? "  |  " : "", bone != (size_t)-1 ? anim->skeleton.bones[bone].name : "");
+                } else {
+                    snprintf(label, sizeof(label), "ANIMATION  |  select a bone to pick a rig");
+                }
+                if (mode == RIG_MODE_WEIGHTS) c = (Color){ 255, 210, 120, 255 };
+            }
+            break;
+        default: return;
+    }
+    Font font = FontAsset();
+    Vector2 size = MeasureTextEx(font, label, 16, 0);
+    float x = (width - size.x) * 0.5f;
+    DrawRectangle(x - 8, 6, size.x + 16, 22, (Color){ 0, 0, 0, 150 });
+    DrawTextEx(font, label, (Vector2){ x, 9 }, 16, 0, c);
+}
+
 static void RigViewportDraw(const ViewProjection* vp, float width, float height) {
     if (!RigViewportActive()) return;
     RigMode mode = RigGetMode();
@@ -235,20 +281,6 @@ static void RigViewportDraw(const ViewProjection* vp, float width, float height)
             }
         }
     }
-    const char* names[RIG_MODE_COUNT] = { "EDIT RIG", "POSE", "WEIGHT PAINT" };
-    char label[400];
-    size_t bone = RigActiveBone();
-    if (anim) {
-        snprintf(label, sizeof(label), "ANIMATION  |  %s  |  frame %.0f%s%.200s", names[mode], Timeline()->frame,
-            bone != (size_t)-1 ? "  |  " : "", bone != (size_t)-1 ? anim->skeleton.bones[bone].name : "");
-    } else {
-        snprintf(label, sizeof(label), "ANIMATION  |  click a bone to pick a rig");
-    }
-    Font font = FontAsset();
-    Vector2 size = MeasureTextEx(font, label, 16, 0);
-    float x = (width - size.x) * 0.5f;
-    DrawRectangle(x - 8, 6, size.x + 16, 22, (Color){ 0, 0, 0, 150 });
-    DrawTextEx(font, label, (Vector2){ x, 9 }, 16, 0, mode == RIG_MODE_WEIGHTS ? (Color){ 255, 210, 120, 255 } : (Color){ 230, 230, 235, 255 });
 }
 
 static void PickBone(size_t animid, size_t b, BOOL shift) {
@@ -279,10 +311,6 @@ static BOOL RigViewportUpdate(const ViewProjection* vp, const vec2 mouse, BOOL h
             if (IsKeyPressed(KEY_S)) RigResetPose(RigSelectedCount() > 0, KEY_CHANNEL_SCALE);
             if (IsKeyPressed(KEY_C)) RigCopyPose();
             if (IsKeyPressed(KEY_V) && !shift) RigPastePose(FALSE);
-        }
-        if (mode == RIG_MODE_EDIT && ctrl && IsKeyPressed(KEY_E) && RigActiveBone() != (size_t)-1) {
-            size_t made = RigExtrudeBone(RigActiveBone());
-            if (made != (size_t)-1) { RigSelectBone(made, FALSE); SetEditBone(made); }
         }
         if (mode == RIG_MODE_WEIGHTS) {
             if (IsKeyPressed(KEY_LEFT_BRACKET)) RigBrush()->radius *= 0.85f;
@@ -559,6 +587,7 @@ static void DrawViewportPanel(float width, float height) {
         RigViewportDraw(&vp, width, height);
     }
     if (g_gizmos) DrawViewTools(width, height);
+    ViewportModeDraw(width);
 }
 
 static void SetTranslateMode() {
@@ -786,6 +815,15 @@ static void UpdateViewportPanel(float width, float height) {
     EndTextureMode();
 }
 
+static BOOL ExtrudeBoneCondition() {
+    return RigViewportActive() && RigGetMode() == RIG_MODE_EDIT && RigActiveBone() != (size_t)-1;
+}
+
+static void ExtrudeCurrentBone() {
+    size_t made = RigExtrudeBone(RigActiveBone());
+    if (made != (size_t)-1) { RigSelectBone(made, FALSE); SetEditBone(made); }
+}
+
 Panel GenerateViewportPanel() {
 	Panel p = { 0 };
     SetupPanel(&p, "Viewport");
@@ -814,5 +852,6 @@ Panel GenerateViewportPanel() {
     AddBind("snap to -Y", SnapNYAxis, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_ALIGN_Y, BIND_KEY_PRESSED });
     AddBind("snap to -Z", SnapNZAxis, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_ALIGN_Z, BIND_KEY_PRESSED });
     AddBind("delete selected", DeleteEditTarget, (BindCommand){ IK_DELETE, BIND_KEY_PRESSED });
+    AddConditionalBind("extrude bone", ExtrudeBoneCondition, ExtrudeCurrentBone, (BindCommand){ IK_LEFT_COMMAND, BIND_KEY_DOWN }, (BindCommand){ IK_EXTRUDE, BIND_KEY_PRESSED });
     return p;
 }

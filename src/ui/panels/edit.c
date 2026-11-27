@@ -20,6 +20,7 @@ static BOOL g_item_selected = FALSE;
 static EditType g_edit_type = EDIT_MATERIAL;
 static const char* g_light_types[] = { "Directional", "Spot", "Point", "Environment" };
 static uint32_t g_preview_level = 0;
+static MaterialID g_material_base = 0;
 
 typedef struct {
     SurfaceMaterial* material;
@@ -220,14 +221,62 @@ static void DrawEditLight(SceneLight* lref, char* name, float width, float heigh
 
 static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float height) {
     BOOL edited = FALSE;
+    float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
     UIMoveCursor((width - 20 - UITextWidth("Edit Object")) / 2.0f, 0);
     UIDrawText("Edit Object");
     UIMoveCursor(0, 15);
     UITextInput("Name", name, MAX_MESH_NAME_SIZE, width - 20, FALSE);
     UIMoveCursor(0, 15);
+    UIDividerLabeled(width, "Transformation");
+    UIMoveCursor(0, 15);
+    UIColumnHeader("Translation", LEFT_COLUMN_WIDTH);
+    edited |= UITriplet("xyz", UI_FLOATS, &(md->translate[0]), &(md->translate[1]), &(md->translate[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
+    UIColumnHeader("Rotation", LEFT_COLUMN_WIDTH);
+    edited |= UITriplet("xyz", UI_FLOATS, &(md->rotate[0]), &(md->rotate[1]), &(md->rotate[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
+    UIColumnHeader("Scale", LEFT_COLUMN_WIDTH);
+    edited |= UITriplet("xyz", UI_FLOATS, &(md->scale[0]), &(md->scale[1]), &(md->scale[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 1.0f }, width - LEFT_COLUMN_WIDTH);
+    UIMoveCursor(0, 15);
+    UIColumnHeader("Disable", LEFT_COLUMN_WIDTH);
+    BOOL disabled = md->disabled != 0;
+    UICheckbox(&disabled);
+    edited |= disabled != (md->disabled != 0);
+    md->disabled = disabled;
+    if (edited) UpdateObjectTransform(g_edit_item_index);
+    if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) {
+        UIMoveCursor(0, 15);
+        UIDividerLabeled(width, "Texturing");
+        UIMoveCursor(0, 5);
+        UIColumnHeader("Texture Filtering", LEFT_COLUMN_WIDTH);
+        UIDropdownMenu(sboxwidth, TEXFILTER_COUNT, TextureFilterLabels(), DropdownSelectObjectFilter, md);
+        if (md->filter == TEXFILTER_ANISOTROPIC) {
+            UIColumnHeader("Max Anisotropy", LEFT_COLUMN_WIDTH);
+            uint32_t aniso = md->anisotaps == 0 ? DEFAULT_MAX_ANISOTROPY : md->anisotaps;
+            if (UIDragUInt(&aniso, 1, 64, 1, sboxwidth)) {
+                md->anisotaps = aniso;
+                UpdateMeshes();
+                ResetAccumulation();
+            }
+        }
+        UIColumnHeader("Recursive Ray Diff.", LEFT_COLUMN_WIDTH);
+        BOOL raydiff = md->raydiff != 0;
+        if (UICheckbox(&raydiff)) {
+            md->raydiff = raydiff ? 1 : 0;
+            UpdateMeshes();
+            ResetAccumulation();
+        }
+    }
+    if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) {
+        SubsurfaceCloudInfo info = { 0 };
+        BOOL linked = QuerySubsurfaceCloudInfo(g_edit_item_index, &info);
+        if (linked) {
+            UIColumnHeader("Subsurface cloud", LEFT_COLUMN_WIDTH);
+            BOOL enabled = info.enabled;
+            if (UICheckbox(&enabled)) SubsurfaceSetCloudEnabled(g_edit_item_index, enabled);
+        }
+    }
     if (md->pose != (uint32_t)-1 && md->pose / MAX_BONES < NumAnimations()) {
         MeshAnimation* anim = AnimationReference(md->pose / MAX_BONES);
-        float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
+        UIMoveCursor(0, 15);
         UIDividerLabeled(width, "Animation");
         UIMoveCursor(0, 5);
         UIColumnHeader("Rig", LEFT_COLUMN_WIDTH);
@@ -250,67 +299,24 @@ static void DrawEditMesh(MeshDescriptor* md, char* name, float width, float heig
             UIColumnHeader("Play", LEFT_COLUMN_WIDTH);
             UICheckbox(&(anim->playing));
         }
-        if (RigActiveMesh() != g_edit_item_index || !RigViewportActive()) {
-            UIMoveCursor(0, 5);
-            if (UIButton("Pose This Rig (Shift+A)", width - 20)) {
-                RigSetActiveMesh(g_edit_item_index);
-                RigSetMode(RIG_MODE_POSE);
-            }
-        }
-    } else if (!(md->end < md->start || md->end == (VertexID)-1)) {
-        UIMoveCursor(0, 5);
-        if (UIButton("Create Rig", width - 20)) {
-            if (RigCreateForMesh(g_edit_item_index)) RigSetMode(RIG_MODE_EDIT);
-        }
     }
     UIMoveCursor(0, 15);
-    UIColumnHeader("Translation", LEFT_COLUMN_WIDTH);
-    edited |= UITriplet("xyz", UI_FLOATS, &(md->translate[0]), &(md->translate[1]), &(md->translate[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
-    UIColumnHeader("Rotation", LEFT_COLUMN_WIDTH);
-    edited |= UITriplet("xyz", UI_FLOATS, &(md->rotate[0]), &(md->rotate[1]), &(md->rotate[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 0.0f }, width - LEFT_COLUMN_WIDTH);
-    UIColumnHeader("Scale", LEFT_COLUMN_WIDTH);
-    edited |= UITriplet("xyz", UI_FLOATS, &(md->scale[0]), &(md->scale[1]), &(md->scale[2]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 1.0f }, width - LEFT_COLUMN_WIDTH);
-    UIMoveCursor(0, 15);
-    UIColumnHeader("Disable", LEFT_COLUMN_WIDTH);
-    BOOL disabled = md->disabled != 0;
-    UICheckbox(&disabled);
-    edited |= disabled != (md->disabled != 0);
-    md->disabled = disabled;
-    if (edited) UpdateObjectTransform(g_edit_item_index);
-    if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) {
-        float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
-        UIMoveCursor(0, 15);
-        UIDividerLabeled(width, "Texturing");
-        UIMoveCursor(0, 5);
-        UIColumnHeader("Texture Filtering", LEFT_COLUMN_WIDTH);
-        UIDropdownMenu(sboxwidth, TEXFILTER_COUNT, TextureFilterLabels(), DropdownSelectObjectFilter, md);
-        if (md->filter == TEXFILTER_ANISOTROPIC) {
-            UIColumnHeader("Max Anisotropy", LEFT_COLUMN_WIDTH);
-            uint32_t aniso = md->anisotaps == 0 ? DEFAULT_MAX_ANISOTROPY : md->anisotaps;
-            if (UIDragUInt(&aniso, 1, 64, 1, sboxwidth)) {
-                md->anisotaps = aniso;
-                UpdateMeshes();
-                ResetAccumulation();
-            }
-        }
-        UIColumnHeader("Recursive Ray Diff.", LEFT_COLUMN_WIDTH);
-        BOOL raydiff = md->raydiff != 0;
-        if (UICheckbox(&raydiff)) {
-            md->raydiff = raydiff ? 1 : 0;
-            UpdateMeshes();
-            ResetAccumulation();
-        }
-        UIDrawSubtleText(raydiff ? "Secondary hits filter with propagated differentials" : "Secondary hits sample the base level");
+    UIDividerLabeled(width, "Actions");
+    UIMoveCursor(0, 5);
+    if (g_material_base >= NumMaterials()) g_material_base = 0;
+    disabled = FALSE;
+    if (md->tend < md->tstart || md->tend == (TriangleID)-1) disabled = TRUE;
+    if (disabled) DisableUI();
+    if (UIButton("Reset Material", LEFT_COLUMN_WIDTH - 20)) {
+        for (TriangleID start = md->tstart; start <= md->tend; start++)
+            TriangleReference(start)->material = g_material_base;
+        UpdateTriangles();
+        loginfo("Reset object \"%s\" material to \"%s\"", *MeshNameReference(g_edit_item_index), *MaterialNameReference(g_material_base));
     }
-    if (!(md->tend < md->tstart || md->tend == (TriangleID)-1)) {
-        SubsurfaceCloudInfo info = { 0 };
-        BOOL linked = QuerySubsurfaceCloudInfo(g_edit_item_index, &info);
-        if (linked) {
-            UIColumnHeader("Subsurface cloud", LEFT_COLUMN_WIDTH);
-            BOOL enabled = info.enabled;
-            if (UICheckbox(&enabled)) SubsurfaceSetCloudEnabled(g_edit_item_index, enabled);
-        }
-    }
+    UIMoveCursor(0, -20);
+    UIColumnHeader("", LEFT_COLUMN_WIDTH);
+    UIDropdownMenu(sboxwidth, NumMaterials(), MaterialNameReference(0), DropdownSelectBaseMaterial, &g_material_base);
+    if (disabled) EnableUI();
 }
 
 static char g_bone_name[256] = { 0 };
@@ -378,7 +384,6 @@ static void DrawEditBone(size_t bone, float width, float height) {
         RigRenameBone(bone, g_bone_name);
         g_bone_name_for = (size_t)-1;
     }
-    UIDrawSubtleText("press enter to rename (keys follow the bone)");
     UIMoveCursor(0, 5);
     size_t nitems = 0;
     char** items = AnimBoneItems(TRUE, &nitems);
@@ -433,9 +438,6 @@ static void DrawEditBone(size_t bone, float width, float height) {
         if (Timeline()->autokey) KeyInsert(anim, bone, Timeline()->frame, KEY_CHANNEL_ALL);
     }
     Animation* clip = CurrentClip(anim);
-    BOOL keyed = clip && KeyExists(clip, b->name, AnimationFrameToTicks(clip, Timeline()->frame));
-    UIColumnHeader("State", LEFT_COLUMN_WIDTH);
-    UIDrawSubtleText("%s%s", keyed ? "keyed at this frame" : "not keyed at this frame", BoneIsPosed(anim, bone) ? ", unkeyed changes" : "");
     UIMoveCursor(0, 5);
     float half = (width - 30) / 2.0f;
     Vector2 row = UIGetCursor();
@@ -472,7 +474,6 @@ static void DrawEditBone(size_t bone, float width, float height) {
     UIColumnHeader("Length", LEFT_COLUMN_WIDTH);
     UIDrawText("%.4f", glm_vec3_distance(head, tail));
     if (rest) RigSetBoneRest(bone, head, tail, glm_rad(roll));
-    UIDrawSubtleText("rest edits keep the mesh in place (weights are not recomputed)");
 
     // inverse kinematics
     UIMoveCursor(0, 10);
@@ -482,7 +483,7 @@ static void DrawEditBone(size_t bone, float width, float height) {
     if (c == (size_t)-1) {
         UIColumnHeader("Chain Length", LEFT_COLUMN_WIDTH);
         UIDragUInt(&g_ik_chain, 0, MAX_BONES, 1, sboxwidth);
-        UIDrawSubtleText("bones from this one up (0 = up to the root)");
+        UIMoveCursor(0, 5);
         if (BoneButton("Add IK With New Target", width - 20)) {
             size_t made = RigCreateIKWithTarget(bone, g_ik_chain);
             if (made != (size_t)-1) {
@@ -499,8 +500,6 @@ static void DrawEditBone(size_t bone, float width, float height) {
                 size_t made = RigAddIK(bone, other);
                 if (made != (size_t)-1) anim->ik[made].chain = g_ik_chain;
             }
-        } else {
-            UIDrawSubtleText("shift-select another bone to use it as the target");
         }
     } else {
         IKConstraint* ik = &(anim->ik[c]);
@@ -776,20 +775,9 @@ static void DrawEditPanel(float width, float height) {
             edited |= UITriplet("xyz", UI_FLOATS, &VertexReference(tref->b)[0], &VertexReference(tref->b)[1], &VertexReference(tref->b)[2], (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 0.0f }, width);
             edited |= UITriplet("xyz", UI_FLOATS, &VertexReference(tref->c)[0], &VertexReference(tref->c)[1], &VertexReference(tref->c)[2], (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 0.0f }, width);
             UIMoveCursor(0, 15);
-            UIDividerLabeled(width, "Move Face");
-            UIMoveCursor(0, 5);
-            vec3 old_a;
-            glm_vec3_copy(VertexReference(tref->a), old_a);
-            edited |= UITriplet("xyz", UI_FLOATS, &VertexReference(tref->a)[0], &VertexReference(tref->a)[1], &VertexReference(tref->a)[2], (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 0.0f }, width);
-            UIMoveCursor(0, 35);
-            UIColumnHeader("Material", LEFT_COLUMN_WIDTH);
-            float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
-            UIDropdownMenu(sboxwidth, NumMaterials(), MaterialNameReference(0), DropdownSelectMaterial, tref);
-            UIMoveCursor(0, 15);
             UIDividerLabeled(width, "UVs");
             UIMoveCursor(0, 5);
             if (TriangleHasUVs(*tref) && tref->at < NumUVs() && tref->bt < NumUVs() && tref->ct < NumUVs()) {
-                // uvs can be shared with neighbouring faces, like vertices
                 BOOL uvedited = FALSE;
                 float* ua = UVReference(tref->at);
                 float* ub = UVReference(tref->bt);
@@ -797,7 +785,6 @@ static void DrawEditPanel(float width, float height) {
                 uvedited |= UIDoublet("uv", UI_FLOATS, &(ua[0]), &(ua[1]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 0.0f }, width);
                 uvedited |= UIDoublet("uv", UI_FLOATS, &(ub[0]), &(ub[1]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 0.0f }, width);
                 uvedited |= UIDoublet("uv", UI_FLOATS, &(uc[0]), &(uc[1]), (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.01f }, (UIMultiValue){ ._float = 0.0f }, width);
-                UIDrawSubtleText("uv indices %u, %u, %u", tref->at, tref->bt, tref->ct);
                 if (uvedited) UpdateUVs();
                 UIMoveCursor(0, 5);
                 if (UIButton("Remove UVs", width - 20)) {
@@ -807,7 +794,6 @@ static void DrawEditPanel(float width, float height) {
                     UpdateTriangles();
                 }
             } else {
-                UIDrawSubtleText("No uvs - the material's plain values are used");
                 if (UIButton("Add UVs", width - 20)) {
                     vec2 defaults[3] = { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f } };
                     tref->at = (uint32_t)NumUVs();
@@ -817,6 +803,16 @@ static void DrawEditPanel(float width, float height) {
                     UpdateTriangles();
                 }
             }
+            UIMoveCursor(0, 15);
+            UIDividerLabeled(width, "Move Face");
+            UIMoveCursor(0, 5);
+            vec3 old_a;
+            glm_vec3_copy(VertexReference(tref->a), old_a);
+            edited |= UITriplet("xyz", UI_FLOATS, &VertexReference(tref->a)[0], &VertexReference(tref->a)[1], &VertexReference(tref->a)[2], (UIMultiValue){ ._float = -FLT_MAX }, (UIMultiValue){ ._float = FLT_MAX }, (UIMultiValue){ ._float = 0.1f }, (UIMultiValue){ ._float = 0.0f }, width);
+            UIMoveCursor(0, 35);
+            UIColumnHeader("Material", LEFT_COLUMN_WIDTH);
+            float sboxwidth = width - 20 - LEFT_COLUMN_WIDTH;
+            UIDropdownMenu(sboxwidth, NumMaterials(), MaterialNameReference(0), DropdownSelectMaterial, tref);
             vec3 adiff;
             glm_vec3_sub(VertexReference(tref->a), old_a, adiff);
             glm_vec3_add(VertexReference(tref->b), adiff, VertexReference(tref->b));
